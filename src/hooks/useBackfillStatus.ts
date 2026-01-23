@@ -157,9 +157,12 @@ export function useBackfillStatus({
         ? Math.round((completedChunks / summary.total) * 100) 
         : 0;
       
-      // Estimate ~2.5 minutes per chunk
+      // With parallel processing (3 chunks per 2-min cron), estimate time more accurately
+      const CHUNKS_PER_CRON = 3;
+      const CRON_INTERVAL_MINUTES = 2;
       const remainingChunks = summary.total - completedChunks;
-      const estimatedMinutesRemaining = remainingChunks > 0 ? Math.round(remainingChunks * 2.5) : null;
+      const cronRunsRemaining = Math.ceil(remainingChunks / CHUNKS_PER_CRON);
+      const estimatedMinutesRemaining = remainingChunks > 0 ? Math.round(cronRunsRemaining * CRON_INTERVAL_MINUTES) : null;
 
       return {
         job,

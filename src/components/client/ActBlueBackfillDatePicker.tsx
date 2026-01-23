@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { format, subDays, differenceInDays } from "date-fns";
-import { Calendar, Play, Loader2 } from "lucide-react";
+import { Calendar, Play, Loader2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { V3Button } from "@/components/v3/V3Button";
+import { Badge } from "@/components/ui/badge";
 import {
   Popover,
   PopoverContent,
@@ -36,6 +37,35 @@ const PRESETS: Record<Exclude<PresetKey, "custom">, Preset> = {
   "365d": { label: "Last Year", days: 365 },
 };
 
+/**
+ * Calculate estimated time based on smart chunking and parallel processing
+ */
+function getEstimatedTime(days: number): { minutes: number; isInstant: boolean } {
+  if (days <= 7) {
+    // Instant mode - processed inline
+    return { minutes: 0, isInstant: true };
+  }
+  
+  // Calculate chunks based on smart sizing
+  let chunkSizeDays: number;
+  if (days <= 14) {
+    chunkSizeDays = 15;
+  } else if (days <= 30) {
+    chunkSizeDays = 15;
+  } else if (days <= 90) {
+    chunkSizeDays = 7;
+  } else {
+    chunkSizeDays = 30;
+  }
+  
+  const numChunks = Math.ceil(days / chunkSizeDays);
+  // 3 chunks processed in parallel every 2 minutes
+  const cronRuns = Math.ceil(numChunks / 3);
+  const minutes = cronRuns * 2;
+  
+  return { minutes: Math.max(2, minutes), isInstant: false };
+}
+
 export const ActBlueBackfillDatePicker = ({ onStartBackfill, isStarting }: Props) => {
   const [selectedPreset, setSelectedPreset] = useState<PresetKey>("30d");
   const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined);
@@ -59,6 +89,12 @@ export const ActBlueBackfillDatePicker = ({ onStartBackfill, isStarting }: Props
       startDate: format(subDays(today, daysBack - 1), "yyyy-MM-dd"),
       endDate: format(today, "yyyy-MM-dd"),
     };
+  };
+
+  // Calculate days in range
+  const getDaysInRange = (): number => {
+    const range = getDateRange();
+    return differenceInDays(new Date(range.endDate), new Date(range.startDate)) + 1;
   };
 
   const handlePresetClick = (preset: Exclude<PresetKey, "custom">) => {
@@ -102,6 +138,9 @@ export const ActBlueBackfillDatePicker = ({ onStartBackfill, isStarting }: Props
     return `${format(new Date(range.startDate), "MMM d")} - ${format(new Date(range.endDate), "MMM d, yyyy")} (${days} days)`;
   };
 
+  const days = getDaysInRange();
+  const { minutes: estimatedMinutes, isInstant } = getEstimatedTime(days);
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
@@ -110,18 +149,26 @@ export const ActBlueBackfillDatePicker = ({ onStartBackfill, isStarting }: Props
       
       {/* Preset buttons */}
       <div className="flex flex-wrap gap-2">
-        {(Object.keys(PRESETS) as Exclude<PresetKey, "custom">[]).map((key) => (
-          <Button
-            key={key}
-            variant={selectedPreset === key ? "default" : "outline"}
-            size="sm"
-            onClick={() => handlePresetClick(key)}
-            disabled={isStarting}
-            className="text-xs"
-          >
-            {PRESETS[key].label}
-          </Button>
-        ))}
+        {(Object.keys(PRESETS) as Exclude<PresetKey, "custom">[]).map((key) => {
+          const presetDays = PRESETS[key].days;
+          const { isInstant: presetIsInstant } = getEstimatedTime(presetDays);
+          
+          return (
+            <Button
+              key={key}
+              variant={selectedPreset === key ? "default" : "outline"}
+              size="sm"
+              onClick={() => handlePresetClick(key)}
+              disabled={isStarting}
+              className="text-xs relative"
+            >
+              {PRESETS[key].label}
+              {presetIsInstant && selectedPreset !== key && (
+                <Zap className="h-3 w-3 ml-1 text-[hsl(var(--portal-warning))]" />
+              )}
+            </Button>
+          );
+        })}
         
         {/* Custom date picker */}
         <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
@@ -150,12 +197,25 @@ export const ActBlueBackfillDatePicker = ({ onStartBackfill, isStarting }: Props
         </Popover>
       </div>
 
-      {/* Selected range display */}
-      {selectedPreset === "custom" && customRange?.from && customRange?.to && (
-        <p className="text-xs text-muted-foreground">
-          Selected: {format(customRange.from, "MMM d, yyyy")} – {format(customRange.to, "MMM d, yyyy")}
-        </p>
-      )}
+      {/* Selected range display with time estimate */}
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        {selectedPreset === "custom" && customRange?.from && customRange?.to && (
+          <span>
+            Selected: {format(customRange.from, "MMM d, yyyy")} – {format(customRange.to, "MMM d, yyyy")}
+          </span>
+        )}
+        
+        {isInstant ? (
+          <Badge variant="outline" className="bg-[hsl(var(--portal-success)/0.1)] text-[hsl(var(--portal-success))] border-[hsl(var(--portal-success)/0.3)]">
+            <Zap className="h-3 w-3 mr-1" />
+            Instant Import (~20s)
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">
+            Estimated time: ~{estimatedMinutes} minutes
+          </span>
+        )}
+      </div>
 
       {/* Start button */}
       <V3Button
@@ -172,8 +232,12 @@ export const ActBlueBackfillDatePicker = ({ onStartBackfill, isStarting }: Props
           </>
         ) : (
           <>
-            <Play className="h-4 w-4 mr-2" />
-            Import {getDateRangeLabel()}
+            {isInstant ? (
+              <Zap className="h-4 w-4 mr-2" />
+            ) : (
+              <Play className="h-4 w-4 mr-2" />
+            )}
+            {isInstant ? "Instant Import" : "Import"} {getDateRangeLabel()}
           </>
         )}
       </V3Button>

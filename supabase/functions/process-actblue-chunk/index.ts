@@ -1,15 +1,16 @@
 /**
  * ActBlue Chunk Processor
  * 
- * This function processes ONE chunk at a time from actblue_backfill_chunks:
- * 1. Picks up the next pending/retrying chunk
- * 2. Locks it (sets status to 'processing')
- * 3. Fetches data from ActBlue API for that date range
+ * This function processes MULTIPLE chunks in parallel from actblue_backfill_chunks:
+ * 1. Picks up the next N pending/retrying chunks (default: 3)
+ * 2. Locks them (sets status to 'processing')
+ * 3. Fetches data from ActBlue API for each date range in parallel
  * 4. Processes in batches with upserts
- * 5. Updates chunk status (completed/failed/retrying)
+ * 5. Updates chunk statuses (completed/failed/retrying)
  * 6. Updates overall backfill_status progress
  * 
  * Called by cron every 2 minutes to continuously process chunks
+ * Parallel processing significantly speeds up large backfills
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -17,8 +18,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { getCorsHeaders, validateCronOrAdmin } from "../_shared/security.ts";
 import { createLogger } from "../_shared/logger.ts";
 
-// Retry delays in seconds: 1min, 5min, 15min
-const RETRY_DELAYS = [60, 300, 900];
+// Configuration
+const MAX_PARALLEL_CHUNKS = 3; // Process up to 3 chunks simultaneously
+const RETRY_DELAYS = [60, 300, 900]; // Retry delays in seconds: 1min, 5min, 15min
 
 interface ChunkRecord {
   id: string;
@@ -30,6 +32,16 @@ interface ChunkRecord {
   status: string;
   attempt_count: number;
   max_attempts: number;
+}
+
+interface ChunkResult {
+  chunkId: string;
+  chunkIndex: number;
+  success: boolean;
+  processed?: number;
+  inserted?: number;
+  error?: string;
+  willRetry?: boolean;
 }
 
 /**
@@ -340,6 +352,98 @@ async function processRows(
   return stats;
 }
 
+/**
+ * Process a single chunk - used for parallel execution
+ */
+async function processSingleChunk(
+  supabase: any,
+  chunk: ChunkRecord,
+  credentials: any,
+  logger: ReturnType<typeof createLogger>
+): Promise<ChunkResult> {
+  const chunkLogger = createLogger(`process-chunk-${chunk.chunk_index}`);
+  
+  try {
+    // Fetch data from ActBlue
+    const rows = await fetchActBlueData(
+      credentials.username,
+      credentials.password,
+      chunk.start_date,
+      chunk.end_date,
+      chunkLogger
+    );
+
+    // Process rows
+    const stats = await processRows(supabase, rows, chunk.organization_id, chunkLogger);
+
+    // Mark chunk as completed
+    await supabase
+      .from('actblue_backfill_chunks')
+      .update({
+        status: 'completed',
+        processed_rows: stats.processed,
+        inserted_rows: stats.inserted,
+        updated_rows: stats.updated,
+        skipped_rows: stats.skipped,
+        completed_at: new Date().toISOString(),
+        error_message: null,
+      })
+      .eq('id', chunk.id);
+
+    chunkLogger.info(`Chunk ${chunk.chunk_index} completed`, stats);
+
+    return {
+      chunkId: chunk.id,
+      chunkIndex: chunk.chunk_index,
+      success: true,
+      processed: stats.processed,
+      inserted: stats.inserted,
+    };
+
+  } catch (error: any) {
+    chunkLogger.error(`Chunk ${chunk.chunk_index} failed`, error);
+
+    // Determine if we should retry
+    const newAttemptCount = chunk.attempt_count + 1;
+    const shouldRetry = newAttemptCount < chunk.max_attempts;
+
+    if (shouldRetry) {
+      const retryDelay = RETRY_DELAYS[newAttemptCount - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+      const nextRetryAt = new Date(Date.now() + retryDelay * 1000).toISOString();
+
+      await supabase
+        .from('actblue_backfill_chunks')
+        .update({
+          status: 'retrying',
+          error_message: error.message,
+          next_retry_at: nextRetryAt,
+        })
+        .eq('id', chunk.id);
+
+      chunkLogger.info(`Chunk ${chunk.chunk_index} scheduled for retry at ${nextRetryAt}`);
+    } else {
+      await supabase
+        .from('actblue_backfill_chunks')
+        .update({
+          status: 'failed',
+          error_message: `Failed after ${chunk.max_attempts} attempts: ${error.message}`,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', chunk.id);
+
+      chunkLogger.error(`Chunk ${chunk.chunk_index} permanently failed`);
+    }
+
+    return {
+      chunkId: chunk.id,
+      chunkIndex: chunk.chunk_index,
+      success: false,
+      error: error.message,
+      willRetry: shouldRetry,
+    };
+  }
+}
+
 serve(async (req) => {
   const logger = createLogger('process-actblue-chunk');
   const corsHeaders = getCorsHeaders(req);
@@ -372,14 +476,14 @@ serve(async (req) => {
       // No body provided, that's OK
     }
 
-    // Find next chunk to process
+    // Find next chunks to process (up to MAX_PARALLEL_CHUNKS)
     let query = supabase
       .from('actblue_backfill_chunks')
       .select('*')
       .in('status', ['pending', 'retrying'])
       .or(`next_retry_at.is.null,next_retry_at.lte.${new Date().toISOString()}`)
       .order('chunk_index', { ascending: true })
-      .limit(1);
+      .limit(MAX_PARALLEL_CHUNKS);
 
     if (targetJobId) {
       query = query.eq('job_id', targetJobId);
@@ -400,150 +504,137 @@ serve(async (req) => {
       );
     }
 
-    const chunk: ChunkRecord = chunks[0];
-    logger.info(`Processing chunk ${chunk.chunk_index} for org ${chunk.organization_id}`, {
-      start_date: chunk.start_date,
-      end_date: chunk.end_date,
-      attempt: chunk.attempt_count + 1
-    });
+    logger.info(`Found ${chunks.length} chunks to process in parallel`);
 
-    // Lock the chunk
+    // Group chunks by organization to get credentials once per org
+    const chunksByOrg = new Map<string, ChunkRecord[]>();
+    for (const chunk of chunks) {
+      const orgChunks = chunksByOrg.get(chunk.organization_id) || [];
+      orgChunks.push(chunk as ChunkRecord);
+      chunksByOrg.set(chunk.organization_id, orgChunks);
+    }
+
+    // Lock all chunks first
+    const chunkIds = chunks.map(c => c.id);
     const { error: lockError } = await supabase
       .from('actblue_backfill_chunks')
       .update({
         status: 'processing',
         started_at: new Date().toISOString(),
-        attempt_count: chunk.attempt_count + 1,
       })
-      .eq('id', chunk.id)
-      .eq('status', chunk.status);  // Optimistic lock
+      .in('id', chunkIds)
+      .in('status', ['pending', 'retrying']);
 
     if (lockError) {
-      logger.warn('Failed to lock chunk (likely already taken)', { message: lockError.message, code: lockError.code });
-      return new Response(
-        JSON.stringify({ message: 'Chunk already being processed', processed: false }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      logger.warn('Failed to lock some chunks', { message: lockError.message });
     }
 
-    // Get ActBlue credentials for the organization
-    const { data: credentials, error: credError } = await supabase
-      .from('client_api_credentials')
-      .select('encrypted_credentials')
-      .eq('organization_id', chunk.organization_id)
-      .eq('platform', 'actblue')
-      .eq('is_active', true)
-      .single();
-
-    if (credError || !credentials) {
-      logger.error('No ActBlue credentials found', { orgId: chunk.organization_id });
-      
+    // Update attempt counts
+    for (const chunk of chunks) {
       await supabase
         .from('actblue_backfill_chunks')
-        .update({
-          status: 'failed',
-          error_message: 'No ActBlue credentials found',
-          completed_at: new Date().toISOString(),
-        })
+        .update({ attempt_count: (chunk.attempt_count || 0) + 1 })
         .eq('id', chunk.id);
-      
-      return new Response(
-        JSON.stringify({ error: 'No ActBlue credentials', processed: false }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
 
-    const config = credentials.encrypted_credentials as any;
+    // Get credentials for each organization
+    const credentialsByOrg = new Map<string, any>();
+    for (const orgId of chunksByOrg.keys()) {
+      const { data: credentials, error: credError } = await supabase
+        .from('client_api_credentials')
+        .select('encrypted_credentials')
+        .eq('organization_id', orgId)
+        .eq('platform', 'actblue')
+        .eq('is_active', true)
+        .single();
 
-    try {
-      // Fetch data from ActBlue
-      const rows = await fetchActBlueData(
-        config.username,
-        config.password,
-        chunk.start_date,
-        chunk.end_date,
-        logger
-      );
-
-      // Process rows
-      const stats = await processRows(supabase, rows, chunk.organization_id, logger);
-
-      // Mark chunk as completed
-      await supabase
-        .from('actblue_backfill_chunks')
-        .update({
-          status: 'completed',
-          processed_rows: stats.processed,
-          inserted_rows: stats.inserted,
-          updated_rows: stats.updated,
-          skipped_rows: stats.skipped,
-          completed_at: new Date().toISOString(),
-          error_message: null,
-        })
-        .eq('id', chunk.id);
-
-      // Update overall progress
-      await updateJobProgress(supabase, chunk.job_id, logger);
-
-      logger.info(`Chunk ${chunk.chunk_index} completed`, stats);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          chunk_id: chunk.id,
-          chunk_index: chunk.chunk_index,
-          ...stats
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-
-    } catch (error: any) {
-      logger.error(`Chunk ${chunk.chunk_index} failed`, error);
-
-      // Determine if we should retry
-      const newAttemptCount = chunk.attempt_count + 1;
-      const shouldRetry = newAttemptCount < chunk.max_attempts;
-
-      if (shouldRetry) {
-        const retryDelay = RETRY_DELAYS[newAttemptCount - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
-        const nextRetryAt = new Date(Date.now() + retryDelay * 1000).toISOString();
-
-        await supabase
-          .from('actblue_backfill_chunks')
-          .update({
-            status: 'retrying',
-            error_message: error.message,
-            next_retry_at: nextRetryAt,
-          })
-          .eq('id', chunk.id);
-
-        logger.info(`Chunk ${chunk.chunk_index} scheduled for retry at ${nextRetryAt}`);
+      if (credError || !credentials) {
+        logger.error('No ActBlue credentials found', { orgId });
+        // Mark all chunks for this org as failed
+        const orgChunks = chunksByOrg.get(orgId) || [];
+        for (const chunk of orgChunks) {
+          await supabase
+            .from('actblue_backfill_chunks')
+            .update({
+              status: 'failed',
+              error_message: 'No ActBlue credentials found',
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', chunk.id);
+        }
+        chunksByOrg.delete(orgId);
       } else {
-        await supabase
-          .from('actblue_backfill_chunks')
-          .update({
-            status: 'failed',
-            error_message: `Failed after ${chunk.max_attempts} attempts: ${error.message}`,
-            completed_at: new Date().toISOString(),
-          })
-          .eq('id', chunk.id);
-
-        // Update failed count in job progress
-        await updateJobProgress(supabase, chunk.job_id, logger);
-
-        logger.error(`Chunk ${chunk.chunk_index} permanently failed`);
+        credentialsByOrg.set(orgId, credentials.encrypted_credentials);
       }
-
-      return new Response(
-        JSON.stringify({
-          success: false,
-          chunk_id: chunk.id,
-          error: error.message,
-          will_retry: shouldRetry,
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
+
+    // Process all chunks in parallel
+    const processingPromises: Promise<ChunkResult>[] = [];
+    
+    for (const [orgId, orgChunks] of chunksByOrg) {
+      const credentials = credentialsByOrg.get(orgId);
+      if (!credentials) continue;
+      
+      for (const chunk of orgChunks) {
+        processingPromises.push(
+          processSingleChunk(supabase, chunk, credentials, logger)
+        );
+      }
+    }
+
+    // Wait for all chunks to complete
+    const results = await Promise.allSettled(processingPromises);
+
+    // Compile results
+    const successfulChunks: ChunkResult[] = [];
+    const failedChunks: ChunkResult[] = [];
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        if (result.value.success) {
+          successfulChunks.push(result.value);
+        } else {
+          failedChunks.push(result.value);
+        }
+      } else {
+        // Promise rejected - unexpected error
+        logger.error('Chunk processing promise rejected', { reason: result.reason });
+      }
+    }
+
+    // Update job progress for all affected jobs
+    const jobIds = new Set(chunks.map(c => c.job_id));
+    for (const jobId of jobIds) {
+      await updateJobProgress(supabase, jobId, logger);
+    }
+
+    const totalProcessed = successfulChunks.reduce((sum, r) => sum + (r.processed || 0), 0);
+    const totalInserted = successfulChunks.reduce((sum, r) => sum + (r.inserted || 0), 0);
+
+    logger.info(`Parallel processing complete`, {
+      chunksAttempted: chunks.length,
+      successful: successfulChunks.length,
+      failed: failedChunks.length,
+      totalProcessed,
+      totalInserted,
+    });
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        parallel: true,
+        chunks_attempted: chunks.length,
+        chunks_successful: successfulChunks.length,
+        chunks_failed: failedChunks.length,
+        total_processed: totalProcessed,
+        total_inserted: totalInserted,
+        results: {
+          successful: successfulChunks,
+          failed: failedChunks,
+        },
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error: any) {
     logger.error('Processor error', error);
