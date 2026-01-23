@@ -1,11 +1,20 @@
-import React, { useMemo } from "react";
-import { Users, DollarSign, TrendingUp, RefreshCw, AlertTriangle, MapPin, PieChart } from "lucide-react";
+import React from "react";
+import { Users, DollarSign, TrendingUp, RefreshCw, AlertTriangle, MapPin, BarChart3 } from "lucide-react";
 import { V3Card, V3CardContent, V3CardHeader, V3CardTitle, V3KPICard, V3LoadingState, V3EmptyState } from "@/components/v3";
-import { V3DonutChart, EChartsBarChart } from "@/components/charts/echarts";
+import { V3DonutChart } from "@/components/charts/echarts";
+import { V3BarChart } from "@/components/charts/V3BarChart";
 import { formatCurrency } from "@/lib/chart-formatters";
 import { cn } from "@/lib/utils";
 import type { SegmentDonor, SegmentAggregates } from "@/types/donorSegment";
 import { useVirtualizer } from "@tanstack/react-virtual";
+
+// Format snake_case segment names to Title Case
+const formatSegmentLabel = (name: string): string => {
+  if (!name) return "Unknown";
+  return name
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, l => l.toUpperCase());
+};
 
 interface DonorSegmentResultsProps {
   data: {
@@ -179,28 +188,35 @@ function AggregateView({ aggregates }: { aggregates: SegmentAggregates }) {
           </V3Card>
         )}
 
-        {/* RFM Segment Distribution */}
+        {/* RFM Segment Distribution - Horizontal bar for readability */}
         {aggregates.bySegment.length > 0 && (
           <V3Card>
             <V3CardHeader className="pb-2">
               <V3CardTitle className="text-sm flex items-center gap-2">
-                <PieChart className="h-4 w-4" />
+                <BarChart3 className="h-4 w-4" />
                 RFM Segments
               </V3CardTitle>
             </V3CardHeader>
             <V3CardContent>
-              <EChartsBarChart
-                data={aggregates.bySegment.slice(0, 8)}
-                xAxisKey="name"
-                series={[{ dataKey: "value", name: "Donors" }]}
-                height={220}
+              <V3BarChart
+                data={aggregates.bySegment.map(item => ({
+                  ...item,
+                  name: formatSegmentLabel(item.name)
+                }))}
+                nameKey="name"
+                valueKey="value"
+                valueName="Donors"
+                height={300}
                 valueType="number"
+                horizontal={true}
+                topN={10}
+                maxLabelLength={18}
               />
             </V3CardContent>
           </V3Card>
         )}
 
-        {/* State Distribution */}
+        {/* State Distribution - Horizontal bar for readability */}
         {aggregates.byState.length > 0 && (
           <V3Card>
             <V3CardHeader className="pb-2">
@@ -210,12 +226,15 @@ function AggregateView({ aggregates }: { aggregates: SegmentAggregates }) {
               </V3CardTitle>
             </V3CardHeader>
             <V3CardContent>
-              <EChartsBarChart
-                data={aggregates.byState.slice(0, 8)}
-                xAxisKey="name"
-                series={[{ dataKey: "value", name: "Donors" }]}
-                height={220}
+              <V3BarChart
+                data={aggregates.byState}
+                nameKey="name"
+                valueKey="value"
+                valueName="Donors"
+                height={300}
                 valueType="number"
+                horizontal={true}
+                topN={10}
               />
             </V3CardContent>
           </V3Card>
