@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShieldCheck, Play, Loader2, Trash2 } from 'lucide-react';
+import { X, ShieldCheck, Play, Loader2, Trash2, Activity, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -30,6 +30,9 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CredentialForm, CredentialFormData } from './CredentialForm';
+import { IntegrationHealthPanel } from './IntegrationHealthPanel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 
 interface Organization {
   id: string;
@@ -255,23 +258,89 @@ export function CredentialSlideOver({
 
   const selectedOrgName = organizations.find(o => o.id === selectedOrg)?.name;
 
+  const [activeTab, setActiveTab] = useState<'credentials' | 'diagnostics'>('credentials');
+
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-green-600" />
+              <ShieldCheck className="h-5 w-5 text-[hsl(var(--portal-success))]" />
               {existingCredential ? 'Update' : 'Add'} Integration
             </SheetTitle>
             <SheetDescription>
-              Credentials are encrypted before storage and never displayed after saving.
+              {existingCredential 
+                ? 'View integration health and update credentials as needed.' 
+                : 'Credentials are encrypted before storage and never displayed after saving.'}
             </SheetDescription>
           </SheetHeader>
 
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : existingCredential ? (
+            <div className="py-4">
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'credentials' | 'diagnostics')}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="diagnostics" className="flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    Diagnostics
+                  </TabsTrigger>
+                  <TabsTrigger value="credentials" className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4" />
+                    Update Credentials
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="diagnostics" className="mt-4">
+                  <IntegrationHealthPanel
+                    organizationId={selectedOrg}
+                    platform={platform}
+                    onUpdateCredentials={() => setActiveTab('credentials')}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="credentials" className="mt-4 space-y-6">
+                  {/* Organization (read-only when editing) */}
+                  <div className="space-y-2">
+                    <Label htmlFor="organization">Organization</Label>
+                    <Select 
+                      value={selectedOrg} 
+                      onValueChange={setSelectedOrg}
+                      disabled
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select organization" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {organizations.map(org => (
+                          <SelectItem key={org.id} value={org.id}>
+                            {org.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Credentials Form */}
+                  <div className="space-y-2">
+                    <Label>Update {platform.charAt(0).toUpperCase() + platform.slice(1)} Credentials</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Leave fields empty to keep existing values. Only fill in fields you want to change.
+                    </p>
+                    <CredentialForm
+                      platform={platform}
+                      formData={formData}
+                      onFormDataChange={setFormData}
+                      onPlatformChange={setPlatform}
+                      organizationId={selectedOrg}
+                      disabled={false}
+                    />
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
           ) : (
             <div className="space-y-6 py-6">
@@ -281,7 +350,6 @@ export function CredentialSlideOver({
                 <Select 
                   value={selectedOrg} 
                   onValueChange={setSelectedOrg}
-                  disabled={!!existingCredential}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select organization" />
@@ -305,7 +373,7 @@ export function CredentialSlideOver({
                   onFormDataChange={setFormData}
                   onPlatformChange={setPlatform}
                   organizationId={selectedOrg}
-                  disabled={!!existingCredential}
+                  disabled={false}
                 />
               </div>
             </div>
@@ -323,31 +391,35 @@ export function CredentialSlideOver({
               </Button>
             )}
             <div className="flex-1" />
-            <Button
-              variant="outline"
-              onClick={handleTest}
-              disabled={isTesting || isSaving}
-              className="w-full sm:w-auto"
-            >
-              {isTesting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Play className="h-4 w-4 mr-2" />
-              )}
-              Test
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={isTesting || isSaving}
-              className="w-full sm:w-auto"
-            >
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <ShieldCheck className="h-4 w-4 mr-2" />
-              )}
-              {existingCredential ? 'Update' : 'Save'} Securely
-            </Button>
+            {(activeTab === 'credentials' || !existingCredential) && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleTest}
+                  disabled={isTesting || isSaving}
+                  className="w-full sm:w-auto"
+                >
+                  {isTesting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Play className="h-4 w-4 mr-2" />
+                  )}
+                  Test
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={isTesting || isSaving}
+                  className="w-full sm:w-auto"
+                >
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="h-4 w-4 mr-2" />
+                  )}
+                  {existingCredential ? 'Update' : 'Save'} Securely
+                </Button>
+              </>
+            )}
           </SheetFooter>
         </SheetContent>
       </Sheet>
