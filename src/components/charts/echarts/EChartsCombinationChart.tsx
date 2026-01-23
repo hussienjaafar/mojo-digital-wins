@@ -141,13 +141,17 @@ export const EChartsCombinationChart: React.FC<EChartsCombinationChartProps> = (
           yAxisIndex: s.yAxisIndex ?? 0,
           itemStyle: {
             color: s.color,
-            opacity: s.barOpacity ?? 0.7,
+            opacity: s.barOpacity ?? 0.85,
             borderRadius: [4, 4, 0, 0],
           },
           barMaxWidth: 40,
+          // Disable emphasis/blur to prevent bars from disappearing on hover
           emphasis: {
+            disabled: true,
+          },
+          blur: {
             itemStyle: {
-              opacity: 1,
+              opacity: s.barOpacity ?? 0.85,
             },
           },
         };
