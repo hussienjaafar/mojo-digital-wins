@@ -341,20 +341,22 @@ function FilterValueInput({ filter, fieldDef, onUpdate, disabled }: FilterValueI
 
     case 'select':
     case 'multi-select':
-      const selectedValues = Array.isArray(filter.value) ? filter.value : [];
+      const selectedValues: string[] = Array.isArray(filter.value) 
+        ? filter.value.map(v => String(v)) 
+        : [];
       return (
         <div className="space-y-1 max-h-32 overflow-y-auto">
           {fieldDef.options?.map(option => (
             <label
-              key={option.value}
+              key={String(option.value)}
               className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[hsl(var(--portal-bg-hover))] cursor-pointer"
             >
               <Checkbox
-                checked={selectedValues.includes(option.value)}
+                checked={selectedValues.includes(String(option.value))}
                 onCheckedChange={(checked) => {
                   const newValues: string[] = checked
-                    ? [...selectedValues, option.value]
-                    : selectedValues.filter((v: string) => v !== option.value);
+                    ? [...selectedValues, String(option.value)]
+                    : selectedValues.filter((v) => v !== String(option.value));
                   onUpdate({ value: newValues });
                 }}
                 disabled={disabled}
