@@ -116,6 +116,21 @@ serve(async (req) => {
     const results: any[] = [];
 
     for (const config of configs) {
+      // ============= ENRICHMENT-ONLY MODE =============
+      // When actblue_owns_donation_complete = true, ActBlue's browser pixel handles conversion tracking.
+      // We must NOT send Purchase events via CAPI to avoid duplicate conversions.
+      if (config.actblue_owns_donation_complete === true) {
+        logger.info('Skipping enrichment-only org (ActBlue owns conversion tracking)', { 
+          orgId: config.organization_id 
+        });
+        results.push({ 
+          org: config.organization_id, 
+          queued: 0, 
+          message: 'Enrichment-only mode - ActBlue handles conversion tracking'
+        });
+        continue; // Skip to next organization
+      }
+
     // Find recent transactions with refcode2 that aren't yet in meta_conversion_events
     // Note: We fetch all with refcode2, then filter in code to validate Click ID format
     const { data: transactions, error: txError } = await supabase

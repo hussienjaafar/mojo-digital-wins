@@ -738,27 +738,22 @@ async function enqueueCAPIEvent(
     return;
   }
 
-  // Determine if this is an enrichment-only event (ActBlue owns primary conversion tracking)
-  // When actblue_owns_donation_complete = true, we still send the event to Meta with 
-  // additional matching data (phone, name, address), using a deterministic event_id 
-  // derived from the transaction so Meta can deduplicate via external_id/fbp/fbc.
-  const isEnrichmentOnly = capiConfig.actblue_owns_donation_complete === true;
+  // ============= ENRICHMENT-ONLY MODE =============
+  // When actblue_owns_donation_complete = true, ActBlue's browser pixel handles conversion tracking.
+  // We must NOT send Purchase events via CAPI to avoid duplicate conversions in Meta Ads Manager.
+  // Meta's deduplication is unreliable when data or timing mismatches occur.
+  if (capiConfig.actblue_owns_donation_complete === true) {
+    console.log('[CAPI] ENRICHMENT-ONLY mode active - SKIPPING Purchase event (ActBlue owns conversion tracking)');
+    console.log('[CAPI] Transaction', transactionId, 'will be tracked by ActBlue browser pixel only');
+    return; // Exit completely - do not enqueue any event
+  }
 
   const eventName = capiConfig.donation_event_name || 'Purchase';
   const dedupeKey = generateDedupeKey(eventName, organization_id, transactionId);
 
-  // Generate event_id:
-  // - For enrichment events: Use lineitem_id directly to match ActBlue's pixel event_id
-  //   This enables Meta's deduplication to merge our enriched user_data with ActBlue's event
-  // - For primary events: Use random UUID (we own the conversion tracking)
-  let eventId: string;
-  if (isEnrichmentOnly) {
-    // Use lineitem_id directly - ActBlue's pixel uses this as event_id
-    eventId = String(transactionId);
-    console.log('[CAPI] Enrichment mode - using lineitem_id as event_id:', eventId);
-  } else {
-    eventId = crypto.randomUUID();
-  }
+  // Generate event_id: For primary mode (non-enrichment), use random UUID since we own conversion tracking
+  // Note: Enrichment mode is handled above (early return) - this code only runs for primary mode
+  const eventId = crypto.randomUUID();
 
   // Lookup fbp/fbc from attribution touchpoints
   // Priority: 1) Email match, 2) Refcode match, 3) Time-proximity with truncated prefix match
@@ -1056,7 +1051,7 @@ async function enqueueCAPIEvent(
       pixel_id: capiConfig.pixel_id,
       match_score: matchScore,
       match_quality: matchQuality,
-      is_enrichment_only: isEnrichmentOnly,
+      is_enrichment_only: false, // We already returned early for enrichment mode
       status: 'pending',
       retry_count: 0,
       max_attempts: 5,
@@ -1075,14 +1070,13 @@ async function enqueueCAPIEvent(
     has_fbp: !!fbp,
     has_fbc: !!fbc,
     has_external_id: !!externalId,
-    is_enrichment_only: isEnrichmentOnly,
+    is_enrichment_only: false,
   });
 
   if (insertError) {
     // Log but don't fail the webhook - CAPI is non-critical
     console.error('[CAPI] [DEBUG] INSERT FAILED:', insertError.message, insertError.details, insertError.hint);
   } else {
-    const eventType = isEnrichmentOnly ? 'enrichment' : 'primary';
-    console.log(`[CAPI] [DEBUG] INSERT SUCCESS - Enqueued ${eventType} donation event:`, dedupeKey);
+    console.log(`[CAPI] [DEBUG] INSERT SUCCESS - Enqueued primary donation event:`, dedupeKey);
   }
 }

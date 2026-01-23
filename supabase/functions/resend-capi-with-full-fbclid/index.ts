@@ -71,6 +71,27 @@ serve(async (req) => {
 
     console.log('[RESEND-CAPI] Starting with:', { organization_id, dry_run, limit });
 
+    // ============= ENRICHMENT-ONLY MODE CHECK =============
+    // When actblue_owns_donation_complete = true, we should never have sent Purchase events.
+    // Reject resend requests for these organizations.
+    const { data: capiConfig } = await supabase
+      .from('meta_capi_config')
+      .select('actblue_owns_donation_complete')
+      .eq('organization_id', organization_id)
+      .maybeSingle();
+
+    if (capiConfig?.actblue_owns_donation_complete === true) {
+      console.log('[RESEND-CAPI] Rejected - organization is in enrichment-only mode');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Cannot resend for enrichment-only organizations',
+        message: 'This organization uses ActBlue for conversion tracking. No CAPI Purchase events should be sent.'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // Find events with truncated fbc (sent status, fbc length ≤ 50)
     // Join with actblue_transactions to find full fbclid
     const { data: truncatedEvents, error: queryError } = await supabase
