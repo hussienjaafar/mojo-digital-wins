@@ -37,7 +37,7 @@ const FIELD_MAPPING: Record<string, string> = {
 const CLIENT_SIDE_FIELDS = [
   'segment', 'churn_risk_label', 'predicted_ltv_90', 'predicted_ltv_180',
   'days_since_donation', 'avg_donation', 'rfm_score', 'recency_score',
-  'frequency_score', 'monetary_score', 'donor_tier'
+  'frequency_score', 'monetary_score', 'donor_tier', 'attributed_channel'
 ];
 
 // Apply a single filter to the Supabase query
@@ -119,10 +119,31 @@ function applyClientFilter(donor: SegmentDonor, filter: FilterCondition): boolea
     case 'avg_donation':
       fieldValue = donor.donation_count > 0 ? donor.total_donated / donor.donation_count : 0;
       break;
-    case 'donor_tier':
-      fieldValue = donor.total_donated >= 1000 ? 'major' 
-        : donor.total_donated >= 250 ? 'mid' 
-        : 'grassroots';
+    case 'donor_tier': {
+      // Return array of ALL matching tiers for this donor
+      const tiers: string[] = [];
+      const total = donor.total_donated;
+      const count = donor.donation_count;
+      const daysSince = donor.days_since_donation;
+      
+      // Monetary tiers (mutually exclusive)
+      if (total >= 1000) tiers.push('major');
+      else if (total >= 250) tiers.push('mid');
+      else tiers.push('grassroots');
+      
+      // Engagement tiers (can stack)
+      if (count >= 5) tiers.push('repeat');
+      if (count === 1) tiers.push('one_time');
+      if (daysSince <= 90) tiers.push('active');
+      else if (daysSince <= 180) tiers.push('lapsing');
+      else tiers.push('lapsed');
+      
+      fieldValue = tiers;
+      break;
+    }
+    case 'attributed_channel':
+      // This will be enriched from attribution data later
+      fieldValue = (donor as any).attributed_channels || [];
       break;
     default:
       return true;
@@ -147,8 +168,16 @@ function applyClientFilter(donor: SegmentDonor, filter: FilterCondition): boolea
     case 'lte':
       return typeof fieldValue === 'number' && fieldValue <= (value as number);
     case 'in':
+      // Handle array fieldValue (like donor_tier which returns multiple tiers)
+      if (Array.isArray(fieldValue)) {
+        return Array.isArray(value) && (value as string[]).some(v => fieldValue.includes(v));
+      }
       return Array.isArray(value) && (value as (string | number)[]).includes(fieldValue);
     case 'nin':
+      // Handle array fieldValue
+      if (Array.isArray(fieldValue)) {
+        return Array.isArray(value) && !(value as string[]).some(v => fieldValue.includes(v));
+      }
       return Array.isArray(value) && !(value as (string | number)[]).includes(fieldValue);
     case 'between':
       if (Array.isArray(value) && value.length === 2 && typeof fieldValue === 'number') {
@@ -338,6 +367,7 @@ function calculateAggregates(donors: SegmentDonor[]): SegmentAggregates {
       bySegment: [],
       byChurnRisk: [],
       byTier: [],
+      byChannel: [],
     };
   }
 
@@ -400,6 +430,27 @@ function calculateAggregates(donors: SegmentDonor[]): SegmentAggregates {
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
+  // Channel distribution (from attributed_channels if available)
+  const channelMap = new Map<string, number>();
+  donors.forEach(d => {
+    const channels = (d as any).attributed_channels as string[] || [];
+    if (channels.length > 0) {
+      channels.forEach(ch => {
+        const channelLabel = ch === 'meta' ? 'Meta Ads' 
+          : ch === 'sms' ? 'SMS' 
+          : ch === 'email' ? 'Email' 
+          : ch === 'direct' ? 'Direct' 
+          : ch;
+        channelMap.set(channelLabel, (channelMap.get(channelLabel) || 0) + 1);
+      });
+    } else {
+      channelMap.set('Unknown', (channelMap.get('Unknown') || 0) + 1);
+    }
+  });
+  const byChannel = Array.from(channelMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+
   return {
     totalDonors,
     totalLifetimeValue,
@@ -412,6 +463,7 @@ function calculateAggregates(donors: SegmentDonor[]): SegmentAggregates {
     bySegment,
     byChurnRisk,
     byTier,
+    byChannel,
   };
 }
 
