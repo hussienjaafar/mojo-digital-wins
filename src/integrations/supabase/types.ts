@@ -8846,6 +8846,67 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_donor_segments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          donor_count_snapshot: number | null
+          filters: Json
+          id: string
+          name: string
+          organization_id: string
+          total_value_snapshot: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          donor_count_snapshot?: number | null
+          filters?: Json
+          id?: string
+          name: string
+          organization_id: string
+          total_value_snapshot?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          donor_count_snapshot?: number | null
+          filters?: Json
+          id?: string
+          name?: string
+          organization_id?: string
+          total_value_snapshot?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_donor_segments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_donor_segments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "saved_donor_segments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       scheduled_jobs: {
         Row: {
           circuit_failure_threshold: number | null
