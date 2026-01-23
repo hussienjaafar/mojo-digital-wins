@@ -7,26 +7,14 @@ const corsHeaders = {
 };
 
 /**
- * Calculate Donor LTV (Lifetime Value)
+ * Calculate Donor LTV (Lifetime Value) - Political Fundraising Model v2.0
  * 
- * Uses RFM (Recency, Frequency, Monetary) analysis to:
- * 1. Score each donor based on their giving behavior
- * 2. Predict future LTV at 30/90/180/365 day horizons
- * 3. Calculate churn risk based on recency patterns
- * 4. Segment donors into behavioral categories
+ * Recalibrated for political giving patterns:
+ * - Episodic giving (election cycles, not monthly subscriptions)
+ * - Longer recency thresholds (365+ days is normal)
+ * - Campaign-aware frequency scoring
+ * - Tenure and recurring donor bonuses
  */
-
-interface DonorStats {
-  donor_key: string;
-  donor_email: string;
-  first_donation_date: string;
-  last_donation_date: string;
-  total_donations: number;
-  total_amount: number;
-  avg_amount: number;
-  is_recurring: boolean;
-  days_since_last: number;
-}
 
 interface LTVPrediction {
   organization_id: string;
@@ -48,96 +36,152 @@ interface LTVPrediction {
   calculated_at: string;
 }
 
-// RFM Scoring Functions
+// =============================================================================
+// POLITICAL FUNDRAISING RFM SCORING (v2.0)
+// =============================================================================
+
+/**
+ * Recency Score - Political Fundraising Thresholds
+ * 
+ * Key insight: Political donors give episodically (election cycles),
+ * not monthly like subscription services. A donor who gave 6 months ago
+ * is still engaged; one who gave 2+ years ago is truly dormant.
+ */
 function calculateRecencyScore(daysSinceLast: number): number {
-  // Lower days = higher score (more recent = better)
-  if (daysSinceLast <= 7) return 5;
-  if (daysSinceLast <= 30) return 4;
-  if (daysSinceLast <= 90) return 3;
-  if (daysSinceLast <= 180) return 2;
-  return 1;
+  if (daysSinceLast <= 30) return 5;    // Active campaign donor
+  if (daysSinceLast <= 90) return 4;    // Recent quarter donor
+  if (daysSinceLast <= 365) return 3;   // Within election cycle (normal!)
+  if (daysSinceLast <= 730) return 2;   // Previous cycle donor
+  return 1;                              // Dormant (2+ years)
 }
 
-function calculateFrequencyScore(donationCount: number): number {
-  if (donationCount >= 10) return 5;
-  if (donationCount >= 5) return 4;
-  if (donationCount >= 3) return 3;
-  if (donationCount >= 2) return 2;
-  return 1;
+/**
+ * Frequency Score - Political Fundraising Thresholds
+ * 
+ * Most political donors give 1-3 times per cycle. High frequency
+ * is 4+ donations, indicating a sustainer-level engagement.
+ */
+function calculateFrequencyScore(donationCount: number, daysSinceLast: number): number {
+  if (donationCount >= 6) return 5;   // Super engaged (sustainer-level)
+  if (donationCount >= 4) return 4;   // Highly engaged
+  if (donationCount >= 2) return 3;   // Multiple-time donor (good!)
+  // Single donation - differentiate recent vs old
+  if (donationCount === 1 && daysSinceLast <= 365) return 2; // Recent first-timer
+  return 1;                            // One-time dormant
 }
 
+/**
+ * Monetary Score - Thresholds for political giving
+ */
 function calculateMonetaryScore(avgAmount: number): number {
-  if (avgAmount >= 250) return 5;
-  if (avgAmount >= 100) return 4;
-  if (avgAmount >= 50) return 3;
-  if (avgAmount >= 25) return 2;
-  return 1;
+  if (avgAmount >= 500) return 5;    // Major donor
+  if (avgAmount >= 100) return 4;    // Strong donor
+  if (avgAmount >= 50) return 3;     // Solid donor
+  if (avgAmount >= 25) return 2;     // Entry-level donor
+  return 1;                           // Micro donor
 }
 
-function calculateChurnRisk(recencyScore: number, frequencyScore: number, isRecurring: boolean): number {
-  // Lower recency (longer time since last) = higher churn risk
-  // Lower frequency = higher churn risk
-  // Recurring donors have lower base churn risk
+/**
+ * Churn Risk - Political-Aware Formula
+ * 
+ * Key changes from e-commerce model:
+ * - Reduced recency weight (0.10 vs 0.15) - gaps are normal
+ * - Reduced frequency weight (0.08 vs 0.10)
+ * - Significant recurring donor discount (0.25)
+ * - Long-tenure donor bonus (0.10 for 2+ year relationship)
+ * - Multi-time donor bonus (0.10)
+ */
+function calculateChurnRisk(
+  recencyScore: number, 
+  frequencyScore: number, 
+  isRecurring: boolean,
+  tenureDays: number
+): number {
+  // Base risk from RFM (weighted less aggressively for political)
+  let risk = (6 - recencyScore) * 0.10 + (6 - frequencyScore) * 0.08;
   
-  const baseRisk = (6 - recencyScore) * 0.15 + (6 - frequencyScore) * 0.10;
-  const recurringDiscount = isRecurring ? 0.2 : 0;
+  // Recurring donors are much more stable
+  if (isRecurring) risk -= 0.25;
   
-  return Math.min(1, Math.max(0, baseRisk - recurringDiscount));
+  // Long-tenure donors get benefit of the doubt
+  if (tenureDays > 730) risk -= 0.10; // 2+ year relationship
+  
+  // Multi-time donors are inherently more loyal
+  if (frequencyScore >= 3) risk -= 0.10;
+  
+  return Math.min(1, Math.max(0, risk));
 }
 
+/**
+ * Churn Risk Labels - Adjusted thresholds
+ */
 function getChurnRiskLabel(churnRisk: number): string {
-  if (churnRisk >= 0.7) return 'high';
-  if (churnRisk >= 0.4) return 'medium';
+  if (churnRisk >= 0.6) return 'high';
+  if (churnRisk >= 0.3) return 'medium';
   return 'low';
 }
 
-function getDonorSegment(rScore: number, fScore: number, mScore: number): string {
-  const rfm = rScore * 100 + fScore * 10 + mScore;
-  
-  // Champions: High R, High F, High M
+/**
+ * Donor Segments - Political-Specific Categories
+ */
+function getDonorSegment(
+  rScore: number, 
+  fScore: number, 
+  mScore: number, 
+  isRecurring: boolean
+): string {
+  // Champions: High across all dimensions
   if (rScore >= 4 && fScore >= 4 && mScore >= 4) return 'champion';
   
-  // Loyal Customers: High F
+  // Sustainers: Recurring donors with recent activity (political-specific)
+  if (isRecurring && rScore >= 3) return 'sustainer';
+  
+  // Major Donors: High monetary regardless of frequency
+  if (mScore === 5 && rScore >= 3) return 'major_donor';
+  
+  // Loyal: High frequency
   if (fScore >= 4) return 'loyal';
   
-  // Potential Loyalists: High R, Medium F
+  // Potential Loyalists: Recent + some frequency
   if (rScore >= 4 && fScore >= 2) return 'potential_loyalist';
   
-  // Recent Donors: High R, Low F
-  if (rScore >= 4 && fScore === 1) return 'new_donor';
+  // New Donors: Recent first-time
+  if (rScore >= 4 && fScore <= 2) return 'new_donor';
   
-  // At Risk: Low R, High F (used to be active)
+  // Cycle Donors: Not recent but gave multiple times (normal for political!)
+  if (rScore === 3 && fScore >= 2) return 'cycle_donor';
+  
+  // At Risk: Used to be active, now fading
   if (rScore <= 2 && fScore >= 3) return 'at_risk';
   
-  // Hibernating: Low R, Low F
-  if (rScore <= 2 && fScore <= 2) return 'hibernating';
+  // Lapsed: Previous cycle donor, low frequency
+  if (rScore === 2 && fScore <= 2) return 'lapsed';
   
-  // Can't Lose: Low R, Very High F, High M
+  // Dormant: Very long time since donation
+  if (rScore === 1) return 'dormant';
+  
+  // Can't Lose: Low recency but very high value
   if (rScore <= 2 && fScore >= 4 && mScore >= 4) return 'cant_lose';
-  
-  // About to Sleep: Medium R, Low F
-  if (rScore === 3 && fScore <= 2) return 'about_to_sleep';
-  
-  // Need Attention
-  if (rScore === 3 && fScore === 3) return 'need_attention';
-  
-  // Promising
-  if (rScore >= 3 && fScore === 1 && mScore >= 3) return 'promising';
   
   return 'other';
 }
 
+/**
+ * Predict LTV - Political-Aware Model
+ * 
+ * Key changes:
+ * - 365-day half-life (not 180) for recency decay
+ * - Higher monthly prediction for recurring donors
+ * - Multi-time donor loyalty boost
+ */
 function predictLTV(
   avgAmount: number, 
   frequency: number, 
   daysSinceLast: number, 
   tenureDays: number,
   isRecurring: boolean,
-  horizon: number // days to predict
+  horizon: number
 ): number {
-  // Simple predictive model based on historical patterns
-  // In production, this would use ML models trained on historical data
-  
   if (tenureDays === 0) tenureDays = 1;
   
   // Calculate donation rate (donations per day)
@@ -146,24 +190,30 @@ function predictLTV(
   // Predict future donations in horizon
   let predictedDonations = dailyRate * horizon;
   
-  // Apply recency decay - donors who haven't given recently are less likely
-  const recencyFactor = Math.exp(-daysSinceLast / 180); // 180-day half-life
+  // Use 365-day half-life for political giving (episodic)
+  const recencyFactor = Math.exp(-daysSinceLast / 365);
   predictedDonations *= recencyFactor;
   
-  // Recurring donors get a boost
+  // Recurring donors: predictable monthly giving
   if (isRecurring) {
     const monthsInHorizon = horizon / 30;
-    predictedDonations = Math.max(predictedDonations, monthsInHorizon * 0.8);
+    predictedDonations = Math.max(predictedDonations, monthsInHorizon * 0.9);
+  }
+  
+  // Multi-time donors get a loyalty boost
+  if (frequency >= 3) {
+    predictedDonations *= 1.2;
   }
   
   // Apply floor and ceiling
-  predictedDonations = Math.max(0, Math.min(predictedDonations, horizon / 7)); // Max 1 donation per week
+  predictedDonations = Math.max(0, Math.min(predictedDonations, horizon / 7));
   
-  // Calculate predicted value
-  const predictedLTV = predictedDonations * avgAmount;
-  
-  return Math.round(predictedLTV * 100) / 100;
+  return Math.round(predictedDonations * avgAmount * 100) / 100;
 }
+
+// =============================================================================
+// MAIN HANDLER
+// =============================================================================
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -184,13 +234,13 @@ serve(async (req) => {
       throw new Error('organization_id is required');
     }
 
-    console.log(`[DONOR LTV] Starting calculation for org ${organization_id}`);
+    console.log(`[DONOR LTV v2.0] Starting calculation for org ${organization_id}`);
 
     const now = new Date();
     const predictions: LTVPrediction[] = [];
 
     // 1. Fetch donor aggregates from actblue_transactions
-    console.log('[DONOR LTV] Aggregating donor statistics...');
+    console.log('[DONOR LTV v2.0] Aggregating donor statistics...');
     
     const { data: donorStats, error: statsError } = await supabase
       .from('actblue_transactions')
@@ -205,7 +255,7 @@ serve(async (req) => {
     }
 
     if (!donorStats || donorStats.length === 0) {
-      console.log('[DONOR LTV] No transactions found');
+      console.log('[DONOR LTV v2.0] No transactions found');
       return new Response(
         JSON.stringify({ success: true, donors_processed: 0, message: 'No transactions to process' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -233,7 +283,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[DONOR LTV] Processing ${donorMap.size} unique donors`);
+    console.log(`[DONOR LTV v2.0] Processing ${donorMap.size} unique donors`);
 
     // 3. Calculate RFM and LTV for each donor
     for (const [email, data] of donorMap.entries()) {
@@ -259,20 +309,20 @@ serve(async (req) => {
       const tenureDays = Math.floor((now.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24));
       const isRecurring = donations.some(d => d.isRecurring);
 
-      // RFM Scores
+      // RFM Scores (Political v2.0)
       const rScore = calculateRecencyScore(daysSinceLast);
-      const fScore = calculateFrequencyScore(donations.length);
+      const fScore = calculateFrequencyScore(donations.length, daysSinceLast);
       const mScore = calculateMonetaryScore(avgAmount);
       const rfmScore = rScore * 100 + fScore * 10 + mScore;
 
-      // Churn Risk
-      const churnRisk = calculateChurnRisk(rScore, fScore, isRecurring);
+      // Churn Risk (Political v2.0)
+      const churnRisk = calculateChurnRisk(rScore, fScore, isRecurring, tenureDays);
       const churnRiskLabel = getChurnRiskLabel(churnRisk);
 
-      // Segment
-      const segment = getDonorSegment(rScore, fScore, mScore);
+      // Segment (Political v2.0)
+      const segment = getDonorSegment(rScore, fScore, mScore, isRecurring);
 
-      // LTV Predictions
+      // LTV Predictions (Political v2.0)
       const ltv30 = predictLTV(avgAmount, donations.length, daysSinceLast, tenureDays, isRecurring, 30);
       const ltv90 = predictLTV(avgAmount, donations.length, daysSinceLast, tenureDays, isRecurring, 90);
       const ltv180 = predictLTV(avgAmount, donations.length, daysSinceLast, tenureDays, isRecurring, 180);
@@ -282,7 +332,7 @@ serve(async (req) => {
       const confidenceScore = Math.min(1, 
         0.3 + // Base confidence
         (donations.length > 5 ? 0.3 : donations.length * 0.06) + // More donations = higher confidence
-        (tenureDays > 180 ? 0.2 : tenureDays / 900) + // Longer tenure = higher confidence
+        (tenureDays > 365 ? 0.2 : tenureDays / 1825) + // Longer tenure = higher confidence (now 1 year threshold)
         (isRecurring ? 0.2 : 0) // Recurring = higher confidence
       );
 
@@ -301,14 +351,14 @@ serve(async (req) => {
         monetary_total: Math.round(totalAmount * 100) / 100,
         rfm_score: rfmScore,
         segment,
-        model_version: 'rfm_v1.0',
+        model_version: 'political_rfm_v2.0',
         confidence_score: Math.round(confidenceScore * 100) / 100,
         calculated_at: now.toISOString(),
       });
     }
 
     // 4. Upsert predictions in batches
-    console.log(`[DONOR LTV] Upserting ${predictions.length} predictions...`);
+    console.log(`[DONOR LTV v2.0] Upserting ${predictions.length} predictions...`);
     let upsertedCount = 0;
     let errorCount = 0;
 
@@ -320,7 +370,7 @@ serve(async (req) => {
         .upsert(batch, { onConflict: 'organization_id,donor_key' });
 
       if (upsertError) {
-        console.error(`[DONOR LTV] Batch upsert error:`, upsertError);
+        console.error(`[DONOR LTV v2.0] Batch upsert error:`, upsertError);
         errorCount += batch.length;
       } else {
         upsertedCount += batch.length;
@@ -338,7 +388,9 @@ serve(async (req) => {
       return acc;
     }, {} as Record<string, number>);
 
-    const avgLTV90 = predictions.reduce((sum, p) => sum + p.predicted_ltv_90, 0) / predictions.length;
+    const avgLTV90 = predictions.length > 0 
+      ? predictions.reduce((sum, p) => sum + p.predicted_ltv_90, 0) / predictions.length
+      : 0;
 
     // 6. Update processing checkpoint
     try {
@@ -347,17 +399,20 @@ serve(async (req) => {
         p_records_processed: upsertedCount,
         p_checkpoint_data: {
           organization_id,
+          model_version: 'political_rfm_v2.0',
           segments: segmentCounts,
           churn_risk_distribution: riskCounts,
           avg_ltv_90: Math.round(avgLTV90 * 100) / 100,
         },
       });
     } catch (checkpointError) {
-      console.warn('[DONOR LTV] Failed to update checkpoint:', checkpointError);
+      console.warn('[DONOR LTV v2.0] Failed to update checkpoint:', checkpointError);
     }
 
     const duration = Date.now() - startTime;
-    console.log(`[DONOR LTV] Complete. Processed ${upsertedCount} donors in ${duration}ms`);
+    console.log(`[DONOR LTV v2.0] Complete. Processed ${upsertedCount} donors in ${duration}ms`);
+    console.log(`[DONOR LTV v2.0] Churn distribution: ${JSON.stringify(riskCounts)}`);
+    console.log(`[DONOR LTV v2.0] Segment distribution: ${JSON.stringify(segmentCounts)}`);
 
     return new Response(
       JSON.stringify({
@@ -365,6 +420,7 @@ serve(async (req) => {
         donors_processed: upsertedCount,
         errors: errorCount,
         duration_ms: duration,
+        model_version: 'political_rfm_v2.0',
         summary: {
           segments: segmentCounts,
           churn_risk: riskCounts,
@@ -375,7 +431,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('[DONOR LTV] Error:', error);
+    console.error('[DONOR LTV v2.0] Error:', error);
     
     // Log failure
     try {
@@ -386,7 +442,7 @@ serve(async (req) => {
       await supabase.rpc('log_job_failure', {
         p_function_name: 'calculate-donor-ltv',
         p_error_message: error instanceof Error ? error.message : String(error),
-        p_context: {},
+        p_context: { model_version: 'political_rfm_v2.0' },
       });
     } catch (_) { /* ignore */ }
 
