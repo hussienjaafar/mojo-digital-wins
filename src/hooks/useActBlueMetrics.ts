@@ -112,6 +112,141 @@ export const actBlueMetricsKeys = {
     [...actBlueMetricsKeys.all, 'health', orgId] as const,
 };
 
+// ==================== RPC Response Types (match database output) ====================
+
+interface RPCSummary {
+  gross_donations: number;
+  net_donations: number;
+  total_fees: number;
+  refunds: number;
+  donation_count: number;
+  refund_count: number;
+  recurring_count: number;
+  recurring_revenue: number;
+  unique_donors: number;
+}
+
+interface RPCDaily {
+  day: string;
+  gross_donations: number;
+  net_donations: number;
+  donation_count: number;
+  unique_donors?: number;
+  recurring_count?: number;
+  recurring_revenue?: number;
+}
+
+interface RPCChannel {
+  channel: string;
+  revenue: number;
+  count: number;
+  donors?: number;
+}
+
+interface RPCResponse {
+  summary: RPCSummary;
+  daily: RPCDaily[];
+  channels: RPCChannel[];
+  timezone: string;
+}
+
+// ==================== Data Transformation ====================
+
+/**
+ * Transforms the RPC response (database field names) to frontend interface names.
+ * This is necessary because the database uses snake_case and different naming conventions.
+ */
+function transformRPCResponse(
+  raw: RPCResponse,
+  startDate: string,
+  endDate: string
+): ActBlueMetricsData {
+  const summary = raw.summary || {} as RPCSummary;
+  
+  const totalDonations = summary.donation_count || 0;
+  const totalRaised = summary.gross_donations || 0;
+  const totalNet = summary.net_donations || 0;
+  const uniqueDonors = summary.unique_donors || 0;
+  const averageDonation = totalDonations > 0 ? totalRaised / totalDonations : 0;
+  const recurringCount = summary.recurring_count || 0;
+  const recurringAmount = summary.recurring_revenue || 0;
+  const recurringRate = totalDonations > 0 ? (recurringCount / totalDonations) * 100 : 0;
+  const refundCount = summary.refund_count || 0;
+  const refundAmount = summary.refunds || 0;
+  const refundRate = totalDonations > 0 ? (refundCount / totalDonations) * 100 : 0;
+
+  // Transform daily data
+  const dailyRollup: ActBlueDailyRollup[] = (raw.daily || []).map(d => ({
+    date: d.day,
+    donations: d.donation_count || 0,
+    raised: d.gross_donations || 0,
+    net: d.net_donations || 0,
+    donors: d.unique_donors || 0,
+    recurring_donations: d.recurring_count || 0,
+    recurring_amount: d.recurring_revenue || 0,
+  }));
+
+  // Transform channel breakdown
+  const channelBreakdown: ActBlueChannelBreakdown[] = (raw.channels || []).map(c => ({
+    channel: c.channel as AttributionChannel,
+    donations: c.count || 0,
+    raised: c.revenue || 0,
+    net: c.revenue || 0, // Approximate - fees not broken down by channel
+    donors: c.donors || 0,
+  }));
+
+  // Calculate attribution metrics from channel data
+  const attributedCount = channelBreakdown
+    .filter(c => c.channel !== 'unattributed' && c.channel !== 'other')
+    .reduce((sum, c) => sum + c.donations, 0);
+
+  return {
+    summary: {
+      totalDonations,
+      totalRaised,
+      totalNet,
+      totalFees: summary.total_fees || 0,
+      uniqueDonors,
+      averageDonation,
+      recurringCount,
+      recurringAmount,
+      recurringRate,
+      refundCount,
+      refundAmount,
+      refundRate,
+    },
+    dailyRollup,
+    channelBreakdown,
+    previousPeriod: {
+      totalDonations: 0,
+      totalRaised: 0,
+      totalNet: 0,
+      uniqueDonors: 0,
+      recurringCount: 0,
+      recurringAmount: 0,
+    },
+    trends: {
+      raisedTrend: null,
+      donationsTrend: null,
+      donorsTrend: null,
+      recurringTrend: null,
+    },
+    attribution: {
+      attributedCount,
+      totalCount: totalDonations,
+      attributionRate: totalDonations > 0 ? Math.round((attributedCount / totalDonations) * 100) : 0,
+    },
+    metadata: {
+      timezone: raw.timezone || 'America/New_York',
+      startDate,
+      endDate,
+      previousStartDate: '',
+      previousEndDate: '',
+      generatedAt: new Date().toISOString(),
+    },
+  };
+}
+
 // ==================== Data Fetching ====================
 
 async function fetchActBlueMetrics(
@@ -138,7 +273,8 @@ async function fetchActBlueMetrics(
     throw new Error('No data returned from get_actblue_dashboard_metrics');
   }
 
-  return data as unknown as ActBlueMetricsData;
+  // Transform RPC response to match frontend interface
+  return transformRPCResponse(data as unknown as RPCResponse, startDate, endDate);
 }
 
 // ==================== Hook ====================
