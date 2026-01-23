@@ -32,7 +32,7 @@ export interface FilterCondition {
   id: string;
   field: string;
   operator: FilterOperator;
-  value: string | number | boolean | string[] | [number, number] | null;
+  value: string | number | boolean | string[] | number[] | [number, number] | null;
 }
 
 export interface SavedSegment {
