@@ -24,6 +24,7 @@ import { useIsSingleDayView } from "@/hooks/useHourlyMetrics";
 import { maskName, maskEmail } from "@/lib/pii-masking";
 import { useDonationMetricsQuery, DonationRow } from "@/queries";
 import { formatCurrency } from "@/lib/chart-formatters";
+import { getOrgToday } from "@/lib/timezone";
 
 type Props = {
   organizationId: string;
@@ -83,9 +84,10 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
     return timeSeries[timeSeries.length - 1].date;
   }, [timeSeries]);
 
+  // Uses org timezone for accurate "today" detection
   const isShowingStaleData = useMemo(() => {
     if (!latestDataDate) return false;
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = getOrgToday();
     return startDate === today && latestDataDate !== today;
   }, [latestDataDate, startDate]);
 

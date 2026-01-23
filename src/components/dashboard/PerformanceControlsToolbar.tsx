@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { DayPicker, type DateRange, type SelectRangeEventHandler } from "react-day-picker";
 import { cn } from "@/lib/utils";
+import { getOrgNow, getOrgToday } from "@/lib/timezone";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -74,40 +75,59 @@ const presets: Record<PresetKey, { label: string; shortLabel: string; getValue: 
   today: {
     label: "Today",
     shortLabel: "Today",
-    getValue: () => ({ start: new Date(), end: new Date() }),
+    getValue: () => {
+      const now = getOrgNow();
+      return { start: now, end: now };
+    },
   },
   yesterday: {
     label: "Yesterday",
     shortLabel: "Yest",
     getValue: () => {
-      const yesterday = subDays(new Date(), 1);
+      const now = getOrgNow();
+      const yesterday = subDays(now, 1);
       return { start: yesterday, end: yesterday };
     },
   },
   "7d": {
     label: "Last 7 days",
     shortLabel: "7D",
-    getValue: () => ({ start: subDays(new Date(), 7), end: new Date() }),
+    getValue: () => {
+      const now = getOrgNow();
+      return { start: subDays(now, 7), end: now };
+    },
   },
   "14d": {
     label: "Last 14 days",
     shortLabel: "14D",
-    getValue: () => ({ start: subDays(new Date(), 14), end: new Date() }),
+    getValue: () => {
+      const now = getOrgNow();
+      return { start: subDays(now, 14), end: now };
+    },
   },
   "30d": {
     label: "Last 30 days",
     shortLabel: "30D",
-    getValue: () => ({ start: subDays(new Date(), 30), end: new Date() }),
+    getValue: () => {
+      const now = getOrgNow();
+      return { start: subDays(now, 30), end: now };
+    },
   },
   "90d": {
     label: "Last 90 days",
     shortLabel: "90D",
-    getValue: () => ({ start: subDays(new Date(), 90), end: new Date() }),
+    getValue: () => {
+      const now = getOrgNow();
+      return { start: subDays(now, 90), end: now };
+    },
   },
   custom: {
     label: "Custom range",
     shortLabel: "Custom",
-    getValue: () => ({ start: subDays(new Date(), 30), end: new Date() }),
+    getValue: () => {
+      const now = getOrgNow();
+      return { start: subDays(now, 30), end: now };
+    },
   },
 };
 
@@ -118,11 +138,12 @@ const presets: Record<PresetKey, { label: string; shortLabel: string; getValue: 
 /**
  * Detects which preset matches the given date range.
  * Returns 'custom' if no preset matches.
+ * Uses organization timezone for accurate "today" detection.
  */
 function detectPresetFromDateRange(startDate: string, endDate: string): PresetKey {
-  const today = new Date();
-  const todayStr = format(today, "yyyy-MM-dd");
-  const yesterdayStr = format(subDays(today, 1), "yyyy-MM-dd");
+  const todayStr = getOrgToday();
+  const now = getOrgNow();
+  const yesterdayStr = format(subDays(now, 1), "yyyy-MM-dd");
   
   // Check for single-day presets first
   if (startDate === endDate) {

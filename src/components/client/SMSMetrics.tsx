@@ -23,6 +23,7 @@ import { useIsSingleDayView } from "@/hooks/useHourlyMetrics";
 import { formatRatio, formatCurrency, formatNumber } from "@/lib/chart-formatters";
 import { SMSCampaignCard, type SMSCampaignData } from "./SMSCampaignCard";
 import { supabase } from "@/integrations/supabase/client";
+import { getOrgToday } from "@/lib/timezone";
 
 type Props = {
   organizationId: string;
@@ -71,9 +72,10 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
     return (dailyMetrics as any[])[(dailyMetrics as any[]).length - 1].date;
   }, [dailyMetrics]);
 
+  // Uses org timezone for accurate "today" detection
   const isShowingStaleData = useMemo(() => {
     if (!latestDataDate) return false;
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = getOrgToday();
     return startDate === today && latestDataDate !== today;
   }, [latestDataDate, startDate]);
 
