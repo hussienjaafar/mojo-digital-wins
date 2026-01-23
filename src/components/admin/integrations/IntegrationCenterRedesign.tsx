@@ -21,6 +21,7 @@ import {
 import { useIntegrationSummary } from '@/hooks/useIntegrationSummary';
 import { IntegrationDetailDrawer } from './IntegrationDetailDrawer';
 import { CredentialSlideOver } from './CredentialSlideOver';
+import { InlineHealthIndicator } from './InlineHealthIndicator';
 import { IntegrationHealthStatus, IntegrationSummary, PLATFORM_ICONS } from '@/types/integrations';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -146,6 +147,16 @@ function ClientRow({
             </span>
           )}
         </div>
+        
+        {/* Inline diagnostics */}
+        {summary.diagnostics && (
+          <InlineHealthIndicator
+            webhookFailures={summary.diagnostics.webhookStats?.failures}
+            failureRate={summary.diagnostics.webhookStats?.failure_rate}
+            lastError={summary.diagnostics.webhookStats?.last_error || undefined}
+            daysStale={summary.diagnostics.dataFreshness?.days_stale || undefined}
+          />
+        )}
       </div>
 
       {/* Platform icons */}

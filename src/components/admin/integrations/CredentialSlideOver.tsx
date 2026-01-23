@@ -149,12 +149,34 @@ export function CredentialSlideOver({
     }
 
     const platformData = formData[platform];
+    
+    // When editing existing credentials, allow partial updates (at least one field filled)
+    if (existingCredential) {
+      if (!platformData) {
+        toast.error('Please fill in at least one credential field to update');
+        return false;
+      }
+      
+      // Check if at least one field has a value
+      const hasAnyValue = Object.values(platformData).some(
+        v => v && typeof v === 'string' && v.trim() !== ''
+      );
+      
+      if (!hasAnyValue) {
+        toast.error('Please fill in at least one credential field to update');
+        return false;
+      }
+      
+      return true;
+    }
+    
+    // For new credentials, require full validation
     if (!platformData) {
       toast.error('Please fill in the credentials');
       return false;
     }
 
-    // Platform-specific validation
+    // Platform-specific validation for new credentials
     if (platform === 'meta' && !formData.meta?.access_token) {
       toast.error('Meta access token is required');
       return false;
@@ -165,9 +187,17 @@ export function CredentialSlideOver({
       return false;
     }
 
-    if (platform === 'actblue' && !formData.actblue?.webhook_secret) {
-      toast.error('ActBlue webhook secret is required for secure webhook validation');
-      return false;
+    if (platform === 'actblue') {
+      // For new ActBlue credentials, require at least CSV or webhook to be complete
+      const csvComplete = formData.actblue?.entity_id && 
+                          formData.actblue?.username && 
+                          formData.actblue?.password;
+      const webhookComplete = formData.actblue?.webhook_secret;
+      
+      if (!csvComplete && !webhookComplete) {
+        toast.error('Please complete either CSV API credentials or Webhook credentials');
+        return false;
+      }
     }
 
     if (platform === 'google_ads' && !formData.google_ads?.developer_token) {
@@ -213,12 +243,39 @@ export function CredentialSlideOver({
 
     setIsSaving(true);
     try {
+      // For partial updates, merge with existing credentials
+      let credentialsToSave: any = formData[platform];
+      
+      if (existingCredential) {
+        // Fetch existing encrypted credentials to merge
+        const { data: existingData, error: fetchError } = await supabase
+          .from('client_api_credentials')
+          .select('encrypted_credentials')
+          .eq('id', existingCredential.id)
+          .single();
+        
+        if (fetchError) throw fetchError;
+        
+        // Merge: only overwrite fields that have non-empty values in the form
+        const existingCreds = (existingData?.encrypted_credentials as Record<string, string>) || {};
+        const newCreds = (formData[platform] as Record<string, string>) || {};
+        
+        credentialsToSave = {
+          ...existingCreds,
+          ...Object.fromEntries(
+            Object.entries(newCreds).filter(([_, value]) => 
+              value && typeof value === 'string' && value.trim() !== ''
+            )
+          ),
+        };
+      }
+      
       const { error } = await supabase
         .from('client_api_credentials')
         .upsert([{
           organization_id: selectedOrg,
           platform: platform,
-          encrypted_credentials: formData[platform],
+          encrypted_credentials: credentialsToSave,
           is_active: true,
         }], {
           onConflict: 'organization_id,platform'

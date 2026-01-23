@@ -14558,6 +14558,15 @@ export type Database = {
           sync_priority: string
         }[]
       }
+      get_org_data_freshness: {
+        Args: { org_ids: string[] }
+        Returns: {
+          days_stale: number
+          last_transaction_at: string
+          org_id: string
+          transaction_count_7d: number
+        }[]
+      }
       get_org_seat_usage: {
         Args: { org_id: string }
         Returns: {
@@ -14586,6 +14595,17 @@ export type Database = {
           trend_event_id: string
           trend_key: string
           urgency_score: number
+        }[]
+      }
+      get_org_webhook_stats: {
+        Args: { org_ids: string[] }
+        Returns: {
+          failure_rate: number
+          failures: number
+          last_error: string
+          last_failure_at: string
+          org_id: string
+          total_events: number
         }[]
       }
       get_organization_members: {

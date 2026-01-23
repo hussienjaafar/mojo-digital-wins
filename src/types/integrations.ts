@@ -24,6 +24,27 @@ export interface IntegrationDetail {
   created_at: string | null;
 }
 
+export interface WebhookStats {
+  org_id: string;
+  total_events: number;
+  failures: number;
+  last_error: string | null;
+  last_failure_at: string | null;
+  failure_rate: number;
+}
+
+export interface DataFreshness {
+  org_id: string;
+  last_transaction_at: string | null;
+  days_stale: number | null;
+  transaction_count_7d: number;
+}
+
+export interface IntegrationDiagnostics {
+  webhookStats?: WebhookStats;
+  dataFreshness?: DataFreshness;
+}
+
 export interface IntegrationSummary {
   organization_id: string;
   organization_name: string;
@@ -36,6 +57,8 @@ export interface IntegrationSummary {
   disabled_count: number;
   untested_count: number;
   health_status: IntegrationHealthStatus;
+  // Diagnostic data
+  diagnostics?: IntegrationDiagnostics;
 }
 
 export interface IntegrationStatusCounts {
@@ -58,3 +81,20 @@ export const PLATFORM_ICONS: Record<IntegrationPlatform, string> = {
   actblue: '💙',
   google_ads: '🔍',
 };
+
+// ActBlue credential sections
+export type ActBlueCredentialSection = 'csv' | 'webhook';
+
+export interface ActBlueCSVCredentials {
+  entity_id?: string;
+  username?: string;
+  password?: string;
+}
+
+export interface ActBlueWebhookCredentials {
+  webhook_username?: string;
+  webhook_password?: string;
+  webhook_secret?: string;
+}
+
+export interface ActBlueCredentials extends ActBlueCSVCredentials, ActBlueWebhookCredentials {}

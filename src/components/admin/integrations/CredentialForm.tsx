@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, ShieldCheck, Facebook } from 'lucide-react';
+import { Eye, EyeOff, ShieldCheck, Download, Webhook } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { IntegrationPlatform } from '@/types/integrations';
+import { IntegrationPlatform, ActBlueCredentialSection } from '@/types/integrations';
 import { MetaCredentialAuth } from './MetaCredentialAuth';
 
 // SECURITY: Form state for new credentials (never persisted to state after save)
@@ -34,6 +34,8 @@ export type CredentialFormData = {
     refresh_token: string;
     customer_id: string;
   };
+  // Track which sections are being updated for partial saves
+  _actblue_section?: ActBlueCredentialSection;
 };
 
 interface CredentialFormProps {
@@ -43,6 +45,8 @@ interface CredentialFormProps {
   onPlatformChange: (platform: 'meta' | 'switchboard' | 'actblue' | 'google_ads') => void;
   organizationId?: string;
   disabled?: boolean;
+  isEditing?: boolean; // True when editing existing credentials
+  existingCredentialMask?: Record<string, string>; // Hints for existing credentials
 }
 
 // Secure input component with show/hide toggle
@@ -54,6 +58,7 @@ function SecureInput({
   placeholder,
   required = false,
   disabled = false,
+  existingHint,
 }: { 
   id: string; 
   label: string; 
@@ -62,13 +67,21 @@ function SecureInput({
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  existingHint?: string; // e.g., "****2026" showing last 4 chars
 }) {
   const [showValue, setShowValue] = useState(false);
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>
-        {label} {required && <span className="text-destructive">*</span>}
+      <Label htmlFor={id} className="flex items-center justify-between">
+        <span>
+          {label} {required && <span className="text-destructive">*</span>}
+        </span>
+        {existingHint && (
+          <span className="text-xs text-muted-foreground font-normal">
+            Current: {existingHint}
+          </span>
+        )}
       </Label>
       <div className="relative">
         <Input
@@ -76,7 +89,7 @@ function SecureInput({
           type={showValue ? "text" : "password"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
+          placeholder={existingHint ? `Leave empty to keep existing` : placeholder}
           autoComplete="off"
           className="pr-10"
           disabled={disabled}
@@ -103,7 +116,11 @@ export function CredentialForm({
   onPlatformChange,
   organizationId,
   disabled = false,
+  isEditing = false,
+  existingCredentialMask = {},
 }: CredentialFormProps) {
+  const [actblueSection, setActblueSection] = useState<ActBlueCredentialSection>('csv');
+
   const handleMetaOAuthSuccess = (credentials: {
     access_token: string;
     ad_account_id: string;
@@ -118,6 +135,7 @@ export function CredentialForm({
       }
     });
   };
+
   const updateMeta = (field: keyof NonNullable<CredentialFormData['meta']>, value: string) => {
     onFormDataChange({
       ...formData,
@@ -135,7 +153,8 @@ export function CredentialForm({
   const updateActblue = (field: keyof NonNullable<CredentialFormData['actblue']>, value: string) => {
     onFormDataChange({
       ...formData,
-      actblue: { ...formData.actblue!, [field]: value }
+      actblue: { ...formData.actblue!, [field]: value },
+      _actblue_section: actblueSection, // Track which section is being edited
     });
   };
 
@@ -143,6 +162,15 @@ export function CredentialForm({
     onFormDataChange({
       ...formData,
       google_ads: { ...formData.google_ads!, [field]: value }
+    });
+  };
+
+  // Handle ActBlue section change
+  const handleActblueSectionChange = (section: ActBlueCredentialSection) => {
+    setActblueSection(section);
+    onFormDataChange({
+      ...formData,
+      _actblue_section: section,
     });
   };
 
@@ -187,6 +215,7 @@ export function CredentialForm({
                   onChange={(v) => updateMeta('access_token', v)}
                   required
                   disabled={disabled}
+                  existingHint={existingCredentialMask.access_token}
                 />
                 <div className="space-y-2">
                   <Label htmlFor="ad_account_id">Ad Account ID</Label>
@@ -222,6 +251,7 @@ export function CredentialForm({
           onChange={(v) => updateSwitchboard('api_key', v)}
           required
           disabled={disabled}
+          existingHint={existingCredentialMask.api_key}
         />
         <div className="space-y-2">
           <Label htmlFor="switchboard_account_id">Account ID</Label>
@@ -235,60 +265,104 @@ export function CredentialForm({
       </TabsContent>
 
       <TabsContent value="actblue" className="space-y-4 pt-4">
-        <Alert>
-          <ShieldCheck className="h-4 w-4" />
-          <AlertDescription>
-            The webhook secret is used to validate incoming webhooks via HMAC signature.
-          </AlertDescription>
-        </Alert>
-        
-        <div className="space-y-2">
-          <Label htmlFor="actblue_entity_id">Entity ID</Label>
-          <Input
-            id="actblue_entity_id"
-            value={formData.actblue?.entity_id || ''}
-            onChange={(e) => updateActblue('entity_id', e.target.value)}
-            placeholder="Your ActBlue entity ID"
-            disabled={disabled}
-          />
-        </div>
-        <SecureInput
-          id="actblue_username"
-          label="API Username"
-          value={formData.actblue?.username || ''}
-          onChange={(v) => updateActblue('username', v)}
-          disabled={disabled}
-        />
-        <SecureInput
-          id="actblue_password"
-          label="API Password"
-          value={formData.actblue?.password || ''}
-          onChange={(v) => updateActblue('password', v)}
-          disabled={disabled}
-        />
-        <SecureInput
-          id="actblue_webhook_username"
-          label="Webhook Username"
-          value={formData.actblue?.webhook_username || ''}
-          onChange={(v) => updateActblue('webhook_username', v)}
-          disabled={disabled}
-        />
-        <SecureInput
-          id="actblue_webhook_password"
-          label="Webhook Password"
-          value={formData.actblue?.webhook_password || ''}
-          onChange={(v) => updateActblue('webhook_password', v)}
-          disabled={disabled}
-        />
-        <SecureInput
-          id="actblue_webhook_secret"
-          label="Webhook Secret (HMAC)"
-          value={formData.actblue?.webhook_secret || ''}
-          onChange={(v) => updateActblue('webhook_secret', v)}
-          placeholder="For signature validation"
-          required
-          disabled={disabled}
-        />
+        {/* Nested tabs for CSV API vs Webhook */}
+        <Tabs value={actblueSection} onValueChange={(v) => handleActblueSectionChange(v as ActBlueCredentialSection)}>
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="csv" disabled={disabled} className="gap-2">
+              <Download className="h-4 w-4" />
+              CSV API
+            </TabsTrigger>
+            <TabsTrigger value="webhook" disabled={disabled} className="gap-2">
+              <Webhook className="h-4 w-4" />
+              Webhook
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="csv" className="space-y-4">
+            {isEditing && (
+              <Alert>
+                <ShieldCheck className="h-4 w-4" />
+                <AlertDescription>
+                  Only fill in fields you want to update. Leave empty to keep existing values.
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="actblue_entity_id">Entity ID</Label>
+              <Input
+                id="actblue_entity_id"
+                value={formData.actblue?.entity_id || ''}
+                onChange={(e) => updateActblue('entity_id', e.target.value)}
+                placeholder={existingCredentialMask.entity_id || "Your ActBlue entity ID"}
+                disabled={disabled}
+              />
+              {existingCredentialMask.entity_id && (
+                <p className="text-xs text-muted-foreground">Current: {existingCredentialMask.entity_id}</p>
+              )}
+            </div>
+            <SecureInput
+              id="actblue_username"
+              label="API Username"
+              value={formData.actblue?.username || ''}
+              onChange={(v) => updateActblue('username', v)}
+              disabled={disabled}
+              existingHint={existingCredentialMask.username}
+            />
+            <SecureInput
+              id="actblue_password"
+              label="API Password"
+              value={formData.actblue?.password || ''}
+              onChange={(v) => updateActblue('password', v)}
+              disabled={disabled}
+              existingHint={existingCredentialMask.password}
+            />
+          </TabsContent>
+
+          <TabsContent value="webhook" className="space-y-4">
+            {isEditing && (
+              <Alert>
+                <ShieldCheck className="h-4 w-4" />
+                <AlertDescription>
+                  Only fill in fields you want to update. Leave empty to keep existing values.
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            <SecureInput
+              id="actblue_webhook_username"
+              label="Webhook Username"
+              value={formData.actblue?.webhook_username || ''}
+              onChange={(v) => updateActblue('webhook_username', v)}
+              disabled={disabled}
+              existingHint={existingCredentialMask.webhook_username}
+            />
+            <SecureInput
+              id="actblue_webhook_password"
+              label="Webhook Password"
+              value={formData.actblue?.webhook_password || ''}
+              onChange={(v) => updateActblue('webhook_password', v)}
+              disabled={disabled}
+              existingHint={existingCredentialMask.webhook_password}
+            />
+            <SecureInput
+              id="actblue_webhook_secret"
+              label="Webhook Secret (HMAC)"
+              value={formData.actblue?.webhook_secret || ''}
+              onChange={(v) => updateActblue('webhook_secret', v)}
+              placeholder="For signature validation"
+              disabled={disabled}
+              existingHint={existingCredentialMask.webhook_secret}
+            />
+            
+            <Alert className="bg-muted/50">
+              <ShieldCheck className="h-4 w-4" />
+              <AlertDescription>
+                The webhook secret is used to validate incoming webhooks via HMAC signature.
+              </AlertDescription>
+            </Alert>
+          </TabsContent>
+        </Tabs>
       </TabsContent>
 
       <TabsContent value="google_ads" className="space-y-4 pt-4">
@@ -299,6 +373,7 @@ export function CredentialForm({
           onChange={(v) => updateGoogleAds('developer_token', v)}
           required
           disabled={disabled}
+          existingHint={existingCredentialMask.developer_token}
         />
         <div className="space-y-2">
           <Label htmlFor="google_client_id">Client ID</Label>
@@ -315,6 +390,7 @@ export function CredentialForm({
           value={formData.google_ads?.client_secret || ''}
           onChange={(v) => updateGoogleAds('client_secret', v)}
           disabled={disabled}
+          existingHint={existingCredentialMask.client_secret}
         />
         <SecureInput
           id="google_refresh_token"
@@ -322,6 +398,7 @@ export function CredentialForm({
           value={formData.google_ads?.refresh_token || ''}
           onChange={(v) => updateGoogleAds('refresh_token', v)}
           disabled={disabled}
+          existingHint={existingCredentialMask.refresh_token}
         />
         <div className="space-y-2">
           <Label htmlFor="google_customer_id">Customer ID</Label>
