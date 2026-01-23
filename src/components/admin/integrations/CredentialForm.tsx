@@ -194,7 +194,7 @@ export function CredentialForm({
           <>
             {formData.meta?.access_token ? (
               <Alert>
-                <ShieldCheck className="h-4 w-4 text-green-500" />
+                <ShieldCheck className="h-4 w-4 text-[hsl(var(--portal-success))]" />
                 <AlertDescription className="flex items-center justify-between">
                   <span>
                     Meta credentials configured
@@ -329,38 +329,46 @@ export function CredentialForm({
               </Alert>
             )}
             
+            {/* Webhook endpoint URL for configuration in ActBlue */}
+            <Alert className="bg-accent/50 border-accent">
+              <AlertDescription className="text-sm">
+                <p className="font-medium mb-1">Webhook Endpoint URL:</p>
+                <code className="text-xs bg-muted px-2 py-1 rounded block overflow-x-auto">
+                  https://nuclmzoasgydubdshtab.supabase.co/functions/v1/actblue-webhook
+                </code>
+                <p className="text-xs mt-2 text-muted-foreground">
+                  Copy this URL to ActBlue's webhook configuration
+                </p>
+              </AlertDescription>
+            </Alert>
+
             <SecureInput
               id="actblue_webhook_username"
-              label="Webhook Username"
+              label="Username (Basic Auth)"
               value={formData.actblue?.webhook_username || ''}
               onChange={(v) => updateActblue('webhook_username', v)}
               disabled={disabled}
-              existingHint={existingCredentialMask.webhook_username}
+              existingHint={existingCredentialMask.basic_auth_username}
+              required
             />
             <SecureInput
               id="actblue_webhook_password"
-              label="Webhook Password"
+              label="Password (Basic Auth)"
               value={formData.actblue?.webhook_password || ''}
               onChange={(v) => updateActblue('webhook_password', v)}
               disabled={disabled}
-              existingHint={existingCredentialMask.webhook_password}
+              existingHint={existingCredentialMask.basic_auth_password}
+              required
             />
             <SecureInput
               id="actblue_webhook_secret"
-              label="Webhook Secret (HMAC)"
+              label="Secret (Optional - for HMAC validation)"
               value={formData.actblue?.webhook_secret || ''}
               onChange={(v) => updateActblue('webhook_secret', v)}
-              placeholder="For signature validation"
+              placeholder="Only if using HMAC signature validation"
               disabled={disabled}
               existingHint={existingCredentialMask.webhook_secret}
             />
-            
-            <Alert className="bg-muted/50">
-              <ShieldCheck className="h-4 w-4" />
-              <AlertDescription>
-                The webhook secret is used to validate incoming webhooks via HMAC signature.
-              </AlertDescription>
-            </Alert>
           </TabsContent>
         </Tabs>
       </TabsContent>

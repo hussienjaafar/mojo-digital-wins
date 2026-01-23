@@ -192,7 +192,8 @@ export function CredentialSlideOver({
       const csvComplete = formData.actblue?.entity_id && 
                           formData.actblue?.username && 
                           formData.actblue?.password;
-      const webhookComplete = formData.actblue?.webhook_secret;
+      const webhookComplete = formData.actblue?.webhook_username && 
+                              formData.actblue?.webhook_password;
       
       if (!csvComplete && !webhookComplete) {
         toast.error('Please complete either CSV API credentials or Webhook credentials');
@@ -238,6 +239,23 @@ export function CredentialSlideOver({
     }
   };
 
+  // Map ActBlue form fields to database field names
+  const mapActBlueCredentials = (formCreds: Record<string, string>): Record<string, string> => {
+    const mapped: Record<string, string> = {};
+    
+    // CSV API credentials (keep same names)
+    if (formCreds.entity_id?.trim()) mapped.entity_id = formCreds.entity_id.trim();
+    if (formCreds.username?.trim()) mapped.username = formCreds.username.trim();
+    if (formCreds.password?.trim()) mapped.password = formCreds.password.trim();
+    
+    // Webhook credentials (map to expected database names)
+    if (formCreds.webhook_username?.trim()) mapped.basic_auth_username = formCreds.webhook_username.trim();
+    if (formCreds.webhook_password?.trim()) mapped.basic_auth_password = formCreds.webhook_password.trim();
+    if (formCreds.webhook_secret?.trim()) mapped.webhook_secret = formCreds.webhook_secret.trim();
+    
+    return mapped;
+  };
+
   const handleSave = async () => {
     if (!validateForm()) return;
 
@@ -258,16 +276,29 @@ export function CredentialSlideOver({
         
         // Merge: only overwrite fields that have non-empty values in the form
         const existingCreds = (existingData?.encrypted_credentials as Record<string, string>) || {};
-        const newCreds = (formData[platform] as Record<string, string>) || {};
+        let newCreds = (formData[platform] as Record<string, string>) || {};
         
-        credentialsToSave = {
-          ...existingCreds,
-          ...Object.fromEntries(
+        // Map ActBlue form fields to database field names
+        if (platform === 'actblue') {
+          newCreds = mapActBlueCredentials(newCreds);
+        } else {
+          // Filter out empty values for other platforms
+          newCreds = Object.fromEntries(
             Object.entries(newCreds).filter(([_, value]) => 
               value && typeof value === 'string' && value.trim() !== ''
             )
-          ),
+          );
+        }
+        
+        credentialsToSave = {
+          ...existingCreds,
+          ...newCreds,
         };
+      } else {
+        // New credential - apply mapping for ActBlue
+        if (platform === 'actblue') {
+          credentialsToSave = mapActBlueCredentials(credentialsToSave || {});
+        }
       }
       
       const { error } = await supabase
