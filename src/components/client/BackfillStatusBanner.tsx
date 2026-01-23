@@ -52,38 +52,48 @@ const statusConfig = {
 };
 
 function ChunkBreakdown({ summary }: { summary: ChunkSummary }) {
+  const hasZeroInsertIssue = summary.completed > 0 && summary.totalRows === 0;
+  
   return (
-    <div className="flex flex-wrap gap-3 text-xs mt-2">
-      {summary.completed > 0 && (
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-[hsl(var(--portal-success))]" />
-          {summary.completed} completed
-        </span>
+    <div className="space-y-2 mt-2">
+      {hasZeroInsertIssue && (
+        <div className="flex items-center gap-2 text-xs text-[hsl(var(--portal-warning))] bg-[hsl(var(--portal-warning)/0.1)] px-2 py-1.5 rounded">
+          <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>Data processing issue: chunks completed but 0 rows imported. Check database constraints.</span>
+        </div>
       )}
-      {summary.processing > 0 && (
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-[hsl(var(--portal-accent-blue))] animate-pulse" />
-          {summary.processing} processing
-        </span>
-      )}
-      {summary.retrying > 0 && (
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-[hsl(var(--portal-warning))]" />
-          {summary.retrying} retrying
-        </span>
-      )}
-      {summary.failed > 0 && (
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-[hsl(var(--portal-error))]" />
-          {summary.failed} failed
-        </span>
-      )}
-      {summary.pending > 0 && (
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-[hsl(var(--portal-text-muted)/0.4)]" />
-          {summary.pending} pending
-        </span>
-      )}
+      <div className="flex flex-wrap gap-3 text-xs">
+        {summary.completed > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[hsl(var(--portal-success))]" />
+            {summary.completed} completed
+          </span>
+        )}
+        {summary.processing > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[hsl(var(--portal-accent-blue))] animate-pulse" />
+            {summary.processing} processing
+          </span>
+        )}
+        {summary.retrying > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[hsl(var(--portal-warning))]" />
+            {summary.retrying} retrying
+          </span>
+        )}
+        {summary.failed > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[hsl(var(--portal-error))]" />
+            {summary.failed} failed
+          </span>
+        )}
+        {summary.pending > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[hsl(var(--portal-text-muted)/0.4)]" />
+            {summary.pending} pending
+          </span>
+        )}
+      </div>
     </div>
   );
 }
