@@ -51,6 +51,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ActBlueBackfillDatePicker } from "./ActBlueBackfillDatePicker";
+import { BackfillStatusBanner } from "./BackfillStatusBanner";
 
 type Props = {
   organizationId: string;
@@ -569,6 +570,15 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
       </V3CardHeader>
 
       <V3CardContent className="space-y-4">
+        {/* Backfill Status Banner - shows when import is running */}
+        <BackfillStatusBanner 
+          organizationId={organizationId}
+          onComplete={() => {
+            queryClient.invalidateQueries({ queryKey: donationKeys.all });
+            invalidateDashboardQueries();
+          }}
+        />
+
         {/* Data Source Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <DataSourceCard

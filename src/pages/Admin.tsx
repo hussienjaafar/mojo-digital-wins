@@ -20,6 +20,7 @@ import CampaignAttributionManager from "@/components/admin/CampaignAttributionMa
 import SyncScheduler from "@/components/admin/SyncScheduler";
 import EmailReportManager from "@/components/admin/EmailReportManager";
 import { DataBackfillPanel } from "@/components/admin/DataBackfillPanel";
+import { BackfillMonitorPanel } from "@/components/admin/BackfillMonitorPanel";
 import { OnboardingBackfillPanel } from "@/components/admin/OnboardingBackfillPanel";
 import AdminActivityAlerts from "@/components/admin/AdminActivityAlerts";
 import UsageAnalytics from "@/components/admin/UsageAnalytics";
@@ -348,6 +349,7 @@ const Admin = () => {
       case "scheduler":
         return (
           <div className="space-y-6">
+            <BackfillMonitorPanel />
             <OnboardingBackfillPanel />
             <DataBackfillPanel />
             <OpsPanel />
