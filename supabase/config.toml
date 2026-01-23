@@ -135,6 +135,9 @@ verify_jwt = false
 [functions.process-actblue-chunk]
 verify_jwt = false
 
+[functions.cancel-backfill]
+verify_jwt = false  # Handles auth internally - supports user JWT, admin, or CRON_SECRET
+
 [functions.backfill-thumbnails]
 verify_jwt = true
 
