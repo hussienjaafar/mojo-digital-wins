@@ -71,6 +71,14 @@ export interface SegmentDonor {
   // Computed
   days_since_donation: number;
   is_multi_channel: boolean;
+  // Attribution data
+  attributed_channels: string[];
+  attributed_topics: string[];
+  // Deep motivation attribution
+  attributed_pain_points: string[];
+  attributed_values: string[];
+  attributed_issues: string[];
+  attributed_emotions: string[];
 }
 
 export interface SegmentAggregates {
@@ -87,6 +95,11 @@ export interface SegmentAggregates {
   byChurnRisk: { name: string; value: number }[];
   byTier: { name: string; value: number }[];
   byChannel: { name: string; value: number }[];
+  // Deep motivation breakdowns
+  byTopic: { name: string; value: number }[];
+  byPainPoint: { name: string; value: number }[];
+  byValue: { name: string; value: number }[];
+  byEmotion: { name: string; value: number }[];
 }
 
 // Available filter fields for the segment builder
@@ -313,6 +326,50 @@ export const SEGMENT_FILTER_FIELDS: FilterField[] = [
       { value: 'direct', label: 'Direct/Organic' },
     ],
     description: 'Marketing channel that drove the donation',
+  },
+  {
+    key: 'attributed_topic',
+    label: 'Acquisition Topic',
+    category: 'Attribution',
+    type: 'multi-select',
+    operators: ['in', 'nin'],
+    options: [
+      { value: 'foreign policy', label: 'Foreign Policy' },
+      { value: 'healthcare', label: 'Healthcare' },
+      { value: 'economy', label: 'Economy' },
+      { value: 'elections', label: 'Elections' },
+      { value: 'civil rights', label: 'Civil Rights' },
+      { value: 'immigration', label: 'Immigration' },
+      { value: 'environment', label: 'Environment' },
+      { value: 'education', label: 'Education' },
+      { value: 'fundraising', label: 'Fundraising' },
+    ],
+    description: 'AI-analyzed topic from the ad/SMS that acquired this donor',
+  },
+  {
+    key: 'attributed_pain_point',
+    label: 'Motivation Pain Point',
+    category: 'Attribution',
+    type: 'string',
+    operators: ['contains', 'not_contains'],
+    description: 'Specific pain point that motivated the donation (e.g., "AIPAC influence")',
+  },
+  {
+    key: 'attributed_value',
+    label: 'Motivation Value',
+    category: 'Attribution',
+    type: 'multi-select',
+    operators: ['in', 'nin'],
+    options: [
+      { value: 'justice', label: 'Justice' },
+      { value: 'community empowerment', label: 'Community Empowerment' },
+      { value: 'anti-establishment', label: 'Anti-Establishment' },
+      { value: 'solidarity', label: 'Solidarity' },
+      { value: 'representation', label: 'Representation' },
+      { value: 'protecting vulnerable', label: 'Protecting Vulnerable' },
+      { value: 'patriotism', label: 'Patriotism' },
+    ],
+    description: 'Core value that motivated the donation',
   },
 ];
 

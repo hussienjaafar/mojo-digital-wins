@@ -37,7 +37,8 @@ const FIELD_MAPPING: Record<string, string> = {
 const CLIENT_SIDE_FIELDS = [
   'segment', 'churn_risk_label', 'predicted_ltv_90', 'predicted_ltv_180',
   'days_since_donation', 'avg_donation', 'rfm_score', 'recency_score',
-  'frequency_score', 'monetary_score', 'donor_tier', 'attributed_channel'
+  'frequency_score', 'monetary_score', 'donor_tier', 'attributed_channel',
+  'attributed_topic', 'attributed_pain_point', 'attributed_value'
 ];
 
 // Apply a single filter to the Supabase query
@@ -145,6 +146,15 @@ function applyClientFilter(donor: SegmentDonor, filter: FilterCondition): boolea
       // This will be enriched from attribution data later
       fieldValue = (donor as any).attributed_channels || [];
       break;
+    case 'attributed_topic':
+      fieldValue = (donor as any).attributed_topics || [];
+      break;
+    case 'attributed_pain_point':
+      fieldValue = ((donor as any).attributed_pain_points || []).join(' ');
+      break;
+    case 'attributed_value':
+      fieldValue = (donor as any).attributed_values || [];
+      break;
     default:
       return true;
   }
@@ -194,8 +204,22 @@ function applyClientFilter(donor: SegmentDonor, filter: FilterCondition): boolea
   }
 }
 
+// Attribution data structure for donors
+interface DonorAttribution {
+  channels: string[];
+  topics: string[];
+  painPoints: string[];
+  values: string[];
+  issues: string[];
+  emotions: string[];
+}
+
 // Transform raw database row to SegmentDonor
-function transformToDonor(row: any, ltvData: any): SegmentDonor {
+function transformToDonor(
+  row: any, 
+  ltvData: any,
+  attribution?: DonorAttribution
+): SegmentDonor {
   const now = Date.now();
   const daysSince = row.last_donation_date 
     ? Math.floor((now - new Date(row.last_donation_date).getTime()) / (1000 * 60 * 60 * 24))
@@ -221,7 +245,13 @@ function transformToDonor(row: any, ltvData: any): SegmentDonor {
     predicted_ltv_90: ltvData?.predicted_ltv_90 || null,
     predicted_ltv_180: ltvData?.predicted_ltv_180 || null,
     days_since_donation: daysSince,
-    is_multi_channel: false,
+    is_multi_channel: (attribution?.channels?.length || 0) > 1,
+    attributed_channels: attribution?.channels || [],
+    attributed_topics: attribution?.topics || [],
+    attributed_pain_points: attribution?.painPoints || [],
+    attributed_values: attribution?.values || [],
+    attributed_issues: attribution?.issues || [],
+    attributed_emotions: attribution?.emotions || [],
   };
 }
 
@@ -330,12 +360,114 @@ async function fetchSegmentDonors(
     }
   }
 
-  // Step 3: Transform and enrich donors
-  let donors = demographics.map(row => 
-    transformToDonor(row, ltvMap.get(row.donor_key || ''))
-  );
+  // Step 3: Fetch attribution data (channel + motivation per donor)
+  const donorEmails = demographics
+    .map(d => d.donor_email?.toLowerCase().trim())
+    .filter((e): e is string => !!e);
 
-  // Step 4: Apply client-side filters
+  const attributionMap = new Map<string, DonorAttribution>();
+
+  if (donorEmails.length > 0) {
+    // Get transactions with refcodes for these donors
+    const emailChunks = [];
+    for (let i = 0; i < donorEmails.length; i += 500) {
+      emailChunks.push(donorEmails.slice(i, i + 500));
+    }
+
+    // Fetch in parallel: transactions, refcode mappings, and creative insights
+    const [txResults, refcodeResult, creativeResult, smsResult] = await Promise.all([
+      Promise.all(emailChunks.map(chunk =>
+        supabase
+          .from('actblue_transactions')
+          .select('donor_email, refcode')
+          .eq('organization_id', organizationId)
+          .in('donor_email', chunk)
+          .not('refcode', 'is', null)
+      )),
+      supabase
+        .from('refcode_mappings')
+        .select('refcode, platform, creative_id, campaign_id')
+        .eq('organization_id', organizationId),
+      supabase
+        .from('meta_creative_insights')
+        .select('creative_id, topic, donor_pain_points, values_appealed, issue_specifics, emotional_triggers')
+        .eq('organization_id', organizationId),
+      supabase
+        .from('sms_campaigns')
+        .select('id, topic, donor_pain_points, values_appealed, issue_specifics, emotional_triggers')
+        .eq('organization_id', organizationId)
+    ]);
+
+    // Build lookup maps
+    const refcodeMap = new Map(
+      refcodeResult.data?.map(r => [r.refcode, r]) || []
+    );
+    const creativeMap = new Map(
+      creativeResult.data?.map(c => [c.creative_id, c]) || []
+    );
+    const smsMap = new Map(
+      smsResult.data?.map(s => [s.id, s]) || []
+    );
+
+    // Aggregate attribution per donor
+    for (const txResult of txResults) {
+      if (!txResult.data) continue;
+      for (const tx of txResult.data) {
+        const email = tx.donor_email?.toLowerCase().trim();
+        if (!email || !tx.refcode) continue;
+
+        if (!attributionMap.has(email)) {
+          attributionMap.set(email, {
+            channels: [],
+            topics: [],
+            painPoints: [],
+            values: [],
+            issues: [],
+            emotions: [],
+          });
+        }
+
+        const attr = attributionMap.get(email)!;
+        const refData = refcodeMap.get(tx.refcode);
+
+        if (refData?.platform && !attr.channels.includes(refData.platform)) {
+          attr.channels.push(refData.platform);
+        }
+
+        // Get motivation data from creative or SMS
+        const creative = refData?.creative_id ? creativeMap.get(refData.creative_id) : null;
+        const sms = refData?.campaign_id ? smsMap.get(refData.campaign_id) : null;
+        const source = creative || sms;
+
+        if (source) {
+          if (source.topic && !attr.topics.includes(source.topic)) {
+            attr.topics.push(source.topic);
+          }
+          (source.donor_pain_points || []).forEach((p: string) => {
+            if (!attr.painPoints.includes(p)) attr.painPoints.push(p);
+          });
+          (source.values_appealed || []).forEach((v: string) => {
+            if (!attr.values.includes(v)) attr.values.push(v);
+          });
+          (source.issue_specifics || []).forEach((i: string) => {
+            if (!attr.issues.includes(i)) attr.issues.push(i);
+          });
+          (source.emotional_triggers || []).forEach((e: string) => {
+            if (!attr.emotions.includes(e)) attr.emotions.push(e);
+          });
+        }
+      }
+    }
+  }
+
+  // Step 4: Transform and enrich donors with attribution
+  let donors = demographics.map(row => {
+    const email = row.donor_email?.toLowerCase().trim();
+    const attribution = email ? attributionMap.get(email) : undefined;
+    return transformToDonor(row, ltvMap.get(row.donor_key || ''), attribution);
+  });
+
+  // Step 5: Apply client-side filters
   const clientFilters = filters.filter(f => CLIENT_SIDE_FIELDS.includes(f.field));
   if (clientFilters.length > 0) {
     donors = donors.filter(donor => 
@@ -343,7 +475,7 @@ async function fetchSegmentDonors(
     );
   }
 
-  // Step 5: Calculate aggregates
+  // Step 6: Calculate aggregates
   const aggregates = calculateAggregates(donors);
 
   return {
@@ -368,6 +500,10 @@ function calculateAggregates(donors: SegmentDonor[]): SegmentAggregates {
       byChurnRisk: [],
       byTier: [],
       byChannel: [],
+      byTopic: [],
+      byPainPoint: [],
+      byValue: [],
+      byEmotion: [],
     };
   }
 
@@ -430,10 +566,10 @@ function calculateAggregates(donors: SegmentDonor[]): SegmentAggregates {
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
-  // Channel distribution (from attributed_channels if available)
+  // Channel distribution (from attributed_channels)
   const channelMap = new Map<string, number>();
   donors.forEach(d => {
-    const channels = (d as any).attributed_channels as string[] || [];
+    const channels = d.attributed_channels || [];
     if (channels.length > 0) {
       channels.forEach(ch => {
         const channelLabel = ch === 'meta' ? 'Meta Ads' 
@@ -451,6 +587,63 @@ function calculateAggregates(donors: SegmentDonor[]): SegmentAggregates {
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
+  // Topic distribution from AI-analyzed content
+  const topicMap = new Map<string, number>();
+  donors.forEach(d => {
+    const topics = d.attributed_topics || [];
+    topics.forEach(t => {
+      const label = t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+      topicMap.set(label, (topicMap.get(label) || 0) + 1);
+    });
+  });
+  const byTopic = Array.from(topicMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+
+  // Pain point distribution
+  const painPointMap = new Map<string, number>();
+  donors.forEach(d => {
+    const painPoints = d.attributed_pain_points || [];
+    painPoints.forEach(p => {
+      // Truncate long pain points for display
+      const label = p.length > 50 ? p.slice(0, 47) + '...' : p;
+      painPointMap.set(label, (painPointMap.get(label) || 0) + 1);
+    });
+  });
+  const byPainPoint = Array.from(painPointMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
+
+  // Values distribution
+  const valueMap = new Map<string, number>();
+  donors.forEach(d => {
+    const values = d.attributed_values || [];
+    values.forEach(v => {
+      const label = v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
+      valueMap.set(label, (valueMap.get(label) || 0) + 1);
+    });
+  });
+  const byValue = Array.from(valueMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
+
+  // Emotion distribution
+  const emotionMap = new Map<string, number>();
+  donors.forEach(d => {
+    const emotions = d.attributed_emotions || [];
+    emotions.forEach(e => {
+      const label = e.charAt(0).toUpperCase() + e.slice(1).toLowerCase();
+      emotionMap.set(label, (emotionMap.get(label) || 0) + 1);
+    });
+  });
+  const byEmotion = Array.from(emotionMap.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
+
   return {
     totalDonors,
     totalLifetimeValue,
@@ -464,6 +657,10 @@ function calculateAggregates(donors: SegmentDonor[]): SegmentAggregates {
     byChurnRisk,
     byTier,
     byChannel,
+    byTopic,
+    byPainPoint,
+    byValue,
+    byEmotion,
   };
 }
 
