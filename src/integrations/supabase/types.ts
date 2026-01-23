@@ -14049,6 +14049,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      compute_donor_key: { Args: { email: string }; Returns: string }
       cosine_similarity: { Args: { a: string; b: string }; Returns: number }
       count_keyword_mentions: {
         Args: { search_keyword: string; time_window?: unknown }

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,21 +32,22 @@ interface DonorJourneyEvent {
   metadata?: Record<string, any>;
 }
 
-// Hash email for privacy-preserving donor key using SHA-256
-// This matches the compute_donor_key() database function for consistency
+/**
+ * Generate donor_key using MD5 hash (first 6 chars)
+ * IMPORTANT: This must match the SQL formula: 'donor_' || substr(md5(lower(trim(email))), 1, 6)
+ * This ensures consistency with donor_demographics and donor_ltv_predictions tables
+ */
 async function hashDonorKey(email: string): Promise<string> {
   const normalized = email.toLowerCase().trim();
   const encoder = new TextEncoder();
   const data = encoder.encode(normalized);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashBuffer = await crypto.subtle.digest("MD5", data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  // Return format matches database function: donor_<16-char-hash-prefix>
-  return `donor_${hashHex.substring(0, 16)}`;
+  return `donor_${hashHex.substring(0, 6)}`;
 }
 
-// Hash phone number for SMS identity resolution
-// Matches the compute_phone_hash() database function
+// Hash phone number for SMS identity resolution (still uses SHA-256 for phone hashes)
 async function hashPhone(phone: string): Promise<string | null> {
   if (!phone) return null;
   const normalized = phone.replace(/\D/g, '');
