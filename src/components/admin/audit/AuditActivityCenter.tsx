@@ -81,12 +81,13 @@ export function AuditActivityCenter() {
     // Calculate date filter
     const now = new Date();
     let fromDate = new Date();
+    // Use N-1 offset for N days inclusive (today + N-1 previous days)
     switch (dateRange) {
       case "24h": fromDate.setHours(now.getHours() - 24); break;
-      case "7d": fromDate.setDate(now.getDate() - 7); break;
-      case "30d": fromDate.setDate(now.getDate() - 30); break;
-      case "90d": fromDate.setDate(now.getDate() - 90); break;
-      default: fromDate.setDate(now.getDate() - 7);
+      case "7d": fromDate.setDate(now.getDate() - 6); break;
+      case "30d": fromDate.setDate(now.getDate() - 29); break;
+      case "90d": fromDate.setDate(now.getDate() - 89); break;
+      default: fromDate.setDate(now.getDate() - 6);
     }
 
     const { data, error } = await supabase

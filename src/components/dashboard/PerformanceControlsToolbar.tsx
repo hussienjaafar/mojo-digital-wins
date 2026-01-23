@@ -94,7 +94,8 @@ const presets: Record<PresetKey, { label: string; shortLabel: string; getValue: 
     shortLabel: "7D",
     getValue: () => {
       const now = getOrgNow();
-      return { start: subDays(now, 7), end: now };
+      // 6 days back = 7 days inclusive (today + 6 previous days)
+      return { start: subDays(now, 6), end: now };
     },
   },
   "14d": {
@@ -102,7 +103,7 @@ const presets: Record<PresetKey, { label: string; shortLabel: string; getValue: 
     shortLabel: "14D",
     getValue: () => {
       const now = getOrgNow();
-      return { start: subDays(now, 14), end: now };
+      return { start: subDays(now, 13), end: now };
     },
   },
   "30d": {
@@ -110,7 +111,7 @@ const presets: Record<PresetKey, { label: string; shortLabel: string; getValue: 
     shortLabel: "30D",
     getValue: () => {
       const now = getOrgNow();
-      return { start: subDays(now, 30), end: now };
+      return { start: subDays(now, 29), end: now };
     },
   },
   "90d": {
@@ -118,7 +119,7 @@ const presets: Record<PresetKey, { label: string; shortLabel: string; getValue: 
     shortLabel: "90D",
     getValue: () => {
       const now = getOrgNow();
-      return { start: subDays(now, 90), end: now };
+      return { start: subDays(now, 89), end: now };
     },
   },
   custom: {
