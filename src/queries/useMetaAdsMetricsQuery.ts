@@ -25,6 +25,10 @@ export interface MetaMetrics {
   ctr: number;
   roas: number;
   cpm: number;
+  // Link-specific metrics (accurate for CPC calculation)
+  link_clicks: number;
+  link_ctr: number;
+  link_cpc: number;
 }
 
 export interface MetaDailyMetric {
@@ -33,6 +37,7 @@ export interface MetaDailyMetric {
   conversions: number;
   impressions: number;
   clicks: number;
+  link_clicks: number;
 }
 
 export interface MetaAdsMetricsResult {
@@ -47,6 +52,9 @@ export interface MetaAdsMetricsResult {
     conversions: number;
     conversion_value: number;
     reach: number;
+    link_clicks: number;
+    link_ctr: number;
+    link_cpc: number;
   };
   previousTotals: {
     impressions: number;
@@ -55,7 +63,14 @@ export interface MetaAdsMetricsResult {
     conversions: number;
     conversion_value: number;
     reach: number;
+    link_clicks: number;
+    link_ctr: number;
+    link_cpc: number;
   };
+  /** True if using fallback campaign-level data (less accurate) */
+  isEstimated: boolean;
+  /** Latest date with data available */
+  latestDataDate: string | null;
 }
 
 function aggregateMetrics(data: any[]): Record<string, MetaMetrics> {
@@ -74,6 +89,9 @@ function aggregateMetrics(data: any[]): Record<string, MetaMetrics> {
         ctr: 0,
         roas: 0,
         cpm: 0,
+        link_clicks: 0,
+        link_ctr: 0,
+        link_cpc: 0,
       };
     }
     aggregated[metric.campaign_id].impressions += metric.impressions || 0;
@@ -82,16 +100,26 @@ function aggregateMetrics(data: any[]): Record<string, MetaMetrics> {
     aggregated[metric.campaign_id].conversions += metric.conversions || 0;
     aggregated[metric.campaign_id].conversion_value += Number(metric.conversion_value || 0);
     aggregated[metric.campaign_id].reach += metric.reach || 0;
+    aggregated[metric.campaign_id].link_clicks += metric.link_clicks || 0;
   });
 
   // Calculate derived metrics
   Object.values(aggregated).forEach((metric) => {
+    // Total clicks-based (all engagement)
     if (metric.clicks > 0) metric.cpc = metric.spend / metric.clicks;
     if (metric.impressions > 0) {
       metric.ctr = (metric.clicks / metric.impressions) * 100;
       metric.cpm = (metric.spend / metric.impressions) * 1000;
     }
     if (metric.spend > 0) metric.roas = metric.conversion_value / metric.spend;
+    
+    // Link clicks-based (accurate CPC)
+    if (metric.link_clicks > 0) {
+      metric.link_cpc = metric.spend / metric.link_clicks;
+      if (metric.impressions > 0) {
+        metric.link_ctr = (metric.link_clicks / metric.impressions) * 100;
+      }
+    }
   });
 
   return aggregated;
@@ -102,18 +130,19 @@ function aggregateDailyMetrics(data: any[]): MetaDailyMetric[] {
   data?.forEach((metric) => {
     const date = metric.date;
     if (!byDate[date]) {
-      byDate[date] = { date, spend: 0, conversions: 0, impressions: 0, clicks: 0 };
+      byDate[date] = { date, spend: 0, conversions: 0, impressions: 0, clicks: 0, link_clicks: 0 };
     }
     byDate[date].spend += Number(metric.spend || 0);
     byDate[date].conversions += metric.conversions || 0;
     byDate[date].impressions += metric.impressions || 0;
     byDate[date].clicks += metric.clicks || 0;
+    byDate[date].link_clicks += metric.link_clicks || 0;
   });
   return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function calculateTotals(metrics: Record<string, MetaMetrics>) {
-  return Object.values(metrics).reduce(
+  const base = Object.values(metrics).reduce(
     (acc, m) => ({
       impressions: acc.impressions + m.impressions,
       clicks: acc.clicks + m.clicks,
@@ -121,9 +150,20 @@ function calculateTotals(metrics: Record<string, MetaMetrics>) {
       conversions: acc.conversions + m.conversions,
       conversion_value: acc.conversion_value + m.conversion_value,
       reach: acc.reach + m.reach,
+      link_clicks: acc.link_clicks + m.link_clicks,
     }),
-    { impressions: 0, clicks: 0, spend: 0, conversions: 0, conversion_value: 0, reach: 0 }
+    { impressions: 0, clicks: 0, spend: 0, conversions: 0, conversion_value: 0, reach: 0, link_clicks: 0 }
   );
+  
+  // Calculate derived link metrics
+  const link_ctr = base.impressions > 0 ? (base.link_clicks / base.impressions) * 100 : 0;
+  const link_cpc = base.link_clicks > 0 ? base.spend / base.link_clicks : 0;
+  
+  return {
+    ...base,
+    link_ctr,
+    link_cpc,
+  };
 }
 
 async function fetchMetaAdsMetrics(
@@ -138,34 +178,72 @@ async function fetchMetaAdsMetrics(
   const prevEnd = subDays(start, 1);
   const prevStart = subDays(prevEnd, daysDiff);
 
-  // Parallel fetch all data
-  const [campaignRes, currentMetricsRes, prevMetricsRes] = await Promise.all([
+  // Fetch campaigns and try ad-level metrics first (more accurate)
+  const [campaignRes, adLevelMetricsRes] = await Promise.all([
     supabase
       .from("meta_campaigns")
       .select("*")
       .eq("organization_id", organizationId),
     supabase
-      .from("meta_ad_metrics")
+      .from("meta_ad_metrics_daily")
       .select("*")
       .eq("organization_id", organizationId)
       .gte("date", startDate)
       .lte("date", endDate)
       .order("date", { ascending: true }),
-    supabase
+  ]);
+
+  if (campaignRes.error) throw campaignRes.error;
+  if (adLevelMetricsRes.error) throw adLevelMetricsRes.error;
+
+  const campaigns = campaignRes.data || [];
+  let isEstimated = false;
+  let metricsData: any[] = (adLevelMetricsRes.data || []) as any[];
+  let latestDataDate: string | null = null;
+
+  // If no ad-level data, fall back to campaign-level metrics
+  if (metricsData.length === 0) {
+    const fallbackRes = await supabase
+      .from("meta_ad_metrics")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .order("date", { ascending: true });
+    
+    if (fallbackRes.error) throw fallbackRes.error;
+    metricsData = fallbackRes.data as any[] ?? [];
+    isEstimated = true;
+  }
+
+  // Determine latest data date
+  if (metricsData.length > 0) {
+    latestDataDate = metricsData[metricsData.length - 1].date;
+  }
+
+  // Fetch previous period metrics (use same source for consistency)
+  let prevMetricsData: any[] = [];
+  if (isEstimated) {
+    const prevRes = await supabase
       .from("meta_ad_metrics")
       .select("*")
       .eq("organization_id", organizationId)
       .gte("date", format(prevStart, "yyyy-MM-dd"))
-      .lte("date", format(prevEnd, "yyyy-MM-dd")),
-  ]);
+      .lte("date", format(prevEnd, "yyyy-MM-dd"));
+    prevMetricsData = prevRes.data || [];
+  } else {
+    const prevRes = await supabase
+      .from("meta_ad_metrics_daily")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .gte("date", format(prevStart, "yyyy-MM-dd"))
+      .lte("date", format(prevEnd, "yyyy-MM-dd"));
+    prevMetricsData = prevRes.data || [];
+  }
 
-  if (campaignRes.error) throw campaignRes.error;
-  if (currentMetricsRes.error) throw currentMetricsRes.error;
-
-  const campaigns = campaignRes.data || [];
-  const metrics = aggregateMetrics(currentMetricsRes.data || []);
-  const dailyMetrics = aggregateDailyMetrics(currentMetricsRes.data || []);
-  const previousPeriodMetrics = aggregateMetrics(prevMetricsRes.data || []);
+  const metrics = aggregateMetrics(metricsData);
+  const dailyMetrics = aggregateDailyMetrics(metricsData);
+  const previousPeriodMetrics = aggregateMetrics(prevMetricsData);
   const totals = calculateTotals(metrics);
   const previousTotals = calculateTotals(previousPeriodMetrics);
 
@@ -176,6 +254,8 @@ async function fetchMetaAdsMetrics(
     previousPeriodMetrics,
     totals,
     previousTotals,
+    isEstimated,
+    latestDataDate,
   };
 }
 

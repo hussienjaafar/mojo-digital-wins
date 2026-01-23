@@ -10,6 +10,7 @@ import {
   V3LoadingState,
   V3ErrorState,
   V3EmptyState,
+  V3InsightBadge,
 } from "@/components/v3";
 import { MessageSquare, DollarSign, Target, TrendingUp, BarChart3, AlertTriangle, Filter, LayoutGrid, List, Sparkles } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -63,6 +64,18 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
     summary: data?.summary,
     previousPeriod: data?.previousPeriod,
   }), [data]);
+
+  // Derive latest data date and check for stale data
+  const latestDataDate = useMemo(() => {
+    if ((dailyMetrics as any[]).length === 0) return null;
+    return (dailyMetrics as any[])[(dailyMetrics as any[]).length - 1].date;
+  }, [dailyMetrics]);
+
+  const isShowingStaleData = useMemo(() => {
+    if (!latestDataDate) return false;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    return startDate === today && latestDataDate !== today;
+  }, [latestDataDate, startDate]);
 
   // Current period totals from unified RPC (now includes SMS-specific fields)
   const totals = useMemo(() => ({
@@ -229,6 +242,13 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
 
   return (
     <div className="space-y-6">
+      {/* Stale data indicator */}
+      {isShowingStaleData && latestDataDate && (
+        <V3InsightBadge type="anomaly-high">
+          Showing data from {format(parseISO(latestDataDate), 'MMM d')} — today's data not yet synced
+        </V3InsightBadge>
+      )}
+
       {/* V3 KPI Cards with Period Comparison */}
       <motion.div
         className="grid grid-cols-2 md:grid-cols-5 gap-3"
