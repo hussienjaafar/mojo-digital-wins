@@ -387,21 +387,43 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
     }
   };
 
-  const syncActBlue = async (backfill = false) => {
+  const syncActBlue = async (options?: { backfill?: boolean; startDate?: string; endDate?: string }) => {
+    const { backfill = false, startDate: customStartDate, endDate: customEndDate } = options || {};
     const syncKey = backfill ? "actblueBackfill" : "actblue";
     setSyncing((prev) => ({ ...prev, [syncKey]: true }));
     try {
       if (backfill) {
-        toast({ title: "Starting Backfill", description: "Fetching 1 year of data. This may take a few minutes..." });
+        toast({ title: "Starting Import", description: "Fetching historical data. This may take a few minutes..." });
+        
+        // Use the orchestrator for backfills with custom date range
+        const { data, error } = await (supabase as any).functions.invoke("backfill-actblue-csv-orchestrator", {
+          body: {
+            organization_id: organizationId,
+            start_date: customStartDate,
+            end_date: customEndDate,
+            start_immediately: true,
+          },
+        });
+
+        if (error) throw error;
+
+        toast({ 
+          title: "Import Started", 
+          description: `Created ${data?.chunks_created || 0} chunks. Processing will continue in the background.` 
+        });
+        await queryClient.invalidateQueries({ queryKey: donationKeys.all });
+        await invalidateDashboardQueries();
+        return;
       }
 
-      const syncStartDate = backfill ? undefined : startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-      const syncEndDate = backfill ? undefined : endDate || new Date().toISOString().split("T")[0];
+      // Regular incremental sync
+      const syncStartDate = startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const syncEndDate = endDate || new Date().toISOString().split("T")[0];
 
       const { data, error } = await (supabase as any).functions.invoke("sync-actblue-csv", {
         body: {
           organization_id: organizationId,
-          mode: backfill ? "backfill" : "incremental",
+          mode: "incremental",
           start_date: syncStartDate,
           end_date: syncEndDate,
         },
@@ -419,7 +441,7 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
       const likelyTimeout = message.includes("timeout") || message.includes("context canceled") || message.includes("aborted");
 
       if (backfill && likelyTimeout) {
-        toast({ title: "Backfill running", description: "This may complete in the background. We'll refresh shortly." });
+        toast({ title: "Import running", description: "This may complete in the background. We'll refresh shortly." });
         window.setTimeout(async () => {
           await loadSyncStatuses();
           await queryClient.invalidateQueries({ queryKey: donationKeys.all });
@@ -451,7 +473,7 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
 
   const syncAll = async () => {
     toast({ title: "Syncing All Sources", description: "This may take a few minutes..." });
-    await Promise.all([syncMetaAds(), syncSwitchboard(), syncActBlue(false)]);
+    await Promise.all([syncMetaAds(), syncSwitchboard(), syncActBlue()]);
     toast({ title: "Complete", description: "All data sources synced" });
     await loadSyncStatuses();
   };
@@ -518,7 +540,7 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
           <DataSourceCard
             source="actblue"
             freshness={getFreshness("actblue")}
-            onSync={() => syncActBlue(false)}
+            onSync={() => syncActBlue()}
             isSyncing={syncing.actblue}
             disabled={isAnySyncing || syncing.actblueBackfill}
           />
@@ -562,12 +584,12 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
               <V3Button
                 variant="ghost"
                 size="sm"
-                onClick={() => syncActBlue(true)}
+                onClick={() => syncActBlue({ backfill: true })}
                 disabled={syncing.actblue || syncing.actblueBackfill}
                 className="text-xs"
               >
                 <History className="h-3.5 w-3.5 mr-1.5" />
-                {syncing.actblueBackfill ? "Backfilling..." : "Backfill ActBlue"}
+                {syncing.actblueBackfill ? "Importing..." : "Import ActBlue History"}
               </V3Button>
               <V3Button
                 variant="ghost"
