@@ -17,7 +17,9 @@ import { createLogger } from "../_shared/logger.ts";
 
 interface BackfillRequest {
   organization_id: string;
-  days_back?: number;  // Default 365 (1 year)
+  days_back?: number;  // Default 365 (1 year) - used if start_date/end_date not provided
+  start_date?: string;  // Explicit start date (YYYY-MM-DD) - takes priority over days_back
+  end_date?: string;    // Explicit end date (YYYY-MM-DD) - defaults to today
   chunk_size_days?: number;  // Default 30 (monthly chunks)
   start_immediately?: boolean;  // Whether to start processing first chunk immediately
 }
@@ -29,16 +31,19 @@ interface ChunkData {
 }
 
 /**
- * Generate monthly chunks for the backfill period
+ * Generate chunks for the backfill period
+ * @param rangeStart - Start of the date range
+ * @param rangeEnd - End of the date range (inclusive)
+ * @param chunkSizeDays - Size of each chunk in days
  */
-function generateChunks(daysBack: number, chunkSizeDays: number): ChunkData[] {
+function generateChunks(rangeStart: Date, rangeEnd: Date, chunkSizeDays: number): ChunkData[] {
   const chunks: ChunkData[] = [];
-  const now = new Date();
-  const endDate = new Date(now);
-  endDate.setDate(endDate.getDate() + 1); // Include today
   
-  const startDate = new Date(now);
-  startDate.setDate(startDate.getDate() - daysBack);
+  // Include the end date (add 1 day)
+  const endDate = new Date(rangeEnd);
+  endDate.setDate(endDate.getDate() + 1);
+  
+  const startDate = new Date(rangeStart);
   
   let chunkIndex = 0;
   let currentEnd = new Date(endDate);
@@ -95,6 +100,8 @@ serve(async (req) => {
     const { 
       organization_id, 
       days_back = 365,
+      start_date,
+      end_date,
       chunk_size_days = 30,
       start_immediately = false
     } = body;
@@ -106,8 +113,16 @@ serve(async (req) => {
       );
     }
 
+    // Calculate date range - explicit dates take priority over days_back
+    const now = new Date();
+    const rangeEnd = end_date ? new Date(end_date) : now;
+    const rangeStart = start_date 
+      ? new Date(start_date) 
+      : new Date(now.getTime() - days_back * 24 * 60 * 60 * 1000);
+
     logger.info(`Starting backfill orchestration for org ${organization_id}`, {
-      days_back,
+      start_date: rangeStart.toISOString().split('T')[0],
+      end_date: rangeEnd.toISOString().split('T')[0],
       chunk_size_days,
       start_immediately
     });
@@ -152,8 +167,8 @@ serve(async (req) => {
       );
     }
 
-    // Generate chunks
-    const chunks = generateChunks(days_back, chunk_size_days);
+    // Generate chunks using calculated date range
+    const chunks = generateChunks(rangeStart, rangeEnd, chunk_size_days);
     const jobId = crypto.randomUUID();
 
     logger.info(`Generated ${chunks.length} chunks for backfill job ${jobId}`);

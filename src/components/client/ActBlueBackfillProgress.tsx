@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -12,10 +11,10 @@ import {
   AlertCircle, 
   Clock, 
   Loader2,
-  Play,
   XCircle
 } from "lucide-react";
 import { format } from "date-fns";
+import { ActBlueBackfillDatePicker } from "./ActBlueBackfillDatePicker";
 
 interface BackfillJob {
   id: string;
@@ -39,10 +38,15 @@ interface ChunkSummary {
   total: number;
 }
 
+interface DateRangeValue {
+  startDate: string;
+  endDate: string;
+}
+
 interface Props {
   organizationId: string;
   onComplete?: () => void;
-  onStartBackfill?: () => Promise<void>;
+  onStartBackfill?: (dateRange: DateRangeValue) => Promise<void>;
   isStarting?: boolean;
 }
 
@@ -213,32 +217,18 @@ export const ActBlueBackfillProgress = ({
     return (
       <Card className="border-dashed border-muted-foreground/30">
         <CardContent className="py-6">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="text-muted-foreground">
+          <div className="flex flex-col gap-4">
+            <div className="text-center text-muted-foreground">
               <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No historical data import in progress</p>
+              <p className="text-sm font-medium">Import Historical Data</p>
               <p className="text-xs mt-1">
-                Import up to 1 year of ActBlue transaction history
+                Fetch transaction history from ActBlue to populate your dashboard
               </p>
             </div>
-            <Button
-              onClick={onStartBackfill}
-              disabled={isStarting}
-              variant="outline"
-              size="sm"
-            >
-              {isStarting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Starting...
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4 mr-2" />
-                  Start Historical Import
-                </>
-              )}
-            </Button>
+            <ActBlueBackfillDatePicker
+              onStartBackfill={onStartBackfill}
+              isStarting={isStarting}
+            />
           </div>
         </CardContent>
       </Card>
