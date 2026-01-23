@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +16,21 @@ const corsHeaders = {
  * - Campaign-aware frequency scoring
  * - Tenure and recurring donor bonuses
  */
+
+/**
+ * Generate donor_key using MD5 hash (first 6 chars)
+ * IMPORTANT: This must match the SQL formula: 'donor_' || substr(md5(lower(trim(email))), 1, 6)
+ * This enables joins with donor_demographics and other tables
+ */
+async function generateDonorKey(email: string): Promise<string> {
+  const normalized = email.toLowerCase().trim();
+  const encoder = new TextEncoder();
+  const data = encoder.encode(normalized);
+  const hashBuffer = await crypto.subtle.digest("MD5", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return `donor_${hashHex.substring(0, 6)}`;
+}
 
 interface LTVPrediction {
   organization_id: string;
@@ -291,14 +307,8 @@ serve(async (req) => {
       
       if (donations.length === 0) continue;
 
-      // Create donor key (hash of email)
-      let hash = 0;
-      for (let i = 0; i < email.length; i++) {
-        const char = email.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-      }
-      const donorKey = `donor_${Math.abs(hash).toString(36)}`;
+      // Create donor key using MD5 hash (matches SQL: 'donor_' || substr(md5(lower(trim(email))), 1, 6))
+      const donorKey = await generateDonorKey(email);
 
       // Calculate metrics
       const totalAmount = donations.reduce((sum, d) => sum + d.amount, 0);
