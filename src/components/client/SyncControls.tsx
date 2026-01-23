@@ -415,7 +415,38 @@ const SyncControls = ({ organizationId, startDate, endDate }: Props) => {
           },
         });
 
-        if (error) throw error;
+        if (error) {
+          // Supabase Functions can surface non-2xx responses as an error with context
+          const status = (error as any)?.context?.status;
+          const rawBody = (error as any)?.context?.body;
+          const body = (() => {
+            if (!rawBody) return null;
+            if (typeof rawBody === "string") {
+              try {
+                return JSON.parse(rawBody);
+              } catch {
+                return null;
+              }
+            }
+            return rawBody;
+          })();
+
+          // Expected case: a backfill is already running for this org
+          if (status === 409) {
+            toast({
+              title: "Import already running",
+              description:
+                body?.job_id
+                  ? `A historical import is already running (job ${body.job_id}). Showing latest progress.`
+                  : "A historical import is already running. Showing latest progress.",
+            });
+            await queryClient.invalidateQueries({ queryKey: donationKeys.all });
+            await invalidateDashboardQueries();
+            return;
+          }
+
+          throw error;
+        }
 
         toast({ 
           title: "Import Started", 
