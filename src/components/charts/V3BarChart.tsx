@@ -231,6 +231,10 @@ export const V3BarChart: React.FC<V3BarChartProps> = ({
           description: `Bar chart showing ${valueName} by category. Top category: ${chartItems[0]?.name || 'none'} with ${formatValue(chartItems[0]?.value || 0)}.`,
         },
       },
+      // Explicitly hide legend - not needed for single series bar charts
+      legend: {
+        show: false,
+      },
       tooltip: {
         trigger: 'item',
         confine: true,
@@ -298,14 +302,19 @@ export const V3BarChart: React.FC<V3BarChartProps> = ({
           name: valueName,
           data: seriesData,
           barMaxWidth: 32,
+          // Disable blur effect on non-hovered bars - prevents "disappearing" bars
           emphasis: {
-            focus: 'self',
+            focus: 'none' as const, // Don't blur/dim other bars
             itemStyle: {
-              shadowBlur: 12,
-              shadowColor: 'hsl(var(--portal-accent-blue) / 0.4)',
+              shadowBlur: 8,
+              shadowColor: 'hsl(var(--portal-accent-blue) / 0.3)',
             },
-            scale: true,
-            scaleSize: 3,
+          },
+          // No blur on non-emphasized items
+          blur: {
+            itemStyle: {
+              opacity: 1, // Keep full opacity
+            },
           },
           label: showValueLabels ? {
             show: true,
