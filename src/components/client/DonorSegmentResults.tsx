@@ -241,7 +241,7 @@ function AggregateView({ aggregates }: { aggregates: SegmentAggregates }) {
         )}
 
         {/* Attribution Channel Distribution */}
-        {aggregates.byChannel.length > 0 && aggregates.byChannel.some(c => c.name !== 'Unknown') && (
+        {(aggregates.byChannel || []).length > 0 && (aggregates.byChannel || []).some(c => c.name !== 'Unknown') && (
           <V3Card>
             <V3CardHeader className="pb-2">
               <V3CardTitle className="text-sm flex items-center gap-2">
