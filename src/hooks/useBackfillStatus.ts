@@ -186,50 +186,53 @@ export function useBackfillStatus({
     staleTime: 5_000,
   });
 
-  // Cancel backfill mutation
+  // Cancel backfill mutation - uses dedicated backend function for reliability
   const cancelMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      // Update job status to cancelled
-      const { error: jobError } = await supabase
-        .from("backfill_status")
-        .update({
-          status: "cancelled",
-          completed_at: new Date().toISOString(),
-          error_message: "Cancelled by user",
-        })
-        .eq("id", jobId);
+      // Get the current session for auth
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Call the cancel-backfill edge function
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cancel-backfill`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            job_id: jobId,
+            organization_id: organizationId,
+          }),
+        }
+      );
 
-      if (jobError) throw jobError;
+      const result = await response.json();
 
-      // Cancel all pending/retrying chunks
-      const { error: chunkError } = await supabase
-        .from("actblue_backfill_chunks")
-        .update({
-          status: "cancelled",
-          error_message: "Job was cancelled by user",
-          completed_at: new Date().toISOString(),
-        })
-        .eq("job_id", jobId)
-        .in("status", ["pending", "retrying"]);
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to cancel backfill');
+      }
 
-      if (chunkError) throw chunkError;
-
-      return jobId;
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       if (enableToasts) {
         toast({
           title: "Import Cancelled",
-          description: "The backfill has been cancelled. Completed chunks will be retained.",
+          description: result.message || "The backfill has been cancelled. Completed chunks will be retained.",
         });
       }
+      // Immediately invalidate to refresh the UI
       queryClient.invalidateQueries({ queryKey: backfillKeys.status(organizationId) });
     },
     onError: (error: any) => {
+      console.error('Cancel backfill error:', error);
       if (enableToasts) {
         toast({
           title: "Failed to Cancel",
-          description: error.message || "Could not cancel the import",
+          description: error.message || "Could not cancel the import. Please try again.",
           variant: "destructive",
         });
       }
@@ -413,45 +416,48 @@ export function useAllBackfillJobs() {
     staleTime: 10_000,
   });
 
-  // Cancel job mutation for admin
+  // Cancel job mutation for admin - uses dedicated backend function
   const cancelJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      const { error: jobError } = await supabase
-        .from("backfill_status")
-        .update({
-          status: "cancelled",
-          completed_at: new Date().toISOString(),
-          error_message: "Cancelled by admin",
-        })
-        .eq("id", jobId);
+      // Get the current session for auth
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Call the cancel-backfill edge function
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cancel-backfill`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            job_id: jobId,
+          }),
+        }
+      );
 
-      if (jobError) throw jobError;
+      const result = await response.json();
 
-      const { error: chunkError } = await supabase
-        .from("actblue_backfill_chunks")
-        .update({
-          status: "cancelled",
-          error_message: "Job was cancelled by admin",
-          completed_at: new Date().toISOString(),
-        })
-        .eq("job_id", jobId)
-        .in("status", ["pending", "retrying"]);
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to cancel backfill');
+      }
 
-      if (chunkError) throw chunkError;
-
-      return jobId;
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       toast({
         title: "Job Cancelled",
-        description: "The backfill job has been cancelled.",
+        description: result.message || "The backfill job has been cancelled.",
       });
       queryClient.invalidateQueries({ queryKey: backfillKeys.allJobs() });
     },
     onError: (error: any) => {
+      console.error('Admin cancel job error:', error);
       toast({
         title: "Failed to Cancel",
-        description: error.message || "Could not cancel the job",
+        description: error.message || "Could not cancel the job. Please try again.",
         variant: "destructive",
       });
     },

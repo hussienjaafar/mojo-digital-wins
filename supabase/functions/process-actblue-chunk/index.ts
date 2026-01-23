@@ -685,6 +685,10 @@ serve(async (req) => {
 
 /**
  * Update overall job progress in backfill_status
+ * 
+ * IMPORTANT: This function now respects the 'cancelled' status and treats
+ * cancelled chunks as terminal (done). It will NOT overwrite a job that
+ * has already been marked as 'cancelled'.
  */
 async function updateJobProgress(
   supabase: any,
@@ -692,6 +696,33 @@ async function updateJobProgress(
   logger: ReturnType<typeof createLogger>
 ): Promise<void> {
   try {
+    // First, check the current job status - if already cancelled, don't overwrite
+    const { data: currentJob } = await supabase
+      .from('backfill_status')
+      .select('status, completed_at')
+      .eq('id', jobId)
+      .single();
+
+    if (!currentJob) {
+      logger.warn(`Job ${jobId} not found during progress update`);
+      return;
+    }
+
+    // If job is already cancelled, only update completed_at if not set
+    if (currentJob.status === 'cancelled') {
+      if (!currentJob.completed_at) {
+        await supabase
+          .from('backfill_status')
+          .update({
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', jobId);
+      }
+      logger.info(`Job ${jobId} is cancelled, not updating status`);
+      return;
+    }
+
     // Get chunk stats for this job
     const { data: chunks } = await supabase
       .from('actblue_backfill_chunks')
@@ -703,19 +734,35 @@ async function updateJobProgress(
     const total = chunks.length;
     const completed = chunks.filter((c: any) => c.status === 'completed').length;
     const failed = chunks.filter((c: any) => c.status === 'failed').length;
+    const cancelled = chunks.filter((c: any) => c.status === 'cancelled').length;
     const totalProcessed = chunks.reduce((sum: number, c: any) => sum + (c.processed_rows || 0), 0);
     const totalInserted = chunks.reduce((sum: number, c: any) => sum + (c.inserted_rows || 0), 0);
 
-    const allDone = completed + failed === total;
-    const status = allDone 
-      ? (failed > 0 ? 'completed_with_errors' : 'completed')
-      : 'running';
+    // Terminal chunks include completed, failed, AND cancelled
+    const terminalChunks = completed + failed + cancelled;
+    const allDone = terminalChunks === total;
 
+    // Determine the appropriate status
+    let status: string;
+    if (allDone) {
+      if (cancelled > 0 && cancelled === total - completed) {
+        // All non-completed chunks were cancelled
+        status = 'cancelled';
+      } else if (failed > 0) {
+        status = 'completed_with_errors';
+      } else {
+        status = 'completed';
+      }
+    } else {
+      status = 'running';
+    }
+
+    // Update the job progress (processed_items now includes cancelled for accurate progress)
     await supabase
       .from('backfill_status')
       .update({
         status,
-        processed_items: completed,
+        processed_items: terminalChunks, // Include cancelled in progress
         failed_items: failed,
         total_items: total,
         updated_at: new Date().toISOString(),
@@ -724,7 +771,7 @@ async function updateJobProgress(
       .eq('id', jobId);
 
     if (allDone) {
-      logger.info(`Job ${jobId} completed: ${completed}/${total} chunks, ${totalInserted} rows inserted`);
+      logger.info(`Job ${jobId} finished: status=${status}, completed=${completed}, failed=${failed}, cancelled=${cancelled}, rows=${totalInserted}`);
     }
   } catch (e: any) {
     logger.error('Failed to update job progress', { message: e?.message || String(e) });
