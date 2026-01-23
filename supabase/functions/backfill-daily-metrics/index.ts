@@ -138,16 +138,17 @@ serve(async (req) => {
           const totalSmsSent = smsCampaigns?.reduce((sum, m) => sum + (m.messages_sent || 0), 0) || 0;
           const totalSmsConversions = smsCampaigns?.reduce((sum, m) => sum + (m.conversions || 0), 0) || 0;
 
-          // Extract ActBlue data from RPC
+          // Extract ActBlue data from RPC - use correct field names from get_actblue_period_summary
           let totalFundsRaised = 0;
           let totalDonations = 0;
           let newDonors = 0;
 
           if (periodSummary && periodSummary.length > 0) {
             const summary = periodSummary[0];
-            totalFundsRaised = parseFloat(summary.net_raised || '0');
-            totalDonations = parseInt(summary.total_donations || '0', 10);
-            newDonors = parseInt(summary.unique_donors || '0', 10);
+            // RPC returns: total_net_donations, total_donation_count, total_unique_donors
+            totalFundsRaised = parseFloat(summary.total_net_donations || summary.total_net_revenue || '0');
+            totalDonations = parseInt(summary.total_donation_count || '0', 10);
+            newDonors = parseInt(summary.total_unique_donors || '0', 10);
           }
 
           // Calculate ROI
