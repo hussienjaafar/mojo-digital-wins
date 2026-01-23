@@ -24,7 +24,10 @@ import { MetaDataFreshnessIndicator } from "./MetaDataFreshnessIndicator";
 import { useMetaAdsMetricsQuery } from "@/queries";
 import { useAnomalyDetection } from "@/hooks/useAnomalyDetection";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsSingleDayView } from "@/hooks/useHourlyMetrics";
 import { formatRatio, formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
+import { SingleDayMetricGrid, type SingleDayMetric } from "./SingleDayMetricGrid";
+import { TopCreativesSection } from "./TopCreativesSection";
 
 type Props = {
   organizationId: string;
@@ -97,6 +100,7 @@ const MetaAdsMetrics = ({
   };
 
   const isMobile = useIsMobile();
+  const isSingleDay = useIsSingleDayView();
 
   // Use TanStack Query hook with dashboard date range
   const { data, isLoading, error, refetch } = useMetaAdsMetricsQuery(organizationId, startDate, endDate);
@@ -411,8 +415,39 @@ const MetaAdsMetrics = ({
         </div>
       )}
 
-      {/* Performance Trend Chart */}
-      {trendChartData.length > 0 && (
+      {/* Single-Day View: Top Creatives + Secondary Metrics Grid */}
+      {isSingleDay && (
+        <>
+          {/* Top Performing Creatives for the selected day */}
+          <TopCreativesSection
+            organizationId={organizationId}
+            startDate={startDate}
+            endDate={endDate}
+            maxItems={5}
+          />
+
+          {/* Additional metrics in grid format for single day */}
+          <V3Card accent="blue">
+            <V3CardHeader className="pb-2">
+              <V3CardTitle className="text-sm">Detailed Metrics</V3CardTitle>
+            </V3CardHeader>
+            <V3CardContent>
+              <SingleDayMetricGrid
+                metrics={[
+                  { label: "Impressions", value: totals.impressions, previousValue: previousTotals.impressions, format: "number", accent: "purple" },
+                  { label: "Clicks", value: totals.clicks, previousValue: previousTotals.clicks, format: "number", accent: "blue" },
+                  { label: "CPC", value: avgCPC, previousValue: previousTotals.clicks > 0 ? previousTotals.spend / previousTotals.clicks : 0, format: "currency", accent: "default" },
+                  { label: "Reach", value: totals.reach, previousValue: previousTotals.reach, format: "number", accent: "green" },
+                ] as SingleDayMetric[]}
+                columns={4}
+              />
+            </V3CardContent>
+          </V3Card>
+        </>
+      )}
+
+      {/* Multi-Day View: Performance Trend Chart */}
+      {!isSingleDay && trendChartData.length > 0 && (
         <div className="space-y-2">
           <V3ChartWrapper
             title="Performance Trend"
@@ -475,8 +510,8 @@ const MetaAdsMetrics = ({
         </div>
       )}
 
-      {/* Campaign Breakdown Chart */}
-      {campaignBreakdownData.length > 0 && (
+      {/* Multi-Day View: Campaign Breakdown Chart */}
+      {!isSingleDay && campaignBreakdownData.length > 0 && (
         <div className="space-y-2">
           <V3ChartWrapper
             title={breakdownChartConfig.title}

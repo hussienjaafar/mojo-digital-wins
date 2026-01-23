@@ -19,6 +19,7 @@ import { Search, DollarSign, Users, Repeat, TrendingUp, PieChart, BarChart3, Shi
 import { format, parseISO } from "date-fns";
 import { EChartsLineChart, EChartsBarChart, V3DonutChart } from "@/components/charts/echarts";
 import { usePIIAccess } from "@/hooks/usePIIAccess";
+import { useIsSingleDayView } from "@/hooks/useHourlyMetrics";
 import { maskName, maskEmail } from "@/lib/pii-masking";
 import { useDonationMetricsQuery, DonationRow } from "@/queries";
 import { formatCurrency } from "@/lib/chart-formatters";
@@ -62,6 +63,9 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
   // Default to masked while loading (fail-closed, non-blocking)
   const { shouldMaskPII, isLoading: piiLoading } = usePIIAccess(organizationId);
   const effectiveMaskPII = piiLoading ? true : shouldMaskPII;
+
+  // Detect single-day view
+  const isSingleDay = useIsSingleDayView();
 
   // Use TanStack Query hook instead of direct Supabase calls
   const { data, isLoading, error, refetch } = useDonationMetricsQuery(organizationId, startDate, endDate);
@@ -293,8 +297,8 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </motion.div>
       </motion.div>
 
-      {/* Donation Trend Chart */}
-      {trendChartData.length > 0 && (
+      {/* Multi-Day View: Donation Trend Chart */}
+      {!isSingleDay && trendChartData.length > 0 && (
         <V3ChartWrapper
           title="Donation Trend"
           icon={TrendingUp}
