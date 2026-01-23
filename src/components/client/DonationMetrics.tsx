@@ -11,6 +11,7 @@ import {
   V3ErrorState,
   V3EmptyState,
   V3DataTable,
+  V3InsightBadge,
 } from "@/components/v3";
 import type { V3Column } from "@/components/v3/V3DataTable";
 import { Input } from "@/components/ui/input";
@@ -75,6 +76,18 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const timeSeries = data?.timeSeries || [];
   const bySource = data?.bySource || [];
   const recentDonations = data?.recentDonations || [];
+
+  // Derive latest data date and check for stale data
+  const latestDataDate = useMemo(() => {
+    if (timeSeries.length === 0) return null;
+    return timeSeries[timeSeries.length - 1].date;
+  }, [timeSeries]);
+
+  const isShowingStaleData = useMemo(() => {
+    if (!latestDataDate) return false;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    return startDate === today && latestDataDate !== today;
+  }, [latestDataDate, startDate]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -212,6 +225,13 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
 
   return (
     <div className="space-y-6">
+      {/* Stale data indicator */}
+      {isShowingStaleData && latestDataDate && (
+        <V3InsightBadge type="anomaly-high">
+          Showing data from {format(parseISO(latestDataDate), 'MMM d')} — today's data not yet synced
+        </V3InsightBadge>
+      )}
+
       {/* Primary KPIs */}
       <motion.div
         className="grid grid-cols-2 md:grid-cols-4 gap-3"

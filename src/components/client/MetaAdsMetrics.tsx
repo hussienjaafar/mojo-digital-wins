@@ -17,7 +17,7 @@ import {
 import { PortalBadge } from "@/components/portal/PortalBadge";
 import { Target, MousePointer, Eye, DollarSign, TrendingUp, BarChart3, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { EChartsLineChart } from "@/components/charts/echarts";
 import { EChartsBarChart } from "@/components/charts/echarts";
 import { MetaDataFreshnessIndicator } from "./MetaDataFreshnessIndicator";
@@ -106,41 +106,32 @@ const MetaAdsMetrics = ({
   const { data, isLoading, error, refetch } = useMetaAdsMetricsQuery(organizationId, startDate, endDate);
 
   // Memoized derived data
-  const { campaigns, metrics, dailyMetrics, previousPeriodMetrics } = useMemo(() => ({
+  const { campaigns, metrics, dailyMetrics, previousPeriodMetrics, isEstimated, latestDataDate } = useMemo(() => ({
     campaigns: data?.campaigns || [],
     metrics: data?.metrics || {},
     dailyMetrics: data?.dailyMetrics || [],
     previousPeriodMetrics: data?.previousPeriodMetrics || {},
+    isEstimated: data?.isEstimated ?? false,
+    latestDataDate: data?.latestDataDate ?? null,
   }), [data]);
 
-  // Calculate totals
-  const totals = useMemo(() => {
-    return Object.values(metrics).reduce(
-      (acc, m) => ({
-        impressions: acc.impressions + m.impressions,
-        clicks: acc.clicks + m.clicks,
-        spend: acc.spend + m.spend,
-        conversions: acc.conversions + m.conversions,
-        conversion_value: acc.conversion_value + m.conversion_value,
-        reach: acc.reach + m.reach,
-      }),
-      { impressions: 0, clicks: 0, spend: 0, conversions: 0, conversion_value: 0, reach: 0 }
-    );
-  }, [metrics]);
+  // Check if showing stale data (selected date has no data yet)
+  const isShowingStaleData = useMemo(() => {
+    if (!latestDataDate) return false;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    return startDate === today && latestDataDate !== today;
+  }, [latestDataDate, startDate]);
 
-  const previousTotals = useMemo(() => {
-    return Object.values(previousPeriodMetrics).reduce(
-      (acc, m) => ({
-        impressions: acc.impressions + m.impressions,
-        clicks: acc.clicks + m.clicks,
-        spend: acc.spend + m.spend,
-        conversions: acc.conversions + m.conversions,
-        conversion_value: acc.conversion_value + m.conversion_value,
-        reach: acc.reach + m.reach,
-      }),
-      { impressions: 0, clicks: 0, spend: 0, conversions: 0, conversion_value: 0, reach: 0 }
-    );
-  }, [previousPeriodMetrics]);
+  // Use pre-calculated totals from the query (includes link metrics)
+  const totals = data?.totals ?? { 
+    impressions: 0, clicks: 0, spend: 0, conversions: 0, 
+    conversion_value: 0, reach: 0, link_clicks: 0, link_ctr: 0, link_cpc: 0 
+  };
+  
+  const previousTotals = data?.previousTotals ?? { 
+    impressions: 0, clicks: 0, spend: 0, conversions: 0, 
+    conversion_value: 0, reach: 0, link_clicks: 0, link_ctr: 0, link_cpc: 0 
+  };
 
   const calcChange = (current: number, previous: number) => {
     if (previous === 0) return current > 0 ? 100 : 0;
@@ -342,9 +333,21 @@ const MetaAdsMetrics = ({
     <div className="space-y-[var(--portal-space-lg)]">
       {/* Panel Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-[hsl(var(--portal-border)/0.5)]">
-        <h4 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))]">
-          Meta Ads Overview
-        </h4>
+        <div className="flex items-center gap-2">
+          <h4 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))]">
+            Meta Ads Overview
+          </h4>
+          {isShowingStaleData && latestDataDate && (
+            <V3InsightBadge type="anomaly-high">
+              Showing data from {format(parseISO(latestDataDate), 'MMM d')} — today's data not yet synced
+            </V3InsightBadge>
+          )}
+          {isEstimated && (
+            <V3InsightBadge type="info">
+              Using estimated campaign-level data
+            </V3InsightBadge>
+          )}
+        </div>
         <MetaDataFreshnessIndicator organizationId={organizationId} compact />
       </div>
 
@@ -435,8 +438,8 @@ const MetaAdsMetrics = ({
               <SingleDayMetricGrid
                 metrics={[
                   { label: "Impressions", value: totals.impressions, previousValue: previousTotals.impressions, format: "number", accent: "purple" },
-                  { label: "Clicks", value: totals.clicks, previousValue: previousTotals.clicks, format: "number", accent: "blue" },
-                  { label: "CPC", value: avgCPC, previousValue: previousTotals.clicks > 0 ? previousTotals.spend / previousTotals.clicks : 0, format: "currency", accent: "default" },
+                  { label: "Link Clicks", value: totals.link_clicks, previousValue: previousTotals.link_clicks, format: "number", accent: "blue" },
+                  { label: "Cost/Link Click", value: totals.link_cpc, previousValue: previousTotals.link_cpc, format: "currency", accent: "default" },
                   { label: "Reach", value: totals.reach, previousValue: previousTotals.reach, format: "number", accent: "green" },
                 ] as SingleDayMetric[]}
                 columns={4}
