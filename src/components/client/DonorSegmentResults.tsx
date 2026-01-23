@@ -1,5 +1,5 @@
 import React from "react";
-import { Users, DollarSign, TrendingUp, RefreshCw, AlertTriangle, MapPin, BarChart3, Megaphone } from "lucide-react";
+import { Users, DollarSign, TrendingUp, RefreshCw, AlertTriangle, MapPin, BarChart3, Megaphone, Heart, Lightbulb, MessageCircle } from "lucide-react";
 import { V3Card, V3CardContent, V3CardHeader, V3CardTitle, V3KPICard, V3LoadingState, V3EmptyState } from "@/components/v3";
 import { V3DonutChart } from "@/components/charts/echarts";
 import { V3BarChart } from "@/components/charts/V3BarChart";
@@ -263,6 +263,114 @@ function AggregateView({ aggregates }: { aggregates: SegmentAggregates }) {
               />
             </V3CardContent>
           </V3Card>
+        )}
+
+        {/* Donor Motivation Insights Section */}
+        {((aggregates.byTopic || []).length > 0 || (aggregates.byPainPoint || []).length > 0 || (aggregates.byValue || []).length > 0) && (
+          <>
+            <div className="col-span-full">
+              <h3 className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] mb-4 flex items-center gap-2">
+                <Lightbulb className="h-4 w-4 text-[hsl(var(--portal-accent-amber))]" />
+                What Motivated These Donors
+                <span className="text-xs font-normal text-[hsl(var(--portal-text-muted))]">
+                  (Based on AI analysis of ads/SMS that drove their donations)
+                </span>
+              </h3>
+            </div>
+
+            {/* Topic Distribution */}
+            {(aggregates.byTopic || []).length > 0 && (
+              <V3Card>
+                <V3CardHeader className="pb-2">
+                  <V3CardTitle className="text-sm flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4" />
+                    Acquisition Topics
+                  </V3CardTitle>
+                </V3CardHeader>
+                <V3CardContent>
+                  <V3DonutChart
+                    data={aggregates.byTopic}
+                    height={220}
+                    valueType="number"
+                    centerLabel="Topics"
+                    legendPosition="bottom"
+                    topN={6}
+                  />
+                </V3CardContent>
+              </V3Card>
+            )}
+
+            {/* Pain Points */}
+            {(aggregates.byPainPoint || []).length > 0 && (
+              <V3Card>
+                <V3CardHeader className="pb-2">
+                  <V3CardTitle className="text-sm flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Pain Points That Drove Giving
+                  </V3CardTitle>
+                </V3CardHeader>
+                <V3CardContent>
+                  <V3BarChart
+                    data={aggregates.byPainPoint}
+                    nameKey="name"
+                    valueKey="value"
+                    valueName="Donors"
+                    height={280}
+                    valueType="number"
+                    horizontal={true}
+                    topN={6}
+                    maxLabelLength={40}
+                  />
+                </V3CardContent>
+              </V3Card>
+            )}
+
+            {/* Values */}
+            {(aggregates.byValue || []).length > 0 && (
+              <V3Card>
+                <V3CardHeader className="pb-2">
+                  <V3CardTitle className="text-sm flex items-center gap-2">
+                    <Heart className="h-4 w-4" />
+                    Values That Resonate
+                  </V3CardTitle>
+                </V3CardHeader>
+                <V3CardContent>
+                  <V3DonutChart
+                    data={aggregates.byValue}
+                    height={220}
+                    valueType="number"
+                    centerLabel="Values"
+                    legendPosition="bottom"
+                    topN={6}
+                  />
+                </V3CardContent>
+              </V3Card>
+            )}
+
+            {/* Emotions */}
+            {(aggregates.byEmotion || []).length > 0 && (
+              <V3Card>
+                <V3CardHeader className="pb-2">
+                  <V3CardTitle className="text-sm flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Emotional Triggers
+                  </V3CardTitle>
+                </V3CardHeader>
+                <V3CardContent>
+                  <V3BarChart
+                    data={aggregates.byEmotion}
+                    nameKey="name"
+                    valueKey="value"
+                    valueName="Donors"
+                    height={220}
+                    valueType="number"
+                    horizontal={true}
+                    topN={6}
+                  />
+                </V3CardContent>
+              </V3Card>
+            )}
+          </>
         )}
       </div>
     </div>

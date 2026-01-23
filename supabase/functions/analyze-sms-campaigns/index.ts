@@ -19,6 +19,12 @@ interface AIAnalysisResult {
   urgency_level: string;
   call_to_action: string;
   key_themes: string[];
+  // Deep donor motivation fields
+  donor_pain_points: string[];
+  values_appealed: string[];
+  issue_specifics: string[];
+  emotional_triggers: string[];
+  urgency_drivers: string[];
 }
 
 serve(async (req) => {
@@ -93,21 +99,53 @@ serve(async (req) => {
         // Truncate message text if too long (keep first 2000 chars)
         const messageText = campaign.message_text.slice(0, 2000);
 
-        const prompt = `Analyze this political SMS campaign message and extract the following information. Respond ONLY with a valid JSON object, no markdown or explanation.
+        const prompt = `You are an expert at understanding what motivates political donors to give money.
+
+Analyze this SMS campaign message and extract SPECIFIC insights about donor psychology and motivations.
 
 SMS Message:
 """
 ${messageText}
 """
 
-Provide analysis in this exact JSON format:
+Focus on:
+1. DONOR_PAIN_POINTS: What specific problem, injustice, or threat is highlighted that would compel someone to donate?
+   - Be SPECIFIC (not "foreign policy" but "US funding of Israeli military operations killing civilians")
+   - What keeps donors up at night that this message addresses?
+
+2. VALUES_APPEALED: What core values are being triggered to motivate action?
+   - Examples: justice, community empowerment, anti-establishment, protecting vulnerable people, religious duty, patriotism, solidarity
+
+3. ISSUE_SPECIFICS: What exact policy, event, or situation is mentioned?
+   - Examples: "Gaza humanitarian crisis", "AIPAC lobbying influence", "Bronx housing affordability crisis"
+
+4. EMOTIONAL_TRIGGERS: What emotions are being activated to drive the donation?
+   - Examples: anger at corruption, fear of losing rights, hope for change, guilt about inaction, pride in community
+
+5. URGENCY_DRIVERS: What creates the sense of "I need to act NOW"?
+   - Examples: matching gift deadline, crisis moment, upcoming vote, opponent threat, end-of-quarter deadline
+
+Also extract:
+- topic: Primary topic category (Healthcare, Immigration, Elections, Endorsement, Fundraising, Policy, Economy, Environment, Civil Rights, Foreign Policy, Education, Gun Rights, Veterans, Other)
+- topic_summary: 10-20 word summary of the message's main intent
+- tone: Emotional tone (urgent, hopeful, angry, grateful, concerned, inspiring, alarming, celebratory)
+- urgency_level: (low, medium, high, critical)
+- call_to_action: Primary CTA (donate, volunteer, sign petition, vote, share, attend event, contact representative, other)
+- key_themes: 2-4 key themes
+
+Respond ONLY with valid JSON, no markdown:
 {
-  "topic": "Primary topic category (one of: Healthcare, Immigration, Elections, Endorsement, Fundraising, Policy, Economy, Environment, Civil Rights, Foreign Policy, Education, Gun Rights, Veterans, Other)",
-  "topic_summary": "A concise 10-20 word summary of the message's main intent and purpose",
-  "tone": "Emotional tone (one of: urgent, hopeful, angry, grateful, concerned, inspiring, alarming, celebratory)",
-  "urgency_level": "Urgency level (one of: low, medium, high, critical)",
-  "call_to_action": "Primary CTA type (one of: donate, volunteer, sign petition, vote, share, attend event, contact representative, other)",
-  "key_themes": ["array", "of", "2-4", "key", "themes"]
+  "topic": "string",
+  "topic_summary": "string",
+  "tone": "string",
+  "urgency_level": "string",
+  "call_to_action": "string",
+  "key_themes": ["array"],
+  "donor_pain_points": ["specific pain point 1", "specific pain point 2"],
+  "values_appealed": ["value 1", "value 2"],
+  "issue_specifics": ["specific issue 1"],
+  "emotional_triggers": ["emotion 1", "emotion 2"],
+  "urgency_drivers": ["urgency reason 1"]
 }`;
 
         // Call Lovable AI gateway
@@ -122,7 +160,7 @@ Provide analysis in this exact JSON format:
             messages: [
               {
                 role: 'system',
-                content: 'You are an expert political campaign analyst. Analyze SMS campaign messages and extract key information. Always respond with valid JSON only.'
+                content: 'You are an expert political campaign analyst who understands donor psychology. Your job is to identify what SPECIFICALLY motivates people to donate - not generic categories, but the exact pain points, values, and emotions that drive giving behavior. Always respond with valid JSON only.'
               },
               {
                 role: 'user',
@@ -130,7 +168,7 @@ Provide analysis in this exact JSON format:
               }
             ],
             temperature: 0.3,
-            max_tokens: 500,
+            max_tokens: 1000,
           }),
         });
 
@@ -163,7 +201,7 @@ Provide analysis in this exact JSON format:
           continue;
         }
 
-        // Update campaign with analysis results
+        // Update campaign with analysis results including motivation fields
         const { error: updateError } = await supabase
           .from('sms_campaigns')
           .update({
@@ -173,6 +211,12 @@ Provide analysis in this exact JSON format:
             urgency_level: analysis.urgency_level || 'medium',
             call_to_action: analysis.call_to_action || null,
             key_themes: analysis.key_themes || [],
+            // Deep motivation fields
+            donor_pain_points: analysis.donor_pain_points || [],
+            values_appealed: analysis.values_appealed || [],
+            issue_specifics: analysis.issue_specifics || [],
+            emotional_triggers: analysis.emotional_triggers || [],
+            urgency_drivers: analysis.urgency_drivers || [],
             analyzed_at: new Date().toISOString(),
           })
           .eq('id', campaign.id);
@@ -181,6 +225,7 @@ Provide analysis in this exact JSON format:
           console.error('Update error for campaign', campaign.id, updateError);
           results.push({ id: campaign.id, success: false, error: updateError.message });
         } else {
+          console.log(`Analyzed SMS campaign ${campaign.id}: pain_points=${analysis.donor_pain_points?.length || 0}, values=${analysis.values_appealed?.length || 0}`);
           results.push({ id: campaign.id, success: true });
         }
       } catch (campaignError) {

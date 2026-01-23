@@ -5637,6 +5637,173 @@ export type Database = {
           },
         ]
       }
+      meta_ad_transcripts: {
+        Row: {
+          ad_id: string
+          analyzed_at: string | null
+          cta_text: string | null
+          donor_pain_points: string[] | null
+          duration_seconds: number | null
+          emotional_triggers: string[] | null
+          id: string
+          issue_specifics: string[] | null
+          key_phrases: string[] | null
+          language: string | null
+          organization_id: string
+          tone_primary: string | null
+          topic_primary: string | null
+          topic_tags: string[] | null
+          transcribed_at: string | null
+          transcript_text: string
+          urgency_drivers: string[] | null
+          values_appealed: string[] | null
+          video_id: string
+        }
+        Insert: {
+          ad_id: string
+          analyzed_at?: string | null
+          cta_text?: string | null
+          donor_pain_points?: string[] | null
+          duration_seconds?: number | null
+          emotional_triggers?: string[] | null
+          id?: string
+          issue_specifics?: string[] | null
+          key_phrases?: string[] | null
+          language?: string | null
+          organization_id: string
+          tone_primary?: string | null
+          topic_primary?: string | null
+          topic_tags?: string[] | null
+          transcribed_at?: string | null
+          transcript_text: string
+          urgency_drivers?: string[] | null
+          values_appealed?: string[] | null
+          video_id: string
+        }
+        Update: {
+          ad_id?: string
+          analyzed_at?: string | null
+          cta_text?: string | null
+          donor_pain_points?: string[] | null
+          duration_seconds?: number | null
+          emotional_triggers?: string[] | null
+          id?: string
+          issue_specifics?: string[] | null
+          key_phrases?: string[] | null
+          language?: string | null
+          organization_id?: string
+          tone_primary?: string | null
+          topic_primary?: string | null
+          topic_tags?: string[] | null
+          transcribed_at?: string | null
+          transcript_text?: string
+          urgency_drivers?: string[] | null
+          values_appealed?: string[] | null
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_ad_transcripts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_ad_transcripts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "meta_ad_transcripts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      meta_ad_videos: {
+        Row: {
+          ad_id: string
+          created_at: string | null
+          downloaded_at: string | null
+          duration_seconds: number | null
+          error_code: string | null
+          error_message: string | null
+          id: string
+          last_error_at: string | null
+          organization_id: string
+          retry_count: number | null
+          status: string | null
+          thumbnail_url: string | null
+          transcribed_at: string | null
+          updated_at: string | null
+          video_id: string
+          video_source_url: string | null
+        }
+        Insert: {
+          ad_id: string
+          created_at?: string | null
+          downloaded_at?: string | null
+          duration_seconds?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          last_error_at?: string | null
+          organization_id: string
+          retry_count?: number | null
+          status?: string | null
+          thumbnail_url?: string | null
+          transcribed_at?: string | null
+          updated_at?: string | null
+          video_id: string
+          video_source_url?: string | null
+        }
+        Update: {
+          ad_id?: string
+          created_at?: string | null
+          downloaded_at?: string | null
+          duration_seconds?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          last_error_at?: string | null
+          organization_id?: string
+          retry_count?: number | null
+          status?: string | null
+          thumbnail_url?: string | null
+          transcribed_at?: string | null
+          updated_at?: string | null
+          video_id?: string
+          video_source_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_ad_videos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_ad_videos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "meta_ad_videos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       meta_campaigns: {
         Row: {
           campaign_id: string
@@ -6054,8 +6221,10 @@ export type Database = {
           description: string | null
           destination_url: string | null
           detected_text: string | null
+          donor_pain_points: string[] | null
           effectiveness_score: number | null
           emotional_appeal: string | null
+          emotional_triggers: string[] | null
           engagement_rate_ranking: string | null
           extracted_refcode: string | null
           first_seen_at: string | null
@@ -6066,6 +6235,7 @@ export type Database = {
           image_height: number | null
           image_width: number | null
           impressions: number | null
+          issue_specifics: string[] | null
           key_quotes: Json | null
           key_themes: string[] | null
           link_clicks: number | null
@@ -6099,7 +6269,9 @@ export type Database = {
           transcript_confidence: number | null
           transcription_status: string | null
           updated_at: string | null
+          urgency_drivers: string[] | null
           urgency_level: string | null
+          values_appealed: string[] | null
           verbal_themes: string[] | null
           video_avg_watch_time_seconds: number | null
           video_duration_seconds: number | null
@@ -6134,8 +6306,10 @@ export type Database = {
           description?: string | null
           destination_url?: string | null
           detected_text?: string | null
+          donor_pain_points?: string[] | null
           effectiveness_score?: number | null
           emotional_appeal?: string | null
+          emotional_triggers?: string[] | null
           engagement_rate_ranking?: string | null
           extracted_refcode?: string | null
           first_seen_at?: string | null
@@ -6146,6 +6320,7 @@ export type Database = {
           image_height?: number | null
           image_width?: number | null
           impressions?: number | null
+          issue_specifics?: string[] | null
           key_quotes?: Json | null
           key_themes?: string[] | null
           link_clicks?: number | null
@@ -6179,7 +6354,9 @@ export type Database = {
           transcript_confidence?: number | null
           transcription_status?: string | null
           updated_at?: string | null
+          urgency_drivers?: string[] | null
           urgency_level?: string | null
+          values_appealed?: string[] | null
           verbal_themes?: string[] | null
           video_avg_watch_time_seconds?: number | null
           video_duration_seconds?: number | null
@@ -6214,8 +6391,10 @@ export type Database = {
           description?: string | null
           destination_url?: string | null
           detected_text?: string | null
+          donor_pain_points?: string[] | null
           effectiveness_score?: number | null
           emotional_appeal?: string | null
+          emotional_triggers?: string[] | null
           engagement_rate_ranking?: string | null
           extracted_refcode?: string | null
           first_seen_at?: string | null
@@ -6226,6 +6405,7 @@ export type Database = {
           image_height?: number | null
           image_width?: number | null
           impressions?: number | null
+          issue_specifics?: string[] | null
           key_quotes?: Json | null
           key_themes?: string[] | null
           link_clicks?: number | null
@@ -6259,7 +6439,9 @@ export type Database = {
           transcript_confidence?: number | null
           transcription_status?: string | null
           updated_at?: string | null
+          urgency_drivers?: string[] | null
           urgency_level?: string | null
+          values_appealed?: string[] | null
           verbal_themes?: string[] | null
           video_avg_watch_time_seconds?: number | null
           video_duration_seconds?: number | null
@@ -9445,8 +9627,11 @@ export type Database = {
           cost: number | null
           created_at: string | null
           destination_url: string | null
+          donor_pain_points: string[] | null
+          emotional_triggers: string[] | null
           extracted_refcode: string | null
           id: string
+          issue_specifics: string[] | null
           key_themes: string[] | null
           message_text: string | null
           messages_delivered: number | null
@@ -9464,7 +9649,9 @@ export type Database = {
           topic: string | null
           topic_summary: string | null
           updated_at: string | null
+          urgency_drivers: string[] | null
           urgency_level: string | null
+          values_appealed: string[] | null
         }
         Insert: {
           actblue_refcode?: string | null
@@ -9478,8 +9665,11 @@ export type Database = {
           cost?: number | null
           created_at?: string | null
           destination_url?: string | null
+          donor_pain_points?: string[] | null
+          emotional_triggers?: string[] | null
           extracted_refcode?: string | null
           id?: string
+          issue_specifics?: string[] | null
           key_themes?: string[] | null
           message_text?: string | null
           messages_delivered?: number | null
@@ -9497,7 +9687,9 @@ export type Database = {
           topic?: string | null
           topic_summary?: string | null
           updated_at?: string | null
+          urgency_drivers?: string[] | null
           urgency_level?: string | null
+          values_appealed?: string[] | null
         }
         Update: {
           actblue_refcode?: string | null
@@ -9511,8 +9703,11 @@ export type Database = {
           cost?: number | null
           created_at?: string | null
           destination_url?: string | null
+          donor_pain_points?: string[] | null
+          emotional_triggers?: string[] | null
           extracted_refcode?: string | null
           id?: string
+          issue_specifics?: string[] | null
           key_themes?: string[] | null
           message_text?: string | null
           messages_delivered?: number | null
@@ -9530,7 +9725,9 @@ export type Database = {
           topic?: string | null
           topic_summary?: string | null
           updated_at?: string | null
+          urgency_drivers?: string[] | null
           urgency_level?: string | null
+          values_appealed?: string[] | null
         }
         Relationships: [
           {
@@ -9570,7 +9767,10 @@ export type Database = {
           conversion_rate: number | null
           conversions: number | null
           created_at: string | null
+          donor_pain_points: string[] | null
+          emotional_triggers: string[] | null
           id: string
+          issue_specifics: string[] | null
           key_themes: string[] | null
           message_text: string
           messages_delivered: number | null
@@ -9584,7 +9784,9 @@ export type Database = {
           tone: string | null
           topic: string | null
           updated_at: string | null
+          urgency_drivers: string[] | null
           urgency_level: string | null
+          values_appealed: string[] | null
         }
         Insert: {
           ai_model_used?: string | null
@@ -9599,7 +9801,10 @@ export type Database = {
           conversion_rate?: number | null
           conversions?: number | null
           created_at?: string | null
+          donor_pain_points?: string[] | null
+          emotional_triggers?: string[] | null
           id?: string
+          issue_specifics?: string[] | null
           key_themes?: string[] | null
           message_text: string
           messages_delivered?: number | null
@@ -9613,7 +9818,9 @@ export type Database = {
           tone?: string | null
           topic?: string | null
           updated_at?: string | null
+          urgency_drivers?: string[] | null
           urgency_level?: string | null
+          values_appealed?: string[] | null
         }
         Update: {
           ai_model_used?: string | null
@@ -9628,7 +9835,10 @@ export type Database = {
           conversion_rate?: number | null
           conversions?: number | null
           created_at?: string | null
+          donor_pain_points?: string[] | null
+          emotional_triggers?: string[] | null
           id?: string
+          issue_specifics?: string[] | null
           key_themes?: string[] | null
           message_text?: string
           messages_delivered?: number | null
@@ -9642,7 +9852,9 @@ export type Database = {
           tone?: string | null
           topic?: string | null
           updated_at?: string | null
+          urgency_drivers?: string[] | null
           urgency_level?: string | null
+          values_appealed?: string[] | null
         }
         Relationships: [
           {
