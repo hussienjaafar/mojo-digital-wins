@@ -14007,6 +14007,14 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Json
       }
+      check_org_membership: {
+        Args: {
+          p_organization_id: string
+          p_roles?: string[]
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       check_pipeline_deadman: {
         Args: never
         Returns: {
