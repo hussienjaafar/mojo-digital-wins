@@ -9,6 +9,8 @@ import { OnboardingWizard } from "@/components/client/OnboardingWizard";
 import { ClientDashboardCharts } from "@/components/client/ClientDashboardCharts";
 import { ConsolidatedChannelMetrics } from "@/components/client/ConsolidatedChannelMetrics";
 import SyncControls from "@/components/client/SyncControls";
+import { DataSyncStatusBar } from "@/components/client/DataSyncStatusBar";
+import { BackfillStatusBanner } from "@/components/client/BackfillStatusBanner";
 import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { motion, AnimatePresence } from "framer-motion";
@@ -424,6 +426,12 @@ const ClientDashboard = () => {
               animate="visible"
               className="space-y-6"
             >
+              {/* Backfill Status Banner - prominent when import is running */}
+              <BackfillStatusBanner 
+                organizationId={organizationId}
+                className="animate-in fade-in slide-in-from-top-2 duration-300"
+              />
+
               {/* AT A GLANCE: Performance Overview - Premium Header + KPIs */}
               <motion.section variants={sectionVariants}>
                 <DashboardTopSection

@@ -13,6 +13,7 @@ import MetaAdsMetrics from "@/components/client/MetaAdsMetrics";
 import SMSMetrics from "@/components/client/SMSMetrics";
 import DonationMetrics from "@/components/client/DonationMetrics";
 import SyncControls from "@/components/client/SyncControls";
+import { BackfillStatusBanner } from "@/components/client/BackfillStatusBanner";
 import { DateRangeSelector } from "@/components/dashboard/DateRangeSelector";
 import { RedirectLinkAnalytics } from "@/components/analytics/RedirectLinkAnalytics";
 
@@ -169,6 +170,12 @@ const AdminClientView = () => {
             onDateChange={handleDateChange}
           />
         </div>
+
+        {/* Backfill Status Banner */}
+        <BackfillStatusBanner 
+          organizationId={organization.id}
+          className="mb-4"
+        />
 
         {/* Sync Controls */}
         <SyncControls organizationId={organization.id} />
