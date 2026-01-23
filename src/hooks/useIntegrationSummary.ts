@@ -4,13 +4,16 @@ import {
   IntegrationSummary, 
   IntegrationStatusCounts, 
   IntegrationHealthStatus,
-  IntegrationDetail 
+  IntegrationDetail,
+  WebhookStats,
+  DataFreshness,
 } from '@/types/integrations';
 
 interface UseIntegrationSummaryOptions {
   statusFilter?: IntegrationHealthStatus | 'all';
   platformFilter?: string | 'all';
   searchQuery?: string;
+  includeDiagnostics?: boolean;
 }
 
 interface UseIntegrationSummaryReturn {
@@ -26,7 +29,7 @@ interface UseIntegrationSummaryReturn {
 export function useIntegrationSummary(
   options: UseIntegrationSummaryOptions = {}
 ): UseIntegrationSummaryReturn {
-  const { statusFilter = 'all', platformFilter = 'all', searchQuery = '' } = options;
+  const { statusFilter = 'all', platformFilter = 'all', searchQuery = '', includeDiagnostics = true } = options;
   
   const [data, setData] = useState<IntegrationSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,6 +40,54 @@ export function useIntegrationSummary(
     noSetup: 0,
     untested: 0,
   });
+
+  const fetchDiagnostics = useCallback(async (orgIds: string[]): Promise<{
+    webhookStats: Map<string, WebhookStats>;
+    dataFreshness: Map<string, DataFreshness>;
+  }> => {
+    const webhookStats = new Map<string, WebhookStats>();
+    const dataFreshness = new Map<string, DataFreshness>();
+
+    if (orgIds.length === 0) return { webhookStats, dataFreshness };
+
+    try {
+      // Fetch webhook stats
+      const { data: webhookData, error: webhookError } = await supabase
+        .rpc('get_org_webhook_stats', { org_ids: orgIds });
+      
+      if (!webhookError && webhookData) {
+        webhookData.forEach((row: any) => {
+          webhookStats.set(row.org_id, {
+            org_id: row.org_id,
+            total_events: row.total_events || 0,
+            failures: row.failures || 0,
+            last_error: row.last_error,
+            last_failure_at: row.last_failure_at,
+            failure_rate: row.failure_rate || 0,
+          });
+        });
+      }
+
+      // Fetch data freshness
+      const { data: freshnessData, error: freshnessError } = await supabase
+        .rpc('get_org_data_freshness', { org_ids: orgIds });
+      
+      if (!freshnessError && freshnessData) {
+        freshnessData.forEach((row: any) => {
+          dataFreshness.set(row.org_id, {
+            org_id: row.org_id,
+            last_transaction_at: row.last_transaction_at,
+            days_stale: row.days_stale,
+            transaction_count_7d: row.transaction_count_7d || 0,
+          });
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching diagnostics:', err);
+    }
+
+    return { webhookStats, dataFreshness };
+  }, []);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -51,7 +102,7 @@ export function useIntegrationSummary(
       if (fetchError) throw fetchError;
 
       // Parse the integrations JSON and type it properly
-      const typedData: IntegrationSummary[] = (summaryData || []).map((row: any) => ({
+      let typedData: IntegrationSummary[] = (summaryData || []).map((row: any) => ({
         organization_id: row.organization_id,
         organization_name: row.organization_name,
         organization_slug: row.organization_slug,
@@ -64,6 +115,21 @@ export function useIntegrationSummary(
         untested_count: row.untested_count || 0,
         health_status: row.health_status as IntegrationHealthStatus,
       }));
+
+      // Fetch diagnostics if enabled
+      if (includeDiagnostics) {
+        const orgIds = typedData.map(d => d.organization_id);
+        const { webhookStats, dataFreshness } = await fetchDiagnostics(orgIds);
+
+        // Enrich with diagnostics
+        typedData = typedData.map(summary => ({
+          ...summary,
+          diagnostics: {
+            webhookStats: webhookStats.get(summary.organization_id),
+            dataFreshness: dataFreshness.get(summary.organization_id),
+          },
+        }));
+      }
 
       // Calculate status counts from unfiltered data
       const counts: IntegrationStatusCounts = {
@@ -105,7 +171,7 @@ export function useIntegrationSummary(
     } finally {
       setIsLoading(false);
     }
-  }, [statusFilter, platformFilter, searchQuery]);
+  }, [statusFilter, platformFilter, searchQuery, includeDiagnostics, fetchDiagnostics]);
 
   useEffect(() => {
     fetchData();
