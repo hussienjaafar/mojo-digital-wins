@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, DollarSign, Users, Repeat, TrendingUp, PieChart, BarChart3, ShieldAlert, Receipt, ArrowUpDown, Filter } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { EChartsLineChart, EChartsBarChart, V3DonutChart } from "@/components/charts/echarts";
+import { EChartsLineChart, EChartsCombinationChart, V3DonutChart } from "@/components/charts/echarts";
 import { usePIIAccess } from "@/hooks/usePIIAccess";
 import { useIsSingleDayView } from "@/hooks/useHourlyMetrics";
 import { maskName, maskEmail } from "@/lib/pii-masking";
@@ -363,8 +363,9 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
               }))}
               valueType="currency"
               height={280}
-              centerLabel="Total Revenue"
+              centerLabel="Net Revenue"
               topN={8}
+              overrideTotal={metrics.netRaised}
             />
           </V3ChartWrapper>
         )}
@@ -378,16 +379,35 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
             description="Comparison of one-time vs recurring donations"
             accent="purple"
           >
-            <EChartsBarChart
+            <EChartsCombinationChart
               data={giftSizeData}
               xAxisKey="name"
               series={[
-                { dataKey: "amount", name: "Amount", valueType: "currency" },
-                { dataKey: "count", name: "Count", valueType: "number" },
+                { 
+                  dataKey: "amount", 
+                  name: "Amount", 
+                  type: "bar",
+                  color: "hsl(var(--portal-accent-blue))",
+                  yAxisIndex: 0,
+                  valueType: "currency"
+                },
+                { 
+                  dataKey: "count", 
+                  name: "Count", 
+                  type: "line",
+                  color: "hsl(var(--portal-accent-purple))",
+                  yAxisIndex: 1,
+                  valueType: "number",
+                  showSymbol: true,
+                  lineWidth: 3
+                },
               ]}
-              valueType="currency"
+              dualYAxis
+              yAxisValueTypeLeft="currency"
+              yAxisValueTypeRight="number"
+              yAxisNameLeft="Amount"
+              yAxisNameRight="Count"
               height={280}
-              disableHoverEmphasis
             />
           </V3ChartWrapper>
         )}
