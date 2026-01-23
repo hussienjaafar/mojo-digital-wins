@@ -64,6 +64,8 @@ export interface V3DonutChartProps {
   dataOptions?: ProcessDonutDataOptions;
   /** Disable hover emphasis to prevent visual glitches */
   disableHoverEmphasis?: boolean;
+  /** Override the calculated total for center display (use canonical value) */
+  overrideTotal?: number;
 }
 
 export const V3DonutChart: React.FC<V3DonutChartProps> = ({
@@ -84,6 +86,7 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
   useDecals = false,
   dataOptions,
   disableHoverEmphasis = true,
+  overrideTotal,
 }) => {
   // Track selected/hovered slice for center label
   const [hoveredSlice, setHoveredSlice] = useState<{ name: string; value: number; percent: number } | null>(null);
@@ -111,32 +114,13 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
     });
   }, [data, topN, includeNotProvided, dataOptions]);
 
-  // Handle loading
-  if (isLoading) {
-    return (
-      <div className={className} style={{ height: typeof height === 'number' ? height : undefined }}>
-        <V3LoadingState variant="chart" />
-      </div>
-    );
-  }
-
-  // Handle empty data
-  if (!processedData.items || processedData.items.length === 0) {
-    return (
-      <div className={className} style={{ height: typeof height === 'number' ? height : undefined }}>
-        <V3EmptyState
-          title={emptyMessage}
-          description={emptyDescription}
-          accent="blue"
-        />
-      </div>
-    );
-  }
-
   // Current display state (selected takes priority over hovered)
   const displaySlice = selectedSlice || hoveredSlice;
+  
+  // Use overrideTotal if provided (canonical value), otherwise use calculated total
+  const effectiveTotal = overrideTotal ?? processedData.total;
 
-  // Build ECharts option
+  // Build ECharts option - MUST be before early returns per hooks rules
   const option = useMemo<EChartsOption>(() => {
     const isRightLegend = showLegend && legendPosition === "right";
     const innerRadius = "55%";
@@ -184,7 +168,7 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
           style: {
             text: displaySlice 
               ? formatValue(displaySlice.value)
-              : formatValue(processedData.total),
+              : formatValue(effectiveTotal),
             textAlign: "center",
             fill: "hsl(var(--portal-text-primary))",
             fontSize: 22,
@@ -245,8 +229,9 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
           box-shadow: 0 8px 24px rgba(0,0,0,0.12);
         `,
         formatter: (params: any) => {
-          const percent = processedData.total > 0 
-            ? ((params.value / processedData.total) * 100).toFixed(1) 
+          // Use effectiveTotal for accurate percentage calculation
+          const percent = effectiveTotal > 0 
+            ? ((params.value / effectiveTotal) * 100).toFixed(1) 
             : '0';
           const rank = params.data?.rank || 1;
           const valueFormatted = formatValue(params.value);
@@ -295,8 +280,8 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
               formatter: (params: any) => {
                 const item = processedData.items.find(i => i.name === params.name);
                 if (!item) return params.name;
-                const percent = processedData.total > 0 
-                  ? ((item.value / processedData.total) * 100).toFixed(1) 
+                const percent = effectiveTotal > 0 
+                  ? ((item.value / effectiveTotal) * 100).toFixed(1) 
                   : '0';
                 return `${params.name}: ${formatValue(item.value)} (${percent}%)`;
               },
@@ -308,8 +293,8 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
             formatter: (name: string) => {
               const item = processedData.items.find(i => i.name === name);
               if (!item) return name;
-              const percent = processedData.total > 0 
-                ? ((item.value / processedData.total) * 100).toFixed(0) 
+              const percent = effectiveTotal > 0 
+                ? ((item.value / effectiveTotal) * 100).toFixed(0) 
                 : '0';
               // Truncate long names
               const displayName = name.length > 14 ? name.substring(0, 14) + '…' : name;
@@ -378,14 +363,15 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
     enableAccessibility,
     useDecals,
     disableHoverEmphasis,
+    effectiveTotal,
   ]);
 
   // Event handlers
   const handleEvents = useMemo(() => ({
     mouseover: (params: any) => {
       if (params.seriesType === 'pie') {
-        const percent = processedData.total > 0 
-          ? (params.value / processedData.total) * 100 
+        const percent = effectiveTotal > 0 
+          ? (params.value / effectiveTotal) * 100 
           : 0;
         setHoveredSlice({
           name: params.name,
@@ -399,8 +385,8 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
     },
     click: (params: any) => {
       if (params.seriesType === 'pie') {
-        const percent = processedData.total > 0 
-          ? (params.value / processedData.total) * 100 
+        const percent = effectiveTotal > 0 
+          ? (params.value / effectiveTotal) * 100 
           : 0;
         const clickedSlice = {
           name: params.name,
@@ -418,7 +404,29 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
         }
       }
     },
-  }), [processedData.total, selectedSlice, onSliceSelect]);
+  }), [effectiveTotal, selectedSlice, onSliceSelect]);
+
+  // Handle loading - AFTER all hooks
+  if (isLoading) {
+    return (
+      <div className={className} style={{ height: typeof height === 'number' ? height : undefined }}>
+        <V3LoadingState variant="chart" />
+      </div>
+    );
+  }
+
+  // Handle empty data - AFTER all hooks
+  if (!processedData.items || processedData.items.length === 0) {
+    return (
+      <div className={className} style={{ height: typeof height === 'number' ? height : undefined }}>
+        <V3EmptyState
+          title={emptyMessage}
+          description={emptyDescription}
+          accent="blue"
+        />
+      </div>
+    );
+  }
 
   return (
     <EChartsBase
