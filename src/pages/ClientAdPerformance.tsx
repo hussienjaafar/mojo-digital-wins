@@ -2,21 +2,26 @@
  * ClientAdPerformance Page
  *
  * Granular Meta Ad + Message Performance page with drill-down capabilities.
- * Shows individual ad performance with ActBlue attribution data.
+ * Shows Campaign → Ad Set → Ad hierarchical navigation like Meta Ads Manager.
  * V3 Design System aligned.
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { format, subDays, parseISO } from 'date-fns';
 import { useClientOrganization } from '@/hooks/useClientOrganization';
 import { ClientLayout } from '@/components/client/ClientLayout';
-import { AdPerformanceList } from '@/components/client/AdPerformance';
+import {
+  AdPerformanceList,
+  HierarchyLevelTabs,
+  HierarchyBreadcrumb,
+  CampaignRow,
+  AdSetRow,
+} from '@/components/client/AdPerformance';
 import { useAdPerformanceQuery } from '@/hooks/useAdPerformanceQuery';
+import { useAdHierarchy } from '@/hooks/useAdHierarchy';
 import { DateRangeSelector } from '@/components/dashboard/DateRangeSelector';
-import { PerformanceControlsToolbar } from '@/components/dashboard/PerformanceControlsToolbar';
 import { useDashboardStore } from '@/stores/dashboardStore';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -51,6 +56,7 @@ import { formatCurrency, formatRoas, formatPercentage, getRoasColor } from '@/ut
 import type { SortField, SortDirection } from '@/utils/adPerformance';
 import { sortAds, filterByMinSpend } from '@/utils/adPerformance';
 import type { AdPerformanceData, AdPerformanceStatus } from '@/types/adPerformance';
+import type { HierarchyLevel, BreadcrumbItem } from '@/types/adHierarchy';
 
 type StatusFilter = 'all' | AdPerformanceStatus;
 
@@ -64,6 +70,11 @@ export default function ClientAdPerformance() {
   const [minSpendFilter, setMinSpendFilter] = useState<number>(0);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Hierarchy navigation state
+  const [hierarchyLevel, setHierarchyLevel] = useState<HierarchyLevel>('campaign');
+  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
+  const [selectedAdsets, setSelectedAdsets] = useState<string[]>([]);
 
   // Get organization ID - respects impersonation context for admins
   const { organizationId, isLoading: isLoadingOrg } = useClientOrganization();
@@ -93,11 +104,33 @@ export default function ClientAdPerformance() {
 
   const isLoading = isLoadingOrg || isLoadingAds;
 
-  // Process, filter, and search ads
-  const processedAds = useMemo(() => {
-    if (!adPerformanceData?.ads) return [];
+  // Aggregate data into hierarchy
+  const { campaigns, adsets, ads } = useAdHierarchy({
+    ads: adPerformanceData?.ads || [],
+  });
 
-    let filtered = adPerformanceData.ads;
+  // Filter adsets by selected campaigns
+  const filteredAdsets = useMemo(() => {
+    if (selectedCampaigns.length === 0) return adsets;
+    return adsets.filter((adset) => selectedCampaigns.includes(adset.campaign_id));
+  }, [adsets, selectedCampaigns]);
+
+  // Filter ads by selected campaigns or adsets
+  const filteredAds = useMemo(() => {
+    let result = ads;
+    
+    if (selectedAdsets.length > 0) {
+      result = result.filter((ad) => selectedAdsets.includes(ad.adset_id || ''));
+    } else if (selectedCampaigns.length > 0) {
+      result = result.filter((ad) => selectedCampaigns.includes(ad.campaign_id));
+    }
+    
+    return result;
+  }, [ads, selectedCampaigns, selectedAdsets]);
+
+  // Process, filter, and search ads for display
+  const processedAds = useMemo(() => {
+    let filtered = filteredAds;
 
     // Filter by status (default: ALL)
     if (statusFilter !== 'all') {
@@ -121,7 +154,7 @@ export default function ClientAdPerformance() {
 
     // Sort
     return sortAds(filtered, sortField, sortDirection);
-  }, [adPerformanceData?.ads, statusFilter, minSpendFilter, searchQuery, sortField, sortDirection]);
+  }, [filteredAds, statusFilter, minSpendFilter, searchQuery, sortField, sortDirection]);
 
   // Deduplicate ads by ad_id to prevent rendering duplicates
   const deduplicatedAds = useMemo(() => {
@@ -144,6 +177,160 @@ export default function ClientAdPerformance() {
   const attributedDonors = useMemo(() => {
     return deduplicatedAds.reduce((sum, ad) => sum + ad.unique_donors, 0);
   }, [deduplicatedAds]);
+
+  // Build breadcrumbs based on current navigation state
+  const breadcrumbs = useMemo<BreadcrumbItem[]>(() => {
+    const crumbs: BreadcrumbItem[] = [
+      { level: 'campaign', name: 'All Campaigns' },
+    ];
+
+    if (hierarchyLevel === 'adset' || hierarchyLevel === 'ad') {
+      if (selectedCampaigns.length === 1) {
+        const campaign = campaigns.find((c) => c.campaign_id === selectedCampaigns[0]);
+        crumbs.push({
+          level: 'adset',
+          id: selectedCampaigns[0],
+          name: campaign?.campaign_name || 'Campaign',
+        });
+      } else if (selectedCampaigns.length > 1) {
+        crumbs.push({
+          level: 'adset',
+          name: `${selectedCampaigns.length} Campaigns`,
+        });
+      }
+    }
+
+    if (hierarchyLevel === 'ad') {
+      if (selectedAdsets.length === 1) {
+        const adset = adsets.find((a) => a.adset_id === selectedAdsets[0]);
+        crumbs.push({
+          level: 'ad',
+          id: selectedAdsets[0],
+          name: adset?.adset_name || 'Ad Set',
+        });
+      } else if (selectedAdsets.length > 1) {
+        crumbs.push({
+          level: 'ad',
+          name: `${selectedAdsets.length} Ad Sets`,
+        });
+      } else if (selectedCampaigns.length > 0) {
+        crumbs.push({
+          level: 'ad',
+          name: 'All Ads',
+        });
+      }
+    }
+
+    return crumbs;
+  }, [hierarchyLevel, selectedCampaigns, selectedAdsets, campaigns, adsets]);
+
+  // Handle breadcrumb navigation
+  const handleBreadcrumbNavigate = useCallback((level: HierarchyLevel, id?: string) => {
+    if (level === 'campaign') {
+      setHierarchyLevel('campaign');
+      setSelectedCampaigns([]);
+      setSelectedAdsets([]);
+    } else if (level === 'adset') {
+      setHierarchyLevel('adset');
+      setSelectedAdsets([]);
+    }
+  }, []);
+
+  // Handle level tab change
+  const handleLevelChange = useCallback((level: HierarchyLevel) => {
+    setHierarchyLevel(level);
+    // Clear selections when going back to a higher level
+    if (level === 'campaign') {
+      setSelectedCampaigns([]);
+      setSelectedAdsets([]);
+    } else if (level === 'adset') {
+      setSelectedAdsets([]);
+    }
+  }, []);
+
+  // Handle campaign selection
+  const handleCampaignSelect = useCallback((campaignId: string, selected: boolean) => {
+    setSelectedCampaigns((prev) =>
+      selected ? [...prev, campaignId] : prev.filter((id) => id !== campaignId)
+    );
+  }, []);
+
+  // Handle campaign drill-down
+  const handleCampaignDrillDown = useCallback((campaignId: string) => {
+    setSelectedCampaigns([campaignId]);
+    setHierarchyLevel('adset');
+  }, []);
+
+  // Handle adset selection
+  const handleAdsetSelect = useCallback((adsetId: string, selected: boolean) => {
+    setSelectedAdsets((prev) =>
+      selected ? [...prev, adsetId] : prev.filter((id) => id !== adsetId)
+    );
+  }, []);
+
+  // Handle adset drill-down
+  const handleAdsetDrillDown = useCallback((adsetId: string) => {
+    setSelectedAdsets([adsetId]);
+    setHierarchyLevel('ad');
+  }, []);
+
+  // Render the appropriate content based on hierarchy level
+  const renderHierarchyContent = () => {
+    switch (hierarchyLevel) {
+      case 'campaign':
+        return (
+          <div className="space-y-2">
+            {campaigns.length === 0 ? (
+              <p className="text-center text-[hsl(var(--portal-text-muted))] py-8">
+                No campaigns found
+              </p>
+            ) : (
+              campaigns.map((campaign) => (
+                <CampaignRow
+                  key={campaign.campaign_id}
+                  campaign={campaign}
+                  isSelected={selectedCampaigns.includes(campaign.campaign_id)}
+                  onSelect={handleCampaignSelect}
+                  onDrillDown={handleCampaignDrillDown}
+                />
+              ))
+            )}
+          </div>
+        );
+
+      case 'adset':
+        return (
+          <div className="space-y-2">
+            {filteredAdsets.length === 0 ? (
+              <p className="text-center text-[hsl(var(--portal-text-muted))] py-8">
+                No ad sets found
+              </p>
+            ) : (
+              filteredAdsets.map((adset) => (
+                <AdSetRow
+                  key={adset.adset_id}
+                  adset={adset}
+                  isSelected={selectedAdsets.includes(adset.adset_id)}
+                  onSelect={handleAdsetSelect}
+                  onDrillDown={handleAdsetDrillDown}
+                />
+              ))
+            )}
+          </div>
+        );
+
+      case 'ad':
+        return (
+          <AdPerformanceList
+            ads={deduplicatedAds}
+            isEstimatedDistribution={adPerformanceData?.isEstimatedDistribution}
+          />
+        );
+
+      default:
+        return null;
+    }
+  };
 
   const renderContent = () => {
     if (isLoading) {
@@ -364,122 +551,138 @@ export default function ClientAdPerformance() {
           </div>
         )}
 
-        {/* Filters Toolbar - Sticky */}
-        <div className="sticky top-0 z-10 bg-[hsl(var(--portal-bg-primary))] py-3 -mx-6 px-6 border-b border-[hsl(var(--portal-border))]">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Search */}
-            <div className="relative flex-1 min-w-[200px] max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
-              <Input
-                type="text"
-                placeholder="Search ads..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={cn(
-                  'pl-9 h-9',
-                  'bg-[hsl(var(--portal-bg-secondary))]',
-                  'border-[hsl(var(--portal-border))]',
-                  'text-sm',
-                  'placeholder:text-[hsl(var(--portal-text-muted))]',
-                  'focus-visible:ring-[hsl(var(--portal-accent-blue)/0.3)]'
-                )}
-              />
-            </div>
-
-            {/* Filters Group */}
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
-
-              {/* Status Filter */}
-              <Select
-                value={statusFilter}
-                onValueChange={(value) => setStatusFilter(value as StatusFilter)}
-              >
-                <SelectTrigger
-                  className={cn(
-                    'h-9 w-[100px] text-xs',
-                    'bg-[hsl(var(--portal-bg-secondary))]',
-                    'border-[hsl(var(--portal-border))]',
-                    statusFilter !== 'all' && 'border-[hsl(var(--portal-accent-blue))]'
-                  )}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="ACTIVE">Active</SelectItem>
-                  <SelectItem value="PAUSED">Paused</SelectItem>
-                  <SelectItem value="ARCHIVED">Archived</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Min Spend Filter */}
-              <Select
-                value={String(minSpendFilter)}
-                onValueChange={(value) => setMinSpendFilter(Number(value))}
-              >
-                <SelectTrigger
-                  className={cn(
-                    'h-9 w-[90px] text-xs',
-                    'bg-[hsl(var(--portal-bg-secondary))]',
-                    'border-[hsl(var(--portal-border))]',
-                    minSpendFilter > 0 && 'border-[hsl(var(--portal-accent-blue))]'
-                  )}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">All Spend</SelectItem>
-                  <SelectItem value="10">$10+</SelectItem>
-                  <SelectItem value="50">$50+</SelectItem>
-                  <SelectItem value="100">$100+</SelectItem>
-                  <SelectItem value="500">$500+</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Sort */}
-              <Select
-                value={sortField}
-                onValueChange={(value) => setSortField(value as SortField)}
-              >
-                <SelectTrigger className="h-9 w-[90px] text-xs bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="spend">Spend</SelectItem>
-                  <SelectItem value="raised">Raised</SelectItem>
-                  <SelectItem value="roas">ROAS</SelectItem>
-                  <SelectItem value="cpa">CPA</SelectItem>
-                  <SelectItem value="ctr">CTR</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={sortDirection}
-                onValueChange={(value) => setSortDirection(value as SortDirection)}
-              >
-                <SelectTrigger className="h-9 w-[80px] text-xs bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="desc">High</SelectItem>
-                  <SelectItem value="asc">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Results count */}
-            <span className="text-xs text-[hsl(var(--portal-text-muted))] ml-auto">
-              {deduplicatedAds.length} of {adPerformanceData?.ads?.length || 0} ads
-            </span>
-          </div>
+        {/* Hierarchy Navigation */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <HierarchyBreadcrumb
+            breadcrumbs={breadcrumbs}
+            onNavigate={handleBreadcrumbNavigate}
+          />
+          <HierarchyLevelTabs
+            activeLevel={hierarchyLevel}
+            onLevelChange={handleLevelChange}
+            campaignCount={campaigns.length}
+            adsetCount={filteredAdsets.length}
+            adCount={deduplicatedAds.length}
+            selectedCampaigns={selectedCampaigns}
+            selectedAdsets={selectedAdsets}
+          />
         </div>
 
-        {/* Ad List */}
-        <AdPerformanceList
-          ads={deduplicatedAds}
-          isEstimatedDistribution={adPerformanceData?.isEstimatedDistribution}
-        />
+        {/* Filters Toolbar - Sticky (only show on Ad level) */}
+        {hierarchyLevel === 'ad' && (
+          <div className="sticky top-0 z-10 bg-[hsl(var(--portal-bg-primary))] py-3 -mx-6 px-6 border-b border-[hsl(var(--portal-border))]">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Search */}
+              <div className="relative flex-1 min-w-[200px] max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+                <Input
+                  type="text"
+                  placeholder="Search ads..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={cn(
+                    'pl-9 h-9',
+                    'bg-[hsl(var(--portal-bg-secondary))]',
+                    'border-[hsl(var(--portal-border))]',
+                    'text-sm',
+                    'placeholder:text-[hsl(var(--portal-text-muted))]',
+                    'focus-visible:ring-[hsl(var(--portal-accent-blue)/0.3)]'
+                  )}
+                />
+              </div>
+
+              {/* Filters Group */}
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+
+                {/* Status Filter */}
+                <Select
+                  value={statusFilter}
+                  onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+                >
+                  <SelectTrigger
+                    className={cn(
+                      'h-9 w-[100px] text-xs',
+                      'bg-[hsl(var(--portal-bg-secondary))]',
+                      'border-[hsl(var(--portal-border))]',
+                      statusFilter !== 'all' && 'border-[hsl(var(--portal-accent-blue))]'
+                    )}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="PAUSED">Paused</SelectItem>
+                    <SelectItem value="ARCHIVED">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Min Spend Filter */}
+                <Select
+                  value={String(minSpendFilter)}
+                  onValueChange={(value) => setMinSpendFilter(Number(value))}
+                >
+                  <SelectTrigger
+                    className={cn(
+                      'h-9 w-[90px] text-xs',
+                      'bg-[hsl(var(--portal-bg-secondary))]',
+                      'border-[hsl(var(--portal-border))]',
+                      minSpendFilter > 0 && 'border-[hsl(var(--portal-accent-blue))]'
+                    )}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">All Spend</SelectItem>
+                    <SelectItem value="10">$10+</SelectItem>
+                    <SelectItem value="50">$50+</SelectItem>
+                    <SelectItem value="100">$100+</SelectItem>
+                    <SelectItem value="500">$500+</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Sort */}
+                <Select
+                  value={sortField}
+                  onValueChange={(value) => setSortField(value as SortField)}
+                >
+                  <SelectTrigger className="h-9 w-[90px] text-xs bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="spend">Spend</SelectItem>
+                    <SelectItem value="raised">Raised</SelectItem>
+                    <SelectItem value="roas">ROAS</SelectItem>
+                    <SelectItem value="cpa">CPA</SelectItem>
+                    <SelectItem value="ctr">CTR</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={sortDirection}
+                  onValueChange={(value) => setSortDirection(value as SortDirection)}
+                >
+                  <SelectTrigger className="h-9 w-[80px] text-xs bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="desc">High</SelectItem>
+                    <SelectItem value="asc">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Results count */}
+              <span className="text-xs text-[hsl(var(--portal-text-muted))] ml-auto">
+                {deduplicatedAds.length} of {adPerformanceData?.ads?.length || 0} ads
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Render content based on hierarchy level */}
+        {renderHierarchyContent()}
       </div>
     );
   };
@@ -494,7 +697,7 @@ export default function ClientAdPerformance() {
               Ad Performance
             </h1>
             <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
-              Individual ad metrics with ActBlue attribution
+              Campaign → Ad Set → Ad drill-down with ActBlue attribution
             </p>
           </div>
 
