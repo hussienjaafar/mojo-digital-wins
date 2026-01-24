@@ -115,6 +115,10 @@ interface DashboardState {
   // Last accessed timestamp (for session freshness check)
   lastAccessedAt: number | null;
 
+  // Timezone mode: true = UTC (matches ActBlue), false = local org timezone
+  useActBlueTimezone: boolean;
+  setUseActBlueTimezone: (value: boolean) => void;
+
   // Channel filter
   selectedChannel: ChannelFilter;
   setSelectedChannel: (channel: ChannelFilter) => void;
@@ -189,6 +193,10 @@ export const useDashboardStore = create<DashboardState>()(
       // Last accessed timestamp
       lastAccessedAt: null,
 
+      // Timezone mode - defaults to UTC (matches ActBlue's Fundraising Performance dashboard)
+      useActBlueTimezone: true,
+      setUseActBlueTimezone: (value) => set({ useActBlueTimezone: value }),
+
       // Channel filter
       selectedChannel: 'all',
       setSelectedChannel: (channel) => set({ selectedChannel: channel }),
@@ -242,6 +250,7 @@ export const useDashboardStore = create<DashboardState>()(
       resetFilters: () =>
         set({
           dateRange: getDefaultDateRange(),
+          useActBlueTimezone: true,
           selectedChannel: 'all',
           selectedCampaignId: null,
           selectedCreativeId: null,
@@ -259,6 +268,7 @@ export const useDashboardStore = create<DashboardState>()(
       // Only persist user preferences, not transient interaction state
       partialize: (state) => ({
         dateRange: state.dateRange,
+        useActBlueTimezone: state.useActBlueTimezone,
         selectedChannel: state.selectedChannel,
         selectedCampaignId: state.selectedCampaignId,
         selectedCreativeId: state.selectedCreativeId,
@@ -290,6 +300,7 @@ export const useDashboardStore = create<DashboardState>()(
 // ============================================================================
 
 export const useDateRange = () => useDashboardStore((s) => s.dateRange);
+export const useActBlueTimezone = () => useDashboardStore((s) => s.useActBlueTimezone);
 export const useSelectedChannel = () => useDashboardStore((s) => s.selectedChannel);
 export const useSelectedCampaignId = () => useDashboardStore((s) => s.selectedCampaignId);
 export const useSelectedCreativeId = () => useDashboardStore((s) => s.selectedCreativeId);

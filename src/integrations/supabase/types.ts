@@ -14339,6 +14339,7 @@ export type Database = {
           p_end_date: string
           p_organization_id: string
           p_start_date: string
+          p_use_utc?: boolean
         }
         Returns: {
           avg_donation: number
@@ -14362,6 +14363,7 @@ export type Database = {
           p_end_date: string
           p_organization_id: string
           p_start_date: string
+          p_use_utc?: boolean
         }
         Returns: Json
       }
@@ -14373,6 +14375,7 @@ export type Database = {
           p_organization_id: string
           p_start_date: string
           p_timezone?: string
+          p_use_utc?: boolean
         }
         Returns: {
           day: string
@@ -14405,6 +14408,7 @@ export type Database = {
           p_end_date: string
           p_organization_id: string
           p_start_date: string
+          p_use_utc?: boolean
         }
         Returns: {
           overall_avg_donation: number

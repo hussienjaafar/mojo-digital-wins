@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useDashboardStore } from "@/stores/dashboardStore";
+import { TimezoneToggle } from "./TimezoneToggle";
 
 // ============================================================================
 // Types
@@ -948,6 +949,9 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
             </PopoverContent>
           </Popover>
         </div>
+
+        {/* Timezone Toggle - matches ActBlue UTC vs Local time */}
+        <TimezoneToggle />
 
         {/* Filters inline on wide layouts (wraps to a second line if needed) */}
         {hasFilters && layoutMode === "lg" && (
