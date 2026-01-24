@@ -52,6 +52,11 @@ interface MatchResult {
  * 3.5. ActBlue form name match - Score 140
  * 4. Extracted refcode in form path - Score 120
  * 5. Generic SMS/text form match (fallback) - Score 50
+ * 
+ * TIEBREAKER: All scores get a proximity bonus (0-9 points) based on
+ * how close the transaction is to the campaign's send date.
+ * This ensures that when two campaigns have the same base match tier,
+ * the campaign sent closest to the transaction date wins.
  */
 function calculateMatchScore(campaign: Campaign, transaction: Transaction): number {
   const txRefcode = transaction.refcode?.toLowerCase() || "";
@@ -72,89 +77,106 @@ function calculateMatchScore(campaign: Campaign, transaction: Transaction): numb
   const txDate = new Date(transaction.transaction_date);
   const daysDiff = Math.abs((txDate.getTime() - campaignDate.getTime()) / (1000 * 60 * 60 * 24));
   
+  // Calculate proximity bonus (0-9 points) - closer transactions get higher bonus
+  // Same day = 9 points, 14+ days = 0 points
+  const proximityBonus = Math.max(0, Math.floor(9 - (daysDiff * 9 / 14)));
+  
+  let baseScore = 0;
+  
   // Tier 1: Explicit actblue_refcode match (highest priority - deterministic)
   // This is the resolved refcode from following vanity URL redirects
   if (actblueRefcode && txRefcode) {
     if (txRefcode === actblueRefcode) {
-      return 200;
+      baseScore = 200;
     }
     // Also match if transaction refcode contains the actblue refcode or vice versa
     // This handles cases like "20250115AAMA" matching "aama" (the form name)
-    if (txRefcode.endsWith(actblueRefcode) || actblueRefcode.includes(txRefcode)) {
-      return 195;
+    else if (txRefcode.endsWith(actblueRefcode) || actblueRefcode.includes(txRefcode)) {
+      baseScore = 195;
     }
   }
   
   // Tier 2: Direct extracted_refcode match (vanity path match)
-  if (extractedRefcode && txRefcode) {
-    if (txRefcode === extractedRefcode) return 180;
-    if (txRefcode.startsWith(extractedRefcode) || extractedRefcode.startsWith(txRefcode)) return 175;
+  if (baseScore === 0 && extractedRefcode && txRefcode) {
+    if (txRefcode === extractedRefcode) {
+      baseScore = 180;
+    } else if (txRefcode.startsWith(extractedRefcode) || extractedRefcode.startsWith(txRefcode)) {
+      baseScore = 175;
+    }
   }
   
   // Tier 3: Date-coded refcode with token match
   // E.g., '20250115AAMA' matches campaign with send_date 2025-01-15 and extracted_refcode containing 'aama'
-  const dateCodedMatch = txRefcode.match(/^(20\d{6})([a-z]+)$/i);
-  if (dateCodedMatch && (extractedRefcode || actblueRefcode)) {
-    const [, dateStr, token] = dateCodedMatch;
-    try {
-      const refcodeDate = new Date(
-        parseInt(dateStr.substring(0, 4)),
-        parseInt(dateStr.substring(4, 6)) - 1,
-        parseInt(dateStr.substring(6, 8))
-      );
-      const refcodeDaysDiff = Math.abs((refcodeDate.getTime() - campaignDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (refcodeDaysDiff <= 1) {
-        const tokenLower = token.toLowerCase();
+  if (baseScore === 0) {
+    const dateCodedMatch = txRefcode.match(/^(20\d{6})([a-z]+)$/i);
+    if (dateCodedMatch && (extractedRefcode || actblueRefcode)) {
+      const [, dateStr, token] = dateCodedMatch;
+      try {
+        const refcodeDate = new Date(
+          parseInt(dateStr.substring(0, 4)),
+          parseInt(dateStr.substring(4, 6)) - 1,
+          parseInt(dateStr.substring(6, 8))
+        );
+        const refcodeDaysDiff = Math.abs((refcodeDate.getTime() - campaignDate.getTime()) / (1000 * 60 * 60 * 24));
         
-        // Check against actblue_refcode first (more reliable)
-        if (actblueRefcode && (actblueRefcode.includes(tokenLower) || tokenLower.includes(actblueRefcode))) {
-          return 160; // Higher score for actblue_refcode match
+        if (refcodeDaysDiff <= 1) {
+          const tokenLower = token.toLowerCase();
+          
+          // Check against actblue_refcode first (more reliable)
+          if (actblueRefcode && (actblueRefcode.includes(tokenLower) || tokenLower.includes(actblueRefcode))) {
+            baseScore = 160; // Higher score for actblue_refcode match
+          }
+          // Fallback to extracted refcode
+          else {
+            const extractedClean = extractedRefcode.replace(/[0-9]/g, '');
+            if (extractedRefcode.includes(tokenLower) || tokenLower.includes(extractedClean)) {
+              baseScore = 150;
+            } else {
+              // Date matches but token doesn't - lower confidence match
+              baseScore = 100;
+            }
+          }
         }
-        
-        // Fallback to extracted refcode
-        const extractedClean = extractedRefcode.replace(/[0-9]/g, '');
-        if (extractedRefcode.includes(tokenLower) || tokenLower.includes(extractedClean)) {
-          return 150;
-        }
-        
-        // Date matches but token doesn't - lower confidence match
-        return 100;
+      } catch {
+        // Invalid date parsing, skip this tier
       }
-    } catch {
-      // Invalid date parsing, skip this tier
     }
   }
   
   // Tier 3.5: ActBlue form name match (campaign's form matches transaction's contribution form)
   // E.g., Campaign has actblue_form='ahamawytext' matches transaction.contribution_form containing 'ahamawytext'
-  if (actblueForm && formName) {
+  if (baseScore === 0 && actblueForm && formName) {
     // Exact or partial form name match within 14 days
     if (formName.includes(actblueForm) || actblueForm.includes(formName.split('/').pop() || '')) {
       if (daysDiff <= 14) {
-        return 140;
+        baseScore = 140;
       } else if (daysDiff <= 30) {
-        return 130; // Slightly lower for older matches
+        baseScore = 130; // Slightly lower for older matches
       }
     }
   }
   
   // Tier 4: Extracted refcode matches form name pattern
   // E.g., extracted_refcode='nakba' matches contribution_form containing 'nakba'
-  if (extractedRefcode && formName) {
+  if (baseScore === 0 && extractedRefcode && formName) {
     const formPath = formName.split('/').pop()?.split('?')[0] || formName;
     if (formPath.includes(extractedRefcode) || extractedRefcode.includes(formPath)) {
       if (daysDiff <= 14) {
-        return 120;
+        baseScore = 120;
       } else if (daysDiff <= 30) {
-        return 110;
+        baseScore = 110;
       }
     }
   }
   
   // Tier 5: Generic SMS/text form-based attribution within 3 days of campaign
-  if ((formName.includes('sms') || formName.includes('text')) && daysDiff <= 3) {
-    return 50;
+  if (baseScore === 0 && (formName.includes('sms') || formName.includes('text')) && daysDiff <= 3) {
+    baseScore = 50;
+  }
+  
+  // Add proximity bonus to break ties between campaigns with same base score
+  if (baseScore > 0) {
+    return baseScore + proximityBonus;
   }
   
   return 0;
