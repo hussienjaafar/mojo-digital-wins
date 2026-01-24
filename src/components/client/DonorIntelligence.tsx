@@ -17,7 +17,7 @@ import { TrendingUp, Users, Target, Sparkles, DollarSign, BarChart3, Activity, G
 import { useDonorIntelligenceQuery, type AttributionData } from "@/queries";
 import { formatCurrency } from "@/lib/chart-formatters";
 import { NoDataAvailable } from "./NoDataAvailable";
-import { useSelectedCampaignId, useSelectedCreativeId } from "@/stores/dashboardStore";
+
 import {
   Tooltip,
   TooltipContent,
@@ -34,16 +34,12 @@ interface DonorIntelligenceProps {
 export const DonorIntelligence = ({ organizationId, startDate, endDate }: DonorIntelligenceProps) => {
   const [deterministicOnly, setDeterministicOnly] = useState(false);
 
-  // Get filter values from dashboard store
-  const selectedCampaignId = useSelectedCampaignId();
-  const selectedCreativeId = useSelectedCreativeId();
-
   const { data, isLoading, error, isError, refetch } = useDonorIntelligenceQuery(
     organizationId,
     startDate,
     endDate,
-    selectedCampaignId,
-    selectedCreativeId
+    null,
+    null
   );
 
   const attributionData = data?.attributionData || [];

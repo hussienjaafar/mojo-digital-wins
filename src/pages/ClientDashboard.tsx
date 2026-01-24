@@ -23,9 +23,8 @@ import {
 import { PerformanceControlsToolbar } from "@/components/dashboard/PerformanceControlsToolbar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useDashboardStore, useDateRange, useSelectedCampaignId, useSelectedCreativeId } from "@/stores/dashboardStore";
+import { useDashboardStore, useDateRange } from "@/stores/dashboardStore";
 import { DashboardTopSection } from "@/components/client/DashboardTopSection";
-import { useFilterOptions } from "@/hooks/useFilterOptions";
 import { useClientDashboardMetricsQuery, useRecurringHealthQuery } from "@/queries";
 import { buildHeroKpis } from "@/utils/buildHeroKpis";
 import { logger } from "@/lib/logger";
@@ -242,10 +241,8 @@ const ClientDashboard = () => {
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const queryClient = useQueryClient();
 
-  // V3: Use Zustand store for global date range and filters
+  // V3: Use Zustand store for global date range
   const dateRange = useDateRange();
-  const selectedCampaignId = useSelectedCampaignId();
-  const selectedCreativeId = useSelectedCreativeId();
   const triggerRefresh = useDashboardStore((s) => s.triggerRefresh);
 
   // Data fetching with TanStack Query
@@ -283,13 +280,6 @@ const ClientDashboard = () => {
     
     toast.success('Dashboard refreshed with latest data');
   }, [queryClient, organizationId, triggerRefresh, refetch]);
-
-  // Fetch filter options for campaigns and creatives
-  const { data: filterOptions } = useFilterOptions(
-    organizationId,
-    dateRange.startDate,
-    dateRange.endDate
-  );
 
   // Build hero KPIs from query data
   const heroKpis = useMemo(() => {
@@ -442,9 +432,6 @@ const ClientDashboard = () => {
                   lastUpdated={dataUpdatedAt ? new Date(dataUpdatedAt) : undefined}
                   controls={
                     <PerformanceControlsToolbar
-                      organizationId={organizationId}
-                      campaignOptions={filterOptions?.campaigns || []}
-                      creativeOptions={filterOptions?.creatives || []}
                       showRefresh
                       onRefresh={handleRefresh}
                       isRefreshing={isFetching}

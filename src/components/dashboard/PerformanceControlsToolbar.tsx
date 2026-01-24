@@ -53,10 +53,6 @@ type LayoutMode = "lg" | "md" | "sm" | "xs";
 interface PerformanceControlsToolbarProps {
   /** Organization ID for filters */
   organizationId?: string;
-  /** Filter options for campaigns */
-  campaignOptions?: { id: string; label: string }[];
-  /** Filter options for creatives */
-  creativeOptions?: { id: string; label: string }[];
   /** Show refresh button */
   showRefresh?: boolean;
   /** Refresh handler */
@@ -651,148 +647,10 @@ const RefreshButton: React.FC<RefreshButtonProps> = ({ onClick, isRefreshing }) 
 );
 
 // ============================================================================
-// Filter Button (icon-only for toolbar)
-// ============================================================================
-
-interface FilterControlProps {
-  campaignOptions: { id: string; label: string }[];
-  creativeOptions: { id: string; label: string }[];
-  selectedCampaignId: string | null;
-  selectedCreativeId: string | null;
-  onCampaignChange: (value: string | null) => void;
-  onCreativeChange: (value: string | null) => void;
-  layoutMode: LayoutMode;
-}
-
-const FilterControl: React.FC<FilterControlProps> = ({
-  campaignOptions,
-  creativeOptions,
-  selectedCampaignId,
-  selectedCreativeId,
-  onCampaignChange,
-  onCreativeChange,
-  layoutMode,
-}) => {
-  const hasFilters = campaignOptions.length > 0 || creativeOptions.length > 0;
-  if (!hasFilters) return null;
-
-  const showBothDropdowns = layoutMode === "lg" || layoutMode === "md";
-
-  return (
-    <div className="flex items-center gap-1.5">
-      {/* Filter icon */}
-      <div
-        className={cn(
-          "flex h-9 w-9 items-center justify-center shrink-0",
-          "rounded-[var(--portal-radius-sm)]",
-          "border border-[hsl(var(--portal-border))]",
-          "bg-[hsl(var(--portal-bg-secondary))]",
-          "text-[hsl(var(--portal-text-muted))]"
-        )}
-        aria-hidden="true"
-      >
-        <Filter className="h-3.5 w-3.5" />
-      </div>
-
-      {/* Campaign dropdown */}
-      {campaignOptions.length > 0 && (
-        <Select
-          value={selectedCampaignId || "all"}
-          onValueChange={(v) => onCampaignChange(v === "all" ? null : v)}
-        >
-          <SelectTrigger
-            className={cn(
-              "h-9 text-xs",
-              "rounded-[var(--portal-radius-sm)]",
-              "border border-[hsl(var(--portal-border))]",
-              "bg-[hsl(var(--portal-bg-secondary))]",
-              "text-[hsl(var(--portal-text-primary))]",
-              "hover:bg-[hsl(var(--portal-bg-hover))]",
-              "focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.3)]",
-              "transition-colors",
-              selectedCampaignId && "border-[hsl(var(--portal-accent-blue))]",
-              showBothDropdowns ? "w-[120px]" : "w-[100px]"
-            )}
-            aria-label="Filter by campaign"
-          >
-            <span className="truncate">
-              <SelectValue placeholder="Campaigns" />
-            </span>
-          </SelectTrigger>
-          <SelectContent
-            className={cn(
-              "z-[100]",
-              "bg-[hsl(var(--portal-bg-secondary))]",
-              "border-[hsl(var(--portal-border))]",
-              "rounded-[var(--portal-radius-sm)]",
-              "shadow-lg",
-              "opacity-100"
-            )}
-          >
-            <SelectItem value="all" className="text-xs">All Campaigns</SelectItem>
-            {campaignOptions.map((opt) => (
-              <SelectItem key={opt.id} value={opt.id} className="text-xs truncate">
-                {opt.label.length > 20 ? `${opt.label.slice(0, 20)}...` : opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
-      {/* Creative dropdown - only show in lg/md modes */}
-      {showBothDropdowns && creativeOptions.length > 0 && (
-        <Select
-          value={selectedCreativeId || "all"}
-          onValueChange={(v) => onCreativeChange(v === "all" ? null : v)}
-        >
-          <SelectTrigger
-            className={cn(
-              "h-9 w-[120px] text-xs",
-              "rounded-[var(--portal-radius-sm)]",
-              "border border-[hsl(var(--portal-border))]",
-              "bg-[hsl(var(--portal-bg-secondary))]",
-              "text-[hsl(var(--portal-text-primary))]",
-              "hover:bg-[hsl(var(--portal-bg-hover))]",
-              "focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.3)]",
-              "transition-colors",
-              selectedCreativeId && "border-[hsl(var(--portal-accent-blue))]"
-            )}
-            aria-label="Filter by creative"
-          >
-            <span className="truncate">
-              <SelectValue placeholder="Creatives" />
-            </span>
-          </SelectTrigger>
-          <SelectContent
-            className={cn(
-              "z-[100]",
-              "bg-[hsl(var(--portal-bg-secondary))]",
-              "border-[hsl(var(--portal-border))]",
-              "rounded-[var(--portal-radius-sm)]",
-              "shadow-lg",
-              "opacity-100"
-            )}
-          >
-            <SelectItem value="all" className="text-xs">All Creatives</SelectItem>
-            {creativeOptions.map((opt) => (
-              <SelectItem key={opt.id} value={opt.id} className="text-xs truncate">
-                {opt.label.length > 20 ? `${opt.label.slice(0, 20)}...` : opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-    </div>
-  );
-};
-
-// ============================================================================
 // Main Toolbar Component
 // ============================================================================
 
 export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProps> = ({
-  campaignOptions = [],
-  creativeOptions = [],
   showRefresh = false,
   onRefresh,
   isRefreshing = false,
@@ -815,12 +673,6 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
       setSelectedPreset(detectedPreset);
     }
   }, [dateRange.startDate, dateRange.endDate]);
-
-  // Filter state from store
-  const selectedCampaignId = useDashboardStore((s) => s.selectedCampaignId);
-  const selectedCreativeId = useDashboardStore((s) => s.selectedCreativeId);
-  const setSelectedCampaignId = useDashboardStore((s) => s.setSelectedCampaignId);
-  const setSelectedCreativeId = useDashboardStore((s) => s.setSelectedCreativeId);
 
   // Parse store dates
   const parseStoreDate = (dateStr: string): Date =>
@@ -874,7 +726,6 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
     }
   };
 
-  const hasFilters = campaignOptions.length > 0 || creativeOptions.length > 0;
   const showSegmentedPresets = layoutMode === "lg";
   const presetKeys: PresetKey[] = ["today", "yesterday", "7d", "14d", "30d", "90d"];
 
@@ -949,57 +800,11 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
           </Popover>
         </div>
 
-
-        {/* Filters inline on wide layouts (wraps to a second line if needed) */}
-        {hasFilters && layoutMode === "lg" && (
-          <div className="min-w-0">
-            <FilterControl
-              campaignOptions={campaignOptions}
-              creativeOptions={creativeOptions}
-              selectedCampaignId={selectedCampaignId}
-              selectedCreativeId={selectedCreativeId}
-              onCampaignChange={setSelectedCampaignId}
-              onCreativeChange={setSelectedCreativeId}
-              layoutMode={layoutMode}
-            />
-          </div>
-        )}
-
         {/* Refresh button - always visible in row 1 */}
         {showRefresh && onRefresh && (
           <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
         )}
       </div>
-
-      {/* Row 2 (md): Filters */}
-      {hasFilters && layoutMode === "md" && (
-        <div className="min-w-0 w-full">
-          <FilterControl
-            campaignOptions={campaignOptions}
-            creativeOptions={creativeOptions}
-            selectedCampaignId={selectedCampaignId}
-            selectedCreativeId={selectedCreativeId}
-            onCampaignChange={setSelectedCampaignId}
-            onCreativeChange={setSelectedCreativeId}
-            layoutMode={layoutMode}
-          />
-        </div>
-      )}
-
-      {/* Row 2 (sm/xs): Filters stacked */}
-      {hasFilters && (layoutMode === "sm" || layoutMode === "xs") && (
-        <div className="flex items-center gap-1.5 w-full min-w-0 overflow-x-auto">
-          <FilterControl
-            campaignOptions={campaignOptions}
-            creativeOptions={creativeOptions}
-            selectedCampaignId={selectedCampaignId}
-            selectedCreativeId={selectedCreativeId}
-            onCampaignChange={setSelectedCampaignId}
-            onCreativeChange={setSelectedCreativeId}
-            layoutMode={layoutMode}
-          />
-        </div>
-      )}
     </div>
   );
 };
