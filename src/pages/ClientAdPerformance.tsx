@@ -339,10 +339,23 @@ export default function ClientAdPerformance() {
             </Card>
             <Card className="bg-[hsl(var(--portal-bg-secondary))]">
               <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 text-[hsl(var(--portal-text-muted))] mb-1">
-                  <BarChart3 className="h-3.5 w-3.5" />
-                  <span className="text-[10px] font-medium uppercase tracking-wide">Avg CTR</span>
-                </div>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1.5 text-[hsl(var(--portal-text-muted))] mb-1 cursor-help">
+                        <BarChart3 className="h-3.5 w-3.5" />
+                        <span className="text-[10px] font-medium uppercase tracking-wide">Link CTR</span>
+                        <HelpCircle className="h-3 w-3" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[250px]">
+                      <p className="text-xs">
+                        <strong>Link CTR</strong> measures clicks to destination URL (outbound clicks), 
+                        not all clicks on the ad. This is the industry standard for conversion-focused campaigns.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <div className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
                   {formatPercentage(adPerformanceData.totals.avg_ctr)}
                 </div>
