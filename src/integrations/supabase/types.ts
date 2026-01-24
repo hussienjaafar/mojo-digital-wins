@@ -14370,7 +14370,7 @@ export type Database = {
               p_campaign_id?: string
               p_creative_id?: string
               p_end_date: string
-              p_organization_id: string
+              p_org_id: string
               p_start_date: string
               p_timezone?: string
               p_use_utc?: boolean
@@ -14438,7 +14438,6 @@ export type Database = {
           recurring_count: number
           refund_amount: number
           refund_count: number
-          total_fees: number
           transaction_count: number
           unique_donors: number
         }[]
