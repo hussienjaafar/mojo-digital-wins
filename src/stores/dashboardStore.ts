@@ -115,7 +115,7 @@ interface DashboardState {
   // Last accessed timestamp (for session freshness check)
   lastAccessedAt: number | null;
 
-  // Timezone mode: true = UTC (matches ActBlue), false = local org timezone
+  // Timezone mode: true = ET (matches ActBlue's Fundraising Performance), false = UTC
   useActBlueTimezone: boolean;
   setUseActBlueTimezone: (value: boolean) => void;
 
@@ -193,7 +193,7 @@ export const useDashboardStore = create<DashboardState>()(
       // Last accessed timestamp
       lastAccessedAt: null,
 
-      // Timezone mode - defaults to UTC (matches ActBlue's Fundraising Performance dashboard)
+      // Timezone mode - defaults to ET (matches ActBlue's Fundraising Performance dashboard)
       useActBlueTimezone: true,
       setUseActBlueTimezone: (value) => set({ useActBlueTimezone: value }),
 

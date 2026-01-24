@@ -14337,22 +14337,19 @@ export type Database = {
       get_actblue_daily_rollup: {
         Args: {
           p_end_date: string
-          p_organization_id: string
+          p_org_id: string
           p_start_date: string
           p_use_utc?: boolean
         }
         Returns: {
-          avg_donation: number
           day: string
-          donation_count: number
-          gross_donations: number
-          net_donations: number
-          net_revenue: number
+          gross_raised: number
+          net_raised: number
+          recurring_amount: number
           recurring_count: number
-          recurring_revenue: number
+          refund_amount: number
           refund_count: number
-          refunds: number
-          total_fees: number
+          transaction_count: number
           unique_donors: number
         }[]
       }
@@ -14367,29 +14364,52 @@ export type Database = {
         }
         Returns: Json
       }
-      get_actblue_filtered_rollup: {
-        Args: {
-          p_campaign_id?: string
-          p_creative_id?: string
-          p_end_date: string
-          p_organization_id: string
-          p_start_date: string
-          p_timezone?: string
-          p_use_utc?: boolean
-        }
-        Returns: {
-          day: string
-          donation_count: number
-          gross_raised: number
-          net_raised: number
-          recurring_amount: number
-          recurring_count: number
-          refund_amount: number
-          refund_count: number
-          total_fees: number
-          unique_donors: number
-        }[]
-      }
+      get_actblue_filtered_rollup:
+        | {
+            Args: {
+              p_campaign_id?: string
+              p_creative_id?: string
+              p_end_date: string
+              p_org_id: string
+              p_start_date: string
+              p_timezone?: string
+              p_use_utc?: boolean
+            }
+            Returns: {
+              day: string
+              gross_raised: number
+              net_raised: number
+              recurring_amount: number
+              recurring_count: number
+              refund_amount: number
+              refund_count: number
+              transaction_count: number
+              unique_donors: number
+            }[]
+          }
+        | {
+            Args: {
+              p_campaign_id?: string
+              p_creative_id?: string
+              p_end_date: string
+              p_organization_id: string
+              p_start_date: string
+              p_timezone?: string
+              p_use_utc?: boolean
+            }
+            Returns: {
+              day: string
+              donation_count: number
+              gross_raised: number
+              net_raised: number
+              recurring_amount: number
+              recurring_count: number
+              refund_amount: number
+              refund_count: number
+              total_fees: number
+              unique_donors: number
+            }[]
+          }
       get_actblue_hourly_metrics: {
         Args: { _date: string; _organization_id: string; _timezone?: string }
         Returns: {
@@ -14406,22 +14426,21 @@ export type Database = {
       get_actblue_period_summary: {
         Args: {
           p_end_date: string
-          p_organization_id: string
+          p_org_id: string
           p_start_date: string
           p_use_utc?: boolean
         }
         Returns: {
-          overall_avg_donation: number
-          total_donation_count: number
+          avg_donation: number
+          gross_raised: number
+          net_raised: number
+          recurring_amount: number
+          recurring_count: number
+          refund_amount: number
+          refund_count: number
           total_fees: number
-          total_gross_donations: number
-          total_net_donations: number
-          total_net_revenue: number
-          total_recurring_count: number
-          total_recurring_revenue: number
-          total_refund_count: number
-          total_refunds: number
-          total_unique_donors: number
+          transaction_count: number
+          unique_donors: number
         }[]
       }
       get_actblue_true_unique_donors: {
