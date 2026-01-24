@@ -59,6 +59,8 @@ interface PerformanceControlsToolbarProps {
   onRefresh?: () => void;
   /** Is refresh in progress */
   isRefreshing?: boolean;
+  /** Sources currently being synced (for smart refresh feedback) */
+  syncingSources?: string[];
   /** Additional className */
   className?: string;
 }
@@ -606,45 +608,67 @@ DateRangeButton.displayName = "DateRangeButton";
 interface RefreshButtonProps {
   onClick: () => void;
   isRefreshing?: boolean;
+  syncingSources?: string[];
 }
 
-const RefreshButton: React.FC<RefreshButtonProps> = ({ onClick, isRefreshing }) => (
-  <TooltipProvider delayDuration={300}>
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={onClick}
-          disabled={isRefreshing}
-          className={cn(
-            "h-9 w-9",
-            "rounded-[var(--portal-radius-sm)]",
-            "border border-[hsl(var(--portal-border))]",
-            "bg-[hsl(var(--portal-bg-secondary))]",
-            "text-[hsl(var(--portal-text-muted))]",
-            "hover:bg-[hsl(var(--portal-bg-hover))]",
-            "hover:text-[hsl(var(--portal-text-primary))]",
-            "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
-            "focus-visible:ring-2",
-            "focus-visible:ring-[hsl(var(--portal-accent-blue)/0.3)]",
-            "transition-all",
-            "disabled:opacity-50"
-          )}
-          aria-label={isRefreshing ? "Refreshing data" : "Refresh data"}
+const RefreshButton: React.FC<RefreshButtonProps> = ({ onClick, isRefreshing, syncingSources = [] }) => {
+  // Build tooltip text based on current state
+  const getTooltipText = () => {
+    if (syncingSources.length > 0) {
+      const sourceLabels: Record<string, string> = {
+        meta: 'Meta Ads',
+        actblue: 'ActBlue',
+        switchboard: 'SMS',
+      };
+      const labels = syncingSources.map(s => sourceLabels[s] || s).join(', ');
+      return `Syncing: ${labels}...`;
+    }
+    if (isRefreshing) {
+      return 'Checking freshness...';
+    }
+    return 'Smart refresh – syncs stale data only';
+  };
+
+  return (
+    <TooltipProvider delayDuration={300}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onClick}
+            disabled={isRefreshing}
+            className={cn(
+              "h-9 w-9",
+              "rounded-[var(--portal-radius-sm)]",
+              "border border-[hsl(var(--portal-border))]",
+              "bg-[hsl(var(--portal-bg-secondary))]",
+              "text-[hsl(var(--portal-text-muted))]",
+              "hover:bg-[hsl(var(--portal-bg-hover))]",
+              "hover:text-[hsl(var(--portal-text-primary))]",
+              "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
+              "focus-visible:ring-2",
+              "focus-visible:ring-[hsl(var(--portal-accent-blue)/0.3)]",
+              "transition-all",
+              "disabled:opacity-50",
+              // Active syncing state - subtle glow
+              syncingSources.length > 0 && "border-[hsl(var(--portal-accent-blue)/0.5)] shadow-[0_0_8px_hsl(var(--portal-accent-blue)/0.15)]"
+            )}
+            aria-label={isRefreshing ? "Refreshing data" : "Refresh data"}
+          >
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="bottom"
+          className="bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]"
         >
-          <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent
-        side="bottom"
-        className="bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]"
-      >
-        <p>{isRefreshing ? "Refreshing..." : "Refresh data"}</p>
-      </TooltipContent>
-    </Tooltip>
-  </TooltipProvider>
-);
+          <p>{getTooltipText()}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
 
 // ============================================================================
 // Main Toolbar Component
@@ -654,6 +678,7 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
   showRefresh = false,
   onRefresh,
   isRefreshing = false,
+  syncingSources = [],
   className,
 }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -802,7 +827,7 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
 
         {/* Refresh button - always visible in row 1 */}
         {showRefresh && onRefresh && (
-          <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
+          <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} syncingSources={syncingSources} />
         )}
       </div>
     </div>

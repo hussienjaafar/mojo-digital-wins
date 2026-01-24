@@ -15,14 +15,26 @@ import { DonorSegmentBuilder } from "@/components/client/DonorSegmentBuilder";
 import { SavedSegmentsList } from "@/components/client/SavedSegmentsList";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { useSmartRefresh } from "@/hooks/useSmartRefresh";
 
 export default function ClientDonorIntelligence() {
   const { organizationId, isLoading: orgLoading } = useClientOrganization();
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isRunningJourneys, setIsRunningJourneys] = useState(false);
   const [isRunningLtv, setIsRunningLtv] = useState(false);
   const [activeTab, setActiveTab] = useState<"builder" | "saved">("builder");
   const queryClient = useQueryClient();
+
+  // Smart refresh hook
+  const { 
+    handleSmartRefresh, 
+    isRefreshing,
+    syncingSources 
+  } = useSmartRefresh({
+    organizationId: organizationId || '',
+    onComplete: () => {
+      queryClient.invalidateQueries({ queryKey: ['donor-segment'] });
+    }
+  });
 
   const handleRunJourneysPipeline = async () => {
     if (!organizationId) return;
@@ -77,30 +89,6 @@ export default function ClientDonorIntelligence() {
     }
   };
 
-  const handleRefreshData = async () => {
-    if (!organizationId) return;
-    
-    setIsRefreshing(true);
-    try {
-      const { error } = await supabase.functions.invoke('refcode-reconcile', {
-        body: { organization_id: organizationId, limit: 500 }
-      });
-      
-      if (error) {
-        console.error('Refresh error:', error);
-        toast.error('Failed to refresh data');
-      } else {
-        await queryClient.invalidateQueries({ queryKey: ['donor-segment'] });
-        toast.success('Data refreshed');
-      }
-    } catch (err) {
-      console.error('Refresh error:', err);
-      toast.error('Failed to refresh data');
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
   const isPipelineRunning = isRefreshing || isRunningJourneys || isRunningLtv;
 
   if (orgLoading || !organizationId) {
@@ -144,11 +132,11 @@ export default function ClientDonorIntelligence() {
             <V3Button
               variant="outline"
               size="sm"
-              onClick={handleRefreshData}
+              onClick={() => handleSmartRefresh()}
               disabled={isPipelineRunning}
             >
               <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+              {isRefreshing ? (syncingSources.length > 0 ? 'Syncing...' : 'Checking...') : 'Refresh'}
             </V3Button>
           </div>
         }
