@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { proxyRpc } from "@/lib/supabaseProxy";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -22,8 +23,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { formatDistanceToNow, format } from "date-fns";
-import { Copy, RotateCcw, Trash2, Clock, Mail, Building2 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { RotateCcw, Trash2, Clock, Mail, Building2 } from "lucide-react";
+
+// Helper to detect portal domain
+const isPortalDomain = () => 
+  typeof window !== "undefined" && window.location.hostname === "portal.molitico.com";
 
 interface PendingInvitation {
   id: string;
@@ -63,7 +68,8 @@ export function PendingInvitations({
 
   const fetchInvitations = async () => {
     try {
-      const { data, error } = await supabase.rpc("get_pending_invitations", {
+      // Use proxy on portal domain to bypass CORS
+      const { data, error } = await proxyRpc("get_pending_invitations", {
         p_type: type,
         p_organization_id: organizationId,
       });
@@ -83,12 +89,20 @@ export function PendingInvitations({
     setRevoking(true);
 
     try {
-      const { error } = await supabase
-        .from("user_invitations")
-        .update({ status: "revoked" })
-        .eq("id", selectedInvitation.id);
-
-      if (error) throw error;
+      // Use Edge Function on portal domain to bypass CORS
+      if (isPortalDomain()) {
+        const { error } = await supabase.functions.invoke("manage-invitation", {
+          body: { action: "revoke", invitation_id: selectedInvitation.id }
+        });
+        if (error) throw error;
+      } else {
+        // Direct Supabase call for preview/other domains
+        const { error } = await supabase
+          .from("user_invitations")
+          .update({ status: "revoked" })
+          .eq("id", selectedInvitation.id);
+        if (error) throw error;
+      }
 
       toast.success("Invitation revoked");
       setRevokeDialogOpen(false);
