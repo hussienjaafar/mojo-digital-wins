@@ -14459,6 +14459,25 @@ export type Database = {
         }[]
       }
       get_active_organization_id: { Args: never; Returns: string }
+      get_ad_performance_donations_tz: {
+        Args: {
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+          p_timezone?: string
+        }
+        Returns: {
+          amount: number
+          attributed_ad_id: string
+          attributed_campaign_id: string
+          attributed_creative_id: string
+          attribution_method: string
+          donor_email: string
+          net_amount: number
+          refcode: string
+          transaction_date: string
+        }[]
+      }
       get_attributed_revenue_tz: {
         Args: {
           p_end_date: string
