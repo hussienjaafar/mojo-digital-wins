@@ -1,11 +1,13 @@
 import * as React from "react";
 import { motion } from "framer-motion";
-import { type LucideIcon, TrendingUp, TrendingDown, Minus, X } from "lucide-react";
+import { type LucideIcon, TrendingUp, TrendingDown, Minus, X, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BreakdownItem } from "./HeroKpiCard";
 import { EChartsLineChart, type LineSeriesConfig } from "@/components/charts/echarts";
+import { useIsSingleDayView, useIsTodayView } from "@/hooks/useHourlyMetrics";
+import type { SingleDayComparisonData } from "@/components/v3/V3KPIDrilldownDrawer";
 
 // ============================================================================
 // Types
@@ -42,6 +44,8 @@ export interface InlineKpiExpansionProps {
   onClose: () => void;
   /** Loading state */
   isLoading?: boolean;
+  /** Single-day comparison data */
+  singleDayData?: SingleDayComparisonData;
 }
 
 // ============================================================================
@@ -200,6 +204,63 @@ const BreakdownTable: React.FC<BreakdownTableProps> = ({ items }) => (
 );
 
 // ============================================================================
+// Single Day Comparison Section
+// ============================================================================
+
+interface SingleDayComparisonProps {
+  currentValue: string;
+  comparisonValue?: string | number;
+  comparisonLabel: string;
+  percentChange?: number;
+  isPositive?: boolean;
+}
+
+const SingleDayComparison: React.FC<SingleDayComparisonProps> = ({
+  currentValue,
+  comparisonValue,
+  comparisonLabel,
+  percentChange,
+  isPositive,
+}) => {
+  const direction = percentChange !== undefined 
+    ? (percentChange > 0 ? "up" : percentChange < 0 ? "down" : "flat")
+    : "flat";
+  const Icon = direction === "up" ? TrendingUp : direction === "down" ? TrendingDown : Minus;
+  const displayPositive = isPositive ?? (percentChange !== undefined && percentChange > 0);
+
+  return (
+    <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-tertiary))] border border-[hsl(var(--portal-border))]">
+      <div className="flex items-baseline justify-between mb-2">
+        <span className="text-2xl font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
+          {currentValue}
+        </span>
+        {percentChange !== undefined && (
+          <div
+            className={cn(
+              "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+              displayPositive
+                ? "bg-[hsl(var(--portal-success)/0.15)] text-[hsl(var(--portal-success))]"
+                : "bg-[hsl(var(--portal-error)/0.15)] text-[hsl(var(--portal-error))]"
+            )}
+          >
+            <Icon className="h-3 w-3" aria-hidden="true" />
+            <span>{Math.abs(percentChange).toFixed(1)}%</span>
+          </div>
+        )}
+      </div>
+      {comparisonValue !== undefined && (
+        <p className="text-sm text-[hsl(var(--portal-text-muted))]">
+          <span className="font-medium text-[hsl(var(--portal-text-secondary))]">
+            {comparisonValue}
+          </span>
+          {" "}{comparisonLabel}
+        </p>
+      )}
+    </div>
+  );
+};
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -216,8 +277,11 @@ export const InlineKpiExpansion: React.FC<InlineKpiExpansionProps> = ({
   valueType = "currency",
   onClose,
   isLoading = false,
+  singleDayData,
 }) => {
   const chartColor = accentColors[accent] || accentColors.default;
+  const isSingleDayView = useIsSingleDayView();
+  const isTodayView = useIsTodayView();
 
   // Handle Escape key to close
   React.useEffect(() => {
@@ -229,6 +293,16 @@ export const InlineKpiExpansion: React.FC<InlineKpiExpansionProps> = ({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
+
+  // Determine comparison label based on view type
+  const comparisonLabel = singleDayData?.comparisonLabel || 
+    (isTodayView ? "vs yesterday" : "vs day before");
+
+  // Check if we should show single-day view
+  const showSingleDayView = isSingleDayView && (
+    singleDayData !== undefined || 
+    (trendData && trendData.length <= 1)
+  );
 
   if (isLoading) {
     return (
@@ -312,20 +386,22 @@ export const InlineKpiExpansion: React.FC<InlineKpiExpansionProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Hero value + trend */}
-            <div className="text-right">
-              <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
-                {value}
-              </p>
-              {trend && (
-                <TrendBadge
-                  value={trend.value}
-                  isPositive={trend.isPositive}
-                  label={trend.label}
-                  size="sm"
-                />
-              )}
-            </div>
+            {/* Hero value + trend - only show for multi-day view */}
+            {!showSingleDayView && (
+              <div className="text-right">
+                <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">
+                  {value}
+                </p>
+                {trend && (
+                  <TrendBadge
+                    value={trend.value}
+                    isPositive={trend.isPositive}
+                    label={trend.label}
+                    size="sm"
+                  />
+                )}
+              </div>
+            )}
 
             {/* Close button */}
             <Button
@@ -340,25 +416,42 @@ export const InlineKpiExpansion: React.FC<InlineKpiExpansionProps> = ({
           </div>
         </div>
 
-        {/* Chart Section */}
-        {trendData && trendData.length > 0 && (
-          <div className="mb-4">
-            <h5 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))] mb-2">
-              Trend Over Time
-            </h5>
-            <div className="rounded-lg border border-[hsl(var(--portal-border))] p-3 bg-[hsl(var(--portal-bg-elevated))]">
-              <InlineChart
-                data={trendData}
-                xAxisKey={trendXAxisKey}
-                color={chartColor}
-                  label={label}
-                valueType={valueType}
-              />
+        {/* Single Day View: Comparison section */}
+        {showSingleDayView ? (
+          <div className="mb-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm text-[hsl(var(--portal-text-muted))]">
+              <Clock className="h-4 w-4" />
+              <span>{isTodayView ? "Today's Performance" : "Daily Performance"}</span>
             </div>
+            <SingleDayComparison
+              currentValue={value}
+              comparisonValue={singleDayData?.comparisonValue}
+              comparisonLabel={comparisonLabel}
+              percentChange={singleDayData?.percentChange ?? trend?.value}
+              isPositive={singleDayData?.isPositive ?? trend?.isPositive}
+            />
           </div>
+        ) : (
+          /* Multi-day View: Chart Section */
+          trendData && trendData.length > 0 && (
+            <div className="mb-4">
+              <h5 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))] mb-2">
+                Trend Over Time
+              </h5>
+              <div className="rounded-lg border border-[hsl(var(--portal-border))] p-3 bg-[hsl(var(--portal-bg-elevated))]">
+                <InlineChart
+                  data={trendData}
+                  xAxisKey={trendXAxisKey}
+                  color={chartColor}
+                  label={label}
+                  valueType={valueType}
+                />
+              </div>
+            </div>
+          )
         )}
 
-        {/* Breakdown Table */}
+        {/* Breakdown Table - shown in both views */}
         {breakdown && breakdown.length > 0 && (
           <div>
             <h5 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))] mb-2">
@@ -369,7 +462,7 @@ export const InlineKpiExpansion: React.FC<InlineKpiExpansionProps> = ({
         )}
 
         {/* Empty state */}
-        {!trendData?.length && !breakdown?.length && (
+        {!showSingleDayView && !trendData?.length && !breakdown?.length && (
           <div className="py-8 text-center text-[hsl(var(--portal-text-muted))]">
             <p>No detailed data available for this metric.</p>
           </div>

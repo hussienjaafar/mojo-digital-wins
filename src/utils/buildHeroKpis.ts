@@ -8,6 +8,7 @@ import type {
   DashboardTimeSeriesPoint,
 } from "@/queries/useClientDashboardMetricsQuery";
 import type { RecurringHealthV2Data } from "@/queries/useRecurringHealthQuery";
+import type { SingleDayComparisonData } from "@/components/v3/V3KPIDrilldownDrawer";
 
 interface BuildHeroKpisParams {
   kpis: DashboardKPIs;
@@ -23,6 +24,10 @@ interface BuildHeroKpisParams {
   attributionFallbackMode?: boolean;
   /** Recurring health v2 (used for Current Active MRR + New MRR Added cards) */
   recurringHealth?: RecurringHealthV2Data;
+  /** Whether this is a single-day view */
+  isSingleDayView?: boolean;
+  /** Whether this is viewing "today" specifically */
+  isTodayView?: boolean;
 }
 
 /**
@@ -43,6 +48,28 @@ function formatCurrency(value: number): string {
 }
 
 /**
+ * Build single-day comparison data for a KPI
+ */
+function buildSingleDayData(
+  currentValue: number | string,
+  previousValue: number | string | undefined,
+  percentChange: number,
+  isPositive: boolean,
+  isTodayView: boolean,
+  formatFn?: (val: number) => string
+): SingleDayComparisonData {
+  const prevNum = typeof previousValue === 'number' ? previousValue : parseFloat(String(previousValue || 0));
+  const formattedPrev = formatFn ? formatFn(prevNum) : String(prevNum);
+  
+  return {
+    comparisonValue: previousValue !== undefined ? formattedPrev : undefined,
+    comparisonLabel: isTodayView ? "vs yesterday" : "vs day before",
+    percentChange: Math.round(percentChange * 10) / 10, // Round to 1 decimal
+    isPositive,
+  };
+}
+
+/**
  * Build hero KPI data array for HeroKpiGrid
  */
 export function buildHeroKpis({
@@ -58,7 +85,54 @@ export function buildHeroKpis({
   directDonations = 0,
   attributionFallbackMode: _attributionFallbackMode = false,
   recurringHealth,
+  isSingleDayView = false,
+  isTodayView = false,
 }: BuildHeroKpisParams): HeroKpiData[] {
+  // Build single-day data for each KPI if in single-day view
+  const netRevenueSingleDay = isSingleDayView 
+    ? buildSingleDayData(
+        kpis.totalNetRevenue,
+        prevKpis.totalNetRevenue,
+        calcChange(kpis.totalNetRevenue, prevKpis.totalNetRevenue),
+        kpis.totalNetRevenue >= (prevKpis.totalNetRevenue || 0),
+        isTodayView,
+        formatCurrency
+      )
+    : undefined;
+
+  const roiSingleDay = isSingleDayView
+    ? buildSingleDayData(
+        kpis.roi,
+        prevKpis.roi,
+        calcChange(kpis.roi, prevKpis.roi),
+        kpis.roi >= (prevKpis.roi || 0),
+        isTodayView,
+        (v) => `${v.toFixed(1)}x`
+      )
+    : undefined;
+
+  const refundRateSingleDay = isSingleDayView
+    ? buildSingleDayData(
+        kpis.refundRate,
+        prevKpis.refundRate,
+        calcChange(kpis.refundRate, prevKpis.refundRate),
+        kpis.refundRate <= (prevKpis.refundRate || 0), // Lower refund rate is positive
+        isTodayView,
+        (v) => `${v.toFixed(1)}%`
+      )
+    : undefined;
+
+  const uniqueDonorsSingleDay = isSingleDayView
+    ? buildSingleDayData(
+        kpis.uniqueDonors,
+        prevKpis.uniqueDonors,
+        calcChange(kpis.uniqueDonors, prevKpis.uniqueDonors),
+        kpis.uniqueDonors >= (prevKpis.uniqueDonors || 0),
+        isTodayView,
+        (v) => v.toLocaleString()
+      )
+    : undefined;
+
   return [
     {
       kpiKey: "netRevenue" as KpiKey,
@@ -83,6 +157,7 @@ export function buildHeroKpis({
         { label: "Refunds", value: `-${formatCurrency(kpis.refundAmount)}`, percentage: kpis.refundRate },
         { label: "Net Revenue", value: formatCurrency(kpis.totalNetRevenue) },
       ],
+      singleDayData: netRevenueSingleDay,
     },
     {
       kpiKey: "netRoi" as KpiKey,
@@ -108,6 +183,7 @@ export function buildHeroKpis({
         { label: "Total Spend", value: formatCurrency(kpis.totalSpend) },
         { label: "ROI Multiplier", value: `${kpis.roi.toFixed(2)}x` },
       ],
+      singleDayData: roiSingleDay,
     },
     {
       kpiKey: "refundRate" as KpiKey,
@@ -131,6 +207,7 @@ export function buildHeroKpis({
         { label: "Refund Rate", value: `${kpis.refundRate.toFixed(2)}%` },
         { label: "Total Donations", value: formatCurrency(kpis.totalRaised) },
       ],
+      singleDayData: refundRateSingleDay,
     },
     {
       kpiKey: "currentMrr" as KpiKey,
@@ -148,6 +225,7 @@ export function buildHeroKpis({
         { label: "Avg Amount", value: formatCurrency(recurringHealth?.avg_recurring_amount || 0) },
         { label: "Churned Donors", value: (recurringHealth?.current_churned_donors || 0).toLocaleString() },
       ],
+      // MRR is a point-in-time metric, so no single-day comparison needed
     },
     {
       kpiKey: "newMrr" as KpiKey,
@@ -169,6 +247,7 @@ export function buildHeroKpis({
         { label: "Period Revenue", value: formatCurrency(recurringHealth?.period_recurring_revenue || 0) },
         { label: "Period Transactions", value: (recurringHealth?.period_recurring_transactions || 0).toLocaleString() },
       ],
+      // New MRR comparison could be added but doesn't have prev data yet
     },
     {
       kpiKey: "uniqueDonors" as KpiKey,
@@ -193,6 +272,7 @@ export function buildHeroKpis({
         { label: "Returning Donors", value: kpis.returningDonors.toLocaleString() },
         { label: "Average Donation", value: formatCurrency(kpis.avgDonation) },
       ],
+      singleDayData: uniqueDonorsSingleDay,
     },
   ];
 }

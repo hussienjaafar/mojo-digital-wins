@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import type { KpiKey } from "@/stores/dashboardStore";
 import { useIsMobile } from "@/hooks/use-mobile";
+import type { SingleDayComparisonData } from "@/components/v3/V3KPIDrilldownDrawer";
 
 // ============================================================================
 // Types
@@ -47,6 +48,8 @@ export interface HeroKpiData {
   breakdown?: BreakdownItem[];
   /** Whether card is expandable (auto-detected if trendData or breakdown present) */
   expandable?: boolean;
+  /** Single-day comparison data for optimized single-day view */
+  singleDayData?: SingleDayComparisonData;
 }
 
 export interface HeroKpiGridProps {
@@ -317,6 +320,8 @@ export const HeroKpiGrid: React.FC<HeroKpiGridProps> = ({
                   trendXAxisKey={kpi.trendXAxisKey ?? "date"}
                   breakdown={kpi.breakdown}
                   expandable={kpi.expandable ?? Boolean(kpi.trendData || kpi.breakdown)}
+                  // Single-day view data
+                  singleDayData={kpi.singleDayData}
                   // Expansion mode props
                   expansionMode={expansionMode}
                   onInlineExpandChange={(expanded) => handleInlineExpandChange(kpi.kpiKey, expanded)}
