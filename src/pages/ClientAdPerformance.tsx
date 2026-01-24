@@ -104,9 +104,21 @@ export default function ClientAdPerformance() {
 
   const isLoading = isLoadingOrg || isLoadingAds;
 
+  // Build lookup maps for hierarchy
+  const campaignNamesMap = useMemo(() => 
+    new Map(Object.entries(adPerformanceData?.campaignNames || {})),
+    [adPerformanceData?.campaignNames]
+  );
+  const adsetNamesMap = useMemo(() => 
+    new Map(Object.entries(adPerformanceData?.adsetNames || {})),
+    [adPerformanceData?.adsetNames]
+  );
+
   // Aggregate data into hierarchy
   const { campaigns, adsets, ads } = useAdHierarchy({
     ads: adPerformanceData?.ads || [],
+    campaignNames: campaignNamesMap,
+    adsetNames: adsetNamesMap,
   });
 
   // Filter adsets by selected campaigns
