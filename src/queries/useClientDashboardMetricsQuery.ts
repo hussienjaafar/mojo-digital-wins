@@ -292,6 +292,42 @@ async function fetchCanonicalPeriodSummary(
 }
 
 /**
+ * Fetch timezone-aware attributed revenue using server-side RPC.
+ * This ensures date comparisons use the org's timezone, matching ActBlue reports.
+ */
+async function fetchAttributedRevenueTz(
+  organizationId: string,
+  startDate: string,
+  endDate: string,
+  timezone: string = DEFAULT_ORG_TIMEZONE
+): Promise<{ meta: number; sms: number; metaCount: number; smsCount: number; unattributedCount: number }> {
+  const { data, error } = await (supabase as any).rpc('get_attributed_revenue_tz', {
+    p_organization_id: organizationId,
+    p_start_date: startDate,
+    p_end_date: endDate,
+    p_timezone: timezone,
+  });
+
+  if (error) {
+    logger.warn('Failed to fetch attributed revenue with timezone, falling back to client-side', { error });
+    return { meta: 0, sms: 0, metaCount: 0, smsCount: 0, unattributedCount: 0 };
+  }
+
+  const rows = data || [];
+  const metaRow = rows.find((r: any) => r.channel === 'meta');
+  const smsRow = rows.find((r: any) => r.channel === 'sms');
+  const unattributedRow = rows.find((r: any) => r.channel === 'unattributed');
+
+  return {
+    meta: Number(metaRow?.net_raised) || 0,
+    sms: Number(smsRow?.net_raised) || 0,
+    metaCount: Number(metaRow?.donation_count) || 0,
+    smsCount: Number(smsRow?.donation_count) || 0,
+    unattributedCount: Number(unattributedRow?.donation_count) || 0,
+  };
+}
+
+/**
  * Fetch filtered ActBlue rollup using server-side RPC.
  * This is used when campaign/creative filters are active for better performance.
  */
@@ -470,6 +506,8 @@ async function fetchDashboardMetrics(
     prevFilteredRollup,
     trueUniqueDonorsData,
     prevTrueUniqueDonorsData,
+    attributedRevenueTz,
+    prevAttributedRevenueTz,
   ] = await Promise.all([
     // Current period donations - fetch all, filter client-side if needed
     // Still needed for: attribution, donors, upsell tracking
@@ -532,6 +570,10 @@ async function fetchDashboardMetrics(
     !hasFilters ? fetchTrueUniqueDonors(startDate, endDate) : Promise.resolve(null),
     // Previous period true unique donors
     !hasFilters ? fetchTrueUniqueDonors(prevPeriod.start, prevPeriod.end) : Promise.resolve(null),
+    // Timezone-aware attributed revenue - CRITICAL for accurate Meta/SMS revenue attribution
+    fetchAttributedRevenueTz(organizationId, startDate, endDate),
+    // Previous period attributed revenue
+    fetchAttributedRevenueTz(organizationId, prevPeriod.start, prevPeriod.end),
   ]);
 
   // Apply client-side filtering for donations only (not refunds)
@@ -966,51 +1008,55 @@ async function fetchDashboardMetrics(
     };
   });
 
-  // Channel breakdown using donation counts from donation_attribution (not platform conversions)
-  // This gives accurate attribution based on actual donor behavior, not platform-reported conversions
+  // Channel breakdown using TIMEZONE-AWARE RPC for attributed revenue (matches ActBlue reports)
+  // The client-side calculation still runs for donation counts for the pie chart,
+  // but revenue figures use the RPC which properly handles timezone conversion
   let metaDonations = 0;
   let smsDonations = 0;
   let unattributedDonations = 0;
-  let metaAttributedRevenue = 0;
-  let smsAttributedRevenue = 0;
+  
+  // USE THE TIMEZONE-AWARE RPC RESULTS FOR REVENUE (fixes $181 vs $131 discrepancy)
+  // This ensures date boundaries match ActBlue's timezone (org_timezone, default Eastern)
+  const metaAttributedRevenue = attributedRevenueTz?.meta || 0;
+  const smsAttributedRevenue = attributedRevenueTz?.sms || 0;
 
-  // Note: getAttributionChannel is defined earlier in the function (around line 691)
-
-  if (donationAttributions.length > 0) {
-    // Use attributed_platform from view when available (most accurate)
-    // Calculate both counts AND revenue for attributed channels
+  // Use RPC counts if available, otherwise fall back to client-side
+  if (attributedRevenueTz && (attributedRevenueTz.metaCount > 0 || attributedRevenueTz.smsCount > 0 || attributedRevenueTz.unattributedCount > 0)) {
+    metaDonations = attributedRevenueTz.metaCount;
+    smsDonations = attributedRevenueTz.smsCount;
+    unattributedDonations = attributedRevenueTz.unattributedCount;
+    
+    logger.debug('Channel breakdown from timezone-aware RPC', {
+      meta: metaDonations,
+      metaRevenue: metaAttributedRevenue,
+      sms: smsDonations,
+      smsRevenue: smsAttributedRevenue,
+      unattributed: unattributedDonations,
+    });
+  } else if (donationAttributions.length > 0) {
+    // Fallback to client-side attribution view (for counts only, revenue still from RPC)
     for (const a of donationAttributions) {
       const channel = getAttributionChannel(a);
-      const revenueValue = Number(a.net_amount ?? a.amount ?? 0);
       
       if (channel === 'meta') {
         metaDonations += 1;
-        metaAttributedRevenue += revenueValue;
       } else if (channel === 'sms') {
         smsDonations += 1;
-        smsAttributedRevenue += revenueValue;
       } else if (channel === 'unattributed' || a.attribution_method === 'unattributed') {
         unattributedDonations += 1;
       }
     }
 
-    // Email attribution count (for logging only)
-    const emailDonations = donationAttributions.filter((a: any) => getAttributionChannel(a) === 'email').length;
-
-    // Log channel breakdown for observability
-    logger.debug('Channel breakdown from donation_attribution', {
+    logger.debug('Channel breakdown from donation_attribution (counts only)', {
       meta: metaDonations,
       metaRevenue: metaAttributedRevenue,
       sms: smsDonations,
       smsRevenue: smsAttributedRevenue,
-      email: emailDonations,
       unattributed: unattributedDonations,
       total: donationAttributions.length,
     });
   } else {
-    // Fallback: use unified channel detection on transaction-level fields
-    // This ensures consistent pattern matching even when donation_attribution is empty
-    // GLOBAL RULES - applies to ALL organizations
+    // Last fallback: use unified channel detection on transaction-level fields
     const getTransactionChannel = (d: any): AttributionChannel => {
       const result = detectChannelWithConfidence({
         refcode: d.refcode,
@@ -1024,20 +1070,17 @@ async function fetchDashboardMetrics(
 
     for (const d of donations) {
       const channel = getTransactionChannel(d);
-      const revenueValue = Number(d.net_amount ?? d.amount ?? 0);
       
       if (channel === 'meta') {
         metaDonations += 1;
-        metaAttributedRevenue += revenueValue;
       } else if (channel === 'sms') {
         smsDonations += 1;
-        smsAttributedRevenue += revenueValue;
       } else if (channel === 'unattributed') {
         unattributedDonations += 1;
       }
     }
 
-    logger.warn('Channel breakdown fallback: using unified channel detection on transaction fields');
+    logger.warn('Channel breakdown fallback: using unified channel detection on transaction fields (counts only)');
   }
 
   // Calculate total attributed revenue and attribution rate
@@ -1049,7 +1092,7 @@ async function fetchDashboardMetrics(
   // Keep blended ROI for reference (total net revenue / spend)
   const blendedRoi = totalSpend > 0 ? totalNetRevenue / totalSpend : 0;
 
-  logger.debug('ROI calculation (attributed)', {
+  logger.debug('ROI calculation (attributed, timezone-aware)', {
     metaAttributedRevenue,
     smsAttributedRevenue,
     totalAttributedRevenue,
