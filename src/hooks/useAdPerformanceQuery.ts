@@ -35,11 +35,12 @@ function getPerformanceTier(roas: number): AdPerformanceTier {
 }
 
 /**
- * Build totals from ads - Uses Set for unique donors
+ * Build totals from ads - Uses Set for unique attributed donors only
+ * IMPORTANT: Only counts donors that have been attributed to Meta ads, not ALL donors
  */
 function buildTotals(
   ads: AdPerformanceData[],
-  allDonorEmails: string[]
+  attributedDonorEmails: string[]
 ): AdPerformanceTotals {
   const total_spend = ads.reduce((sum, ad) => sum + ad.spend, 0);
   const total_raised = ads.reduce((sum, ad) => sum + ad.raised, 0);
@@ -49,8 +50,8 @@ function buildTotals(
   // Use link_clicks for accurate Link CTR (outbound clicks to destination URL)
   const total_link_clicks = ads.reduce((sum, ad) => sum + (ad.link_clicks || 0), 0);
 
-  // Use unique donors from the actual set
-  const unique_donors = new Set(allDonorEmails).size;
+  // FIXED: Only count donors attributed to Meta ads (not ALL donors in period)
+  const unique_donors = new Set(attributedDonorEmails).size;
 
   return {
     total_spend,
@@ -173,6 +174,7 @@ export function useAdPerformanceQuery({
         ad_id: string;
         ad_name: string | null;
         campaign_id: string;
+        adset_id: string | null;
         creative_id: string | null;
         spend: number;
         impressions: number;
@@ -192,6 +194,7 @@ export function useAdPerformanceQuery({
             ad_id: adId,
             ad_name: row.ad_name,
             campaign_id: row.campaign_id,
+            adset_id: row.adset_id || null,
             creative_id: row.creative_id,
             spend: 0,
             impressions: 0,
@@ -326,7 +329,9 @@ export function useAdPerformanceQuery({
         attribution_methods: Map<string, number>;
       }>();
 
+      // Track ALL donors (for unattributed banner) vs ATTRIBUTED donors (for KPI summary)
       const allDonorEmails: string[] = [];
+      const attributedDonorEmails: string[] = []; // NEW: Only donors matched to Meta ads
       let directAdIdMatches = 0;
       let creativeIdMatches = 0;
       let refcodeMatches = 0;
@@ -355,6 +360,8 @@ export function useAdPerformanceQuery({
           donationsByAdId.set(adId, existing);
           directAdIdMatches++;
           wasAttributed = true;
+          // Track as attributed donor for accurate KPI count
+          attributedDonorEmails.push(donorEmail);
         }
 
         // Also track by creative_id for fallback
@@ -371,7 +378,11 @@ export function useAdPerformanceQuery({
           existing.donors.add(donorEmail);
           existing.attribution_methods.set(method, (existing.attribution_methods.get(method) || 0) + 1);
           donationsByCreativeId.set(creativeId, existing);
-          if (!wasAttributed) creativeIdMatches++;
+          if (!wasAttributed) {
+            creativeIdMatches++;
+            // Track as attributed donor for accurate KPI count
+            attributedDonorEmails.push(donorEmail);
+          }
           wasAttributed = true;
         }
 
@@ -396,6 +407,8 @@ export function useAdPerformanceQuery({
             donationsByAdId.set(mappedAdId, existing);
             refcodeMatches++;
             wasAttributed = true;
+            // Track as attributed donor for accurate KPI count
+            attributedDonorEmails.push(donorEmail);
           } else {
             // Track by refcode for later analysis
             const existing = donationsByRefcode.get(refcodeLower) || {
@@ -469,6 +482,7 @@ export function useAdPerformanceQuery({
             ad_id: adId,
             creative_id: metrics.creative_id || creative?.creative_id || '',
             campaign_id: metrics.campaign_id,
+            adset_id: metrics.adset_id || undefined,
             status: 'ACTIVE',
             spend,
             raised,
@@ -591,6 +605,7 @@ export function useAdPerformanceQuery({
             ad_id: creative.ad_id || '',
             creative_id: creativeId,
             campaign_id: creative.campaign_id,
+            adset_id: undefined, // Not available in fallback path
             status: 'ACTIVE',
             spend,
             raised,
@@ -678,7 +693,8 @@ export function useAdPerformanceQuery({
       }
 
       // ========== STEP 6: Calculate totals and summary ==========
-      const totals = buildTotals(ads, allDonorEmails);
+      // FIXED: Use attributedDonorEmails (donors matched to Meta ads) not allDonorEmails (all donors in period)
+      const totals = buildTotals(ads, attributedDonorEmails);
 
       const topThree = [...ads]
         .sort((a, b) => b.roas - a.roas)
