@@ -265,27 +265,33 @@ export function useAdPerformanceQuery({
         });
       }
 
-      // ========== STEP 3: Get donations with attribution ==========
-      const { data: donationsData, error: donationsError } = await sb
-        .from('donation_attribution')
-        .select(`
-          attributed_creative_id,
-          attributed_ad_id,
-          attributed_campaign_id,
-          refcode,
-          attribution_method,
-          amount,
-          net_amount,
-          donor_email
-        `)
-        .eq('organization_id', organizationId)
-        .gte('transaction_date', startDate)
-        .lte('transaction_date', `${endDate}T23:59:59`)
-        .eq('transaction_type', 'donation');
+      // ========== STEP 3: Get donations with attribution (TIMEZONE-AWARE) ==========
+      // Use the timezone-aware RPC to match ActBlue's Eastern time boundaries
+      const orgTimezone = 'America/New_York'; // Default to ET for political orgs
+      
+      const { data: donationsData, error: donationsError } = await sb.rpc(
+        'get_ad_performance_donations_tz',
+        {
+          p_organization_id: organizationId,
+          p_start_date: startDate,
+          p_end_date: endDate,
+          p_timezone: orgTimezone
+        }
+      );
 
       if (donationsError) {
         logger.error('Failed to load donation attribution', donationsError);
         throw new Error('Failed to load donation data');
+      }
+
+      // DEV-ONLY: Log timezone-aware query results
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[AdPerformance:Hook] Timezone-aware donation query:', {
+          rpc: 'get_ad_performance_donations_tz',
+          params: { p_organization_id: organizationId, p_start_date: startDate, p_end_date: endDate, p_timezone: orgTimezone },
+          resultCount: (donationsData || []).length,
+          totalRaised: (donationsData || []).reduce((sum: number, d: any) => sum + Number(d.net_amount || 0), 0),
+        });
       }
 
       // Aggregate donations by ad_id (primary), creative_id (secondary), or refcode (fallback)
