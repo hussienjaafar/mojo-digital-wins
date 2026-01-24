@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useActBlueTimezone } from "@/stores/dashboardStore";
 
 export interface ActBlueFilteredRollupParams {
   organizationId: string;
@@ -9,7 +8,6 @@ export interface ActBlueFilteredRollupParams {
   campaignId?: string | null;
   creativeId?: string | null;
   timezone?: string;
-  useUtc?: boolean; // Optional override for UTC mode
 }
 
 export interface ActBlueDailyMetrics {
@@ -51,8 +49,7 @@ const DEFAULT_TIMEZONE = "America/New_York";
  * Hook to fetch ActBlue metrics using the server-side filtered rollup RPC.
  * Uses timezone-aware day bucketing and supports optional campaign/creative filtering.
  *
- * By default, uses Eastern Time boundaries to match ActBlue's Fundraising Performance dashboard.
- * Set useUtc: true to use UTC boundaries instead.
+ * Always uses Eastern Time boundaries to match ActBlue's Fundraising Performance dashboard.
  *
  * This replaces client-side day bucketing with server-side aggregation for:
  * - Better performance (aggregation happens in DB)
@@ -66,14 +63,7 @@ export function useActBlueFilteredRollup({
   campaignId,
   creativeId,
   timezone = DEFAULT_TIMEZONE,
-  useUtc,
 }: ActBlueFilteredRollupParams): UseActBlueFilteredRollupResult {
-  const hasFilters = !!(campaignId || creativeId);
-  const storeUseActBlueTimezone = useActBlueTimezone();
-  
-  // When useActBlueTimezone is true, we want ET (p_use_utc=false)
-  // When useActBlueTimezone is false, we want UTC (p_use_utc=true)
-  const effectiveUseUtc = useUtc ?? !storeUseActBlueTimezone;
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
@@ -84,10 +74,9 @@ export function useActBlueFilteredRollup({
       campaignId,
       creativeId,
       timezone,
-      effectiveUseUtc,
     ],
     queryFn: async () => {
-      // Call the RPC with optional parameters
+      // Call the RPC with optional parameters - always use ET (p_use_utc: false)
       const { data: rpcData, error: rpcError } = await (supabase as any).rpc(
         "get_actblue_filtered_rollup",
         {
@@ -97,7 +86,7 @@ export function useActBlueFilteredRollup({
           p_campaign_id: campaignId || null,
           p_creative_id: creativeId || null,
           p_timezone: timezone,
-          p_use_utc: effectiveUseUtc,
+          p_use_utc: false,
         }
       );
 
