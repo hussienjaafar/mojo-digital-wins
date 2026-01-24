@@ -20,6 +20,7 @@ interface Campaign {
   organization_id: string;
   extracted_refcode: string | null;
   actblue_refcode: string | null;
+  actblue_form: string | null;
   campaign_name: string | null;
   send_date: string;
 }
@@ -48,15 +49,22 @@ interface MatchResult {
  * 1. Exact actblue_refcode match (resolved from vanity URL) - Score 200
  * 2. Direct extracted_refcode match - Score 180
  * 3. Date-coded refcode pattern matching - Score 150/100
- * 4. Form-based attribution (fallback) - Score 50
+ * 3.5. ActBlue form name match - Score 140
+ * 4. Extracted refcode in form path - Score 120
+ * 5. Generic SMS/text form match (fallback) - Score 50
  */
 function calculateMatchScore(campaign: Campaign, transaction: Transaction): number {
   const txRefcode = transaction.refcode?.toLowerCase() || "";
   const extractedRefcode = campaign.extracted_refcode?.toLowerCase() || "";
   const actblueRefcode = campaign.actblue_refcode?.toLowerCase() || "";
+  const actblueForm = campaign.actblue_form?.toLowerCase() || "";
   const formName = transaction.contribution_form?.toLowerCase() || "";
   
-  if (!txRefcode && !formName.includes('sms') && !formName.includes('text')) {
+  // Check if this could possibly be an SMS-related transaction
+  const hasSmsIndicator = txRefcode || formName.includes('sms') || formName.includes('text') || 
+    (actblueForm && formName.includes(actblueForm));
+  
+  if (!hasSmsIndicator) {
     return 0; // No refcode and not SMS form - no match possible
   }
   
@@ -118,7 +126,33 @@ function calculateMatchScore(campaign: Campaign, transaction: Transaction): numb
     }
   }
   
-  // Tier 4: Form-based attribution within 3 days of campaign
+  // Tier 3.5: ActBlue form name match (campaign's form matches transaction's contribution form)
+  // E.g., Campaign has actblue_form='ahamawytext' matches transaction.contribution_form containing 'ahamawytext'
+  if (actblueForm && formName) {
+    // Exact or partial form name match within 14 days
+    if (formName.includes(actblueForm) || actblueForm.includes(formName.split('/').pop() || '')) {
+      if (daysDiff <= 14) {
+        return 140;
+      } else if (daysDiff <= 30) {
+        return 130; // Slightly lower for older matches
+      }
+    }
+  }
+  
+  // Tier 4: Extracted refcode matches form name pattern
+  // E.g., extracted_refcode='nakba' matches contribution_form containing 'nakba'
+  if (extractedRefcode && formName) {
+    const formPath = formName.split('/').pop()?.split('?')[0] || formName;
+    if (formPath.includes(extractedRefcode) || extractedRefcode.includes(formPath)) {
+      if (daysDiff <= 14) {
+        return 120;
+      } else if (daysDiff <= 30) {
+        return 110;
+      }
+    }
+  }
+  
+  // Tier 5: Generic SMS/text form-based attribution within 3 days of campaign
   if ((formName.includes('sms') || formName.includes('text')) && daysDiff <= 3) {
     return 50;
   }
@@ -170,7 +204,7 @@ serve(async (req) => {
     // Get all SMS campaigns with extracted refcodes
     let campaignsQuery = supabase
       .from("sms_campaigns")
-      .select("id, campaign_id, organization_id, extracted_refcode, actblue_refcode, campaign_name, send_date")
+      .select("id, campaign_id, organization_id, extracted_refcode, actblue_refcode, actblue_form, campaign_name, send_date")
       .not("extracted_refcode", "is", null);
 
     if (organizationId) {
