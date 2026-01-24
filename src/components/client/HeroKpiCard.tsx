@@ -17,7 +17,7 @@ import {
   useIsDrilldownOpen,
   type KpiKey,
 } from "@/stores/dashboardStore";
-import { V3KPIDrilldownDrawer, type KPIDrilldownData } from "@/components/v3/V3KPIDrilldownDrawer";
+import { V3KPIDrilldownDrawer, type KPIDrilldownData, type SingleDayComparisonData } from "@/components/v3/V3KPIDrilldownDrawer";
 import { InlineKpiExpansion, type ValueType } from "./InlineKpiExpansion";
 import type { LineSeriesConfig } from "@/components/charts/echarts";
 import { EChartsSparkline, type SparklineValueType } from "@/components/charts/echarts";
@@ -95,6 +95,8 @@ export interface HeroKpiCardProps {
   expansionMode?: "drawer" | "inline";
   /** Callback when inline expansion state changes */
   onInlineExpandChange?: (expanded: boolean) => void;
+  /** Single-day comparison data for optimized single-day view */
+  singleDayData?: SingleDayComparisonData;
 }
 
 // ============================================================================
@@ -259,6 +261,7 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
   expandable,
   expansionMode = "drawer",
   onInlineExpandChange,
+  singleDayData,
 }) => {
   const cardRef = React.useRef<HTMLElement>(null);
   // Local state for inline expansion mode
@@ -308,8 +311,9 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
         }] as LineSeriesConfig[],
       } : undefined,
       breakdown,
+      singleDayData,
     };
-  }, [label, value, Icon, trend, description, trendData, trendXAxisKey, breakdown, accent, hasDrilldownData]);
+  }, [label, value, Icon, trend, description, trendData, trendXAxisKey, breakdown, accent, hasDrilldownData, singleDayData]);
 
   const handleClick = () => {
     if (isExpandable && hasDrilldownData) {
@@ -547,6 +551,7 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
             accent={accent}
             valueType={KPI_VALUE_TYPE_MAP[kpiKey] || "currency"}
             onClose={handleInlineClose}
+            singleDayData={singleDayData}
           />
         )}
       </AnimatePresence>
