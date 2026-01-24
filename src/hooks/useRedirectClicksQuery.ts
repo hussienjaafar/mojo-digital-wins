@@ -151,7 +151,7 @@ async function fetchRedirectClicks(
     entry.uniqueSessions = sessions ? sessions.size : entry.totalClicks;
     entry.cookieCaptureRate =
       entry.totalClicks > 0
-        ? Math.round(((entry.withFbp + entry.withFbc) / entry.totalClicks) * 50)
+        ? Math.round(((entry.withFbp + entry.withFbc) / entry.totalClicks) * 100)
         : 0;
   });
 

@@ -14661,6 +14661,41 @@ export type Database = {
           status: string
         }[]
       }
+      get_link_tracking_metrics: {
+        Args: {
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+        }
+        Returns: {
+          attribution_type: string
+          conversions: number
+          cookie_capture_rate: number
+          meta_ad_clicks: number
+          refcode: string
+          revenue: number
+          total_clicks: number
+          unique_sessions: number
+          with_fbc: number
+          with_fbp: number
+        }[]
+      }
+      get_link_tracking_summary: {
+        Args: {
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+        }
+        Returns: {
+          attributed_revenue: number
+          conversion_rate: number
+          conversions: number
+          cookie_capture_rate: number
+          meta_ad_clicks: number
+          total_clicks: number
+          unique_sessions: number
+        }[]
+      }
       get_meta_accounts_due_for_sync: {
         Args: { p_limit?: number }
         Returns: {
