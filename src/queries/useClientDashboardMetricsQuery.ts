@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useDateRange, useSelectedCampaignId, useSelectedCreativeId } from "@/stores/dashboardStore";
+import { useDateRange } from "@/stores/dashboardStore";
 import { format, parseISO, subDays, eachDayOfInterval, addDays } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { logger } from "@/lib/logger";
@@ -1128,17 +1128,15 @@ async function fetchDashboardMetrics(
 
 export function useClientDashboardMetricsQuery(organizationId: string | undefined) {
   const dateRange = useDateRange();
-  const selectedCampaignId = useSelectedCampaignId();
-  const selectedCreativeId = useSelectedCreativeId();
 
   return useQuery({
-    queryKey: ['dashboard', 'metrics', organizationId, dateRange, selectedCampaignId, selectedCreativeId],
+    queryKey: ['dashboard', 'metrics', organizationId, dateRange],
     queryFn: () => fetchDashboardMetrics(
       organizationId!,
       dateRange.startDate,
       dateRange.endDate,
-      selectedCampaignId,
-      selectedCreativeId
+      null,
+      null
     ),
     enabled: !!organizationId,
     staleTime: 2 * 60 * 1000,

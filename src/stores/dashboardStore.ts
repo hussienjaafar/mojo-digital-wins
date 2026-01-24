@@ -119,14 +119,6 @@ interface DashboardState {
   selectedChannel: ChannelFilter;
   setSelectedChannel: (channel: ChannelFilter) => void;
 
-  // Campaign filter (null = all campaigns)
-  selectedCampaignId: string | null;
-  setSelectedCampaignId: (campaignId: string | null) => void;
-
-  // Creative filter (null = all creatives)
-  selectedCreativeId: string | null;
-  setSelectedCreativeId: (creativeId: string | null) => void;
-
   // View mode
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
@@ -193,14 +185,6 @@ export const useDashboardStore = create<DashboardState>()(
       selectedChannel: 'all',
       setSelectedChannel: (channel) => set({ selectedChannel: channel }),
 
-      // Campaign filter
-      selectedCampaignId: null,
-      setSelectedCampaignId: (campaignId) => set({ selectedCampaignId: campaignId }),
-
-      // Creative filter
-      selectedCreativeId: null,
-      setSelectedCreativeId: (creativeId) => set({ selectedCreativeId: creativeId }),
-
       // View mode
       viewMode: 'overview',
       setViewMode: (mode) => set({ viewMode: mode }),
@@ -243,8 +227,6 @@ export const useDashboardStore = create<DashboardState>()(
         set({
           dateRange: getDefaultDateRange(),
           selectedChannel: 'all',
-          selectedCampaignId: null,
-          selectedCreativeId: null,
           viewMode: 'overview',
           comparisonEnabled: false,
           selectedKpiKey: null,
@@ -260,8 +242,6 @@ export const useDashboardStore = create<DashboardState>()(
       partialize: (state) => ({
         dateRange: state.dateRange,
         selectedChannel: state.selectedChannel,
-        selectedCampaignId: state.selectedCampaignId,
-        selectedCreativeId: state.selectedCreativeId,
         viewMode: state.viewMode,
         comparisonEnabled: state.comparisonEnabled,
         lastAccessedAt: state.lastAccessedAt,
@@ -291,8 +271,6 @@ export const useDashboardStore = create<DashboardState>()(
 
 export const useDateRange = () => useDashboardStore((s) => s.dateRange);
 export const useSelectedChannel = () => useDashboardStore((s) => s.selectedChannel);
-export const useSelectedCampaignId = () => useDashboardStore((s) => s.selectedCampaignId);
-export const useSelectedCreativeId = () => useDashboardStore((s) => s.selectedCreativeId);
 export const useViewMode = () => useDashboardStore((s) => s.viewMode);
 export const useRefreshKey = () => useDashboardStore((s) => s.refreshKey);
 export const useComparisonEnabled = () => useDashboardStore((s) => s.comparisonEnabled);
