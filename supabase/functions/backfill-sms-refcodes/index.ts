@@ -96,7 +96,7 @@ serve(async (req) => {
     // Query campaigns that need refcode resolution
     let query = supabase
       .from("sms_campaigns")
-      .select("id, campaign_name, destination_url, extracted_refcode, actblue_refcode")
+      .select("id, campaign_name, destination_url, extracted_refcode, actblue_refcode, actblue_form")
       .not("destination_url", "is", null);
 
     // Only process campaigns without actblue_refcode (unless forcing)
@@ -151,15 +151,29 @@ serve(async (req) => {
         const resolved = await resolveVanityUrl(campaign.destination_url);
 
         if (resolved.success && (resolved.actblueRefcode || resolved.actblueForm)) {
-          // Use refcode if available, otherwise use form name
-          const actblueRefcode = resolved.actblueRefcode || resolved.actblueForm;
+          // Store both refcode and form name separately for flexible matching
+          const updateData: Record<string, string | null> = {
+            updated_at: new Date().toISOString(),
+          };
+          
+          // Store refcode if available
+          if (resolved.actblueRefcode) {
+            updateData.actblue_refcode = resolved.actblueRefcode;
+          }
+          
+          // Always store form name if available (for fallback matching)
+          if (resolved.actblueForm) {
+            updateData.actblue_form = resolved.actblueForm;
+          }
+          
+          // If no refcode but we have form, use form as refcode fallback
+          if (!resolved.actblueRefcode && resolved.actblueForm) {
+            updateData.actblue_refcode = resolved.actblueForm;
+          }
           
           const { error: updateError } = await supabase
             .from("sms_campaigns")
-            .update({
-              actblue_refcode: actblueRefcode,
-              updated_at: new Date().toISOString(),
-            })
+            .update(updateData)
             .eq("id", campaign.id);
 
           if (updateError) {
@@ -167,7 +181,7 @@ serve(async (req) => {
             result.failed++;
           } else {
             result.refcodes_resolved++;
-            console.log(`[BACKFILL] Resolved "${campaign.campaign_name}": ${campaign.extracted_refcode} -> ${actblueRefcode}`);
+            console.log(`[BACKFILL] Resolved "${campaign.campaign_name}": refcode=${resolved.actblueRefcode || 'none'}, form=${resolved.actblueForm || 'none'}`);
           }
         } else {
           console.log(`[BACKFILL] Could not resolve ActBlue refcode for "${campaign.campaign_name}": ${resolved.error || 'No ActBlue URL found'}`);

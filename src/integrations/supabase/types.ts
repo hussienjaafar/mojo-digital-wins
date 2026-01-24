@@ -9616,6 +9616,7 @@ export type Database = {
       }
       sms_campaigns: {
         Row: {
+          actblue_form: string | null
           actblue_refcode: string | null
           amount_raised: number | null
           analyzed_at: string | null
@@ -9654,6 +9655,7 @@ export type Database = {
           values_appealed: string[] | null
         }
         Insert: {
+          actblue_form?: string | null
           actblue_refcode?: string | null
           amount_raised?: number | null
           analyzed_at?: string | null
@@ -9692,6 +9694,7 @@ export type Database = {
           values_appealed?: string[] | null
         }
         Update: {
+          actblue_form?: string | null
           actblue_refcode?: string | null
           amount_raised?: number | null
           analyzed_at?: string | null
