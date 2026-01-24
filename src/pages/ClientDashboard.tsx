@@ -464,7 +464,8 @@ const ClientDashboard = () => {
 
               {/* Charts Section - Always render wrapper to prevent CLS */}
               <motion.section variants={sectionVariants}>
-                {(data || (isLoading && !error)) && (
+                {/* Only show "Trends & Drivers" header for multi-day view - single day view has its own header */}
+                {(data || (isLoading && !error)) && !isSingleDayView && (
                   <V3SectionHeader
                     title="Trends & Drivers"
                     subtitle="Revenue trends and attribution breakdown"
