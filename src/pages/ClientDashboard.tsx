@@ -33,6 +33,7 @@ import { ActBlueMetricsDebug } from "@/components/debug/ActBlueMetricsDebug";
 import { TodayViewDashboard } from "@/components/client/TodayViewDashboard";
 import { useIsSingleDayView } from "@/hooks/useHourlyMetrics";
 import { useInactivityReset } from "@/hooks/useInactivityReset";
+import { useSmartRefresh } from "@/hooks/useSmartRefresh";
 
 // Lazy load Heatmap for performance
 const DonationHeatmap = lazy(() => import("@/components/client/DonationHeatmap"));
@@ -253,33 +254,18 @@ const ClientDashboard = () => {
   // Reset date range to "today" after 30 minutes of inactivity
   useInactivityReset({ enabled: true, timeoutMs: 30 * 60 * 1000 });
 
-  // Handler for refresh button - invalidates cache and forces fresh fetch
-  const handleRefresh = useCallback(async () => {
-    logger.info('Dashboard refresh triggered', { organizationId });
-    
-    // Invalidate ALL dashboard-related queries to ensure fresh data
-    await queryClient.invalidateQueries({ 
-      queryKey: ['dashboard'],
-      refetchType: 'all'
-    });
-    
-    // Also invalidate related queries that feed into the dashboard
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['actblue'] }),
-      queryClient.invalidateQueries({ queryKey: ['meta-metrics'] }),
-      queryClient.invalidateQueries({ queryKey: ['sms'] }),
-      queryClient.invalidateQueries({ queryKey: ['attribution'] }),
-      queryClient.invalidateQueries({ queryKey: ['recurring-health'] }),
-    ]);
-    
-    // Trigger store refresh (for components listening to refreshKey)
-    triggerRefresh();
-    
-    // Force refetch with network-only behavior
-    await refetch();
-    
-    toast.success('Dashboard refreshed with latest data');
-  }, [queryClient, organizationId, triggerRefresh, refetch]);
+  // Smart refresh hook - checks freshness and conditionally syncs stale sources
+  const { 
+    handleSmartRefresh, 
+    isRefreshing: isSmartRefreshing,
+    syncingSources 
+  } = useSmartRefresh({
+    organizationId: organizationId || '',
+    onComplete: () => {
+      triggerRefresh();
+      refetch();
+    }
+  });
 
   // Build hero KPIs from query data
   const heroKpis = useMemo(() => {
@@ -433,8 +419,9 @@ const ClientDashboard = () => {
                   controls={
                     <PerformanceControlsToolbar
                       showRefresh
-                      onRefresh={handleRefresh}
-                      isRefreshing={isFetching}
+                      onRefresh={handleSmartRefresh}
+                      isRefreshing={isSmartRefreshing || isFetching}
+                      syncingSources={syncingSources}
                     />
                   }
                   kpis={heroKpis}
