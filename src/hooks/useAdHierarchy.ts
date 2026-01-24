@@ -12,18 +12,24 @@ import type { CampaignMetrics, AdSetMetrics, AdHierarchyResult } from '@/types/a
 interface UseAdHierarchyOptions {
   ads: AdPerformanceData[];
   campaignNames?: Map<string, string>;
+  adsetNames?: Map<string, string>;
 }
 
 /**
- * Extract adset name from ad name if available
- * Meta often embeds adset info in ad names like "Campaign_AdSet_Ad"
+ * Get campaign name from lookup or generate fallback
  */
-function extractAdsetName(adName: string | null, adsetId: string): string {
-  // Use the adset_id as fallback
-  return adName?.split('_').slice(0, 2).join('_') || `Ad Set ${adsetId.slice(-8)}`;
+function getCampaignName(campaignId: string, campaignNames?: Map<string, string>): string {
+  return campaignNames?.get(campaignId) || `Campaign ${campaignId.slice(-8)}`;
 }
 
-export function useAdHierarchy({ ads, campaignNames = new Map() }: UseAdHierarchyOptions): AdHierarchyResult {
+/**
+ * Get adset name from lookup or generate fallback
+ */
+function getAdsetName(adsetId: string, adsetNames?: Map<string, string>): string {
+  return adsetNames?.get(adsetId) || `Ad Set ${adsetId.slice(-8)}`;
+}
+
+export function useAdHierarchy({ ads, campaignNames = new Map(), adsetNames = new Map() }: UseAdHierarchyOptions): AdHierarchyResult {
   // Aggregate by campaign
   const campaigns = useMemo(() => {
     const campaignMap = new Map<string, {
@@ -40,7 +46,7 @@ export function useAdHierarchy({ ads, campaignNames = new Map() }: UseAdHierarch
 
       const existing = campaignMap.get(ad.campaign_id) || {
         campaign_id: ad.campaign_id,
-        campaign_name: campaignNames.get(ad.campaign_id) || `Campaign ${ad.campaign_id.slice(-8)}`,
+        campaign_name: getCampaignName(ad.campaign_id, campaignNames),
         status: ad.status,
         ads: [],
         adsets: new Set<string>(),
@@ -105,9 +111,9 @@ export function useAdHierarchy({ ads, campaignNames = new Map() }: UseAdHierarch
 
       const existing = adsetMap.get(adsetId) || {
         adset_id: adsetId,
-        adset_name: extractAdsetName(ad.ad_copy_headline || ad.refcode, adsetId),
+        adset_name: getAdsetName(adsetId, adsetNames),
         campaign_id: ad.campaign_id,
-        campaign_name: campaignNames.get(ad.campaign_id) || `Campaign ${ad.campaign_id.slice(-8)}`,
+        campaign_name: getCampaignName(ad.campaign_id, campaignNames),
         ads: [],
       };
 

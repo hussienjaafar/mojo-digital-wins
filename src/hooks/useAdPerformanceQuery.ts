@@ -246,6 +246,32 @@ export function useAdPerformanceQuery({
         throw new Error('Failed to load creative data');
       }
 
+      // ========== STEP 2b: Fetch campaign names for hierarchy ==========
+      const { data: campaignsData } = await sb
+        .from('meta_campaigns')
+        .select('campaign_id, campaign_name, status, objective')
+        .eq('organization_id', organizationId);
+
+      // Build campaign name lookup
+      const campaignNamesMap: Record<string, string> = {};
+      for (const campaign of campaignsData || []) {
+        if (campaign.campaign_id && campaign.campaign_name) {
+          campaignNamesMap[campaign.campaign_id] = campaign.campaign_name;
+        }
+      }
+
+      // Build adset name lookup from ad-level data (adset names not stored separately)
+      // Use ad_name as fallback hint for adset identification
+      const adsetNamesMap: Record<string, string> = {};
+      for (const row of adLevelData || []) {
+        if (row.adset_id && !adsetNamesMap[row.adset_id]) {
+          // Use ad_name as hint or fallback to truncated ID
+          adsetNamesMap[row.adset_id] = row.ad_name 
+            ? `Ad Set (${row.ad_name.split(' ')[0] || row.adset_id.slice(-8)})`
+            : `Ad Set ${row.adset_id.slice(-8)}`;
+        }
+      }
+
       // Build creative lookup by ad_id, creative_id, and refcode
       const creativeByAdId = new Map<string, any>();
       const creativeByCreativeId = new Map<string, any>();
@@ -771,6 +797,8 @@ export function useAdPerformanceQuery({
           modeled_attributed: modeledAttributed,
           total_attributed: totalAttributed,
         },
+        campaignNames: campaignNamesMap,
+        adsetNames: adsetNamesMap,
         attributionFallbackMode,
         isEstimatedDistribution,
         hasUnattributedDonations,

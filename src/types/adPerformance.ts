@@ -145,6 +145,9 @@ export interface AdPerformanceResult {
     modeled_attributed: number;
     total_attributed: number;
   };
+  // Lookup maps for hierarchical navigation
+  campaignNames: Record<string, string>;
+  adsetNames: Record<string, string>;
   // Flag indicating whether fallback attribution was used due to no click data
   attributionFallbackMode: boolean;
   // Flag indicating spend/impressions are estimated (campaign distributed, not true ad-level)
