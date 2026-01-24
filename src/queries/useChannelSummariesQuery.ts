@@ -178,26 +178,26 @@ async function fetchSmsSummary(
     throw error;
   }
 
-  // Extract totals from the RPC response
-  const totals = data?.totals || {};
+  // Extract summary from the RPC response (not "totals")
+  const summary = data?.summary || {};
   const campaigns = data?.campaigns || [];
   
-  const sent = totals.totalSent || 0;
-  const raised = totals.totalAmountRaised || 0;
-  const cost = totals.totalCost || 0;
+  const sent = summary.totalSent || 0;
+  const raised = summary.totalRaised || 0;
+  const cost = summary.totalCost || 0;
   const roi = cost > 0 ? raised / cost : 0;
   
   // Get last data date from most recent campaign
-  const lastDataDate = campaigns[0]?.sendDate?.split("T")[0] || null;
+  const lastDataDate = campaigns[0]?.send_date?.split("T")[0] || null;
 
   return {
     sent,
     raised,
     cost,
     roi,
-    campaignCount: totals.campaignCount || 0,
+    campaignCount: summary.campaignCount || 0,
     lastDataDate,
-    hasData: (totals.campaignCount || 0) > 0,
+    hasData: (summary.campaignCount || 0) > 0,
   };
 }
 
