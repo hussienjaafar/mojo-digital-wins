@@ -218,14 +218,15 @@ async function fetchDonationsSummary(
     throw error;
   }
 
+  // Map RPC field names (gross_raised, net_raised, transaction_count, etc.)
   const row = data?.[0] || {};
-  const grossDonations = Number(row.total_gross_donations) || 0;
-  const netDonations = Number(row.total_net_donations) || 0;
-  const donationCount = Number(row.total_donation_count) || 0;
-  const refundCount = Number(row.total_refund_count) || 0;
-  const refundAmount = Number(row.total_refunds) || 0;
-  const uniqueDonors = Number(row.total_unique_donors) || 0;
-  const avgDonation = Number(row.overall_avg_donation) || 0;
+  const grossDonations = Number(row.gross_raised) || 0;
+  const netDonations = Number(row.net_raised) || 0;
+  const donationCount = Number(row.transaction_count) || 0;
+  const refundCount = Number(row.refund_count) || 0;
+  const refundAmount = Number(row.refund_amount) || 0;
+  const uniqueDonors = Number(row.unique_donors) || 0;
+  const avgDonation = Number(row.avg_donation) || 0;
 
   // For lastDataDate, we need a separate lightweight query
   const { data: latestTxn } = await supabase
