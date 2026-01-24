@@ -260,15 +260,24 @@ export function useAdPerformanceQuery({
         }
       }
 
-      // Build adset name lookup from ad-level data (adset names not stored separately)
-      // Use ad_name as fallback hint for adset identification
+      // ========== STEP 2c: Fetch ad set names from meta_adsets table ==========
+      const { data: adsetsData } = await sb
+        .from('meta_adsets')
+        .select('adset_id, adset_name, campaign_id')
+        .eq('organization_id', organizationId);
+
+      // Build adset name lookup from actual Meta data
       const adsetNamesMap: Record<string, string> = {};
+      for (const adset of adsetsData || []) {
+        if (adset.adset_id && adset.adset_name) {
+          adsetNamesMap[adset.adset_id] = adset.adset_name;
+        }
+      }
+
+      // Fallback: For any adset IDs not in meta_adsets table, use truncated ID
       for (const row of adLevelData || []) {
         if (row.adset_id && !adsetNamesMap[row.adset_id]) {
-          // Use ad_name as hint or fallback to truncated ID
-          adsetNamesMap[row.adset_id] = row.ad_name 
-            ? `Ad Set (${row.ad_name.split(' ')[0] || row.adset_id.slice(-8)})`
-            : `Ad Set ${row.adset_id.slice(-8)}`;
+          adsetNamesMap[row.adset_id] = `Ad Set ${row.adset_id.slice(-8)}`;
         }
       }
 
@@ -506,9 +515,12 @@ export function useAdPerformanceQuery({
           ads.push({
             id: creative?.id || adId,
             ad_id: adId,
+            ad_name: metrics.ad_name || null, // Actual Meta ad name
             creative_id: metrics.creative_id || creative?.creative_id || '',
             campaign_id: metrics.campaign_id,
+            campaign_name: campaignNamesMap[metrics.campaign_id] || undefined,
             adset_id: metrics.adset_id || undefined,
+            adset_name: metrics.adset_id ? adsetNamesMap[metrics.adset_id] : undefined,
             status: 'ACTIVE',
             spend,
             raised,
@@ -527,7 +539,7 @@ export function useAdPerformanceQuery({
             cpc,
             creative_thumbnail_url: creative?.thumbnail_url || null,
             ad_copy_primary_text: creative?.primary_text || null,
-            ad_copy_headline: creative?.headline || metrics.ad_name || null,
+            ad_copy_headline: creative?.headline || null,
             ad_copy_description: creative?.description || null,
             creative_type: creative?.creative_type || 'unknown',
             performance_tier: creative?.performance_tier || getPerformanceTier(roas),

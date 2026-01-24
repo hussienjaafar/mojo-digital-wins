@@ -5804,6 +5804,64 @@ export type Database = {
           },
         ]
       }
+      meta_adsets: {
+        Row: {
+          adset_id: string
+          adset_name: string
+          campaign_id: string
+          created_at: string | null
+          id: string
+          organization_id: string
+          status: string | null
+          targeting_summary: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          adset_id: string
+          adset_name: string
+          campaign_id: string
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          status?: string | null
+          targeting_summary?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          adset_id?: string
+          adset_name?: string
+          campaign_id?: string
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          status?: string | null
+          targeting_summary?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_adsets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_adsets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "meta_adsets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       meta_campaigns: {
         Row: {
           campaign_id: string

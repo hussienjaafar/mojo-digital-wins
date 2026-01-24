@@ -399,6 +399,48 @@ serve(async (req) => {
       }
     }
 
+    // ========== FETCH AND STORE AD SETS ==========
+    console.log(`[SYNC-META-ADS] Fetching ad sets for account ${ad_account_id}`);
+    
+    let adsetsProcessed = 0;
+    try {
+      const adsetsUrl = `https://graph.facebook.com/v22.0/${ad_account_id}/adsets?fields=id,name,campaign_id,status,targeting&limit=500&access_token=${access_token}`;
+      const adsetsResponse = await fetch(adsetsUrl);
+      const adsetsData = await adsetsResponse.json();
+      
+      if (!adsetsData.error && adsetsData.data) {
+        const adsets = adsetsData.data || [];
+        console.log(`[SYNC-META-ADS] Found ${adsets.length} ad sets`);
+        
+        for (const adset of adsets) {
+          const { error: adsetError } = await supabase
+            .from('meta_adsets')
+            .upsert({
+              organization_id,
+              adset_id: adset.id,
+              adset_name: adset.name,
+              campaign_id: adset.campaign_id,
+              status: adset.status || 'UNKNOWN',
+              targeting_summary: adset.targeting || {},
+            }, {
+              onConflict: 'organization_id,adset_id'
+            });
+          
+          if (adsetError) {
+            console.error(`[SYNC-META-ADS] Error storing adset ${adset.id}:`, adsetError.message);
+          } else {
+            adsetsProcessed++;
+          }
+        }
+        
+        console.log(`[SYNC-META-ADS] Stored ${adsetsProcessed} ad sets`);
+      } else if (adsetsData.error) {
+        console.error(`[SYNC-META-ADS] Error fetching ad sets: ${adsetsData.error.message}`);
+      }
+    } catch (adsetErr) {
+      console.error(`[SYNC-META-ADS] Exception fetching ad sets:`, adsetErr);
+    }
+
     // Fetch campaign attribution mappings
     const { data: attributionMappings } = await supabase
       .from('campaign_attribution')
@@ -1842,6 +1884,7 @@ serve(async (req) => {
 
     console.log(`=== META ADS SYNC COMPLETE ===`);
     console.log(`Campaigns: ${campaigns.length}`);
+    console.log(`Ad sets processed: ${adsetsProcessed}`);
     console.log(`Creatives processed: ${creativesProcessed}`);
     console.log(`Total insight records: ${totalInsightRecords}`);
     console.log(`Ad-level daily records: ${adLevelRecords}`);
@@ -1877,6 +1920,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         campaigns: campaigns.length,
+        adsets_processed: adsetsProcessed,
         creatives_processed: creativesProcessed,
         insight_records: totalInsightRecords,
         ad_level_daily_records: adLevelRecords,
