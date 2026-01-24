@@ -14,7 +14,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useDateRange } from "@/stores/dashboardStore";
+import { useDateRange, useActBlueTimezone } from "@/stores/dashboardStore";
 import type { AttributionChannel } from "@/utils/channelDetection";
 
 
@@ -98,14 +98,15 @@ export interface UseActBlueMetricsOptions {
   campaignId?: string | null;
   creativeId?: string | null;
   enabled?: boolean;
+  useUtc?: boolean; // Optional override for UTC mode
 }
 
 // ==================== Query Keys ====================
 
 export const actBlueMetricsKeys = {
   all: ['actblue-metrics'] as const,
-  dashboard: (orgId: string, startDate: string, endDate: string, campaignId?: string | null, creativeId?: string | null) =>
-    [...actBlueMetricsKeys.all, 'dashboard', orgId, startDate, endDate, campaignId, creativeId] as const,
+  dashboard: (orgId: string, startDate: string, endDate: string, campaignId?: string | null, creativeId?: string | null, useUtc?: boolean) =>
+    [...actBlueMetricsKeys.all, 'dashboard', orgId, startDate, endDate, campaignId, creativeId, useUtc] as const,
   sms: (orgId: string, startDate: string, endDate: string) =>
     [...actBlueMetricsKeys.all, 'sms', orgId, startDate, endDate] as const,
   health: (orgId: string) =>
@@ -254,7 +255,8 @@ async function fetchActBlueMetrics(
   startDate: string,
   endDate: string,
   campaignId?: string | null,
-  creativeId?: string | null
+  creativeId?: string | null,
+  useUtc: boolean = true
 ): Promise<ActBlueMetricsData> {
   const { data, error } = await supabase.rpc('get_actblue_dashboard_metrics', {
     p_organization_id: organizationId,
@@ -262,6 +264,7 @@ async function fetchActBlueMetrics(
     p_end_date: endDate,
     p_campaign_id: campaignId || null,
     p_creative_id: creativeId || null,
+    p_use_utc: useUtc,
   });
 
   if (error) {
@@ -282,13 +285,20 @@ async function fetchActBlueMetrics(
 /**
  * Primary hook for fetching all ActBlue dashboard metrics.
  * Uses the unified `get_actblue_dashboard_metrics` RPC.
+ * 
+ * By default, uses UTC boundaries to match ActBlue's Fundraising Performance dashboard.
+ * Set useUtc: false to use the organization's local timezone instead.
  */
 export function useActBlueMetrics(
   organizationId: string | undefined,
   options: UseActBlueMetricsOptions = {}
 ) {
   const { startDate, endDate } = useDateRange();
-  const { campaignId, creativeId, enabled = true } = options;
+  const storeUseActBlueTimezone = useActBlueTimezone();
+  const { campaignId, creativeId, enabled = true, useUtc } = options;
+  
+  // Use provided useUtc option or fall back to store preference
+  const effectiveUseUtc = useUtc ?? storeUseActBlueTimezone;
 
   return useQuery({
     queryKey: actBlueMetricsKeys.dashboard(
@@ -296,14 +306,16 @@ export function useActBlueMetrics(
       startDate,
       endDate,
       campaignId,
-      creativeId
+      creativeId,
+      effectiveUseUtc
     ),
     queryFn: () => fetchActBlueMetrics(
       organizationId!,
       startDate,
       endDate,
       campaignId,
-      creativeId
+      creativeId,
+      effectiveUseUtc
     ),
     enabled: enabled && !!organizationId,
     staleTime: 2 * 60 * 1000, // 2 minutes
