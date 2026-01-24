@@ -176,7 +176,7 @@ export function AdPerformanceCard({ ad, onSelect }: AdPerformanceCardProps) {
                 <div className="text-sm font-semibold">{formatPercentage(ad.ctr)}</div>
                 <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                   <MousePointer className="h-3 w-3" />
-                  CTR
+                  Link CTR
                 </div>
               </div>
               <div>

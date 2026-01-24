@@ -46,6 +46,8 @@ function buildTotals(
   const total_donations = ads.reduce((sum, ad) => sum + ad.donation_count, 0);
   const total_impressions = ads.reduce((sum, ad) => sum + ad.impressions, 0);
   const total_clicks = ads.reduce((sum, ad) => sum + ad.clicks, 0);
+  // Use link_clicks for accurate Link CTR (outbound clicks to destination URL)
+  const total_link_clicks = ads.reduce((sum, ad) => sum + (ad.link_clicks || 0), 0);
 
   // Use unique donors from the actual set
   const unique_donors = new Set(allDonorEmails).size;
@@ -61,7 +63,9 @@ function buildTotals(
     avg_cpa: unique_donors > 0 ? total_spend / unique_donors : 0,
     total_impressions,
     total_clicks,
-    avg_ctr: total_impressions > 0 ? (total_clicks / total_impressions) * 100 : 0,
+    total_link_clicks,
+    // Use Link CTR (link_clicks / impressions) - industry standard for conversion-focused campaigns
+    avg_ctr: total_impressions > 0 ? (total_link_clicks / total_impressions) * 100 : 0,
   };
 }
 
@@ -105,6 +109,8 @@ export function useAdPerformanceQuery({
           spend,
           impressions,
           clicks,
+          link_clicks,
+          link_ctr,
           reach,
           ctr,
           cpm,
@@ -171,6 +177,7 @@ export function useAdPerformanceQuery({
         spend: number;
         impressions: number;
         clicks: number;
+        link_clicks: number;
         reach: number;
         meta_roas: number | null;
         quality_ranking: string | null;
@@ -189,6 +196,7 @@ export function useAdPerformanceQuery({
             spend: 0,
             impressions: 0,
             clicks: 0,
+            link_clicks: 0,
             reach: 0,
             meta_roas: null,
             quality_ranking: row.quality_ranking,
@@ -199,6 +207,7 @@ export function useAdPerformanceQuery({
             spend: existing.spend + Number(row.spend || 0),
             impressions: existing.impressions + Number(row.impressions || 0),
             clicks: existing.clicks + Number(row.clicks || 0),
+            link_clicks: existing.link_clicks + Number(row.link_clicks || 0),
             reach: existing.reach + Number(row.reach || 0),
             // Use the most recent meta_roas value
             meta_roas: row.meta_roas ?? existing.meta_roas,
@@ -449,9 +458,11 @@ export function useAdPerformanceQuery({
           const roiPct = spend > 0 ? (profit / spend) * 100 : 0;
           const avgDonation = donationCount > 0 ? raised / donationCount : 0;
           const cpa = uniqueDonors > 0 ? spend / uniqueDonors : 0;
-          const ctr = metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0;
+          // Use link_clicks for Link CTR (accurate measure of outbound clicks)
+          const linkClicks = metrics.link_clicks || 0;
+          const ctr = metrics.impressions > 0 ? (linkClicks / metrics.impressions) * 100 : 0;
           const cpm = metrics.impressions > 0 ? (spend / metrics.impressions) * 1000 : 0;
-          const cpc = metrics.clicks > 0 ? spend / metrics.clicks : 0;
+          const cpc = linkClicks > 0 ? spend / linkClicks : 0;
 
           ads.push({
             id: creative?.id || adId,
@@ -470,6 +481,7 @@ export function useAdPerformanceQuery({
             cpa,
             impressions: metrics.impressions,
             clicks: metrics.clicks,
+            link_clicks: linkClicks,
             ctr,
             cpm,
             cpc,
@@ -569,6 +581,7 @@ export function useAdPerformanceQuery({
           const roiPct = spend > 0 ? (profit / spend) * 100 : 0;
           const avgDonation = donationCount > 0 ? raised / donationCount : 0;
           const cpa = uniqueDonors > 0 ? spend / uniqueDonors : 0;
+          // Fallback path: no link_clicks available, use total clicks
           const ctr = impressionsShare > 0 ? (clicksShare / impressionsShare) * 100 : 0;
           const cpm = impressionsShare > 0 ? (spend / impressionsShare) * 1000 : 0;
           const cpc = clicksShare > 0 ? spend / clicksShare : 0;
@@ -590,6 +603,7 @@ export function useAdPerformanceQuery({
             cpa,
             impressions: impressionsShare,
             clicks: clicksShare,
+            link_clicks: 0, // Not available in fallback path
             ctr,
             cpm,
             cpc,

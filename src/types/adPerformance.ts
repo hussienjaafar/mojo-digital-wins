@@ -73,6 +73,7 @@ export interface AdPerformanceData {
   // Meta metrics
   impressions: number;
   clicks: number;
+  link_clicks: number;
   ctr: number;
   cpm: number;
   cpc: number;
@@ -114,7 +115,8 @@ export interface AdPerformanceTotals {
   avg_cpa: number;
   total_impressions: number;
   total_clicks: number;
-  avg_ctr: number;
+  total_link_clicks: number;
+  avg_ctr: number; // Now uses Link CTR
 }
 
 /**

@@ -229,6 +229,26 @@ serve(async (req) => {
         continue;
       }
 
+      // Check if corrected event already exists to prevent duplicates
+      const correctedDedupeKey = `${event.dedupe_key}_corrected`;
+      const { data: existingCorrected } = await supabase
+        .from('meta_conversion_events')
+        .select('id, status')
+        .eq('organization_id', organization_id)
+        .eq('dedupe_key', correctedDedupeKey)
+        .maybeSingle();
+
+      if (existingCorrected) {
+        skippedCount++;
+        results.push({
+          event_id: event.event_id,
+          source_id: event.source_id,
+          status: 'skipped',
+          reason: `Corrected event already exists (status: ${existingCorrected.status})`
+        });
+        continue;
+      }
+
       // Fix event_id format if it was wrong in the original
       // For enrichment mode, event_id should be raw lineitem_id (source_id) to match ActBlue pixel
       const correctedEventId = event.is_enrichment_only && event.event_id.startsWith('actblue_')

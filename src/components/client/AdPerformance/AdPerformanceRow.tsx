@@ -262,9 +262,9 @@ export function AdPerformanceRow({
             </div>
           </div>
 
-          {/* CTR */}
+          {/* Link CTR */}
           <div className="w-12 hidden lg:block">
-            <div className="text-xs text-[hsl(var(--portal-text-muted))]">CTR</div>
+            <div className="text-xs text-[hsl(var(--portal-text-muted))]">Link CTR</div>
             <div className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
               {formatPercentage(ad.ctr)}
             </div>
