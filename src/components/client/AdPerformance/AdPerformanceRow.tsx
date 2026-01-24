@@ -330,9 +330,18 @@ export function AdPerformanceRow({
                   </div>
                 )}
                 {!ad.ad_copy_headline && !ad.ad_copy_primary_text && !ad.ad_copy_description && (
-                  <p className="text-sm text-[hsl(var(--portal-text-muted))] italic">
-                    No message content available
-                  </p>
+                  <div className="space-y-1">
+                    {/* Show ad name as fallback title when no content available */}
+                    {ad.refcode && (
+                      <div>
+                        <span className="text-[10px] text-[hsl(var(--portal-text-muted))]">Ad Name / Refcode</span>
+                        <p className="text-sm text-[hsl(var(--portal-text-primary))] font-medium">{ad.refcode}</p>
+                      </div>
+                    )}
+                    <p className="text-sm text-[hsl(var(--portal-text-muted))] italic">
+                      Creative content not available in Meta API. This ad may use a Page Post format or dynamic creative.
+                    </p>
+                  </div>
                 )}
               </div>
 

@@ -55,6 +55,7 @@ export interface AdPerformanceData {
   ad_id: string;
   creative_id: string;
   campaign_id: string;
+  adset_id?: string; // Ad Set ID for hierarchical navigation
   status: AdPerformanceStatus | string;
 
   // Core metrics
