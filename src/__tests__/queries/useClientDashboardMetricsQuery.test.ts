@@ -168,7 +168,7 @@ describe('useClientDashboardMetricsQuery', () => {
   });
 
   describe('ROI Calculation', () => {
-    it('calculates ROI as net revenue divided by total spend (investment multiplier)', async () => {
+    it('calculates ROI as attributed revenue divided by total spend', async () => {
       const { result } = renderHookWithClient(() =>
         useClientDashboardMetricsQuery(TEST_ORG_ID)
       );
@@ -180,10 +180,22 @@ describe('useClientDashboardMetricsQuery', () => {
       // Meta spend: 500 + 600 = 1100
       // SMS cost: 100 + 150 = 250
       // Total spend: 1350
-      // Net revenue: 188.75
-      // ROI = Net Revenue / Spend (investment multiplier) = 188.75 / 1350 = 0.14
+      // Meta attributed revenue: 47.5 (from txn-1 attributed to meta)
+      // SMS attributed revenue: 95 (from txn-2 attributed to sms)
+      // Total attributed revenue: 142.5
+      // Attributed ROI = 142.5 / 1350 = 0.1056
       expect(kpis.totalSpend).toBe(1350);
-      expect(kpis.roi).toBeCloseTo(0.14, 1);
+      expect(kpis.metaAttributedRevenue).toBe(47.5);
+      expect(kpis.smsAttributedRevenue).toBe(95);
+      expect(kpis.totalAttributedRevenue).toBe(142.5);
+      expect(kpis.roi).toBeCloseTo(0.106, 2);
+      
+      // Blended ROI should still be available for reference
+      // Blended = 188.75 / 1350 = 0.14
+      expect(kpis.blendedRoi).toBeCloseTo(0.14, 1);
+      
+      // Attribution rate = 142.5 / 188.75 * 100 = 75.5%
+      expect(kpis.attributionRate).toBeCloseTo(75.5, 0);
     });
   });
 

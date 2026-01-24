@@ -24,6 +24,16 @@ export interface DashboardKPIs {
   recurringPercentage: number;
   upsellConversionRate: number;
   roi: number;
+  /** Blended ROI using total net revenue (for reference) */
+  blendedRoi: number;
+  /** Revenue attributed to Meta ads via refcode matching */
+  metaAttributedRevenue: number;
+  /** Revenue attributed to SMS via refcode matching */
+  smsAttributedRevenue: number;
+  /** Total attributed revenue (Meta + SMS) */
+  totalAttributedRevenue: number;
+  /** Percentage of net revenue that is attributed to paid channels */
+  attributionRate: number;
   totalSpend: number;
   totalImpressions: number;
   totalClicks: number;
@@ -664,8 +674,7 @@ async function fetchDashboardMetrics(
   const totalMetaSpend = metaMetrics.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0);
   const totalSMSCost = smsMetrics.reduce((sum: number, s: any) => sum + Number(s.cost || 0), 0);
   const totalSpend = totalMetaSpend + totalSMSCost;
-  // ROI = Net Revenue / Spend (investment multiplier: 1.5x = $1.50 back per $1 spent)
-  const roi = totalSpend > 0 ? totalNetRevenue / totalSpend : 0;
+  // Note: ROI is now calculated later after channel attribution is computed
 
   const totalImpressions = metaMetrics.reduce((sum: number, m: any) => sum + (m.impressions || 0), 0);
   const totalClicks = metaMetrics.reduce((sum: number, m: any) => sum + (m.clicks || 0), 0);
@@ -677,6 +686,26 @@ async function fetchDashboardMetrics(
   // Deterministic rate from donation_attribution (includes refcode, click_id, fbclid, sms_last_touch)
   // Fall back to transaction-level fields if attribution view is empty
   const donationAttributions = attribution.filter((a: any) => a.transaction_type === 'donation');
+  
+  // Helper to get attribution channel consistently - defined here so it can be reused for prev period
+  const getAttributionChannel = (a: any): AttributionChannel => {
+    // Prefer direct platform from view (computed server-side with latest logic)
+    if (a.attributed_platform) {
+      return a.attributed_platform as AttributionChannel;
+    }
+    
+    // Fallback to client-side detection for records without attributed_platform
+    const result = detectChannelWithConfidence({
+      attribution_method: a.attribution_method,
+      attributed_campaign_id: a.attributed_campaign_id,
+      attributed_ad_id: a.attributed_ad_id,
+      attributed_creative_id: a.attributed_creative_id,
+      refcode: a.refcode,
+      contribution_form: a.contribution_form,
+    });
+    return result.channel;
+  };
+  
   let deterministicCount: number;
   let deterministicRate: number;
 
@@ -753,12 +782,12 @@ async function fetchDashboardMetrics(
   const prevMetaSpend = prevMetaMetrics.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0);
   const prevSMSCost = prevSmsMetrics.reduce((sum: number, s: any) => sum + Number(s.cost || 0), 0);
   const prevTotalSpend = prevMetaSpend + prevSMSCost;
-  // ROI = Net Revenue / Spend (investment multiplier)
-  const prevRoi = prevTotalSpend > 0 ? prevTotalNetRevenue / prevTotalSpend : 0;
 
   // Previous period deterministic rate using same logic as current period
   const prevDonationAttributions = prevAttribution.filter((a: any) => a.transaction_type === 'donation');
   let prevDeterministicRate: number;
+  let prevMetaAttributedRevenue = 0;
+  let prevSmsAttributedRevenue = 0;
 
   if (prevDonationAttributions.length > 0) {
     // Use attribution_method from donation_attribution view (same as current period)
@@ -768,6 +797,18 @@ async function fetchDashboardMetrics(
     prevDeterministicRate = prevDonationAttributions.length > 0
       ? (prevDeterministicCount / prevDonationAttributions.length) * 100
       : 0;
+    
+    // Calculate previous period attributed revenue by channel
+    for (const a of prevDonationAttributions) {
+      const channel = getAttributionChannel(a);
+      const revenueValue = Number(a.net_amount ?? a.amount ?? 0);
+      
+      if (channel === 'meta') {
+        prevMetaAttributedRevenue += revenueValue;
+      } else if (channel === 'sms') {
+        prevSmsAttributedRevenue += revenueValue;
+      }
+    }
   } else {
     // Fallback: check transaction-level fields (only when attribution data is empty)
     const prevDeterministicCount = prevDonations.filter((d: any) =>
@@ -776,7 +817,34 @@ async function fetchDashboardMetrics(
     prevDeterministicRate = prevDonations.length > 0
       ? (prevDeterministicCount / prevDonations.length) * 100
       : 0;
+    
+    // Calculate previous period attributed revenue using fallback detection
+    const getTransactionChannel = (d: any): AttributionChannel => {
+      const result = detectChannelWithConfidence({
+        refcode: d.refcode,
+        source_campaign: d.source_campaign,
+        click_id: d.click_id,
+        fbclid: d.fbclid,
+        contribution_form: d.contribution_form,
+      });
+      return result.channel;
+    };
+    
+    for (const d of prevDonations) {
+      const channel = getTransactionChannel(d);
+      const revenueValue = Number(d.net_amount ?? d.amount ?? 0);
+      
+      if (channel === 'meta') {
+        prevMetaAttributedRevenue += revenueValue;
+      } else if (channel === 'sms') {
+        prevSmsAttributedRevenue += revenueValue;
+      }
+    }
   }
+  
+  // Previous period ROI = Attributed Revenue / Spend
+  const prevTotalAttributedRevenue = prevMetaAttributedRevenue + prevSmsAttributedRevenue;
+  const prevRoi = prevTotalSpend > 0 ? prevTotalAttributedRevenue / prevTotalSpend : 0;
 
   // ============================================================================
   // Build time series data
@@ -903,41 +971,38 @@ async function fetchDashboardMetrics(
   let metaDonations = 0;
   let smsDonations = 0;
   let unattributedDonations = 0;
+  let metaAttributedRevenue = 0;
+  let smsAttributedRevenue = 0;
+
+  // Note: getAttributionChannel is defined earlier in the function (around line 691)
 
   if (donationAttributions.length > 0) {
     // Use attributed_platform from view when available (most accurate)
-    // Fall back to unified channel detection for legacy records
-    const getAttributionChannel = (a: any): AttributionChannel => {
-      // Prefer direct platform from view (computed server-side with latest logic)
-      if (a.attributed_platform) {
-        return a.attributed_platform as AttributionChannel;
-      }
-      
-      // Fallback to client-side detection for records without attributed_platform
-      const result = detectChannelWithConfidence({
-        attribution_method: a.attribution_method,
-        attributed_campaign_id: a.attributed_campaign_id,
-        attributed_ad_id: a.attributed_ad_id,
-        attributed_creative_id: a.attributed_creative_id,
-        refcode: a.refcode,
-        contribution_form: a.contribution_form,
-      });
-      return result.channel;
-    };
-
-    metaDonations = donationAttributions.filter((a: any) => getAttributionChannel(a) === 'meta').length;
-    smsDonations = donationAttributions.filter((a: any) => getAttributionChannel(a) === 'sms').length;
-    // Email attribution
-    const emailDonations = donationAttributions.filter((a: any) => getAttributionChannel(a) === 'email').length;
-    unattributedDonations = donationAttributions.filter((a: any) => {
+    // Calculate both counts AND revenue for attributed channels
+    for (const a of donationAttributions) {
       const channel = getAttributionChannel(a);
-      return channel === 'unattributed' || a.attribution_method === 'unattributed';
-    }).length;
+      const revenueValue = Number(a.net_amount ?? a.amount ?? 0);
+      
+      if (channel === 'meta') {
+        metaDonations += 1;
+        metaAttributedRevenue += revenueValue;
+      } else if (channel === 'sms') {
+        smsDonations += 1;
+        smsAttributedRevenue += revenueValue;
+      } else if (channel === 'unattributed' || a.attribution_method === 'unattributed') {
+        unattributedDonations += 1;
+      }
+    }
+
+    // Email attribution count (for logging only)
+    const emailDonations = donationAttributions.filter((a: any) => getAttributionChannel(a) === 'email').length;
 
     // Log channel breakdown for observability
     logger.debug('Channel breakdown from donation_attribution', {
       meta: metaDonations,
+      metaRevenue: metaAttributedRevenue,
       sms: smsDonations,
+      smsRevenue: smsAttributedRevenue,
       email: emailDonations,
       unattributed: unattributedDonations,
       total: donationAttributions.length,
@@ -957,12 +1022,42 @@ async function fetchDashboardMetrics(
       return result.channel;
     };
 
-    metaDonations = donations.filter((d: any) => getTransactionChannel(d) === 'meta').length;
-    smsDonations = donations.filter((d: any) => getTransactionChannel(d) === 'sms').length;
-    unattributedDonations = donations.filter((d: any) => getTransactionChannel(d) === 'unattributed').length;
+    for (const d of donations) {
+      const channel = getTransactionChannel(d);
+      const revenueValue = Number(d.net_amount ?? d.amount ?? 0);
+      
+      if (channel === 'meta') {
+        metaDonations += 1;
+        metaAttributedRevenue += revenueValue;
+      } else if (channel === 'sms') {
+        smsDonations += 1;
+        smsAttributedRevenue += revenueValue;
+      } else if (channel === 'unattributed') {
+        unattributedDonations += 1;
+      }
+    }
 
     logger.warn('Channel breakdown fallback: using unified channel detection on transaction fields');
   }
+
+  // Calculate total attributed revenue and attribution rate
+  const totalAttributedRevenue = metaAttributedRevenue + smsAttributedRevenue;
+  const attributionRate = totalNetRevenue > 0 ? (totalAttributedRevenue / totalNetRevenue) * 100 : 0;
+
+  // ROI = Attributed Revenue / Spend (only revenue from paid channels)
+  const attributedRoi = totalSpend > 0 ? totalAttributedRevenue / totalSpend : 0;
+  // Keep blended ROI for reference (total net revenue / spend)
+  const blendedRoi = totalSpend > 0 ? totalNetRevenue / totalSpend : 0;
+
+  logger.debug('ROI calculation (attributed)', {
+    metaAttributedRevenue,
+    smsAttributedRevenue,
+    totalAttributedRevenue,
+    totalSpend,
+    attributedRoi: attributedRoi.toFixed(2) + 'x',
+    blendedRoi: blendedRoi.toFixed(2) + 'x',
+    attributionRate: attributionRate.toFixed(1) + '%',
+  });
 
   // Anything not in meta/sms/unattributed is "Other" (refcode without platform mapping, etc.)
   const otherAttributed = donations.length - metaDonations - smsDonations - unattributedDonations;
@@ -1091,7 +1186,12 @@ async function fetchDashboardMetrics(
       returningDonors,
       recurringPercentage,
       upsellConversionRate,
-      roi,
+      roi: attributedRoi,
+      blendedRoi,
+      metaAttributedRevenue,
+      smsAttributedRevenue,
+      totalAttributedRevenue,
+      attributionRate,
       totalSpend,
       totalImpressions,
       totalClicks,
