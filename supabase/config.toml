@@ -138,6 +138,9 @@ verify_jwt = false
 [functions.cancel-backfill]
 verify_jwt = false  # Handles auth internally - supports user JWT, admin, or CRON_SECRET
 
+[functions.reconcile-actblue-data]
+verify_jwt = false  # Daily cron job to detect and fix ActBlue data gaps
+
 [functions.backfill-thumbnails]
 verify_jwt = true
 
