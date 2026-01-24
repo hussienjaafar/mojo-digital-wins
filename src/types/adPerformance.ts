@@ -53,9 +53,12 @@ export interface AdVideoTranscription {
 export interface AdPerformanceData {
   id: string;
   ad_id: string;
+  ad_name?: string; // Actual Meta ad name (e.g., "FR2025OCT_ADV_4to1")
   creative_id: string;
   campaign_id: string;
+  campaign_name?: string; // Resolved campaign name for display
   adset_id?: string; // Ad Set ID for hierarchical navigation
+  adset_name?: string; // Resolved ad set name for display
   status: AdPerformanceStatus | string;
 
   // Core metrics

@@ -155,7 +155,7 @@ export function AdPerformanceRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="font-medium text-sm text-[hsl(var(--portal-text-primary))] truncate">
-              {ad.ad_copy_headline || ad.refcode || `Ad ${ad.ad_id.slice(0, 8)}`}
+              {ad.ad_name || ad.refcode || `Ad ${ad.ad_id.slice(0, 8)}`}
             </h3>
             {tierBadge && (
               <Badge variant="secondary" className={cn('text-[10px] px-1.5 py-0 h-4 font-medium', tierBadge.className)}>
