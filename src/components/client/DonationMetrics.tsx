@@ -123,14 +123,32 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
 
   // Build drilldown data for each KPI - centralized so only one drawer instance is needed
   const drilldownDataMap = useMemo((): Partial<Record<KpiKey, KPIDrilldownData>> => {
-    if (!metrics) return {};
+    // Use safe fallback metrics to prevent null-pointer closures during loading/refetch
+    const safeMetrics = metrics ?? {
+      totalRaised: 0,
+      netRaised: 0,
+      totalDonations: 0,
+      uniqueDonors: 0,
+      averageDonation: 0,
+      oneTimeRevenue: 0,
+      recurringRevenue: 0,
+      oneTimeCount: 0,
+      recurringCount: 0,
+      refundAmount: 0,
+      refundCount: 0,
+    };
+    
+    // Log when using fallback metrics
+    if (!metrics) {
+      console.log('[DonationMetrics] Using fallback metrics - real metrics not yet available');
+    }
     
     const seriesColor = "hsl(var(--portal-success))";
     
     return {
       channel_grossRaised: {
         label: "Gross Raised",
-        value: formatCurrency(metrics.totalRaised, true),
+        value: formatCurrency(safeMetrics.totalRaised, true),
         icon: DollarSign,
         description: "Total donations before fees and refunds",
         timeSeriesData: grossRaisedTrend,
@@ -139,13 +157,13 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
           series: [{ dataKey: "value", name: "Gross Raised", color: seriesColor, type: "area", areaStyle: { opacity: 0.1 } }],
         },
         breakdown: [
-          { label: "One-time", value: formatCurrency(metrics.oneTimeRevenue, true) },
-          { label: "Recurring", value: formatCurrency(metrics.recurringRevenue, true) },
+          { label: "One-time", value: formatCurrency(safeMetrics.oneTimeRevenue, true) },
+          { label: "Recurring", value: formatCurrency(safeMetrics.recurringRevenue, true) },
         ],
       },
       channel_uniqueDonors: {
         label: "Unique Donors",
-        value: metrics.uniqueDonors.toLocaleString(),
+        value: safeMetrics.uniqueDonors.toLocaleString(),
         icon: Users,
         timeSeriesData: donationCountTrend,
         timeSeriesConfig: {
@@ -153,32 +171,32 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
           series: [{ dataKey: "value", name: "Donors", color: "hsl(var(--portal-accent-blue))", type: "area", areaStyle: { opacity: 0.1 } }],
         },
         breakdown: [
-          { label: "One-time", value: metrics.oneTimeCount.toLocaleString() },
-          { label: "Recurring", value: metrics.recurringCount.toLocaleString() },
+          { label: "One-time", value: safeMetrics.oneTimeCount.toLocaleString() },
+          { label: "Recurring", value: safeMetrics.recurringCount.toLocaleString() },
         ],
       },
       channel_avgDonation: {
         label: "Avg Donation",
-        value: `$${metrics.averageDonation.toFixed(2)}`,
+        value: `$${safeMetrics.averageDonation.toFixed(2)}`,
         icon: TrendingUp,
         breakdown: [
-          { label: "One-time Avg", value: formatCurrency(metrics.oneTimeRevenue / (metrics.oneTimeCount || 1), true) },
-          { label: "Recurring Avg", value: formatCurrency(metrics.recurringRevenue / (metrics.recurringCount || 1), true) },
+          { label: "One-time Avg", value: formatCurrency(safeMetrics.oneTimeRevenue / (safeMetrics.oneTimeCount || 1), true) },
+          { label: "Recurring Avg", value: formatCurrency(safeMetrics.recurringRevenue / (safeMetrics.recurringCount || 1), true) },
         ],
       },
       channel_recurringPercent: {
         label: "Recurring",
-        value: `${metrics.totalDonations > 0 ? ((metrics.recurringCount / metrics.totalDonations) * 100).toFixed(0) : 0}%`,
+        value: `${safeMetrics.totalDonations > 0 ? ((safeMetrics.recurringCount / safeMetrics.totalDonations) * 100).toFixed(0) : 0}%`,
         icon: Repeat,
         breakdown: [
-          { label: "Recurring Count", value: metrics.recurringCount.toLocaleString() },
-          { label: "One-time Count", value: metrics.oneTimeCount.toLocaleString() },
-          { label: "Recurring Revenue", value: formatCurrency(metrics.recurringRevenue, true) },
+          { label: "Recurring Count", value: safeMetrics.recurringCount.toLocaleString() },
+          { label: "One-time Count", value: safeMetrics.oneTimeCount.toLocaleString() },
+          { label: "Recurring Revenue", value: formatCurrency(safeMetrics.recurringRevenue, true) },
         ],
       },
       channel_netRaisedDonations: {
         label: "Net Revenue",
-        value: formatCurrency(metrics.netRaised, true),
+        value: formatCurrency(safeMetrics.netRaised, true),
         icon: DollarSign,
         timeSeriesData: grossRaisedTrend,
         timeSeriesConfig: {
@@ -186,14 +204,14 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
           series: [{ dataKey: "value", name: "Revenue", color: seriesColor, type: "area", areaStyle: { opacity: 0.1 } }],
         },
         breakdown: [
-          { label: "Gross Raised", value: formatCurrency(metrics.totalRaised, true) },
-          { label: "Fees", value: formatCurrency(metrics.totalRaised - metrics.netRaised, true) },
-          { label: "Refunds", value: formatCurrency(metrics.refundAmount, true) },
+          { label: "Gross Raised", value: formatCurrency(safeMetrics.totalRaised, true) },
+          { label: "Fees", value: formatCurrency(safeMetrics.totalRaised - safeMetrics.netRaised, true) },
+          { label: "Refunds", value: formatCurrency(safeMetrics.refundAmount, true) },
         ],
       },
       channel_totalDonations: {
         label: "Total Donations",
-        value: metrics.totalDonations.toLocaleString(),
+        value: safeMetrics.totalDonations.toLocaleString(),
         icon: Receipt,
         timeSeriesData: donationCountTrend,
         timeSeriesConfig: {
@@ -201,27 +219,27 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
           series: [{ dataKey: "value", name: "Donations", color: "hsl(var(--portal-accent-blue))", type: "area", areaStyle: { opacity: 0.1 } }],
         },
         breakdown: [
-          { label: "One-time", value: metrics.oneTimeCount.toLocaleString() },
-          { label: "Recurring", value: metrics.recurringCount.toLocaleString() },
-          { label: "Refunds", value: metrics.refundCount.toLocaleString() },
+          { label: "One-time", value: safeMetrics.oneTimeCount.toLocaleString() },
+          { label: "Recurring", value: safeMetrics.recurringCount.toLocaleString() },
+          { label: "Refunds", value: safeMetrics.refundCount.toLocaleString() },
         ],
       },
       channel_recurringRevenue: {
         label: "Recurring Revenue",
-        value: formatCurrency(metrics.recurringRevenue, true),
+        value: formatCurrency(safeMetrics.recurringRevenue, true),
         icon: Repeat,
         breakdown: [
-          { label: "Recurring Count", value: metrics.recurringCount.toLocaleString() },
-          { label: "Avg Recurring", value: formatCurrency(metrics.recurringRevenue / (metrics.recurringCount || 1), true) },
+          { label: "Recurring Count", value: safeMetrics.recurringCount.toLocaleString() },
+          { label: "Avg Recurring", value: formatCurrency(safeMetrics.recurringRevenue / (safeMetrics.recurringCount || 1), true) },
         ],
       },
       channel_refundAmount: {
         label: "Refunds",
-        value: formatCurrency(metrics.refundAmount, true),
+        value: formatCurrency(safeMetrics.refundAmount, true),
         icon: TrendingUp,
         breakdown: [
-          { label: "Refund Count", value: metrics.refundCount.toLocaleString() },
-          { label: "Avg Refund", value: formatCurrency(metrics.refundAmount / (metrics.refundCount || 1), true) },
+          { label: "Refund Count", value: safeMetrics.refundCount.toLocaleString() },
+          { label: "Avg Refund", value: formatCurrency(safeMetrics.refundAmount / (safeMetrics.refundCount || 1), true) },
         ],
       },
     };
@@ -230,8 +248,25 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
   // Get current drilldown data based on selected KPI
   const currentDrilldownData = selectedKpiKey ? drilldownDataMap[selectedKpiKey] ?? null : null;
 
+  // Debug logging for drilldown issues
+  useEffect(() => {
+    if (selectedKpiKey || isDrilldownOpen) {
+      console.log('[DonationMetrics Drawer Debug]', {
+        selectedKpiKey,
+        isDrilldownOpen,
+        hasMetrics: !!metrics,
+        metricsTotal: metrics?.totalDonations,
+        hasDrilldownData: !!currentDrilldownData,
+        drilldownMapKeys: Object.keys(drilldownDataMap),
+        isLoading,
+        willDrawerOpen: isDrilldownOpen && currentDrilldownData !== null,
+      });
+    }
+  }, [selectedKpiKey, isDrilldownOpen, metrics, currentDrilldownData, drilldownDataMap, isLoading]);
+
   // Handle drawer close
   const handleDrawerOpenChange = (open: boolean) => {
+    console.log('[DonationMetrics] handleDrawerOpenChange called:', { open, selectedKpiKey });
     setDrilldownOpen(open);
     if (!open) {
       setSelectedKpiKey(null);
@@ -726,6 +761,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
       </V3Card>
 
       {/* Centralized Drilldown Drawer - single instance for all KPI cards */}
+      {/* Keep drawer open if we have data, even during loading to prevent flicker */}
       <V3KPIDrilldownDrawer
         open={isDrilldownOpen && currentDrilldownData !== null}
         onOpenChange={handleDrawerOpenChange}
