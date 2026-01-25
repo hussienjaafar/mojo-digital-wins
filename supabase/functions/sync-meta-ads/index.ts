@@ -839,32 +839,58 @@ serve(async (req) => {
                   conversionRanking = insight.conversion_rate_ranking || '';
                   
                   // Extract video engagement metrics
+                  // FIXED: Meta returns action_type as 'video_view' OR 'video_thruplay' depending on campaign type
+                  // Try both action types for reliable extraction
                   if (insight.video_play_actions) {
-                    const playAction = insight.video_play_actions.find((a: any) => a.action_type === 'video_view');
+                    const playAction = insight.video_play_actions.find((a: any) => 
+                      a.action_type === 'video_view' || a.action_type === 'video_play'
+                    );
                     videoPlays = parseInt(playAction?.value) || 0;
                   }
                   if (insight.video_thruplay_watched_actions) {
-                    const thruplayAction = insight.video_thruplay_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    // Try 'video_view' first (common), then 'video_thruplay' (explicit)
+                    let thruplayAction = insight.video_thruplay_watched_actions.find((a: any) => 
+                      a.action_type === 'video_view'
+                    );
+                    if (!thruplayAction) {
+                      thruplayAction = insight.video_thruplay_watched_actions.find((a: any) => 
+                        a.action_type === 'video_thruplay'
+                      );
+                    }
+                    // Fallback: if array has exactly one element, use it
+                    if (!thruplayAction && insight.video_thruplay_watched_actions.length === 1) {
+                      thruplayAction = insight.video_thruplay_watched_actions[0];
+                    }
                     videoThruplay = parseInt(thruplayAction?.value) || 0;
                   }
                   if (insight.video_p25_watched_actions) {
-                    const p25Action = insight.video_p25_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    const p25Action = insight.video_p25_watched_actions.find((a: any) => 
+                      a.action_type === 'video_view' || a.action_type === 'video_p25_watched'
+                    ) || insight.video_p25_watched_actions[0];
                     videoP25 = parseInt(p25Action?.value) || 0;
                   }
                   if (insight.video_p50_watched_actions) {
-                    const p50Action = insight.video_p50_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    const p50Action = insight.video_p50_watched_actions.find((a: any) => 
+                      a.action_type === 'video_view' || a.action_type === 'video_p50_watched'
+                    ) || insight.video_p50_watched_actions[0];
                     videoP50 = parseInt(p50Action?.value) || 0;
                   }
                   if (insight.video_p75_watched_actions) {
-                    const p75Action = insight.video_p75_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    const p75Action = insight.video_p75_watched_actions.find((a: any) => 
+                      a.action_type === 'video_view' || a.action_type === 'video_p75_watched'
+                    ) || insight.video_p75_watched_actions[0];
                     videoP75 = parseInt(p75Action?.value) || 0;
                   }
                   if (insight.video_p100_watched_actions) {
-                    const p100Action = insight.video_p100_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    const p100Action = insight.video_p100_watched_actions.find((a: any) => 
+                      a.action_type === 'video_view' || a.action_type === 'video_p100_watched'
+                    ) || insight.video_p100_watched_actions[0];
                     videoP100 = parseInt(p100Action?.value) || 0;
                   }
                   if (insight.video_avg_time_watched_actions) {
-                    const avgTimeAction = insight.video_avg_time_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    const avgTimeAction = insight.video_avg_time_watched_actions.find((a: any) => 
+                      a.action_type === 'video_view' || a.action_type === 'video_avg_time_watched'
+                    ) || insight.video_avg_time_watched_actions[0];
                     videoAvgWatchTime = parseFloat(avgTimeAction?.value) || 0;
                   }
                   
