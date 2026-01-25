@@ -423,10 +423,40 @@ export function useDonationMetricsQuery(
     endDate: endDate || storeRange.endDate,
   };
 
+  // ========== DIAGNOSTIC LOGGING ==========
+  console.log('[useDonationMetricsQuery] Hook called with:', {
+    organizationId,
+    propStartDate: startDate,
+    propEndDate: endDate,
+    storeStartDate: storeRange.startDate,
+    storeEndDate: storeRange.endDate,
+    effectiveStartDate: effectiveRange.startDate,
+    effectiveEndDate: effectiveRange.endDate,
+    queryEnabled: !!organizationId,
+    queryKey: donationKeys.metrics(organizationId || "", effectiveRange),
+  });
+
   return useQuery({
     queryKey: donationKeys.metrics(organizationId || "", effectiveRange),
-    queryFn: () =>
-      fetchDonationMetrics(organizationId!, effectiveRange.startDate, effectiveRange.endDate),
+    queryFn: async () => {
+      console.log('[useDonationMetricsQuery] queryFn EXECUTING - making RPC calls now:', {
+        organizationId,
+        startDate: effectiveRange.startDate,
+        endDate: effectiveRange.endDate,
+      });
+      try {
+        const result = await fetchDonationMetrics(organizationId!, effectiveRange.startDate, effectiveRange.endDate);
+        console.log('[useDonationMetricsQuery] queryFn SUCCESS:', {
+          metricsTotal: result.metrics.totalDonations,
+          grossRaised: result.metrics.totalRaised,
+          timeSeriesLength: result.timeSeries.length,
+        });
+        return result;
+      } catch (err) {
+        console.error('[useDonationMetricsQuery] queryFn ERROR:', err);
+        throw err;
+      }
+    },
     enabled: !!organizationId,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
