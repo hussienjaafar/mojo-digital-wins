@@ -10,6 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { CreativeCard } from "@/components/client/CreativeCard";
 import { CreativePerformanceMatrix } from "@/components/client/CreativePerformanceMatrix";
+import { CreativePerformanceQuadrant } from "@/components/client/CreativePerformanceQuadrant";
+import { CreativeComparison } from "@/components/client/CreativeComparison";
+import { DataAccuracyDisclosure } from "@/components/client/DataAccuracyDisclosure";
 import { CreativeRecommendations } from "@/components/client/CreativeRecommendations";
 import { CreativeScorecard } from "@/components/client/CreativeScorecard";
 import { CreativeDataImport } from "@/components/client/CreativeDataImport";
@@ -30,6 +33,7 @@ import {
   AlertTriangle,
   ChevronRight,
   LucideIcon,
+  Pin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -290,9 +294,17 @@ export default function ClientCreativeIntelligence() {
   
   // Collapsible section state
   const [expandedSections, setExpandedSections] = useState({
+    quadrant: true,
+    comparison: false,
     gallery: true,
     analysis: false,
   });
+
+  // Pinned creatives for comparison
+  const [pinnedCreatives, setPinnedCreatives] = useState<[any | null, any | null]>([null, null]);
+
+  // Data freshness tracking
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({
@@ -300,6 +312,26 @@ export default function ClientCreativeIntelligence() {
       [section]: !prev[section]
     }));
   };
+
+  // Handle pinning a creative for comparison
+  const handlePinCreative = useCallback((creative: any) => {
+    setPinnedCreatives(prev => {
+      // If already pinned, remove it
+      if (prev[0]?.id === creative.id) return [null, prev[1]];
+      if (prev[1]?.id === creative.id) return [prev[0], null];
+      
+      // Add to first empty slot
+      if (!prev[0]) return [creative, prev[1]];
+      if (!prev[1]) return [prev[0], creative];
+      
+      // Replace first slot if both full
+      return [creative, prev[1]];
+    });
+    
+    // Auto-expand comparison section when pinning
+    setExpandedSections(prev => ({ ...prev, comparison: true }));
+    toast.success('Creative pinned for comparison');
+  }, []);
 
   const loadCreatives = useCallback(async () => {
     if (!organizationId) return;
@@ -329,6 +361,13 @@ export default function ClientCreativeIntelligence() {
       const topPerformers = data?.filter(c => c.performance_tier === 'top').length || 0;
 
       setStats({ total, analyzed, pendingTranscription, videos, images, avgRoas, topPerformers });
+      
+      // Track data freshness
+      const latestAnalyzedAt = data?.filter(c => c.analyzed_at)
+        .map(c => c.analyzed_at)
+        .sort()
+        .pop();
+      setLastSyncedAt(latestAnalyzedAt || null);
     } catch (error) {
       console.error('Error loading creatives:', error);
       toast.error('Failed to load creatives');
@@ -655,6 +694,54 @@ export default function ClientCreativeIntelligence() {
                     </V3Button>
                   </V3CardContent>
                 </V3Card>
+              </motion.section>
+            )}
+
+            {/* Data Accuracy Disclosure */}
+            <motion.section variants={sectionVariants}>
+              <DataAccuracyDisclosure
+                lastSyncedAt={lastSyncedAt}
+                totalCreatives={stats?.total || 0}
+                creativesWithMetrics={creatives.filter(c => c.impressions > 0).length}
+              />
+            </motion.section>
+
+            {/* Performance Quadrant - Strategic Overview */}
+            <motion.section variants={sectionVariants}>
+              <CollapsibleSection
+                title="Performance Quadrant"
+                subtitle="Strategic view of creative performance by Spend vs ROAS"
+                icon={Target}
+                accent="purple"
+                isExpanded={expandedSections.quadrant}
+                onToggle={() => toggleSection('quadrant')}
+              >
+                <CreativePerformanceQuadrant
+                  creatives={creatives}
+                  onCreativeClick={(creative) => handlePinCreative(creative)}
+                />
+              </CollapsibleSection>
+            </motion.section>
+
+            {/* Creative Comparison Tool */}
+            {(pinnedCreatives[0] || pinnedCreatives[1]) && (
+              <motion.section variants={sectionVariants}>
+                <CollapsibleSection
+                  title="Creative Comparison"
+                  subtitle="Side-by-side comparison of pinned creatives"
+                  icon={Pin}
+                  accent="blue"
+                  isExpanded={expandedSections.comparison}
+                  onToggle={() => toggleSection('comparison')}
+                >
+                  <CreativeComparison
+                    pinnedCreatives={pinnedCreatives}
+                    onRemove={(slot) => setPinnedCreatives(prev => 
+                      slot === 0 ? [null, prev[1]] : [prev[0], null]
+                    )}
+                    onClear={() => setPinnedCreatives([null, null])}
+                  />
+                </CollapsibleSection>
               </motion.section>
             )}
 
