@@ -1406,11 +1406,12 @@ serve(async (req) => {
 
     try {
       // Fetch account-level insights broken down by ad with daily granularity
-      // UPDATED: Added outbound_clicks and inline_link_click_ctr for Link CTR metrics
+      // UPDATED: Added inline_link_clicks, outbound_clicks, and inline_link_click_ctr for Link CTR metrics
+      // inline_link_clicks is the most reliable source for conversion campaigns
       const adInsightsUrl = `https://graph.facebook.com/v22.0/${ad_account_id}/insights?` +
         `level=ad&` +
         `fields=ad_id,ad_name,campaign_id,adset_id,impressions,clicks,spend,reach,cpc,cpm,ctr,frequency,` +
-        `outbound_clicks,inline_link_click_ctr,` + // Link CTR metrics
+        `inline_link_clicks,outbound_clicks,inline_link_click_ctr,` + // Link CTR metrics (inline_link_clicks is primary source)
         `actions,action_values,cost_per_action_type,purchase_roas,quality_ranking,engagement_rate_ranking,conversion_rate_ranking&` +
         `time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&` +
         `time_increment=1&` + // Daily granularity
@@ -1473,19 +1474,33 @@ serve(async (req) => {
           // Normalize CTR to decimal (Meta returns as percentage)
           const normalizedCtr = (parseFloat(insight.ctr) || 0) / 100;
 
-          // Extract Link CTR metrics (clicks that go to the destination URL)
+          // Extract Link CTR metrics with multi-source fallback
+          // Priority: inline_link_clicks (most reliable) → outbound_clicks → actions:link_click
           let linkClicks = 0;
-          if (insight.outbound_clicks) {
+          
+          // Try 1: inline_link_clicks (direct field from Meta - works for all campaign types)
+          if (insight.inline_link_clicks) {
+            linkClicks = parseInt(insight.inline_link_clicks) || 0;
+          }
+          
+          // Try 2: outbound_clicks action array (traffic campaigns)
+          if (linkClicks === 0 && insight.outbound_clicks) {
             const outboundAction = insight.outbound_clicks.find((a: any) => 
               a.action_type === 'outbound_click'
             );
             if (outboundAction) linkClicks = parseInt(outboundAction.value) || 0;
           }
+          
+          // Try 3: actions array with link_click type (conversion campaigns fallback)
+          if (linkClicks === 0 && insight.actions) {
+            const linkAction = insight.actions.find((a: any) => a.action_type === 'link_click');
+            if (linkAction) linkClicks = parseInt(linkAction.value) || 0;
+          }
 
           // Meta's inline_link_click_ctr is returned as percentage (e.g., 2.5 for 2.5%)
           const linkCtr = insight.inline_link_click_ctr 
             ? parseFloat(insight.inline_link_click_ctr) / 100 
-            : (parseInt(insight.impressions) > 0 
+            : (parseInt(insight.impressions) > 0 && linkClicks > 0
               ? linkClicks / parseInt(insight.impressions) 
               : null);
 

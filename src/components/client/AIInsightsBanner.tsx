@@ -129,8 +129,38 @@ export const AIInsightsBanner: React.FC<AIInsightsBannerProps> = ({
     setCurrentIndex((prev) => (prev + 1) % visibleInsights.length);
   };
 
+  // Empty state when no insights available
   if (visibleInsights.length === 0) {
-    return null;
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={cn(
+          "relative overflow-hidden rounded-xl",
+          "bg-gradient-to-r from-[hsl(var(--portal-accent-purple)/0.08)] via-[hsl(var(--portal-bg-secondary))] to-[hsl(var(--portal-accent-purple)/0.08)]",
+          "border border-[hsl(var(--portal-border))]",
+          className
+        )}
+      >
+        <div className="relative p-4 sm:p-5">
+          <div className="flex items-center gap-4">
+            <div className="shrink-0 p-2.5 rounded-lg bg-[hsl(var(--portal-accent-purple)/0.1)]">
+              <Sparkles className="w-5 h-5 text-[hsl(var(--portal-text-muted))]" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-medium text-[hsl(var(--portal-text-muted))]">
+                  AI INSIGHTS
+                </span>
+              </div>
+              <p className="text-sm text-[hsl(var(--portal-text-secondary))]">
+                No patterns detected yet. Click <span className="font-medium text-[hsl(var(--portal-accent-purple))]">"Sync Data"</span> to analyze your campaigns — need at least 5 analyzed creatives with performance data.
+              </p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
   }
 
   const currentInsight = visibleInsights[currentIndex];
