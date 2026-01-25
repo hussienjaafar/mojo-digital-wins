@@ -25,6 +25,15 @@ export type KpiKey =
   | 'netRaisedDonations'
   | 'recurringRevenue'
   | 'refundAmount'
+  // Channel Details - Donation KPIs (prefixed to avoid collision with Hero section)
+  | 'channel_grossRaised'
+  | 'channel_uniqueDonors'
+  | 'channel_avgDonation'
+  | 'channel_recurringPercent'
+  | 'channel_netRaisedDonations'
+  | 'channel_totalDonations'
+  | 'channel_recurringRevenue'
+  | 'channel_refundAmount'
   // Creative Intelligence KPIs
   | 'totalCreatives'
   | 'activeVariations'
@@ -84,6 +93,15 @@ export const KPI_TO_SERIES_MAP: Record<KpiKey, SeriesKey[]> = {
   netRaisedDonations: ['netDonations'],
   recurringRevenue: [],
   refundAmount: ['refunds'],
+  // Channel Details - Donation KPIs (same series associations)
+  channel_grossRaised: ['donations'],
+  channel_uniqueDonors: [],
+  channel_avgDonation: [],
+  channel_recurringPercent: [],
+  channel_netRaisedDonations: ['netDonations'],
+  channel_totalDonations: ['donations'],
+  channel_recurringRevenue: [],
+  channel_refundAmount: ['refunds'],
   // Creative Intelligence KPIs (no chart series associations)
   totalCreatives: [],
   activeVariations: [],
