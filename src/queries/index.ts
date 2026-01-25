@@ -15,7 +15,6 @@ export * from "./useClientDashboardMetricsQuery";
 export { useDashboardKPIsQuery } from "./useDashboardKPIsQuery";
 export {
   useChannelSummariesQuery,
-  useChannelSummariesLegacy,
   isChannelStale,
   formatLastDataDate,
   type MetaSummary,

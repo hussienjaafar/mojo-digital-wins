@@ -1167,6 +1167,13 @@ async function fetchDashboardMetrics(
   };
 }
 
+/**
+ * @deprecated Use `useActBlueMetrics` from `@/hooks/useActBlueMetrics` instead.
+ * This hook is retained for backwards compatibility during migration.
+ * 
+ * Migration blocked: useActBlueMetrics lacks sparklines, previous period comparison,
+ * and Meta/SMS spend data that buildHeroKpis requires. RPC enhancement needed first.
+ */
 export function useClientDashboardMetricsQuery(organizationId: string | undefined) {
   const dateRange = useDateRange();
 
