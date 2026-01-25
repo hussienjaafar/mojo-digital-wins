@@ -17,6 +17,14 @@ export type KpiKey =
   | 'currentMrr'
   | 'newMrr'
   | 'uniqueDonors'
+  // Donation Metrics KPIs
+  | 'grossRaised'
+  | 'totalDonations'
+  | 'avgDonation'
+  | 'recurringPercent'
+  | 'netRaisedDonations'
+  | 'recurringRevenue'
+  | 'refundAmount'
   // Creative Intelligence KPIs
   | 'totalCreatives'
   | 'activeVariations'
@@ -68,6 +76,14 @@ export const KPI_TO_SERIES_MAP: Record<KpiKey, SeriesKey[]> = {
   currentMrr: [], // No recurring-specific series in Fundraising chart
   newMrr: [], // No recurring-specific series in Fundraising chart
   uniqueDonors: [], // No donor count series in Fundraising chart
+  // Donation Metrics KPIs
+  grossRaised: ['donations'],
+  totalDonations: ['donations'],
+  avgDonation: [],
+  recurringPercent: [],
+  netRaisedDonations: ['netDonations'],
+  recurringRevenue: [],
+  refundAmount: ['refunds'],
   // Creative Intelligence KPIs (no chart series associations)
   totalCreatives: [],
   activeVariations: [],

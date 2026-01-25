@@ -5,7 +5,6 @@ import {
   V3CardContent,
   V3CardHeader,
   V3CardTitle,
-  V3KPICard,
   V3ChartWrapper,
   V3LoadingState,
   V3ErrorState,
@@ -25,6 +24,7 @@ import { maskName, maskEmail } from "@/lib/pii-masking";
 import { useDonationMetricsQuery, DonationRow } from "@/queries";
 import { formatCurrency } from "@/lib/chart-formatters";
 import { getOrgToday } from "@/lib/timezone";
+import { HeroKpiCard } from "@/components/client/HeroKpiCard";
 
 type Props = {
   organizationId: string;
@@ -101,6 +101,17 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
     name: format(parseISO(d.date), 'MMM d'),
     Amount: d.amount,
     Donations: d.donations,
+  })), [timeSeries]);
+
+  // Build trend data for expandable KPI cards
+  const grossRaisedTrend = useMemo(() => timeSeries.map(d => ({
+    date: d.date,
+    value: d.amount,
+  })), [timeSeries]);
+
+  const donationCountTrend = useMemo(() => timeSeries.map(d => ({
+    date: d.date,
+    value: d.donations,
   })), [timeSeries]);
 
   // Attribution pie chart data
@@ -242,37 +253,66 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         animate="visible"
       >
         <motion.div variants={itemVariants}>
-          <V3KPICard
+          <HeroKpiCard
+            kpiKey="grossRaised"
             icon={DollarSign}
             label="Gross Raised"
             value={formatCurrency(metrics.totalRaised, true)}
             subtitle="Before fees"
             accent="green"
+            trendData={grossRaisedTrend}
+            trendXAxisKey="date"
+            breakdown={[
+              { label: "One-time", value: formatCurrency(metrics.oneTimeRevenue, true) },
+              { label: "Recurring", value: formatCurrency(metrics.recurringRevenue, true) },
+            ]}
+            expansionMode="drawer"
           />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <V3KPICard
+          <HeroKpiCard
+            kpiKey="uniqueDonors"
             icon={Users}
             label="Unique Donors"
             value={metrics.uniqueDonors.toLocaleString()}
             accent="blue"
+            trendData={donationCountTrend}
+            trendXAxisKey="date"
+            breakdown={[
+              { label: "One-time", value: metrics.oneTimeCount.toLocaleString() },
+              { label: "Recurring", value: metrics.recurringCount.toLocaleString() },
+            ]}
+            expansionMode="drawer"
           />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <V3KPICard
+          <HeroKpiCard
+            kpiKey="avgDonation"
             icon={TrendingUp}
             label="Avg Donation"
             value={`$${metrics.averageDonation.toFixed(2)}`}
             accent="purple"
+            breakdown={[
+              { label: "One-time Avg", value: formatCurrency(metrics.oneTimeRevenue / (metrics.oneTimeCount || 1), true) },
+              { label: "Recurring Avg", value: formatCurrency(metrics.recurringRevenue / (metrics.recurringCount || 1), true) },
+            ]}
+            expansionMode="drawer"
           />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <V3KPICard
+          <HeroKpiCard
+            kpiKey="recurringPercent"
             icon={Repeat}
             label="Recurring"
             value={`${metrics.totalDonations > 0 ? ((metrics.recurringCount / metrics.totalDonations) * 100).toFixed(0) : 0}%`}
             subtitle={`${metrics.recurringCount} sustainers`}
             accent="amber"
+            breakdown={[
+              { label: "Recurring Count", value: metrics.recurringCount.toLocaleString() },
+              { label: "One-time Count", value: metrics.oneTimeCount.toLocaleString() },
+              { label: "Recurring Revenue", value: formatCurrency(metrics.recurringRevenue, true) },
+            ]}
+            expansionMode="drawer"
           />
         </motion.div>
       </motion.div>
@@ -285,36 +325,66 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         animate="visible"
       >
         <motion.div variants={itemVariants}>
-          <V3KPICard
+          <HeroKpiCard
+            kpiKey="netRaisedDonations"
             icon={DollarSign}
             label="Net Revenue"
             value={formatCurrency(metrics.netRaised, true)}
             accent="green"
+            trendData={grossRaisedTrend}
+            trendXAxisKey="date"
+            breakdown={[
+              { label: "Gross Raised", value: formatCurrency(metrics.totalRaised, true) },
+              { label: "Fees", value: formatCurrency(metrics.totalRaised - metrics.netRaised, true) },
+              { label: "Refunds", value: formatCurrency(metrics.refundAmount, true) },
+            ]}
+            expansionMode="drawer"
           />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <V3KPICard
+          <HeroKpiCard
+            kpiKey="totalDonations"
             icon={Receipt}
             label="Total Donations"
             value={metrics.totalDonations.toLocaleString()}
             accent="default"
+            trendData={donationCountTrend}
+            trendXAxisKey="date"
+            breakdown={[
+              { label: "One-time", value: metrics.oneTimeCount.toLocaleString() },
+              { label: "Recurring", value: metrics.recurringCount.toLocaleString() },
+              { label: "Refunds", value: metrics.refundCount.toLocaleString() },
+            ]}
+            expansionMode="drawer"
           />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <V3KPICard
+          <HeroKpiCard
+            kpiKey="recurringRevenue"
             icon={Repeat}
             label="Recurring Revenue"
             value={formatCurrency(metrics.recurringRevenue, true)}
             accent="blue"
+            breakdown={[
+              { label: "Recurring Count", value: metrics.recurringCount.toLocaleString() },
+              { label: "Avg Recurring", value: formatCurrency(metrics.recurringRevenue / (metrics.recurringCount || 1), true) },
+            ]}
+            expansionMode="drawer"
           />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <V3KPICard
+          <HeroKpiCard
+            kpiKey="refundAmount"
             icon={TrendingUp}
             label="Refunds"
             value={formatCurrency(metrics.refundAmount, true)}
             subtitle={`${metrics.refundCount} refunds`}
             accent={metrics.refundAmount > 0 ? "red" : "default"}
+            breakdown={[
+              { label: "Refund Count", value: metrics.refundCount.toLocaleString() },
+              { label: "Avg Refund", value: formatCurrency(metrics.refundAmount / (metrics.refundCount || 1), true) },
+            ]}
+            expansionMode="drawer"
           />
         </motion.div>
       </motion.div>
