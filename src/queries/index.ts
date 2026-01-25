@@ -203,6 +203,8 @@ export {
   type ActBlueAttribution,
   type ActBlueMetadata,
   type ActBlueMetricsData,
+  type ActBlueMetricsDataWithSparklines,
+  type SparklineData,
   type SMSMetricsData,
   type ClientHealthData,
 } from "@/hooks/useActBlueMetrics";

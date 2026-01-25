@@ -248,6 +248,80 @@ function transformRPCResponse(
   };
 }
 
+// ==================== Sparkline Computation ====================
+
+/**
+ * Compute sparkline coordinates from daily rollup data.
+ * Takes the last 7 days of data and normalizes to 0-100 range.
+ */
+function computeSparklines(dailyRollup: ActBlueDailyRollup[]): SparklineData {
+  // Take last 7 days (or all if fewer)
+  const recentDays = dailyRollup.slice(-7);
+  
+  if (recentDays.length === 0) {
+    return { 
+      raised: [], 
+      donations: [], 
+      donors: [], 
+      recurring: [] 
+    };
+  }
+
+  const normalize = (values: number[]): Array<{x: number; y: number}> => {
+    const max = Math.max(...values, 1);
+    return values.map((v, i) => ({
+      x: (i / Math.max(values.length - 1, 1)) * 100,
+      y: (v / max) * 100,
+    }));
+  };
+
+  return {
+    raised: normalize(recentDays.map(d => d.raised)),
+    donations: normalize(recentDays.map(d => d.donations)),
+    donors: normalize(recentDays.map(d => d.donors)),
+    recurring: normalize(recentDays.map(d => d.recurring_amount)),
+  };
+}
+
+export interface SparklineData {
+  raised: Array<{x: number; y: number}>;
+  donations: Array<{x: number; y: number}>;
+  donors: Array<{x: number; y: number}>;
+  recurring: Array<{x: number; y: number}>;
+}
+
+// ==================== Previous Period Calculation ====================
+
+/**
+ * Calculate the previous period date range based on current range.
+ * If current is 7 days, previous is the 7 days before that.
+ */
+function calculatePreviousPeriod(startDate: string, endDate: string): { prevStart: string; prevEnd: string } {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const periodLength = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  
+  const prevEnd = new Date(start);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+  
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevStart.getDate() - periodLength + 1);
+  
+  return {
+    prevStart: prevStart.toISOString().split('T')[0],
+    prevEnd: prevEnd.toISOString().split('T')[0],
+  };
+}
+
+/**
+ * Calculate percentage trend between current and previous values.
+ * Returns null if previous is 0 or undefined.
+ */
+function calculateTrend(current: number, previous: number): number | null {
+  if (previous === 0) return current > 0 ? 100 : null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
 // ==================== Data Fetching ====================
 
 async function fetchActBlueMetrics(
@@ -258,26 +332,82 @@ async function fetchActBlueMetrics(
   creativeId?: string | null,
   useUtc: boolean = false
 ): Promise<ActBlueMetricsData> {
-  const { data, error } = await supabase.rpc('get_actblue_dashboard_metrics', {
-    p_organization_id: organizationId,
-    p_start_date: startDate,
-    p_end_date: endDate,
-    p_campaign_id: campaignId || null,
-    p_creative_id: creativeId || null,
-    p_use_utc: useUtc,
-  });
+  // Calculate previous period dates
+  const { prevStart, prevEnd } = calculatePreviousPeriod(startDate, endDate);
 
-  if (error) {
-    console.error('[useActBlueMetrics] RPC error:', error);
-    throw new Error(`Failed to fetch ActBlue metrics: ${error.message}`);
+  // Fetch current and previous period in parallel
+  const [currentResult, prevResult] = await Promise.all([
+    supabase.rpc('get_actblue_dashboard_metrics', {
+      p_organization_id: organizationId,
+      p_start_date: startDate,
+      p_end_date: endDate,
+      p_campaign_id: campaignId || null,
+      p_creative_id: creativeId || null,
+      p_use_utc: useUtc,
+    }),
+    supabase.rpc('get_actblue_dashboard_metrics', {
+      p_organization_id: organizationId,
+      p_start_date: prevStart,
+      p_end_date: prevEnd,
+      p_campaign_id: campaignId || null,
+      p_creative_id: creativeId || null,
+      p_use_utc: useUtc,
+    }),
+  ]);
+
+  if (currentResult.error) {
+    console.error('[useActBlueMetrics] RPC error:', currentResult.error);
+    throw new Error(`Failed to fetch ActBlue metrics: ${currentResult.error.message}`);
   }
 
-  if (!data) {
+  if (!currentResult.data) {
     throw new Error('No data returned from get_actblue_dashboard_metrics');
   }
 
   // Transform RPC response to match frontend interface
-  return transformRPCResponse(data as unknown as RPCResponse, startDate, endDate);
+  const transformed = transformRPCResponse(
+    currentResult.data as unknown as RPCResponse, 
+    startDate, 
+    endDate
+  );
+
+  // Extract previous period summary if available
+  const prevData = prevResult.data as unknown as RPCResponse | null;
+  const prevSummary = prevData?.summary;
+
+  // Populate previous period data
+  if (prevSummary) {
+    transformed.previousPeriod = {
+      totalDonations: prevSummary.donation_count || 0,
+      totalRaised: prevSummary.gross_donations || 0,
+      totalNet: prevSummary.net_donations || 0,
+      uniqueDonors: prevSummary.unique_donors || 0,
+      recurringCount: prevSummary.recurring_count || 0,
+      recurringAmount: prevSummary.recurring_revenue || 0,
+    };
+
+    // Calculate trends
+    transformed.trends = {
+      raisedTrend: calculateTrend(transformed.summary.totalRaised, prevSummary.gross_donations || 0),
+      donationsTrend: calculateTrend(transformed.summary.totalDonations, prevSummary.donation_count || 0),
+      donorsTrend: calculateTrend(transformed.summary.uniqueDonors, prevSummary.unique_donors || 0),
+      recurringTrend: calculateTrend(transformed.summary.recurringAmount, prevSummary.recurring_revenue || 0),
+    };
+  }
+
+  // Update metadata with previous period dates
+  transformed.metadata.previousStartDate = prevStart;
+  transformed.metadata.previousEndDate = prevEnd;
+
+  // Compute sparklines from daily data
+  (transformed as ActBlueMetricsDataWithSparklines).sparklines = computeSparklines(transformed.dailyRollup);
+
+  return transformed;
+}
+
+// Extended interface with sparklines
+export interface ActBlueMetricsDataWithSparklines extends ActBlueMetricsData {
+  sparklines: SparklineData;
 }
 
 // ==================== Hook ====================
