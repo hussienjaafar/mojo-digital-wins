@@ -63,6 +63,20 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const [filterRecurring, setFilterRecurring] = useState<"all" | "one-time" | "recurring">("all");
   const [currentPage, setCurrentPage] = useState(1);
 
+  // ========== DIAGNOSTIC LOGGING ==========
+  // Log props on every render to trace data flow
+  useEffect(() => {
+    console.log('[DonationMetrics] Component mounted/updated with props:', {
+      organizationId,
+      startDate,
+      endDate,
+      hasOrgId: !!organizationId,
+      orgIdLength: organizationId?.length,
+      startDateFormat: startDate?.match(/^\d{4}-\d{2}-\d{2}$/) ? 'valid' : 'invalid',
+      endDateFormat: endDate?.match(/^\d{4}-\d{2}-\d{2}$/) ? 'valid' : 'invalid',
+    });
+  }, [organizationId, startDate, endDate]);
+
   // PII access control - masks donor names/emails for users without PII access
   // Default to masked while loading (fail-closed, non-blocking)
   const { shouldMaskPII, isLoading: piiLoading } = usePIIAccess(organizationId);
@@ -73,6 +87,20 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
 
   // Use TanStack Query hook instead of direct Supabase calls
   const { data, isLoading, error, refetch } = useDonationMetricsQuery(organizationId, startDate, endDate);
+
+  // ========== DIAGNOSTIC LOGGING ==========
+  // Log query state changes
+  useEffect(() => {
+    console.log('[DonationMetrics] Query state changed:', {
+      isLoading,
+      hasError: !!error,
+      errorMessage: error instanceof Error ? error.message : null,
+      hasData: !!data,
+      metricsTotal: data?.metrics?.totalDonations,
+      timeSeriesLength: data?.timeSeries?.length,
+      recentDonationsLength: data?.recentDonations?.length,
+    });
+  }, [data, isLoading, error]);
 
   // Extract data from query result
   const metrics = data?.metrics;
