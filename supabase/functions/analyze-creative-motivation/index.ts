@@ -11,9 +11,9 @@ interface CreativeData {
   organization_id: string;
   creative_id: string;
   ad_id: string;
-  body_text: string | null;
-  title_text: string | null;
-  transcript_text?: string | null;
+  primary_text: string | null;
+  headline: string | null;
+  audio_transcript?: string | null;
 }
 
 interface MotivationAnalysis {
@@ -43,9 +43,9 @@ serve(async (req) => {
     // Fetch unanalyzed creatives - those without motivation data
     let query = supabase
       .from('meta_creative_insights')
-      .select('id, organization_id, creative_id, ad_id, body_text, title_text')
+      .select('id, organization_id, creative_id, ad_id, primary_text, headline, audio_transcript')
       .or('donor_pain_points.is.null,donor_pain_points.eq.{}')
-      .not('body_text', 'is', null)
+      .not('primary_text', 'is', null)
       .limit(batch_size);
 
     if (organization_id) {
@@ -72,38 +72,16 @@ serve(async (req) => {
 
     console.log(`Found ${creatives.length} creatives to analyze for motivation`);
 
-    // Optionally fetch transcripts for video ads
-    let transcriptMap = new Map<string, string>();
-    if (include_transcripts) {
-      const adIds = creatives.map(c => c.ad_id).filter(Boolean);
-      if (adIds.length > 0) {
-        const { data: transcripts } = await supabase
-          .from('meta_ad_transcripts')
-          .select('ad_id, transcript_text')
-          .in('ad_id', adIds);
-        
-        if (transcripts) {
-          for (const t of transcripts) {
-            if (t.transcript_text) {
-              transcriptMap.set(t.ad_id, t.transcript_text);
-            }
-          }
-        }
-        console.log(`Found ${transcriptMap.size} video transcripts to include`);
-      }
-    }
-
     let analyzed = 0;
     let errors = 0;
 
     for (const creative of creatives) {
       try {
-        // Combine ad text with transcript if available
-        const transcript = transcriptMap.get(creative.ad_id);
+        // Combine ad text with audio transcript if available
         const adContent = [
-          creative.title_text ? `Title: ${creative.title_text}` : '',
-          creative.body_text ? `Body: ${creative.body_text}` : '',
-          transcript ? `Video Transcript: ${transcript.slice(0, 2000)}` : '',
+          creative.headline ? `Headline: ${creative.headline}` : '',
+          creative.primary_text ? `Primary Text: ${creative.primary_text}` : '',
+          creative.audio_transcript ? `Video Transcript: ${creative.audio_transcript.slice(0, 2000)}` : '',
         ].filter(Boolean).join('\n\n');
 
         if (!adContent.trim()) {
