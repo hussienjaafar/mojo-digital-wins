@@ -17,7 +17,7 @@ const corsHeaders = {
 
 interface DailyMetric {
   ad_id: string;
-  date_start: string;
+  date: string;
   clicks: number;
   impressions: number;
   link_clicks: number;
@@ -77,10 +77,10 @@ serve(async (req) => {
 
       const { data: dailyMetrics, error: metricsError } = await supabase
         .from('meta_ad_metrics_daily')
-        .select('ad_id, date_start, clicks, impressions, link_clicks, spend')
+        .select('ad_id, date, clicks, impressions, link_clicks, spend, frequency')
         .eq('organization_id', orgId)
-        .gte('date_start', fourteenDaysAgo.toISOString().split('T')[0])
-        .order('date_start', { ascending: true });
+        .gte('date', fourteenDaysAgo.toISOString().split('T')[0])
+        .order('date', { ascending: true });
 
       if (metricsError) {
         console.error(`Error fetching metrics for org ${orgId}:`, metricsError);
@@ -114,10 +114,10 @@ serve(async (req) => {
 
         // Split into baseline (days 8-14) and recent (days 1-7)
         const baselineMetrics = metrics.filter(m => 
-          new Date(m.date_start) < sevenDaysAgo
+          new Date(m.date) < sevenDaysAgo
         );
         const recentMetrics = metrics.filter(m => 
-          new Date(m.date_start) >= sevenDaysAgo
+          new Date(m.date) >= sevenDaysAgo
         );
 
         if (baselineMetrics.length < 3 || recentMetrics.length < 3) {
@@ -147,7 +147,7 @@ serve(async (req) => {
         // Calculate consecutive days of decline
         let daysDeclined = 0;
         const sortedRecent = [...recentMetrics].sort((a, b) => 
-          new Date(b.date_start).getTime() - new Date(a.date_start).getTime()
+          new Date(b.date).getTime() - new Date(a.date).getTime()
         );
         
         let prevCtr = 0;
@@ -164,11 +164,14 @@ serve(async (req) => {
           }
         }
 
-        // Determine severity
+        // Check average frequency (leading indicator of fatigue)
+        const avgFrequency = metrics.reduce((sum, m) => sum + ((m as any).frequency || 0), 0) / metrics.length;
+
+        // Determine severity (consider both decline and frequency)
         let severity: 'watch' | 'warning' | 'critical';
-        if (declinePercent >= 30 || daysDeclined >= 5) {
+        if (declinePercent >= 30 || daysDeclined >= 5 || avgFrequency >= 8) {
           severity = 'critical';
-        } else if (declinePercent >= 20 || daysDeclined >= 3) {
+        } else if (declinePercent >= 20 || daysDeclined >= 3 || avgFrequency >= 6) {
           severity = 'warning';
         } else {
           severity = 'watch';
