@@ -64,6 +64,16 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const [currentPage, setCurrentPage] = useState(1);
 
   // PII access control - masks donor names/emails for users without PII access
+  const { hasPIIAccess, isLoading: piiLoading } = usePIIAccess(organizationId);
+  // Default to masked while loading (fail-closed security)
+  const effectiveMaskPII = piiLoading ? true : !hasPIIAccess;
+
+  // Fetch donation metrics
+  const { data, isLoading, error, refetch } = useDonationMetricsQuery(organizationId, startDate, endDate);
+
+  // Check if this is a single-day view
+  const isSingleDay = useIsSingleDayView();
+
   const metrics = data?.metrics;
   const timeSeries = data?.timeSeries || [];
   const bySource = data?.bySource || [];
