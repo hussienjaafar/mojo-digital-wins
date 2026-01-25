@@ -78,70 +78,75 @@ interface DonationItemProps {
   index: number;
 }
 
-const DonationItem: React.FC<DonationItemProps> = ({ donation, index }) => {
-  const channel = getChannelFromRefcode(donation.refcode, null);
-  const channelColor = getChannelColor(channel);
-  
-  const donorDisplay = donation.donor_name || "Anonymous";
-  const timeAgo = formatDistanceToNow(new Date(donation.transaction_date), { addSuffix: true });
-  const exactTime = format(new Date(donation.transaction_date), "h:mm a");
+const DonationItem = React.forwardRef<HTMLDivElement, DonationItemProps>(
+  ({ donation, index }, ref) => {
+    const channel = getChannelFromRefcode(donation.refcode, null);
+    const channelColor = getChannelColor(channel);
+    
+    const donorDisplay = donation.donor_name || "Anonymous";
+    const timeAgo = formatDistanceToNow(new Date(donation.transaction_date), { addSuffix: true });
+    const exactTime = format(new Date(donation.transaction_date), "h:mm a");
 
-  return (
-    <motion.div
-      variants={itemVariants}
-      className={cn(
-        "flex items-center gap-3 py-3",
-        "border-b border-[hsl(var(--portal-border))] last:border-0",
-        // Highlight newest donation
-        index === 0 && "bg-[hsl(var(--portal-success)/0.03)]"
-      )}
-    >
-      {/* Icon */}
-      <div className={cn(
-        "p-2 rounded-full shrink-0",
-        donation.is_recurring 
-          ? "bg-[hsl(var(--portal-accent-purple)/0.1)]"
-          : "bg-[hsl(var(--portal-accent-blue)/0.1)]"
-      )}>
-        {donation.is_recurring ? (
-          <Repeat className="h-3.5 w-3.5 text-[hsl(var(--portal-accent-purple))]" />
-        ) : (
-          <DollarSign className="h-3.5 w-3.5 text-[hsl(var(--portal-accent-blue))]" />
+    return (
+      <motion.div
+        ref={ref}
+        variants={itemVariants}
+        className={cn(
+          "flex items-center gap-3 py-3",
+          "border-b border-[hsl(var(--portal-border))] last:border-0",
+          // Highlight newest donation
+          index === 0 && "bg-[hsl(var(--portal-success)/0.03)]"
         )}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))] truncate">
-            {formatCurrency(donation.amount, false)}
-          </span>
-          <Badge variant="secondary" className={cn("text-[10px] px-1.5 py-0", channelColor)}>
-            {channel}
-          </Badge>
-          {donation.is_recurring && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-[hsl(var(--portal-accent-purple)/0.1)] text-[hsl(var(--portal-accent-purple))]">
-              Recurring
-            </Badge>
+      >
+        {/* Icon */}
+        <div className={cn(
+          "p-2 rounded-full shrink-0",
+          donation.is_recurring 
+            ? "bg-[hsl(var(--portal-accent-purple)/0.1)]"
+            : "bg-[hsl(var(--portal-accent-blue)/0.1)]"
+        )}>
+          {donation.is_recurring ? (
+            <Repeat className="h-3.5 w-3.5 text-[hsl(var(--portal-accent-purple))]" />
+          ) : (
+            <DollarSign className="h-3.5 w-3.5 text-[hsl(var(--portal-accent-blue))]" />
           )}
         </div>
-        <p className="text-xs text-[hsl(var(--portal-text-muted))] truncate">
-          {donorDisplay}
-        </p>
-      </div>
 
-      {/* Time */}
-      <div className="text-right shrink-0">
-        <p className="text-xs font-medium text-[hsl(var(--portal-text-secondary))]">
-          {exactTime}
-        </p>
-        <p className="text-[10px] text-[hsl(var(--portal-text-muted))]">
-          {timeAgo}
-        </p>
-      </div>
-    </motion.div>
-  );
-};
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))] truncate">
+              {formatCurrency(donation.amount, false)}
+            </span>
+            <Badge variant="secondary" className={cn("text-[10px] px-1.5 py-0", channelColor)}>
+              {channel}
+            </Badge>
+            {donation.is_recurring && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-[hsl(var(--portal-accent-purple)/0.1)] text-[hsl(var(--portal-accent-purple))]">
+                Recurring
+              </Badge>
+            )}
+          </div>
+          <p className="text-xs text-[hsl(var(--portal-text-muted))] truncate">
+            {donorDisplay}
+          </p>
+        </div>
+
+        {/* Time */}
+        <div className="text-right shrink-0">
+          <p className="text-xs font-medium text-[hsl(var(--portal-text-secondary))]">
+            {exactTime}
+          </p>
+          <p className="text-[10px] text-[hsl(var(--portal-text-muted))]">
+            {timeAgo}
+          </p>
+        </div>
+      </motion.div>
+    );
+  }
+);
+
+DonationItem.displayName = "DonationItem";
 
 // ============================================================================
 // RecentActivityFeed Component
