@@ -15,7 +15,8 @@ import { useActBlueMetrics, type ActBlueMetricsDataWithSparklines } from "./useA
 import type { 
   DashboardKPIs, 
   SparklineData, 
-  DashboardTimeSeriesPoint 
+  DashboardTimeSeriesPoint,
+  ChannelBreakdown,
 } from "@/queries/useClientDashboardMetricsQuery";
 
 // ==================== Types ====================
@@ -41,6 +42,10 @@ interface DashboardMetricsV2Data {
   smsConversions: number;
   directDonations: number;
   attributionFallbackMode: boolean;
+  
+  // Additional fields for ClientDashboardCharts
+  channelBreakdown: ChannelBreakdown[];
+  smsMessagesSent: number;
   
   // Original unified data (for components that can use it directly)
   _unified: ActBlueMetricsDataWithSparklines;
@@ -188,6 +193,22 @@ function transformToLegacyFormat(
     .filter((c) => c.channel === 'other' || c.channel === 'unattributed')
     .reduce((sum, c) => sum + c.raised, 0);
 
+  // Transform channelBreakdown to legacy format for ClientDashboardCharts
+  const channelNameMap: Record<string, string> = {
+    meta: 'Meta Ads',
+    sms: 'SMS',
+    email: 'Email',
+    organic: 'Organic',
+    other: 'Other',
+    unattributed: 'Direct',
+  };
+  
+  const legacyChannelBreakdown: ChannelBreakdown[] = channelBreakdown.map((c) => ({
+    name: channelNameMap[c.channel] || c.channel,
+    value: c.donations,
+    label: `$${c.raised.toLocaleString()}`,
+  }));
+
   return {
     kpis,
     prevKpis,
@@ -199,6 +220,8 @@ function transformToLegacyFormat(
     smsConversions: channelSpend.smsConversions,
     directDonations,
     attributionFallbackMode: false, // Unified hook uses proper attribution
+    channelBreakdown: legacyChannelBreakdown,
+    smsMessagesSent: 0, // Will be populated from SMS metrics if needed
     _unified: unified,
   };
 }

@@ -25,7 +25,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useDashboardStore, useDateRange } from "@/stores/dashboardStore";
 import { DashboardTopSection } from "@/components/client/DashboardTopSection";
-import { useClientDashboardMetricsQuery, useRecurringHealthQuery } from "@/queries";
+import { useRecurringHealthQuery } from "@/queries";
+import { useDashboardMetricsV2 } from "@/hooks/useDashboardMetricsV2";
 import { buildHeroKpis } from "@/utils/buildHeroKpis";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
@@ -246,8 +247,8 @@ const ClientDashboard = () => {
   const dateRange = useDateRange();
   const triggerRefresh = useDashboardStore((s) => s.triggerRefresh);
 
-  // Data fetching with TanStack Query
-  const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useClientDashboardMetricsQuery(organizationId);
+  // Data fetching with unified metrics hook (V2 adapter)
+  const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useDashboardMetricsV2(organizationId);
   const { data: recurringHealthData } = useRecurringHealthQuery(organizationId);
   const isSingleDayView = useIsSingleDayView();
 
