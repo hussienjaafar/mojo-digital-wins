@@ -21,7 +21,8 @@ serve(async (req) => {
 
     console.log('[AGGREGATE CREATIVE METRICS] Starting aggregation...', { organization_id });
 
-    // Get all creatives that need metrics aggregation (zero or null metrics)
+    // Get all creatives that need metrics aggregation
+    // IMPORTANT: Also include creatives missing link_clicks, not just impressions
     let query = supabase
       .from('meta_creative_insights')
       .select('id, campaign_id, ad_id, organization_id, impressions, clicks, link_clicks, spend, conversions, conversion_value, ctr, link_ctr, roas');
@@ -30,8 +31,9 @@ serve(async (req) => {
       query = query.eq('organization_id', organization_id);
     }
 
-    // Focus on creatives with missing/zero metrics
-    query = query.or('impressions.is.null,impressions.eq.0');
+    // Include creatives with missing/zero impressions OR missing/zero link_clicks
+    // This ensures we backfill link CTR for creatives that already have impressions
+    query = query.or('impressions.is.null,impressions.eq.0,link_clicks.is.null,link_clicks.eq.0,link_ctr.is.null');
 
     const { data: creatives, error: fetchError } = await query;
 
