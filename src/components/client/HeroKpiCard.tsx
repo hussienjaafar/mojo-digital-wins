@@ -316,19 +316,10 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
   }, [label, value, Icon, trend, description, trendData, trendXAxisKey, breakdown, accent, hasDrilldownData, singleDayData]);
 
   const handleClick = (e: React.MouseEvent) => {
-    // Prevent event bubbling to parent containers
+    // Aggressive event prevention to avoid parent handlers catching this
     e.stopPropagation();
-    
-    console.log('[HeroKpiCard] handleClick:', {
-      kpiKey,
-      expansionMode,
-      isExpandable,
-      hasDrilldownData,
-      isSelected,
-      isDrilldownOpen,
-      drilldownDataExists: !!drilldownData,
-      timeSeriesLength: drilldownData?.timeSeriesData?.length,
-    });
+    e.preventDefault();
+    e.nativeEvent.stopImmediatePropagation();
     
     if (isExpandable && hasDrilldownData) {
       if (expansionMode === "inline") {
@@ -366,20 +357,7 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
     cardRef.current?.focus();
   };
 
-  const handleDrawerOpenChange = (open: boolean) => {
-    console.log('[HeroKpiCard] handleDrawerOpenChange called:', {
-      kpiKey,
-      open,
-      currentIsSelected: isSelected,
-      currentIsDrilldownOpen: isDrilldownOpen,
-    });
-    setDrilldownOpen(open);
-    if (!open) {
-      setSelectedKpi(null);
-      // Restore focus to the card after drawer closes
-      cardRef.current?.focus();
-    }
-  };
+  // Note: handleDrawerOpenChange is now handled at parent level
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -600,20 +578,8 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
     return cardContent;
   };
 
-  return (
-    <>
-      {renderContent()}
-
-      {/* Drilldown Drawer - only render in drawer mode */}
-      {expansionMode === "drawer" && isExpandable && drilldownData && (
-        <V3KPIDrilldownDrawer
-          open={isSelected && isDrilldownOpen}
-          onOpenChange={handleDrawerOpenChange}
-          data={drilldownData}
-        />
-      )}
-    </>
-  );
+  // Drawer is now rendered at parent level (DonationMetrics) to prevent multiple instances
+  return renderContent();
 };
 
 export default HeroKpiCard;
