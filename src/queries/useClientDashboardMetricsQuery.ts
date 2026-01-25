@@ -5,6 +5,7 @@ import { format, parseISO, subDays, eachDayOfInterval, addDays } from "date-fns"
 import { formatInTimeZone } from "date-fns-tz";
 import { logger } from "@/lib/logger";
 import { DEFAULT_ORG_TIMEZONE } from "@/lib/metricDefinitions";
+import { fetchDailyRollup, fetchPeriodSummary } from "@/lib/actblueRpcClient";
 import type { DailyRollupRow, PeriodSummary } from "./useActBlueDailyRollupQuery";
 import { detectChannelWithConfidence, type AttributionChannel } from "@/utils/channelDetection";
 
@@ -184,112 +185,9 @@ function bucketMetaByDay<T extends { date?: string }>(items: T[]): Map<string, T
 }
 
 // ============================================================================
-// Canonical ActBlue Rollup Functions (timezone-aware, single source of truth)
+// Canonical ActBlue Rollup Functions - now imported from @/lib/actblueRpcClient
+// fetchDailyRollup and fetchPeriodSummary are the SINGLE SOURCE OF TRUTH
 // ============================================================================
-
-/**
- * Fetch daily ActBlue rollup from the canonical RPC.
- * This uses org timezone for day bucketing - the SINGLE SOURCE OF TRUTH.
- */
-async function fetchCanonicalDailyRollup(
-  organizationId: string,
-  startDate: string,
-  endDate: string
-): Promise<DailyRollupRow[]> {
-  const { data, error } = await (supabase as any).rpc('get_actblue_daily_rollup', {
-    p_organization_id: organizationId,
-    p_start_date: startDate,
-    p_end_date: endDate,
-  });
-
-  if (error) {
-    logger.error('Failed to fetch canonical ActBlue daily rollup', { error, organizationId });
-    throw new Error(`Failed to fetch daily rollup: ${error.message}`);
-  }
-
-  // Map RPC field names to frontend interface names
-  // RPC returns: gross_raised, net_raised, transaction_count, recurring_count, recurring_amount, refund_count, refund_amount, unique_donors
-  return (data || []).map((row: any) => {
-    const grossDonations = Number(row.gross_raised) || 0;
-    const netDonations = Number(row.net_raised) || 0;
-    const donationCount = Number(row.transaction_count) || 0;
-    const recurringCount = Number(row.recurring_count) || 0;
-    const recurringRevenue = Number(row.recurring_amount) || 0;
-    const refundCount = Number(row.refund_count) || 0;
-    const refundAmount = Number(row.refund_amount) || 0;
-    const totalFees = grossDonations - netDonations; // Fees = gross - net
-
-    return {
-      day: row.day,
-      gross_raised: grossDonations,
-      net_raised: netDonations,
-      refunds: refundAmount,
-      net_revenue: netDonations - refundAmount,
-      total_fees: totalFees,
-      donation_count: donationCount,
-      unique_donors: Number(row.unique_donors) || 0,
-      refund_count: refundCount,
-      recurring_count: recurringCount,
-      one_time_count: donationCount - recurringCount,
-      recurring_revenue: recurringRevenue,
-      one_time_revenue: netDonations - recurringRevenue,
-      fee_percentage: grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0,
-      refund_rate: donationCount > 0 ? (refundCount / donationCount) * 100 : 0,
-    };
-  });
-}
-
-/**
- * Fetch ActBlue period summary from the canonical RPC.
- * This uses org timezone for day bucketing - the SINGLE SOURCE OF TRUTH.
- */
-async function fetchCanonicalPeriodSummary(
-  organizationId: string,
-  startDate: string,
-  endDate: string
-): Promise<PeriodSummary> {
-  const { data, error } = await (supabase as any).rpc('get_actblue_period_summary', {
-    p_organization_id: organizationId,
-    p_start_date: startDate,
-    p_end_date: endDate,
-  });
-
-  if (error) {
-    logger.error('Failed to fetch canonical ActBlue period summary', { error, organizationId });
-    throw new Error(`Failed to fetch period summary: ${error.message}`);
-  }
-
-  // Map RPC field names to frontend interface names
-  // RPC returns: gross_raised, net_raised, transaction_count, recurring_count, recurring_amount, refund_count, refund_amount, unique_donors, avg_donation
-  const row = data?.[0] || {};
-  const grossDonations = Number(row.gross_raised) || 0;
-  const netDonations = Number(row.net_raised) || 0;
-  const donationCount = Number(row.transaction_count) || 0;
-  const recurringCount = Number(row.recurring_count) || 0;
-  const recurringRevenue = Number(row.recurring_amount) || 0;
-  const refundCount = Number(row.refund_count) || 0;
-  const refundAmount = Number(row.refund_amount) || 0;
-  const totalFees = grossDonations - netDonations; // Fees = gross - net
-
-  return {
-    gross_raised: grossDonations,
-    net_raised: netDonations,
-    refunds: refundAmount,
-    net_revenue: netDonations - refundAmount,
-    total_fees: totalFees,
-    donation_count: donationCount,
-    unique_donors_approx: Number(row.unique_donors) || 0,
-    refund_count: refundCount,
-    recurring_count: recurringCount,
-    one_time_count: donationCount - recurringCount,
-    recurring_revenue: recurringRevenue,
-    one_time_revenue: netDonations - recurringRevenue,
-    avg_fee_percentage: grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0,
-    refund_rate: donationCount > 0 ? (refundCount / donationCount) * 100 : 0,
-    avg_donation: Number(row.avg_donation) || 0,
-    days_with_donations: 0, // Not provided by RPC, compute separately if needed
-  };
-}
 
 /**
  * Fetch timezone-aware attributed revenue using server-side RPC.
@@ -553,11 +451,11 @@ async function fetchDashboardMetrics(
       .lt('send_date', prevEndInclusive)
       .neq('status', 'draft'),
     // Canonical ActBlue daily rollup - timezone-aware, SINGLE SOURCE OF TRUTH
-    fetchCanonicalDailyRollup(organizationId, startDate, endDate),
+    fetchDailyRollup(organizationId, startDate, endDate),
     // Canonical ActBlue period summary
-    fetchCanonicalPeriodSummary(organizationId, startDate, endDate),
+    fetchPeriodSummary(organizationId, startDate, endDate),
     // Previous period canonical summary
-    fetchCanonicalPeriodSummary(organizationId, prevPeriod.start, prevPeriod.end),
+    fetchPeriodSummary(organizationId, prevPeriod.start, prevPeriod.end),
     // Filtered rollup using server-side RPC (only used when campaign/creative filters are active)
     hasFilters
       ? fetchFilteredActBlueRollup(organizationId, startDate, endDate, campaignId, creativeId)
