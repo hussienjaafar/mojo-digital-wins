@@ -10,7 +10,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { format, subDays, parseISO } from 'date-fns';
 import { useClientOrganization } from '@/hooks/useClientOrganization';
 import { ClientLayout } from '@/components/client/ClientLayout';
-import { ProductionGate } from '@/components/client/ProductionGate';
 import {
   AdPerformanceList,
   HierarchyLevelTabs,
@@ -701,46 +700,40 @@ export default function ClientAdPerformance() {
   };
 
   return (
-    <ProductionGate
-      title="Ad Performance"
-      description="Granular ad performance analytics are coming soon. We're working on bringing you detailed campaign insights."
-      icon={BarChart3}
-    >
-      <ClientLayout showDateControls={false}>
-        <div className="container mx-auto p-6 space-y-4">
-          {/* Header with V3 Date Range Toolbar */}
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
-                Ad Performance
-              </h1>
-              <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
-                Campaign → Ad Set → Ad drill-down with ActBlue attribution
-              </p>
-            </div>
-
-            {/* Date Range Selector */}
-            <div className="flex items-center gap-3">
-              <DateRangeSelector
-                startDate={dateRange.startDate}
-                endDate={dateRange.endDate}
-                onDateChange={(start, end) => useDashboardStore.getState().setDateRange(start, end)}
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => refetch()}
-                disabled={isLoading}
-                className="h-9 w-9 shrink-0"
-              >
-                <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
-              </Button>
-            </div>
+    <ClientLayout showDateControls={false}>
+      <div className="container mx-auto p-6 space-y-4">
+        {/* Header with V3 Date Range Toolbar */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
+              Ad Performance
+            </h1>
+            <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
+              Campaign → Ad Set → Ad drill-down with ActBlue attribution
+            </p>
           </div>
 
-          {renderContent()}
+          {/* Date Range Selector */}
+          <div className="flex items-center gap-3">
+            <DateRangeSelector
+              startDate={dateRange.startDate}
+              endDate={dateRange.endDate}
+              onDateChange={(start, end) => useDashboardStore.getState().setDateRange(start, end)}
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isLoading}
+              className="h-9 w-9 shrink-0"
+            >
+              <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+            </Button>
+          </div>
         </div>
-      </ClientLayout>
-    </ProductionGate>
+
+        {renderContent()}
+      </div>
+    </ClientLayout>
   );
 }
