@@ -128,7 +128,23 @@ export const V3KPIDrilldownDrawer: React.FC<V3KPIDrilldownDrawerProps> = ({
   const isSingleDayView = useIsSingleDayView();
   const isTodayView = useIsTodayView();
 
-  if (!data) return null;
+  // Debug: Log whenever the drawer receives props
+  React.useEffect(() => {
+    console.log('[V3KPIDrilldownDrawer] Props changed:', {
+      open,
+      hasData: !!data,
+      label: data?.label,
+      timeSeriesLength: data?.timeSeriesData?.length,
+      timeSeriesSample: data?.timeSeriesData?.slice(0, 2),
+      breakdownLength: data?.breakdown?.length,
+      isSingleDayView,
+    });
+  }, [open, data, isSingleDayView]);
+
+  if (!data) {
+    console.log('[V3KPIDrilldownDrawer] No data, returning null');
+    return null;
+  }
 
   const Icon = data.icon;
   const { singleDayData } = data;
@@ -145,6 +161,12 @@ export const V3KPIDrilldownDrawer: React.FC<V3KPIDrilldownDrawerProps> = ({
     singleDayData !== undefined || 
     (data.timeSeriesData && data.timeSeriesData.length <= 1)
   );
+  
+  console.log('[V3KPIDrilldownDrawer] Rendering with:', {
+    label: data.label,
+    showSingleDayView,
+    willShowChart: !showSingleDayView && data.timeSeriesData && data.timeSeriesConfig,
+  });
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
