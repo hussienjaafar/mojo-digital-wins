@@ -32,7 +32,7 @@ export interface EChartsCombinationChartProps {
   animationDuration?: number;
 }
 
-export const EChartsCombinationChart: React.FC<EChartsCombinationChartProps> = ({
+const EChartsCombinationChartInner: React.FC<EChartsCombinationChartProps> = ({
   data,
   xAxisKey,
   series,
@@ -291,5 +291,66 @@ export const EChartsCombinationChart: React.FC<EChartsCombinationChartProps> = (
     />
   );
 };
+
+/**
+ * Memoized EChartsCombinationChart to prevent unnecessary re-renders.
+ * Uses shallow comparison for primitives and deep comparison for data/series arrays.
+ */
+export const EChartsCombinationChart = React.memo(EChartsCombinationChartInner, (prevProps, nextProps) => {
+  // Fast path: check primitives first
+  if (
+    prevProps.height !== nextProps.height ||
+    prevProps.className !== nextProps.className ||
+    prevProps.isLoading !== nextProps.isLoading ||
+    prevProps.dualYAxis !== nextProps.dualYAxis ||
+    prevProps.showLegend !== nextProps.showLegend ||
+    prevProps.xAxisKey !== nextProps.xAxisKey ||
+    prevProps.animationDuration !== nextProps.animationDuration ||
+    prevProps.yAxisNameLeft !== nextProps.yAxisNameLeft ||
+    prevProps.yAxisNameRight !== nextProps.yAxisNameRight ||
+    prevProps.yAxisValueTypeLeft !== nextProps.yAxisValueTypeLeft ||
+    prevProps.yAxisValueTypeRight !== nextProps.yAxisValueTypeRight
+  ) {
+    return false; // Props changed, re-render
+  }
+
+  // Check series array length
+  if (prevProps.series.length !== nextProps.series.length) return false;
+  
+  // Check data array length
+  if (prevProps.data.length !== nextProps.data.length) return false;
+
+  // Compare series config (stable between renders typically)
+  for (let i = 0; i < prevProps.series.length; i++) {
+    const prev = prevProps.series[i];
+    const next = nextProps.series[i];
+    if (
+      prev.dataKey !== next.dataKey ||
+      prev.name !== next.name ||
+      prev.type !== next.type ||
+      prev.color !== next.color ||
+      prev.yAxisIndex !== next.yAxisIndex
+    ) {
+      return false;
+    }
+  }
+
+  // Compare data values for each series dataKey
+  const dataKeys = prevProps.series.map(s => s.dataKey);
+  for (let i = 0; i < prevProps.data.length; i++) {
+    const prevItem = prevProps.data[i];
+    const nextItem = nextProps.data[i];
+    
+    // Check xAxis value
+    if (prevItem[prevProps.xAxisKey] !== nextItem[nextProps.xAxisKey]) return false;
+    
+    // Check each series value
+    for (const key of dataKeys) {
+      if (prevItem[key] !== nextItem[key]) return false;
+    }
+  }
+
+  return true; // Props are equal, skip re-render
+});
 
 EChartsCombinationChart.displayName = "EChartsCombinationChart";

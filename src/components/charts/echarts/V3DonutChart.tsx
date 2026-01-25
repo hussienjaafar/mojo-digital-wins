@@ -68,7 +68,7 @@ export interface V3DonutChartProps {
   overrideTotal?: number;
 }
 
-export const V3DonutChart: React.FC<V3DonutChartProps> = ({
+const V3DonutChartInner: React.FC<V3DonutChartProps> = ({
   data,
   height = 300,
   className,
@@ -439,5 +439,44 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
     />
   );
 };
+
+/**
+ * Memoized V3DonutChart to prevent unnecessary re-renders.
+ * Uses shallow comparison for primitive props and JSON comparison for data array.
+ */
+export const V3DonutChart = React.memo(V3DonutChartInner, (prevProps, nextProps) => {
+  // Fast path: check primitives first
+  if (
+    prevProps.height !== nextProps.height ||
+    prevProps.valueType !== nextProps.valueType ||
+    prevProps.isLoading !== nextProps.isLoading ||
+    prevProps.showLegend !== nextProps.showLegend ||
+    prevProps.legendPosition !== nextProps.legendPosition ||
+    prevProps.topN !== nextProps.topN ||
+    prevProps.includeNotProvided !== nextProps.includeNotProvided ||
+    prevProps.className !== nextProps.className ||
+    prevProps.centerLabel !== nextProps.centerLabel ||
+    prevProps.overrideTotal !== nextProps.overrideTotal
+  ) {
+    return false; // Props changed, re-render
+  }
+
+  // Deep compare data array (main performance concern)
+  if (prevProps.data.length !== nextProps.data.length) return false;
+  
+  // Compare each data item by value and name (most common changes)
+  for (let i = 0; i < prevProps.data.length; i++) {
+    if (
+      prevProps.data[i].name !== nextProps.data[i].name ||
+      prevProps.data[i].value !== nextProps.data[i].value
+    ) {
+      return false;
+    }
+  }
+
+  return true; // Props are equal, skip re-render
+});
+
+V3DonutChart.displayName = 'V3DonutChart';
 
 export default V3DonutChart;
