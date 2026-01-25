@@ -6,7 +6,7 @@ import type {
   DashboardKPIs,
   SparklineData,
   DashboardTimeSeriesPoint,
-} from "@/queries/useClientDashboardMetricsQuery";
+} from "@/types/dashboard";
 import type { RecurringHealthV2Data } from "@/queries/useRecurringHealthQuery";
 import type { SingleDayComparisonData } from "@/components/v3/V3KPIDrilldownDrawer";
 
