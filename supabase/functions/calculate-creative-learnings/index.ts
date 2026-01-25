@@ -350,15 +350,174 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Creative learnings calculation complete. Org learnings: ${orgLearnings}, Global learnings: ${globalLearnings}`);
+    // ========== CORRELATION DETECTION ==========
+    console.log('Calculating creative performance correlations...');
+    let correlationsCreated = 0;
+
+    for (const orgId of orgIds) {
+      // Fetch all analyzed meta creatives with performance data
+      const { data: metaCreatives } = await supabase
+        .from('meta_creative_insights')
+        .select('*')
+        .eq('organization_id', orgId)
+        .not('analyzed_at', 'is', null)
+        .gt('impressions', 100)
+        .gte('created_at', periodStart.toISOString());
+
+      if (!metaCreatives || metaCreatives.length < 5) continue;
+
+      // Calculate correlations for different attributes
+      const attributes = [
+        { name: 'topic', type: 'topic_roas' },
+        { name: 'tone', type: 'tone_performance' },
+        { name: 'emotional_appeal', type: 'emotional_impact' },
+        { name: 'urgency_level', type: 'urgency_effect' },
+        { name: 'call_to_action_type', type: 'cta_effectiveness' },
+      ];
+
+      for (const attr of attributes) {
+        const groups = groupBy(metaCreatives.filter(c => c[attr.name]), attr.name);
+        
+        // Calculate overall average ROAS for comparison
+        const allWithRoas = metaCreatives.filter(c => c.roas && c.roas > 0);
+        const overallAvgRoas = allWithRoas.length > 0 
+          ? allWithRoas.reduce((sum, c) => sum + c.roas, 0) / allWithRoas.length
+          : 0;
+
+        for (const [value, items] of Object.entries(groups)) {
+          if (items.length < 3) continue;
+
+          const withRoas = items.filter(i => i.roas && i.roas > 0);
+          if (withRoas.length < 2) continue;
+
+          const avgRoas = withRoas.reduce((sum, i) => sum + i.roas, 0) / withRoas.length;
+          const avgCtr = items.reduce((sum, i) => sum + (i.ctr || 0), 0) / items.length;
+          
+          // Calculate lift percentage vs overall
+          const liftPercent = overallAvgRoas > 0 
+            ? ((avgRoas - overallAvgRoas) / overallAvgRoas) * 100 
+            : 0;
+
+          // Simple confidence based on sample size and variance
+          const variance = withRoas.reduce((sum, i) => sum + Math.pow(i.roas - avgRoas, 2), 0) / withRoas.length;
+          const stdDev = Math.sqrt(variance);
+          const coeffOfVar = avgRoas > 0 ? stdDev / avgRoas : 1;
+          const confidenceLevel = Math.min(100, (withRoas.length * 10) * (1 - Math.min(coeffOfVar, 0.9)));
+
+          // Generate insight text
+          const direction = liftPercent > 0 ? 'higher' : 'lower';
+          const insightText = `Creatives with "${value}" ${attr.name.replace('_', ' ')} show ${Math.abs(liftPercent).toFixed(0)}% ${direction} ROAS than average`;
+          
+          // Determine if actionable
+          const isActionable = Math.abs(liftPercent) >= 15 && confidenceLevel >= 50 && withRoas.length >= 5;
+          
+          // Generate recommended action
+          let recommendedAction = null;
+          if (isActionable) {
+            if (liftPercent > 20) {
+              recommendedAction = `Consider increasing spend on "${value}" ${attr.name.replace('_', ' ')} creatives`;
+            } else if (liftPercent < -20) {
+              recommendedAction = `Consider reducing spend on "${value}" ${attr.name.replace('_', ' ')} creatives or testing alternatives`;
+            }
+          }
+
+          // Upsert correlation
+          const { error: corrError } = await supabase
+            .from('creative_performance_correlations')
+            .upsert({
+              organization_id: orgId,
+              correlation_type: attr.type,
+              attribute_name: attr.name,
+              attribute_value: value,
+              correlated_metric: 'roas',
+              correlation_coefficient: liftPercent / 100,
+              sample_size: withRoas.length,
+              confidence_level: confidenceLevel,
+              p_value: null,
+              insight_text: insightText,
+              is_actionable: isActionable,
+              recommended_action: recommendedAction,
+              metric_avg_with_attribute: avgRoas,
+              metric_avg_without_attribute: overallAvgRoas,
+              lift_percentage: liftPercent,
+              detected_at: new Date().toISOString(),
+            }, {
+              onConflict: 'organization_id,correlation_type,attribute_name,attribute_value,correlated_metric',
+              ignoreDuplicates: false,
+            });
+
+          if (!corrError) {
+            correlationsCreated++;
+          } else {
+            console.error('Error upserting correlation:', corrError);
+          }
+        }
+      }
+
+      // Video-specific correlations (thruplay rate vs ROAS)
+      const videoCreatives = metaCreatives.filter(c => 
+        c.creative_type === 'video' && 
+        c.video_thruplay && 
+        c.impressions > 0 && 
+        c.roas && c.roas > 0
+      );
+
+      if (videoCreatives.length >= 5) {
+        // Calculate thruplay rate buckets
+        const buckets = {
+          low: videoCreatives.filter(c => c.video_thruplay / c.impressions < 0.25),
+          medium: videoCreatives.filter(c => c.video_thruplay / c.impressions >= 0.25 && c.video_thruplay / c.impressions < 0.5),
+          high: videoCreatives.filter(c => c.video_thruplay / c.impressions >= 0.5),
+        };
+
+        const overallVideoRoas = videoCreatives.reduce((sum, c) => sum + c.roas, 0) / videoCreatives.length;
+
+        for (const [bucket, items] of Object.entries(buckets)) {
+          if (items.length < 2) continue;
+
+          const avgRoas = items.reduce((sum, i) => sum + i.roas, 0) / items.length;
+          const liftPercent = overallVideoRoas > 0 
+            ? ((avgRoas - overallVideoRoas) / overallVideoRoas) * 100 
+            : 0;
+
+          const { error: corrError } = await supabase
+            .from('creative_performance_correlations')
+            .upsert({
+              organization_id: orgId,
+              correlation_type: 'video_retention',
+              attribute_name: 'thruplay_rate',
+              attribute_value: bucket,
+              correlated_metric: 'roas',
+              correlation_coefficient: liftPercent / 100,
+              sample_size: items.length,
+              confidence_level: Math.min(100, items.length * 15),
+              insight_text: `Videos with ${bucket} retention (${bucket === 'high' ? '>50%' : bucket === 'medium' ? '25-50%' : '<25%'} thruplay) show ${Math.abs(liftPercent).toFixed(0)}% ${liftPercent > 0 ? 'higher' : 'lower'} ROAS`,
+              is_actionable: Math.abs(liftPercent) >= 20 && items.length >= 3,
+              recommended_action: liftPercent > 20 ? 'Prioritize videos with strong early engagement hooks' : null,
+              metric_avg_with_attribute: avgRoas,
+              metric_avg_without_attribute: overallVideoRoas,
+              lift_percentage: liftPercent,
+              detected_at: new Date().toISOString(),
+            }, {
+              onConflict: 'organization_id,correlation_type,attribute_name,attribute_value,correlated_metric',
+              ignoreDuplicates: false,
+            });
+
+          if (!corrError) correlationsCreated++;
+        }
+      }
+    }
+
+    console.log(`Creative learnings calculation complete. Org learnings: ${orgLearnings}, Global learnings: ${globalLearnings}, Correlations: ${correlationsCreated}`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         org_learnings: orgLearnings,
         global_learnings: globalLearnings,
+        correlations_created: correlationsCreated,
         total: orgLearnings + globalLearnings,
-        message: `Calculated ${orgLearnings + globalLearnings} creative performance learnings` 
+        message: `Calculated ${orgLearnings + globalLearnings} creative performance learnings and ${correlationsCreated} correlations` 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
