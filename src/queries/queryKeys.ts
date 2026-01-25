@@ -109,6 +109,23 @@ export const adPerformanceKeys = {
     [...adPerformanceKeys.all, 'list', params] as const,
 };
 
+// Standardized ActBlue query keys - single source of truth for cache management
+export const actblueKeys = {
+  all: ['actblue'] as const,
+  dailyRollup: (orgId: string, startDate: string, endDate: string) =>
+    [...actblueKeys.all, 'daily-rollup', orgId, startDate, endDate] as const,
+  periodSummary: (orgId: string, startDate: string, endDate: string) =>
+    [...actblueKeys.all, 'period-summary', orgId, startDate, endDate] as const,
+  filteredRollup: (
+    orgId: string,
+    startDate: string,
+    endDate: string,
+    campaignId?: string | null,
+    creativeId?: string | null
+  ) =>
+    [...actblueKeys.all, 'filtered-rollup', orgId, startDate, endDate, campaignId, creativeId] as const,
+};
+
 // Unified queryKeys object for backwards compatibility
 export const queryKeys = {
   dashboard: dashboardKeys,
@@ -123,4 +140,5 @@ export const queryKeys = {
   sync: syncKeys,
   kpis: kpiKeys,
   adPerformance: adPerformanceKeys,
+  actblue: actblueKeys,
 };

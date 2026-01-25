@@ -6,6 +6,7 @@ import { format, parseISO, eachDayOfInterval } from "date-fns";
 import { formatInTimeZone, toZonedTime, fromZonedTime } from "date-fns-tz";
 import { logger } from "@/lib/logger";
 import { DEFAULT_ORG_TIMEZONE } from "@/lib/metricDefinitions";
+import { fetchDailyRollup, fetchPeriodSummary } from "@/lib/actblueRpcClient";
 import type { DailyRollupRow, PeriodSummary } from "./useActBlueDailyRollupQuery";
 
 /**
@@ -110,108 +111,6 @@ interface DonationMetricsResult {
   recentDonations: DonationRow[];
 }
 
-/**
- * Fetch canonical ActBlue daily rollup for timezone-aware metrics
- */
-async function fetchCanonicalDailyRollup(
-  organizationId: string,
-  startDate: string,
-  endDate: string
-): Promise<DailyRollupRow[]> {
-  const { data, error } = await (supabase as any).rpc('get_actblue_daily_rollup', {
-    p_organization_id: organizationId,
-    p_start_date: startDate,
-    p_end_date: endDate,
-  });
-
-  if (error) {
-    logger.error('Failed to fetch canonical ActBlue daily rollup', { error, organizationId });
-    throw new Error(`Failed to fetch daily rollup: ${error.message}`);
-  }
-
-  return (data || []).map((row: any) => {
-    // Field names match actual RPC response: gross_raised, net_raised, transaction_count, etc.
-    const grossDonations = Number(row.gross_raised) || 0;
-    const netDonations = Number(row.net_raised) || 0;
-    const donationCount = Number(row.transaction_count) || 0;
-    const recurringCount = Number(row.recurring_count) || 0;
-    const recurringRevenue = Number(row.recurring_amount) || 0;
-    const totalFees = grossDonations - netDonations; // Calculate fees as difference
-    const refundCount = Number(row.refund_count) || 0;
-    const refundAmount = Number(row.refund_amount) || 0;
-
-    return {
-      day: row.day,
-      gross_raised: grossDonations,
-      net_raised: netDonations,
-      refunds: refundAmount,
-      net_revenue: netDonations - refundAmount,
-      total_fees: totalFees,
-      donation_count: donationCount,
-      unique_donors: Number(row.unique_donors) || 0,
-      refund_count: refundCount,
-      recurring_count: recurringCount,
-      one_time_count: donationCount - recurringCount,
-      recurring_revenue: recurringRevenue,
-      one_time_revenue: netDonations - recurringRevenue,
-      fee_percentage: grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0,
-      refund_rate: donationCount > 0 ? (refundCount / donationCount) * 100 : 0,
-    };
-  });
-}
-
-/**
- * Fetch canonical ActBlue period summary for timezone-aware metrics
- */
-async function fetchCanonicalPeriodSummary(
-  organizationId: string,
-  startDate: string,
-  endDate: string
-): Promise<PeriodSummary> {
-  const { data, error } = await (supabase as any).rpc('get_actblue_period_summary', {
-    p_organization_id: organizationId,
-    p_start_date: startDate,
-    p_end_date: endDate,
-  });
-
-  if (error) {
-    logger.error('Failed to fetch canonical ActBlue period summary', { error, organizationId });
-    throw new Error(`Failed to fetch period summary: ${error.message}`);
-  }
-
-  // Field names match actual RPC response: gross_raised, net_raised, transaction_count, etc.
-  const row = data?.[0] || {};
-  const grossDonations = Number(row.gross_raised) || 0;
-  const netDonations = Number(row.net_raised) || 0;
-  const donationCount = Number(row.transaction_count) || 0;
-  const recurringCount = Number(row.recurring_count) || 0;
-  const recurringRevenue = Number(row.recurring_amount) || 0;
-  const totalFees = grossDonations - netDonations; // Calculate fees as difference
-  const refundCount = Number(row.refund_count) || 0;
-  const refundAmount = Number(row.refund_amount) || 0;
-  const uniqueDonors = Number(row.unique_donors) || 0;
-  const avgDonation = Number(row.avg_donation) || 0;
-
-  return {
-    gross_raised: grossDonations,
-    net_raised: netDonations,
-    refunds: refundAmount,
-    net_revenue: netDonations - refundAmount,
-    total_fees: totalFees,
-    donation_count: donationCount,
-    unique_donors_approx: uniqueDonors,
-    refund_count: refundCount,
-    recurring_count: recurringCount,
-    one_time_count: donationCount - recurringCount,
-    recurring_revenue: recurringRevenue,
-    one_time_revenue: netDonations - recurringRevenue,
-    avg_fee_percentage: grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0,
-    refund_rate: donationCount > 0 ? (refundCount / donationCount) * 100 : 0,
-    avg_donation: avgDonation || (grossDonations / (donationCount || 1)),
-    days_with_donations: 0, // Not provided by RPC
-  };
-}
-
 async function fetchDonationMetrics(
   organizationId: string,
   startDate: string,
@@ -236,8 +135,8 @@ async function fetchDonationMetrics(
     canonicalPeriodSummary,
     { data: allTransactions, error },
   ] = await Promise.all([
-    fetchCanonicalDailyRollup(organizationId, startDate, endDate),
-    fetchCanonicalPeriodSummary(organizationId, startDate, endDate),
+    fetchDailyRollup(organizationId, startDate, endDate),
+    fetchPeriodSummary(organizationId, startDate, endDate),
     // Raw transactions for donor details, top donors, by source
     // NOW USES TIMEZONE-AWARE BOUNDARIES to match canonical rollup
     (supabase as any)
@@ -429,44 +328,15 @@ export function useDonationMetricsQuery(
     endDate: endDate || storeRange.endDate,
   };
 
-  // ========== DIAGNOSTIC LOGGING ==========
-  console.log('[useDonationMetricsQuery] Hook called with:', {
-    organizationId,
-    propStartDate: startDate,
-    propEndDate: endDate,
-    storeStartDate: storeRange.startDate,
-    storeEndDate: storeRange.endDate,
-    effectiveStartDate: effectiveRange.startDate,
-    effectiveEndDate: effectiveRange.endDate,
-    queryEnabled: !!organizationId,
-    queryKey: donationKeys.metrics(organizationId || "", effectiveRange),
-  });
+  // Removed diagnostic logging - using shared actblueRpcClient
 
   return useQuery({
     queryKey: donationKeys.metrics(organizationId || "", effectiveRange),
-    queryFn: async () => {
-      console.log('[useDonationMetricsQuery] queryFn EXECUTING - making RPC calls now:', {
-        organizationId,
-        startDate: effectiveRange.startDate,
-        endDate: effectiveRange.endDate,
-      });
-      try {
-        const result = await fetchDonationMetrics(organizationId!, effectiveRange.startDate, effectiveRange.endDate);
-        console.log('[useDonationMetricsQuery] queryFn SUCCESS:', {
-          metricsTotal: result.metrics.totalDonations,
-          grossRaised: result.metrics.totalRaised,
-          timeSeriesLength: result.timeSeries.length,
-        });
-        return result;
-      } catch (err) {
-        console.error('[useDonationMetricsQuery] queryFn ERROR:', err);
-        throw err;
-      }
-    },
+    queryFn: () => fetchDonationMetrics(organizationId!, effectiveRange.startDate, effectiveRange.endDate),
     enabled: !!organizationId,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    retry: false, // Fail fast instead of infinite skeleton on errors
+    retry: false,
   });
 }
 
