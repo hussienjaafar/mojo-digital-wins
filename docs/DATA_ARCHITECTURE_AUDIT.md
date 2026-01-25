@@ -1,9 +1,9 @@
-# Data Architecture Audit Report (v3 - Post Remediation)
+# Data Architecture Audit Report (v4 - Final Verification)
 
 **Repo:** mojo-digital-wins
 **Branch:** docs/dashboard-architecture
 **Audit Date:** 2026-01-25 (Final)
-**Last Pull:** 49fe7e5 (Remediation complete)
+**Last Pull:** 66e0640 (Latest)
 **Auditor:** Claude (Data Architecture Specialist)
 **Remediation Report:** [DATA_ARCHITECTURE_REMEDIATION_REPORT.md](./DATA_ARCHITECTURE_REMEDIATION_REPORT.md)
 
@@ -23,6 +23,21 @@ All critical (P0) and high-priority (P1) issues identified in the original audit
 | P1 | Legacy compatibility hook | **RESOLVED** | Removed `useChannelSummariesLegacy` |
 | P1 | RPC parameter inconsistency | **RESOLVED** | Standardized on `p_use_utc=false` (Eastern Time) |
 | P2 | Meta tables clarified | **CLOSED** | Documented: `meta_ad_metrics` = canonical |
+
+### Latest Updates (66e0640)
+
+| Migration/File | Change | Purpose |
+|----------------|--------|---------|
+| `20260125224435` | Fixed RPC type mismatch | Changed `campaign_id`/`creative_id` from UUID to TEXT |
+| `20260125225147` | Added expression index | Performance optimization for ET timezone queries |
+| `useDashboardMetricsV2.ts` | Added `useMemo` | Performance optimization |
+| Chart components | Enhanced | Improved rendering |
+
+### Dead Code Identified
+
+| File | Status | Notes |
+|------|--------|-------|
+| `src/components/client/ClientDashboardMetrics.tsx` | **DEAD CODE** | Not imported anywhere, uses deprecated hook |
 
 ### Files Added/Changed in Remediation
 
@@ -156,11 +171,12 @@ All query hooks now import from shared client:
 
 | ID | Issue | Priority | Effort | Notes |
 |----|-------|----------|--------|-------|
+| **NEW** | Delete dead `ClientDashboardMetrics.tsx` | P2 | 15m | Component not imported anywhere, uses deprecated hook |
 | R6 | Backfill Edge Function Audit | P2 | 2h | 33+ `backfill-*` functions need review |
 | MR-2 | Unified Donor Segment RPC | P2 | 4h | Consolidate 2-stage fetch in `useDonorSegmentQuery` |
 | N3 | Session Table TTL Cleanup | P3 | 1h | Verify cron job for `user_sessions` |
 | LA-2 | Materialized Channel Summary | P3 | 8h | `channel_summary_daily` view for cross-channel queries |
-| - | Remove deprecated hook | P3 | 1h | Delete `useClientDashboardMetricsQuery` after confirming no consumers |
+| - | Remove deprecated hook | P3 | 1h | Delete `useClientDashboardMetricsQuery` after dead code removal |
 
 ---
 
