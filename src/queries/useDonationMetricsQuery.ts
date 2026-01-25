@@ -1,40 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { donationKeys } from "./queryKeys";
+import { actblueKeys } from "./queryKeys";
 import { useDateRange } from "@/stores/dashboardStore";
 import { format, parseISO, eachDayOfInterval } from "date-fns";
-import { formatInTimeZone, toZonedTime, fromZonedTime } from "date-fns-tz";
+import { formatInTimeZone } from "date-fns-tz";
 import { logger } from "@/lib/logger";
 import { DEFAULT_ORG_TIMEZONE } from "@/lib/metricDefinitions";
 import { fetchDailyRollup, fetchPeriodSummary } from "@/lib/actblueRpcClient";
 import type { DailyRollupRow, PeriodSummary } from "./useActBlueDailyRollupQuery";
 
-/**
- * Convert a date string (e.g., '2026-01-22') to UTC timestamp boundaries
- * representing midnight-to-midnight in the org's local timezone.
- * 
- * For America/New_York:
- * - '2026-01-22' → start: '2026-01-22T05:00:00.000Z' (midnight ET = 5am UTC)
- * - '2026-01-22' → end: '2026-01-23T04:59:59.999Z' (11:59pm ET)
- */
-function getTimezoneAwareBounds(
-  startDate: string,
-  endDate: string,
-  timezone: string
-): { startISO: string; endISO: string } {
-  // Parse date strings as local dates in the org's timezone
-  const startLocal = toZonedTime(new Date(`${startDate}T00:00:00`), timezone);
-  const endLocal = toZonedTime(new Date(`${endDate}T23:59:59.999`), timezone);
-  
-  // Convert back to UTC for the database query
-  const startUTC = fromZonedTime(new Date(`${startDate}T00:00:00`), timezone);
-  const endUTC = fromZonedTime(new Date(`${endDate}T23:59:59.999`), timezone);
-  
-  return {
-    startISO: startUTC.toISOString(),
-    endISO: endUTC.toISOString(),
-  };
-}
+// NOTE: Timezone conversion is now handled server-side by RPCs using p_use_utc=false
+// All date strings are interpreted as Eastern Time boundaries by the database
 /**
  * Format a timestamp in org timezone for display purposes.
  * @param dateStr ISO timestamp string
@@ -116,19 +92,11 @@ async function fetchDonationMetrics(
   startDate: string,
   endDate: string
 ): Promise<DonationMetricsResult> {
-  // Convert date strings to timezone-aware UTC boundaries
-  // This ensures raw transaction fetches match the canonical rollup day boundaries
-  const { startISO, endISO } = getTimezoneAwareBounds(startDate, endDate, DEFAULT_ORG_TIMEZONE);
-  
-  logger.debug('Fetching donation metrics with timezone-aware bounds', {
-    startDate,
-    endDate,
-    startISO,
-    endISO,
-    timezone: DEFAULT_ORG_TIMEZONE,
-  });
+  // Timezone conversion is now handled server-side by RPCs (p_use_utc=false)
+  // Date strings are interpreted as Eastern Time boundaries by the database
+  logger.debug('Fetching donation metrics', { startDate, endDate, timezone: DEFAULT_ORG_TIMEZONE });
 
-  // Fetch CANONICAL ROLLUP for summary metrics and time series (timezone-aware)
+  // Fetch CANONICAL ROLLUP for summary metrics and time series (timezone-aware via RPC)
   // AND raw transactions for donor details (top donors, recent donations, by source)
   const [
     canonicalDailyRollup,
@@ -137,14 +105,14 @@ async function fetchDonationMetrics(
   ] = await Promise.all([
     fetchDailyRollup(organizationId, startDate, endDate),
     fetchPeriodSummary(organizationId, startDate, endDate),
-    // Raw transactions for donor details, top donors, by source
-    // NOW USES TIMEZONE-AWARE BOUNDARIES to match canonical rollup
+    // Raw transactions for donor details - date filtering uses yyyy-MM-dd bounds
+    // Database will interpret these as ET boundaries when comparing timestamptz
     (supabase as any)
       .from("actblue_transactions_secure")
       .select("amount, net_amount, donor_email, donor_name, first_name, last_name, state, city, is_recurring, transaction_type, transaction_date, refcode, source_campaign, transaction_id, id")
       .eq("organization_id", organizationId)
-      .gte("transaction_date", startISO)
-      .lte("transaction_date", endISO)
+      .gte("transaction_date", `${startDate}T00:00:00-05:00`) // ET midnight start
+      .lt("transaction_date", `${endDate}T23:59:59.999-05:00`) // ET midnight end
       .order("transaction_date", { ascending: false })
       .limit(2000),
   ]);
@@ -328,10 +296,9 @@ export function useDonationMetricsQuery(
     endDate: endDate || storeRange.endDate,
   };
 
-  // Removed diagnostic logging - using shared actblueRpcClient
-
   return useQuery({
-    queryKey: donationKeys.metrics(organizationId || "", effectiveRange),
+    // Use unified actblueKeys for better cache sharing across hooks
+    queryKey: actblueKeys.periodSummary(organizationId || "", effectiveRange.startDate, effectiveRange.endDate),
     queryFn: () => fetchDonationMetrics(organizationId!, effectiveRange.startDate, effectiveRange.endDate),
     enabled: !!organizationId,
     staleTime: 2 * 60 * 1000,
@@ -355,7 +322,8 @@ export function useDonationTimeSeriesQuery(
   };
 
   return useQuery({
-    queryKey: donationKeys.timeSeries(organizationId || "", effectiveRange),
+    // Use unified actblueKeys for cache sharing
+    queryKey: actblueKeys.dailyRollup(organizationId || "", effectiveRange.startDate, effectiveRange.endDate),
     queryFn: async () => {
       const result = await fetchDonationMetrics(
         organizationId!,
