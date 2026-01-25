@@ -20,6 +20,7 @@ import { CreativeOptimizationScorecard } from "@/components/client/CreativeOptim
 import { AIInsightsBanner } from "@/components/client/AIInsightsBanner";
 import { WinningFormulasGrid } from "@/components/client/WinningFormulasGrid";
 import { AdFatigueMonitor } from "@/components/client/AdFatigueMonitor";
+import { IntelligenceBackfillPanel } from "@/components/client/IntelligenceBackfillPanel";
 import { useCreativeCorrelations, useAdFatigueAlerts, useRefreshCorrelations } from "@/hooks/useCreativeCorrelations";
 import {
   Sparkles,
@@ -503,15 +504,28 @@ export default function ClientCreativeIntelligence() {
             {/* COMMAND CENTER VIEW */}
             {activeView === "command" && (
               <>
+                {/* Intelligence Engine Status */}
+                <motion.section variants={sectionVariants}>
+                  <IntelligenceBackfillPanel
+                    organizationId={organizationId || ''}
+                    correlationsCount={correlations.length}
+                    fatigueAlertsCount={fatigueAlerts.length}
+                    analyzedCreativesCount={stats?.analyzed || 0}
+                    totalCreativesCount={stats?.total || 1}
+                    onComplete={() => {
+                      loadCreatives();
+                      refreshCorrelations.mutate();
+                    }}
+                  />
+                </motion.section>
+
                 {/* AI Insights Banner */}
-                {correlations.length > 0 && (
-                  <motion.section variants={sectionVariants}>
-                    <AIInsightsBanner 
-                      correlations={correlations}
-                      onDismiss={(id) => console.log('Dismissed:', id)}
-                    />
-                  </motion.section>
-                )}
+                <motion.section variants={sectionVariants}>
+                  <AIInsightsBanner 
+                    correlations={correlations}
+                    onDismiss={(id) => console.log('Dismissed:', id)}
+                  />
+                </motion.section>
 
                 {/* Optimization Scorecard */}
                 <motion.section variants={sectionVariants}>
