@@ -20,6 +20,7 @@ import { CreativeOptimizationScorecard } from "@/components/client/CreativeOptim
 import { AIInsightsBanner } from "@/components/client/AIInsightsBanner";
 import { WinningFormulasGrid } from "@/components/client/WinningFormulasGrid";
 import { AdFatigueMonitor } from "@/components/client/AdFatigueMonitor";
+import { MotivationInsights } from "@/components/client/MotivationInsights";
 import { IntelligenceBackfillPanel } from "@/components/client/IntelligenceBackfillPanel";
 import { useCreativeCorrelations, useAdFatigueAlerts, useRefreshCorrelations } from "@/hooks/useCreativeCorrelations";
 import {
@@ -553,6 +554,18 @@ export default function ClientCreativeIntelligence() {
                       />
                     </V3CardContent>
                   </V3Card>
+                </motion.section>
+
+                {/* Motivation Insights - Deep Donor Psychology */}
+                <motion.section variants={sectionVariants}>
+                  <V3SectionHeader
+                    title="Donor Psychology Insights"
+                    subtitle="Specific pain points, values, and emotions driving donations"
+                    icon={Target}
+                    size="sm"
+                    className="mb-4"
+                  />
+                  <MotivationInsights correlations={correlations} />
                 </motion.section>
 
                 {/* Two-column layout for Winning Formulas + Fatigue Monitor */}

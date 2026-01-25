@@ -54,24 +54,31 @@ export function IntelligenceBackfillPanel({
     
     try {
       // Phase 1: Aggregate metrics
-      setStatus({ phase: "Aggregating Metrics", progress: 15, message: "Updating creative-level metrics..." });
+      setStatus({ phase: "Aggregating Metrics", progress: 10, message: "Updating creative-level metrics..." });
       await supabase.functions.invoke('aggregate-creative-metrics', {
         body: { organization_id: organizationId }
       });
 
-      // Phase 2: AI Analysis backfill
-      setStatus({ phase: "AI Analysis", progress: 35, message: "Analyzing unprocessed creatives..." });
-      const { data: analysisResult } = await supabase.functions.invoke('backfill-creative-analysis', {
+      // Phase 2: AI Analysis backfill (basic topics/tone)
+      setStatus({ phase: "AI Analysis", progress: 25, message: "Analyzing unprocessed creatives..." });
+      await supabase.functions.invoke('backfill-creative-analysis', {
         body: { organization_id: organizationId, batch_size: 20 }
       });
       
-      // Phase 3: Calculate correlations
-      setStatus({ phase: "Correlation Engine", progress: 60, message: "Detecting performance patterns..." });
+      // Phase 3: Deep Motivation Analysis (pain points, values, triggers)
+      setStatus({ phase: "Motivation Analysis", progress: 45, message: "Extracting donor psychology insights..." });
+      const { data: motivationResult } = await supabase.functions.invoke('analyze-creative-motivation', {
+        body: { organization_id: organizationId, batch_size: 30, include_transcripts: true }
+      });
+      console.log('Motivation analysis:', motivationResult);
+
+      // Phase 4: Calculate correlations (now includes motivation-based correlations)
+      setStatus({ phase: "Correlation Engine", progress: 65, message: "Detecting performance patterns..." });
       await supabase.functions.invoke('calculate-creative-learnings', {
         body: { organization_id: organizationId, period_days: 180 }
       });
 
-      // Phase 4: Detect fatigue
+      // Phase 5: Detect fatigue
       setStatus({ phase: "Fatigue Detection", progress: 85, message: "Analyzing ad health trends..." });
       await supabase.functions.invoke('detect-ad-fatigue', {
         body: { organization_id: organizationId, min_spend: 50, decline_threshold: 15 }
