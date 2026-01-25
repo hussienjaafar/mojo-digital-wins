@@ -13,9 +13,6 @@ import { CreativePerformanceMatrix } from "@/components/client/CreativePerforman
 import { CreativeRecommendations } from "@/components/client/CreativeRecommendations";
 import { CreativeScorecard } from "@/components/client/CreativeScorecard";
 import { CreativeDataImport } from "@/components/client/CreativeDataImport";
-import { CreativeVariationTable } from "@/components/client/CreativeVariationTable";
-import { VariationWinnerCard } from "@/components/client/VariationWinnerCard";
-import { useCreativeVariationsQuery } from "@/queries/useCreativeVariationsQuery";
 import { DashboardTopSection } from "@/components/client/DashboardTopSection";
 import type { HeroKpiData } from "@/components/client/HeroKpiGrid";
 import {
@@ -31,7 +28,6 @@ import {
   Target,
   RefreshCw,
   AlertTriangle,
-  Layers,
   ChevronRight,
   LucideIcon,
 } from "lucide-react";
@@ -294,13 +290,9 @@ export default function ClientCreativeIntelligence() {
   
   // Collapsible section state
   const [expandedSections, setExpandedSections] = useState({
-    variations: true,
     gallery: true,
     analysis: false,
   });
-
-  // Fetch creative variations
-  const { data: variations = [], isLoading: variationsLoading } = useCreativeVariationsQuery(organizationId);
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({
@@ -481,13 +473,6 @@ export default function ClientCreativeIntelligence() {
         accent: 'default' as const,
       },
       { 
-        kpiKey: 'variations', 
-        label: 'Text Variations', 
-        value: variations.length.toLocaleString(), 
-        icon: Layers,
-        accent: 'blue' as const,
-      },
-      { 
         kpiKey: 'avgRoas', 
         label: 'Avg ROAS', 
         value: `${stats.avgRoas.toFixed(2)}x`, 
@@ -516,7 +501,7 @@ export default function ClientCreativeIntelligence() {
         accent: 'green' as const,
       },
     ];
-  }, [stats, variations.length]);
+  }, [stats]);
 
   // Controls for header
   const headerControls = (
@@ -672,26 +657,6 @@ export default function ClientCreativeIntelligence() {
                 </V3Card>
               </motion.section>
             )}
-
-            {/* Creative Variations Section - Collapsible */}
-            <motion.section variants={sectionVariants}>
-              <CollapsibleSection
-                title="Copy Variation Testing"
-                subtitle="Performance comparison of text, headline, and description variations"
-                icon={Layers}
-                accent="purple"
-                isExpanded={expandedSections.variations}
-                onToggle={() => toggleSection('variations')}
-              >
-                <div className="space-y-6">
-                  <VariationWinnerCard variations={variations} />
-                  <CreativeVariationTable 
-                    variations={variations} 
-                    isLoading={variationsLoading}
-                  />
-                </div>
-              </CollapsibleSection>
-            </motion.section>
 
             {/* Creative Gallery Section - Collapsible */}
             <motion.section variants={sectionVariants}>
