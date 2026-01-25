@@ -401,6 +401,94 @@ export type Database = {
           },
         ]
       }
+      ad_fatigue_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          ad_id: string
+          alert_severity: string | null
+          baseline_ctr: number | null
+          created_at: string | null
+          creative_id: string | null
+          current_ctr: number | null
+          days_declining: number | null
+          decline_percent: number | null
+          decline_start_date: string | null
+          id: string
+          is_acknowledged: boolean | null
+          organization_id: string | null
+          predicted_exhaustion_date: string | null
+          resolution_action: string | null
+          resolved_at: string | null
+          total_spend_at_detection: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          ad_id: string
+          alert_severity?: string | null
+          baseline_ctr?: number | null
+          created_at?: string | null
+          creative_id?: string | null
+          current_ctr?: number | null
+          days_declining?: number | null
+          decline_percent?: number | null
+          decline_start_date?: string | null
+          id?: string
+          is_acknowledged?: boolean | null
+          organization_id?: string | null
+          predicted_exhaustion_date?: string | null
+          resolution_action?: string | null
+          resolved_at?: string | null
+          total_spend_at_detection?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          ad_id?: string
+          alert_severity?: string | null
+          baseline_ctr?: number | null
+          created_at?: string | null
+          creative_id?: string | null
+          current_ctr?: number | null
+          days_declining?: number | null
+          decline_percent?: number | null
+          decline_start_date?: string | null
+          id?: string
+          is_acknowledged?: boolean | null
+          organization_id?: string | null
+          predicted_exhaustion_date?: string | null
+          resolution_action?: string | null
+          resolved_at?: string | null
+          total_spend_at_detection?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_fatigue_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_fatigue_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "ad_fatigue_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       admin_activity_alerts: {
         Row: {
           alert_type: string
@@ -2856,6 +2944,94 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles_secure"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      creative_performance_correlations: {
+        Row: {
+          attribute_name: string
+          attribute_value: string
+          confidence_level: number | null
+          correlated_metric: string
+          correlation_coefficient: number | null
+          correlation_type: string
+          created_at: string | null
+          detected_at: string | null
+          id: string
+          insight_text: string | null
+          is_actionable: boolean | null
+          lift_percentage: number | null
+          metric_avg_with_attribute: number | null
+          metric_avg_without_attribute: number | null
+          organization_id: string | null
+          p_value: number | null
+          recommended_action: string | null
+          sample_size: number
+          updated_at: string | null
+        }
+        Insert: {
+          attribute_name: string
+          attribute_value: string
+          confidence_level?: number | null
+          correlated_metric: string
+          correlation_coefficient?: number | null
+          correlation_type: string
+          created_at?: string | null
+          detected_at?: string | null
+          id?: string
+          insight_text?: string | null
+          is_actionable?: boolean | null
+          lift_percentage?: number | null
+          metric_avg_with_attribute?: number | null
+          metric_avg_without_attribute?: number | null
+          organization_id?: string | null
+          p_value?: number | null
+          recommended_action?: string | null
+          sample_size?: number
+          updated_at?: string | null
+        }
+        Update: {
+          attribute_name?: string
+          attribute_value?: string
+          confidence_level?: number | null
+          correlated_metric?: string
+          correlation_coefficient?: number | null
+          correlation_type?: string
+          created_at?: string | null
+          detected_at?: string | null
+          id?: string
+          insight_text?: string | null
+          is_actionable?: boolean | null
+          lift_percentage?: number | null
+          metric_avg_with_attribute?: number | null
+          metric_avg_without_attribute?: number | null
+          organization_id?: string | null
+          p_value?: number | null
+          recommended_action?: string | null
+          sample_size?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_performance_correlations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_performance_correlations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "creative_performance_correlations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
