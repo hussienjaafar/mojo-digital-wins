@@ -360,42 +360,44 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
     return null;
   };
 
-  // Show loading state ONLY for donation data - PII is non-blocking (defaults to masked)
-  if (isLoading) {
+  // Determine content to render - but keep drawer always mounted outside conditionals
+  const renderContent = () => {
+    // Show loading state ONLY for donation data - PII is non-blocking (defaults to masked)
+    if (isLoading) {
+      return (
+        <div className="space-y-6">
+          <V3LoadingState variant="kpi-grid" count={4} />
+          <V3LoadingState variant="kpi-grid" count={4} />
+          <V3LoadingState variant="chart" height={280} />
+          <V3LoadingState variant="table" />
+        </div>
+      );
+    }
+
+    // Show error state
+    if (error) {
+      return (
+        <V3ErrorState
+          title="Failed to load donation data"
+          message={error instanceof Error ? error.message : 'An error occurred'}
+          onRetry={() => refetch()}
+        />
+      );
+    }
+
+    // Show empty state if no data
+    if (!metrics || metrics.totalDonations === 0) {
+      return (
+        <V3EmptyState
+          icon={DollarSign}
+          title="No donations found"
+          description="Transactions will appear here once donations are received through ActBlue."
+        />
+      );
+    }
+
     return (
       <div className="space-y-6">
-        <V3LoadingState variant="kpi-grid" count={4} />
-        <V3LoadingState variant="kpi-grid" count={4} />
-        <V3LoadingState variant="chart" height={280} />
-        <V3LoadingState variant="table" />
-      </div>
-    );
-  }
-
-  // Show error state
-  if (error) {
-    return (
-      <V3ErrorState
-        title="Failed to load donation data"
-        message={error instanceof Error ? error.message : 'An error occurred'}
-        onRetry={() => refetch()}
-      />
-    );
-  }
-
-  // Show empty state if no data
-  if (!metrics || metrics.totalDonations === 0) {
-    return (
-      <V3EmptyState
-        icon={DollarSign}
-        title="No donations found"
-        description="Transactions will appear here once donations are received through ActBlue."
-      />
-    );
-  }
-
-  return (
-    <div className="space-y-6">
       {/* Stale data indicator */}
       {isShowingStaleData && latestDataDate && (
         <V3InsightBadge type="anomaly-high">
@@ -760,14 +762,22 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </V3CardContent>
       </V3Card>
 
-      {/* Centralized Drilldown Drawer - single instance for all KPI cards */}
-      {/* Keep drawer open if we have data, even during loading to prevent flicker */}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      {renderContent()}
+      
+      {/* Centralized Drilldown Drawer - ALWAYS MOUNTED outside conditionals */}
+      {/* This survives loading/error/empty state changes so drawer stays open */}
       <V3KPIDrilldownDrawer
         open={isDrilldownOpen && currentDrilldownData !== null}
         onOpenChange={handleDrawerOpenChange}
         data={currentDrilldownData}
       />
-    </div>
+    </>
   );
 };
 
