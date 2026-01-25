@@ -319,6 +319,17 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
     // Prevent event bubbling to parent containers
     e.stopPropagation();
     
+    console.log('[HeroKpiCard] handleClick:', {
+      kpiKey,
+      expansionMode,
+      isExpandable,
+      hasDrilldownData,
+      isSelected,
+      isDrilldownOpen,
+      drilldownDataExists: !!drilldownData,
+      timeSeriesLength: drilldownData?.timeSeriesData?.length,
+    });
+    
     if (isExpandable && hasDrilldownData) {
       if (expansionMode === "inline") {
         // Inline mode: toggle local expansion state
@@ -356,6 +367,12 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
   };
 
   const handleDrawerOpenChange = (open: boolean) => {
+    console.log('[HeroKpiCard] handleDrawerOpenChange called:', {
+      kpiKey,
+      open,
+      currentIsSelected: isSelected,
+      currentIsDrilldownOpen: isDrilldownOpen,
+    });
     setDrilldownOpen(open);
     if (!open) {
       setSelectedKpi(null);
