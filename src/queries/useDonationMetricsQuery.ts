@@ -130,20 +130,22 @@ async function fetchCanonicalDailyRollup(
   }
 
   return (data || []).map((row: any) => {
-    const grossDonations = Number(row.gross_donations) || 0;
-    const netDonations = Number(row.net_donations) || 0;
-    const donationCount = Number(row.donation_count) || 0;
+    // Field names match actual RPC response: gross_raised, net_raised, transaction_count, etc.
+    const grossDonations = Number(row.gross_raised) || 0;
+    const netDonations = Number(row.net_raised) || 0;
+    const donationCount = Number(row.transaction_count) || 0;
     const recurringCount = Number(row.recurring_count) || 0;
-    const recurringRevenue = Number(row.recurring_revenue) || 0;
-    const totalFees = Number(row.total_fees) || 0;
+    const recurringRevenue = Number(row.recurring_amount) || 0;
+    const totalFees = grossDonations - netDonations; // Calculate fees as difference
     const refundCount = Number(row.refund_count) || 0;
+    const refundAmount = Number(row.refund_amount) || 0;
 
     return {
       day: row.day,
       gross_raised: grossDonations,
       net_raised: netDonations,
-      refunds: Number(row.refunds) || 0,
-      net_revenue: Number(row.net_revenue) || 0,
+      refunds: refundAmount,
+      net_revenue: netDonations - refundAmount,
       total_fees: totalFees,
       donation_count: donationCount,
       unique_donors: Number(row.unique_donors) || 0,
@@ -177,23 +179,27 @@ async function fetchCanonicalPeriodSummary(
     throw new Error(`Failed to fetch period summary: ${error.message}`);
   }
 
+  // Field names match actual RPC response: gross_raised, net_raised, transaction_count, etc.
   const row = data?.[0] || {};
-  const grossDonations = Number(row.total_gross_donations) || 0;
-  const netDonations = Number(row.total_net_donations) || 0;
-  const donationCount = Number(row.total_donation_count) || 0;
-  const recurringCount = Number(row.total_recurring_count) || 0;
-  const recurringRevenue = Number(row.total_recurring_revenue) || 0;
-  const totalFees = Number(row.total_fees) || 0;
-  const refundCount = Number(row.total_refund_count) || 0;
+  const grossDonations = Number(row.gross_raised) || 0;
+  const netDonations = Number(row.net_raised) || 0;
+  const donationCount = Number(row.transaction_count) || 0;
+  const recurringCount = Number(row.recurring_count) || 0;
+  const recurringRevenue = Number(row.recurring_amount) || 0;
+  const totalFees = grossDonations - netDonations; // Calculate fees as difference
+  const refundCount = Number(row.refund_count) || 0;
+  const refundAmount = Number(row.refund_amount) || 0;
+  const uniqueDonors = Number(row.unique_donors) || 0;
+  const avgDonation = Number(row.avg_donation) || 0;
 
   return {
     gross_raised: grossDonations,
     net_raised: netDonations,
-    refunds: Number(row.total_refunds) || 0,
-    net_revenue: Number(row.total_net_revenue) || 0,
+    refunds: refundAmount,
+    net_revenue: netDonations - refundAmount,
     total_fees: totalFees,
     donation_count: donationCount,
-    unique_donors_approx: Number(row.total_unique_donors) || 0,
+    unique_donors_approx: uniqueDonors,
     refund_count: refundCount,
     recurring_count: recurringCount,
     one_time_count: donationCount - recurringCount,
@@ -201,7 +207,7 @@ async function fetchCanonicalPeriodSummary(
     one_time_revenue: netDonations - recurringRevenue,
     avg_fee_percentage: grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0,
     refund_rate: donationCount > 0 ? (refundCount / donationCount) * 100 : 0,
-    avg_donation: Number(row.overall_avg_donation) || 0,
+    avg_donation: avgDonation || (grossDonations / (donationCount || 1)),
     days_with_donations: 0, // Not provided by RPC
   };
 }
