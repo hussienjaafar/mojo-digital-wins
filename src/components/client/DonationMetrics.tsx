@@ -25,6 +25,8 @@ import { useDonationMetricsQuery, DonationRow } from "@/queries";
 import { formatCurrency } from "@/lib/chart-formatters";
 import { getOrgToday } from "@/lib/timezone";
 import { HeroKpiCard } from "@/components/client/HeroKpiCard";
+import { V3KPIDrilldownDrawer, type KPIDrilldownData } from "@/components/v3/V3KPIDrilldownDrawer";
+import { useDashboardStore, useSelectedKpiKey, useIsDrilldownOpen, type KpiKey } from "@/stores/dashboardStore";
 
 type Props = {
   organizationId: string;
@@ -114,7 +116,128 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
     value: d.donations,
   })), [timeSeries]);
 
-  // Attribution pie chart data
+  // ========== Centralized Drawer State ==========
+  const selectedKpiKey = useSelectedKpiKey();
+  const isDrilldownOpen = useIsDrilldownOpen();
+  const { setDrilldownOpen, setSelectedKpiKey } = useDashboardStore();
+
+  // Build drilldown data for each KPI - centralized so only one drawer instance is needed
+  const drilldownDataMap = useMemo((): Partial<Record<KpiKey, KPIDrilldownData>> => {
+    if (!metrics) return {};
+    
+    const seriesColor = "hsl(var(--portal-success))";
+    
+    return {
+      channel_grossRaised: {
+        label: "Gross Raised",
+        value: formatCurrency(metrics.totalRaised, true),
+        icon: DollarSign,
+        description: "Total donations before fees and refunds",
+        timeSeriesData: grossRaisedTrend,
+        timeSeriesConfig: {
+          xAxisKey: "date",
+          series: [{ dataKey: "value", name: "Gross Raised", color: seriesColor, type: "area", areaStyle: { opacity: 0.1 } }],
+        },
+        breakdown: [
+          { label: "One-time", value: formatCurrency(metrics.oneTimeRevenue, true) },
+          { label: "Recurring", value: formatCurrency(metrics.recurringRevenue, true) },
+        ],
+      },
+      channel_uniqueDonors: {
+        label: "Unique Donors",
+        value: metrics.uniqueDonors.toLocaleString(),
+        icon: Users,
+        timeSeriesData: donationCountTrend,
+        timeSeriesConfig: {
+          xAxisKey: "date",
+          series: [{ dataKey: "value", name: "Donors", color: "hsl(var(--portal-accent-blue))", type: "area", areaStyle: { opacity: 0.1 } }],
+        },
+        breakdown: [
+          { label: "One-time", value: metrics.oneTimeCount.toLocaleString() },
+          { label: "Recurring", value: metrics.recurringCount.toLocaleString() },
+        ],
+      },
+      channel_avgDonation: {
+        label: "Avg Donation",
+        value: `$${metrics.averageDonation.toFixed(2)}`,
+        icon: TrendingUp,
+        breakdown: [
+          { label: "One-time Avg", value: formatCurrency(metrics.oneTimeRevenue / (metrics.oneTimeCount || 1), true) },
+          { label: "Recurring Avg", value: formatCurrency(metrics.recurringRevenue / (metrics.recurringCount || 1), true) },
+        ],
+      },
+      channel_recurringPercent: {
+        label: "Recurring",
+        value: `${metrics.totalDonations > 0 ? ((metrics.recurringCount / metrics.totalDonations) * 100).toFixed(0) : 0}%`,
+        icon: Repeat,
+        breakdown: [
+          { label: "Recurring Count", value: metrics.recurringCount.toLocaleString() },
+          { label: "One-time Count", value: metrics.oneTimeCount.toLocaleString() },
+          { label: "Recurring Revenue", value: formatCurrency(metrics.recurringRevenue, true) },
+        ],
+      },
+      channel_netRaisedDonations: {
+        label: "Net Revenue",
+        value: formatCurrency(metrics.netRaised, true),
+        icon: DollarSign,
+        timeSeriesData: grossRaisedTrend,
+        timeSeriesConfig: {
+          xAxisKey: "date",
+          series: [{ dataKey: "value", name: "Revenue", color: seriesColor, type: "area", areaStyle: { opacity: 0.1 } }],
+        },
+        breakdown: [
+          { label: "Gross Raised", value: formatCurrency(metrics.totalRaised, true) },
+          { label: "Fees", value: formatCurrency(metrics.totalRaised - metrics.netRaised, true) },
+          { label: "Refunds", value: formatCurrency(metrics.refundAmount, true) },
+        ],
+      },
+      channel_totalDonations: {
+        label: "Total Donations",
+        value: metrics.totalDonations.toLocaleString(),
+        icon: Receipt,
+        timeSeriesData: donationCountTrend,
+        timeSeriesConfig: {
+          xAxisKey: "date",
+          series: [{ dataKey: "value", name: "Donations", color: "hsl(var(--portal-accent-blue))", type: "area", areaStyle: { opacity: 0.1 } }],
+        },
+        breakdown: [
+          { label: "One-time", value: metrics.oneTimeCount.toLocaleString() },
+          { label: "Recurring", value: metrics.recurringCount.toLocaleString() },
+          { label: "Refunds", value: metrics.refundCount.toLocaleString() },
+        ],
+      },
+      channel_recurringRevenue: {
+        label: "Recurring Revenue",
+        value: formatCurrency(metrics.recurringRevenue, true),
+        icon: Repeat,
+        breakdown: [
+          { label: "Recurring Count", value: metrics.recurringCount.toLocaleString() },
+          { label: "Avg Recurring", value: formatCurrency(metrics.recurringRevenue / (metrics.recurringCount || 1), true) },
+        ],
+      },
+      channel_refundAmount: {
+        label: "Refunds",
+        value: formatCurrency(metrics.refundAmount, true),
+        icon: TrendingUp,
+        breakdown: [
+          { label: "Refund Count", value: metrics.refundCount.toLocaleString() },
+          { label: "Avg Refund", value: formatCurrency(metrics.refundAmount / (metrics.refundCount || 1), true) },
+        ],
+      },
+    };
+  }, [metrics, grossRaisedTrend, donationCountTrend]);
+
+  // Get current drilldown data based on selected KPI
+  const currentDrilldownData = selectedKpiKey ? drilldownDataMap[selectedKpiKey] ?? null : null;
+
+  // Handle drawer close
+  const handleDrawerOpenChange = (open: boolean) => {
+    setDrilldownOpen(open);
+    if (!open) {
+      setSelectedKpiKey(null);
+    }
+  };
+
   const attributionData = useMemo(() => bySource.slice(0, 6).map(s => ({
     name: s.source.length > 15 ? s.source.slice(0, 15) + '...' : s.source,
     fullName: s.source,
@@ -601,6 +724,13 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
           />
         </V3CardContent>
       </V3Card>
+
+      {/* Centralized Drilldown Drawer - single instance for all KPI cards */}
+      <V3KPIDrilldownDrawer
+        open={isDrilldownOpen && currentDrilldownData !== null}
+        onOpenChange={handleDrawerOpenChange}
+        data={currentDrilldownData}
+      />
     </div>
   );
 };

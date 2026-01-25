@@ -169,7 +169,7 @@ export const V3KPIDrilldownDrawer: React.FC<V3KPIDrilldownDrawerProps> = ({
   });
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange} modal={true}>
       <SheetContent className="sm:max-w-lg overflow-y-auto">
         <SheetHeader className="pb-4">
           <div className="flex items-center gap-3">
