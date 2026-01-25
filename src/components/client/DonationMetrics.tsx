@@ -254,7 +254,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
       >
         <motion.div variants={itemVariants}>
           <HeroKpiCard
-            kpiKey="grossRaised"
+            kpiKey="channel_grossRaised"
             icon={DollarSign}
             label="Gross Raised"
             value={formatCurrency(metrics.totalRaised, true)}
@@ -271,7 +271,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </motion.div>
         <motion.div variants={itemVariants}>
           <HeroKpiCard
-            kpiKey="uniqueDonors"
+            kpiKey="channel_uniqueDonors"
             icon={Users}
             label="Unique Donors"
             value={metrics.uniqueDonors.toLocaleString()}
@@ -287,7 +287,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </motion.div>
         <motion.div variants={itemVariants}>
           <HeroKpiCard
-            kpiKey="avgDonation"
+            kpiKey="channel_avgDonation"
             icon={TrendingUp}
             label="Avg Donation"
             value={`$${metrics.averageDonation.toFixed(2)}`}
@@ -301,7 +301,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </motion.div>
         <motion.div variants={itemVariants}>
           <HeroKpiCard
-            kpiKey="recurringPercent"
+            kpiKey="channel_recurringPercent"
             icon={Repeat}
             label="Recurring"
             value={`${metrics.totalDonations > 0 ? ((metrics.recurringCount / metrics.totalDonations) * 100).toFixed(0) : 0}%`}
@@ -326,7 +326,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
       >
         <motion.div variants={itemVariants}>
           <HeroKpiCard
-            kpiKey="netRaisedDonations"
+            kpiKey="channel_netRaisedDonations"
             icon={DollarSign}
             label="Net Revenue"
             value={formatCurrency(metrics.netRaised, true)}
@@ -343,7 +343,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </motion.div>
         <motion.div variants={itemVariants}>
           <HeroKpiCard
-            kpiKey="totalDonations"
+            kpiKey="channel_totalDonations"
             icon={Receipt}
             label="Total Donations"
             value={metrics.totalDonations.toLocaleString()}
@@ -360,7 +360,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </motion.div>
         <motion.div variants={itemVariants}>
           <HeroKpiCard
-            kpiKey="recurringRevenue"
+            kpiKey="channel_recurringRevenue"
             icon={Repeat}
             label="Recurring Revenue"
             value={formatCurrency(metrics.recurringRevenue, true)}
@@ -374,7 +374,7 @@ const DonationMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </motion.div>
         <motion.div variants={itemVariants}>
           <HeroKpiCard
-            kpiKey="refundAmount"
+            kpiKey="channel_refundAmount"
             icon={TrendingUp}
             label="Refunds"
             value={formatCurrency(metrics.refundAmount, true)}
