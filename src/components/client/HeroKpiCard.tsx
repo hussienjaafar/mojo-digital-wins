@@ -315,7 +315,10 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
     };
   }, [label, value, Icon, trend, description, trendData, trendXAxisKey, breakdown, accent, hasDrilldownData, singleDayData]);
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    // Prevent event bubbling to parent containers
+    e.stopPropagation();
+    
     if (isExpandable && hasDrilldownData) {
       if (expansionMode === "inline") {
         // Inline mode: toggle local expansion state
@@ -364,7 +367,8 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      handleClick();
+      // Create a synthetic mouse event for keyboard activation
+      handleClick(e as unknown as React.MouseEvent);
     } else if (e.key === "Escape" && expansionMode === "inline" && isInlineExpanded) {
       e.preventDefault();
       handleInlineClose();
