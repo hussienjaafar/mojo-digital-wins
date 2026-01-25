@@ -1,15 +1,15 @@
 // Query key factories
 export * from "./queryKeys";
 
-// Query hooks
-export * from "./useClientDashboardMetricsQuery";
-export * from "./useMetaAdsMetricsQuery";
-export * from "./useSMSMetricsQuery";
-export * from "./useIntelligenceHubQuery";
-export * from "./useDonorIntelligenceQuery";
-export * from "./useCreativeInsightsQuery";
-export * from "./queryKeys";
-export * from "./useClientDashboardMetricsQuery";
+// Dashboard Types (shared across components)
+export type {
+  DashboardKPIs,
+  DashboardTimeSeriesPoint,
+  ChannelBreakdown,
+  SparklineData,
+  SparklineDataPoint,
+  DashboardMetricsResult,
+} from "@/types/dashboard";
 
 // Dashboard queries
 export { useDashboardKPIsQuery } from "./useDashboardKPIsQuery";
@@ -204,7 +204,7 @@ export {
   type ActBlueMetadata,
   type ActBlueMetricsData,
   type ActBlueMetricsDataWithSparklines,
-  type SparklineData,
+  type SparklineData as ActBlueSparklineData,
   type SMSMetricsData,
   type ClientHealthData,
 } from "@/hooks/useActBlueMetrics";

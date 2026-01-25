@@ -18,7 +18,7 @@ import type {
   SparklineData, 
   DashboardTimeSeriesPoint,
   ChannelBreakdown,
-} from "@/queries/useClientDashboardMetricsQuery";
+} from "@/types/dashboard";
 
 // ==================== Types ====================
 

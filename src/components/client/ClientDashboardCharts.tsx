@@ -13,7 +13,7 @@ import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useDashboardStore, useComparisonEnabled, type SeriesKey } from "@/stores/dashboardStore";
 import { cssVar, colors } from "@/lib/design-tokens";
-import type { DashboardKPIs, DashboardTimeSeriesPoint, ChannelBreakdown } from "@/queries/useClientDashboardMetricsQuery";
+import type { DashboardKPIs, DashboardTimeSeriesPoint, ChannelBreakdown } from "@/types/dashboard";
 
 interface ClientDashboardChartsProps {
   kpis: DashboardKPIs;
