@@ -8,6 +8,7 @@
  * the components can use useActBlueMetrics directly.
  */
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDateRange } from "@/stores/dashboardStore";
@@ -251,23 +252,34 @@ export function useDashboardMetricsV2(organizationId: string | undefined) {
     gcTime: 10 * 60 * 1000,
   });
 
-  // Combine data when both queries are ready
-  const isLoading = actBlueQuery.isLoading || channelSpendQuery.isLoading;
+  // Progressive loading: Don't block on channel spend - show ActBlue data immediately
+  const isLoading = actBlueQuery.isLoading;
   const isFetching = actBlueQuery.isFetching || channelSpendQuery.isFetching;
-  const error = actBlueQuery.error || channelSpendQuery.error;
+  const error = actBlueQuery.error; // Only block on ActBlue errors
+  const isChannelSpendLoading = channelSpendQuery.isLoading;
 
-  // Transform to legacy format
-  const data = actBlueQuery.data && channelSpendQuery.data
-    ? transformToLegacyFormat(
-        actBlueQuery.data as ActBlueMetricsDataWithSparklines,
-        channelSpendQuery.data
-      )
-    : undefined;
+  // Default channel spend when still loading
+  const defaultChannelSpend: ChannelSpendData = {
+    metaSpend: 0,
+    smsSpend: 0,
+    metaConversions: 0,
+    smsConversions: 0,
+  };
+
+  // Transform to legacy format - use defaults for channel spend if not ready
+  const data = useMemo(() => {
+    if (!actBlueQuery.data) return undefined;
+    return transformToLegacyFormat(
+      actBlueQuery.data as ActBlueMetricsDataWithSparklines,
+      channelSpendQuery.data || defaultChannelSpend
+    );
+  }, [actBlueQuery.data, channelSpendQuery.data]);
 
   return {
     data,
     isLoading,
     isFetching,
+    isChannelSpendLoading,
     error,
     refetch: async () => {
       await Promise.all([
