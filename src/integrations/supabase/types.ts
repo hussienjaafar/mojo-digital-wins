@@ -14976,6 +14976,14 @@ export type Database = {
           total_sms_sent: number
         }[]
       }
+      get_dashboard_sparkline_data: {
+        Args: {
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
       get_donation_heatmap: {
         Args: {
           _end_date: string
