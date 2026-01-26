@@ -382,3 +382,7 @@ verify_jwt = true
 
 [functions.request-password-reset]
 verify_jwt = false
+
+# --- VIDEO TRANSCRIPTION ---
+[functions.upload-video-for-transcription]
+verify_jwt = true  # Requires auth, accepts video uploads for transcription
