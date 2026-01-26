@@ -5905,6 +5905,7 @@ export type Database = {
         Row: {
           ad_id: string
           created_at: string | null
+          creative_id: string | null
           downloaded_at: string | null
           duration_seconds: number | null
           error_code: string | null
@@ -5912,17 +5913,21 @@ export type Database = {
           id: string
           last_error_at: string | null
           organization_id: string
+          resolution_method: string | null
           retry_count: number | null
           status: string | null
           thumbnail_url: string | null
           transcribed_at: string | null
           updated_at: string | null
+          url_fetched_at: string | null
           video_id: string
+          video_source_expires_at: string | null
           video_source_url: string | null
         }
         Insert: {
           ad_id: string
           created_at?: string | null
+          creative_id?: string | null
           downloaded_at?: string | null
           duration_seconds?: number | null
           error_code?: string | null
@@ -5930,17 +5935,21 @@ export type Database = {
           id?: string
           last_error_at?: string | null
           organization_id: string
+          resolution_method?: string | null
           retry_count?: number | null
           status?: string | null
           thumbnail_url?: string | null
           transcribed_at?: string | null
           updated_at?: string | null
+          url_fetched_at?: string | null
           video_id: string
+          video_source_expires_at?: string | null
           video_source_url?: string | null
         }
         Update: {
           ad_id?: string
           created_at?: string | null
+          creative_id?: string | null
           downloaded_at?: string | null
           duration_seconds?: number | null
           error_code?: string | null
@@ -5948,12 +5957,15 @@ export type Database = {
           id?: string
           last_error_at?: string | null
           organization_id?: string
+          resolution_method?: string | null
           retry_count?: number | null
           status?: string | null
           thumbnail_url?: string | null
           transcribed_at?: string | null
           updated_at?: string | null
+          url_fetched_at?: string | null
           video_id?: string
+          video_source_expires_at?: string | null
           video_source_url?: string | null
         }
         Relationships: [
