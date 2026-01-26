@@ -1,176 +1,123 @@
 
-# Fix Recent Activity Feed Channel Attribution
+# Fix Meta Ad Videos Table: Add Missing Columns
 
 ## Problem Summary
 
-The "Recent Activity" feed in the single-day view shows incorrect channel tags. Donations that should be labeled as "Meta" are displaying as "Other" because:
+The `meta_ad_videos` table in the production database is **missing three columns** that the `sync-meta-ad-videos` edge function requires:
 
-| Current Flow (Broken) |
-|----------------------|
-| `get_recent_donations` RPC returns only `refcode` |
-| Frontend `getChannelFromRefcode()` pattern-matches refcode |
-| "gaza0108" doesn't match "meta/fb/facebook" patterns |
-| Result: Shows "Other" instead of "Meta" |
+| Missing Column | Type | Purpose |
+|---------------|------|---------|
+| `creative_id` | TEXT | Links video to Meta creative |
+| `resolution_method` | TEXT | Tracks how video_id was discovered |
+| `url_fetched_at` | TIMESTAMPTZ | When source URL was fetched |
 
-**Database Evidence:**
-- John ($10), Herman ($10), Elisabeth ($10) all have `click_id`, `source_campaign: meta`, and `contribution_form: moliticometa`
-- The database function `detect_donation_channel()` correctly returns "meta" for these
-- But the RPC never sends this data to the frontend
+### Root Cause
 
-## Solution Overview
+Two different migrations attempted to create this table:
 
-Update the `get_recent_donations` RPC to return the correctly detected channel using the existing `detect_donation_channel` SQL function, then update the frontend to use this server-provided channel.
+1. **`20260113200000_video_transcription_pipeline.sql`** - Comprehensive schema with all columns
+2. **`20260123034910_0fb4089a-10b4-479e-b52c-2d9a21361c8e.sql`** - Simplified version missing the three columns
+
+The database has the simplified version applied, causing the edge function to fail.
+
+### Current vs Required Schema
+
+```text
+CURRENT TABLE (in database):
+┌─────────────────────────────────────┐
+│ id, organization_id, ad_id,         │
+│ video_id, video_source_url,         │
+│ thumbnail_url, duration_seconds,    │
+│ status, error_code, error_message,  │
+│ retry_count, last_error_at,         │
+│ downloaded_at, transcribed_at,      │
+│ created_at, updated_at              │
+└─────────────────────────────────────┘
+
+REQUIRED (by edge function):
+┌─────────────────────────────────────┐
+│ ... all of the above PLUS:          │
+│ + creative_id           ← MISSING   │
+│ + resolution_method     ← MISSING   │
+│ + url_fetched_at        ← MISSING   │
+│ + video_source_expires_at (optional)│
+└─────────────────────────────────────┘
+```
+
+---
+
+## Solution
+
+Create a migration to add the missing columns to the existing `meta_ad_videos` table.
 
 ---
 
 ## Implementation Plan
 
-### Step 1: Update get_recent_donations RPC
+### Step 1: Database Migration
 
-Create a new migration to update the RPC to return the channel:
+Add the three missing columns plus the optional `video_source_expires_at` column:
 
 ```sql
-CREATE OR REPLACE FUNCTION public.get_recent_donations(
-  _organization_id UUID,
-  _date DATE,
-  _limit INTEGER DEFAULT 20,
-  _timezone TEXT DEFAULT 'America/New_York'
-)
-RETURNS TABLE (
-  id UUID,
-  amount NUMERIC,
-  net_amount NUMERIC,
-  donor_first_name TEXT,
-  transaction_date TIMESTAMPTZ,
-  is_recurring BOOLEAN,
-  refcode TEXT,
-  channel TEXT  -- NEW COLUMN
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT
-    t.id,
-    t.amount,
-    t.net_amount,
-    t.first_name AS donor_first_name,
-    t.transaction_date,
-    COALESCE(t.is_recurring, false) AS is_recurring,
-    t.refcode,
-    -- Use the system-wide channel detection function
-    public.detect_donation_channel(
-      t.contribution_form,
-      t.refcode,
-      t.source_campaign,
-      t.click_id,
-      t.fbclid,
-      NULL,  -- attributed_campaign_id (not available in this context)
-      NULL,  -- attributed_ad_id
-      NULL   -- attribution_method
-    ) AS channel
-  FROM actblue_transactions t
-  WHERE t.organization_id = _organization_id
-    AND (t.transaction_date AT TIME ZONE _timezone)::DATE = _date
-    AND t.transaction_type = 'donation'
-  ORDER BY t.transaction_date DESC
-  LIMIT _limit;
-END;
-$$;
+-- Add missing columns to meta_ad_videos table for video sync pipeline
+
+-- Add creative_id column for linking to Meta creatives
+ALTER TABLE public.meta_ad_videos
+ADD COLUMN IF NOT EXISTS creative_id TEXT;
+
+-- Add resolution_method to track how video_id was discovered
+-- Values: 'meta_creative_insights', 'creative.video_id', etc.
+ALTER TABLE public.meta_ad_videos
+ADD COLUMN IF NOT EXISTS resolution_method TEXT;
+
+-- Add url_fetched_at timestamp for when source URL was successfully fetched
+ALTER TABLE public.meta_ad_videos
+ADD COLUMN IF NOT EXISTS url_fetched_at TIMESTAMPTZ;
+
+-- Add video_source_expires_at for tracking URL expiration (optional but useful)
+ALTER TABLE public.meta_ad_videos
+ADD COLUMN IF NOT EXISTS video_source_expires_at TIMESTAMPTZ;
+
+-- Update status values to match what edge function expects
+-- Current: 'pending', 'downloading', 'transcribing', 'completed', 'error'
+-- Required: 'PENDING', 'URL_FETCHED', 'URL_EXPIRED', 'URL_INACCESSIBLE', 
+--           'DOWNLOADED', 'TRANSCRIBED', 'TRANSCRIPT_FAILED', 'ERROR'
+
+-- Drop old check constraint if exists
+ALTER TABLE public.meta_ad_videos 
+DROP CONSTRAINT IF EXISTS meta_ad_videos_status_check;
+
+-- Add new status values (case-insensitive to allow existing lowercase values to work)
+ALTER TABLE public.meta_ad_videos
+ADD CONSTRAINT meta_ad_videos_status_check 
+CHECK (LOWER(status) IN (
+  'pending', 'url_fetched', 'url_expired', 'url_inaccessible',
+  'downloading', 'downloaded', 'transcribing', 'transcribed', 
+  'transcript_failed', 'completed', 'error'
+));
+
+-- Create index on creative_id for efficient lookups
+CREATE INDEX IF NOT EXISTS idx_meta_ad_videos_creative_id 
+ON public.meta_ad_videos(creative_id);
+
+-- Add comments for documentation
+COMMENT ON COLUMN public.meta_ad_videos.creative_id IS 
+  'Meta creative ID associated with this video';
+COMMENT ON COLUMN public.meta_ad_videos.resolution_method IS 
+  'How the video_id was resolved (meta_creative_insights, direct_api, etc)';
+COMMENT ON COLUMN public.meta_ad_videos.url_fetched_at IS 
+  'When the video source URL was successfully fetched from Meta API';
+COMMENT ON COLUMN public.meta_ad_videos.video_source_expires_at IS 
+  'When the video source URL expires (Meta URLs are temporary)';
 ```
 
-### Step 2: Update RecentDonation Interface
+### Step 2: Verify the Fix
 
-In `src/hooks/useHourlyMetrics.ts`, add `channel` to the interface:
+After migration runs, trigger a test sync:
 
-```typescript
-export interface RecentDonation {
-  id: string;
-  amount: number;
-  net_amount: number;
-  donor_name: string | null;
-  transaction_date: string;
-  is_recurring: boolean;
-  refcode: string | null;
-  channel: string | null;  // NEW
-}
-```
-
-### Step 3: Update fetchRecentDonations
-
-In `src/hooks/useHourlyMetrics.ts`, map the new channel field:
-
-```typescript
-async function fetchRecentDonations(
-  organizationId: string,
-  date: string
-): Promise<RecentDonation[]> {
-  const { data, error } = await supabase.rpc("get_recent_donations", {
-    _organization_id: organizationId,
-    _date: date,
-    _limit: 20,
-    _timezone: "America/New_York",
-  });
-
-  if (error) throw error;
-  
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    amount: Number(row.amount) || 0,
-    net_amount: Number(row.net_amount) || 0,
-    donor_name: row.donor_first_name || null,
-    transaction_date: row.transaction_date,
-    is_recurring: row.is_recurring || false,
-    refcode: row.refcode || null,
-    channel: row.channel || null,  // NEW
-  }));
-}
-```
-
-### Step 4: Update RecentActivityFeed Component
-
-In `src/components/client/RecentActivityFeed.tsx`, update to use server-provided channel:
-
-```typescript
-// Update getChannelFromRefcode to accept optional pre-computed channel
-function getDisplayChannel(
-  serverChannel: string | null, 
-  refcode: string | null
-): string {
-  // If server provided a channel, use it (with proper capitalization)
-  if (serverChannel) {
-    switch (serverChannel.toLowerCase()) {
-      case 'meta': return 'Meta';
-      case 'sms': return 'SMS';
-      case 'email': return 'Email';
-      case 'google': return 'Google';
-      case 'other': return 'Other';
-      case 'unattributed': return 'Direct';
-      default: return 'Other';
-    }
-  }
-  
-  // Fallback to old logic for backward compatibility
-  if (!refcode) return "Direct";
-  
-  const lower = refcode.toLowerCase();
-  if (lower.includes("sms") || lower.includes("text")) return "SMS";
-  if (lower.includes("meta") || lower.includes("facebook") || lower.includes("fb")) return "Meta";
-  if (lower.includes("email") || lower.includes("em_")) return "Email";
-  if (lower.includes("google") || lower.includes("ggl")) return "Google";
-  
-  return "Other";
-}
-```
-
-And update the DonationItem to use it:
-
-```typescript
-// In DonationItem component
-const channel = getDisplayChannel(donation.channel, donation.refcode);
-```
+1. Call `sync-meta-ad-videos` edge function for the organization
+2. Verify videos are created in `meta_ad_videos` with correct status
+3. Check that `creative_id`, `resolution_method`, and `url_fetched_at` are populated
 
 ---
 
@@ -178,38 +125,34 @@ const channel = getDisplayChannel(donation.channel, donation.refcode);
 
 | File | Action | Description |
 |------|--------|-------------|
-| Database Migration | **CREATE** | Update `get_recent_donations` RPC to return `channel` column |
-| `src/hooks/useHourlyMetrics.ts` | **MODIFY** | Add `channel` to `RecentDonation` interface and mapping |
-| `src/components/client/RecentActivityFeed.tsx` | **MODIFY** | Use server-provided channel with fallback |
+| Database Migration | **CREATE** | Add missing columns to `meta_ad_videos` table |
+
+No frontend or edge function code changes needed - they already expect these columns.
 
 ---
 
 ## Expected Results After Fix
 
-| Donor | Before | After | Reason |
-|-------|--------|-------|--------|
-| Colin ($1,000) | Direct | Direct | No attribution signals (unattributed) |
-| Ryan ($1) | Other | Other | refcode="web" with no platform match |
-| John ($10) | **Other** | **Meta** | Has click_id and source_campaign=meta |
-| Herman ($10) | **Other** | **Meta** | Has click_id and source_campaign=meta |
-| Elisabeth ($10) | **Other** | **Meta** | Has click_id and source_campaign=meta |
-| Keishon ($100) | Direct | Direct | No attribution signals (unattributed) |
-| Sydney ($10) | **Other** | **Meta** | Has source_campaign=meta |
-| Afaf ($25) | **Other** | **Meta** | Has click_id and source_campaign=meta |
+| Step | Expected Outcome |
+|------|-----------------|
+| Migration applied | `meta_ad_videos` has all required columns |
+| Sync function called | Videos created with `status: 'URL_FETCHED'` or `'URL_INACCESSIBLE'` |
+| Column values | `creative_id`, `resolution_method`, `url_fetched_at` populated |
+| Transcription | Can proceed for videos with `status: 'URL_FETCHED'` |
 
 ---
 
-## Technical Notes
+## Verification Query
 
-1. **Single Source of Truth**: Uses the existing `detect_donation_channel` SQL function, ensuring consistency with the dashboard attribution system
+After migration, run this to verify columns exist:
 
-2. **Backward Compatible**: Frontend includes fallback logic in case the RPC returns null for channel (e.g., during migration rollout)
+```sql
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'meta_ad_videos'
+  AND table_schema = 'public'
+  AND column_name IN ('creative_id', 'resolution_method', 'url_fetched_at', 'video_source_expires_at')
+ORDER BY column_name;
+```
 
-3. **No Performance Impact**: The channel detection is done inline in the query, no additional joins required
-
-4. **Channel Mapping**:
-   - `meta` → "Meta" (blue badge)
-   - `sms` → "SMS" (green badge)
-   - `email` → "Email" (purple badge)
-   - `unattributed` → "Direct" (gray badge)
-   - `other` → "Other" (gray badge)
+Expected result: 4 rows showing all new columns.
