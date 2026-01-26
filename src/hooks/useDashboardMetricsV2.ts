@@ -32,6 +32,8 @@ interface ChannelSpendData {
   smsSpend: number;
   metaConversions: number;
   smsConversions: number;
+  metaImpressions: number;
+  metaClicks: number;
   dailyMetaSpend: DailySpendPoint[];
   dailySmsSpend: DailySpendPoint[];
 }
@@ -69,7 +71,7 @@ async function fetchChannelSpend(
   // Build Meta query - also fetch daily data for graph
   const metaQuery = supabase
     .from('meta_ad_metrics')
-    .select('date, spend, conversions')
+    .select('date, spend, conversions, impressions, clicks')
     .eq('organization_id', organizationId)
     .gte('date', startDate)
     .lte('date', endDate)
@@ -98,6 +100,14 @@ async function fetchChannelSpend(
   );
   const metaConversions = (metaResult.data || []).reduce(
     (sum: number, m: any) => sum + Number(m.conversions || 0),
+    0
+  );
+  const metaImpressions = (metaResult.data || []).reduce(
+    (sum: number, m: any) => sum + Number(m.impressions || 0),
+    0
+  );
+  const metaClicks = (metaResult.data || []).reduce(
+    (sum: number, m: any) => sum + Number(m.clicks || 0),
     0
   );
 
@@ -139,6 +149,8 @@ async function fetchChannelSpend(
     smsSpend, 
     metaConversions, 
     smsConversions,
+    metaImpressions,
+    metaClicks,
     dailyMetaSpend,
     dailySmsSpend,
   };
@@ -150,6 +162,7 @@ async function fetchChannelSpend(
 interface SparklineExtras {
   dailyRoi?: Array<{ date: string; value: number }>;
   dailyNewMrr?: Array<{ date: string; value: number }>;
+  dailyActiveMrr?: Array<{ date: string; value: number }>;
   newDonors?: number;
   returningDonors?: number;
 }
@@ -193,8 +206,8 @@ function transformToLegacyFormat(
     totalAttributedRevenue,
     attributionRate: summary.totalNet > 0 ? (totalAttributedRevenue / summary.totalNet) * 100 : 0,
     totalSpend,
-    totalImpressions: 0, // Not available from unified yet
-    totalClicks: 0, // Not available from unified yet
+    totalImpressions: channelSpend.metaImpressions,
+    totalClicks: channelSpend.metaClicks,
     avgDonation: summary.averageDonation,
     donationCount: summary.totalDonations,
     deterministicRate: 0, // Not available from unified yet
@@ -216,7 +229,8 @@ function transformToLegacyFormat(
     netRevenue: dailyRollup.slice(-7).map(d => ({ date: d.date, value: d.net })),
     roi: sparklineExtras?.dailyRoi?.slice(-7) || [], // Daily ROI from new RPC
     refundRate: [], // Not computed per-day
-    recurringHealth: dailyRollup.slice(-7).map(d => ({ date: d.date, value: d.recurring_amount })),
+    recurringHealth: sparklineExtras?.dailyActiveMrr?.slice(-7) || 
+      dailyRollup.slice(-7).map(d => ({ date: d.date, value: d.recurring_amount })), // Cumulative MRR from new RPC
     uniqueDonors: dailyRollup.slice(-7).map(d => ({ date: d.date, value: d.donors })),
     attributionQuality: [], // Not available
     newMrr: sparklineExtras?.dailyNewMrr?.slice(-7) || [], // Daily new MRR from new RPC
@@ -247,10 +261,10 @@ function transformToLegacyFormat(
     smsSpendPrev: 0,
   }));
 
-  // Calculate direct donations from channel breakdown
+  // Calculate direct donations from channel breakdown - use donation COUNT not revenue
   const directDonations = channelBreakdown
     .filter((c) => c.channel === 'other' || c.channel === 'unattributed')
-    .reduce((sum, c) => sum + c.raised, 0);
+    .reduce((sum, c) => sum + c.donations, 0);
 
   // Transform channelBreakdown to legacy format for ClientDashboardCharts
   const channelNameMap: Record<string, string> = {
@@ -339,6 +353,8 @@ export function useDashboardMetricsV2(organizationId: string | undefined) {
     smsSpend: 0,
     metaConversions: 0,
     smsConversions: 0,
+    metaImpressions: 0,
+    metaClicks: 0,
     dailyMetaSpend: [],
     dailySmsSpend: [],
   };

@@ -395,18 +395,14 @@ export const ClientDashboardCharts = ({
         </V3Card>
       </div>
 
-      {/* Row 3: Campaign Health + Recurring Summary */}
+      {/* Row 3: Meta Ads Performance Overview + Recurring Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-[var(--portal-space-lg)]">
-        <V3Card id="campaign-health" className="lg:col-span-2" accent="purple">
+        <V3Card id="meta-ads-performance" className="lg:col-span-2" accent="blue">
           <V3CardHeader>
-            <V3CardTitle>Campaign Health</V3CardTitle>
-            <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">Key efficiency metrics</p>
+            <V3CardTitle>Meta Ads Performance Overview</V3CardTitle>
+            <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">Meta ad campaign metrics</p>
           </V3CardHeader>
           <V3CardContent className="space-y-4">
-            <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
-              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Average Donation</span>
-              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{formatCurrency(kpis.avgDonation)}</span>
-            </div>
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
               <span className="text-sm text-[hsl(var(--portal-text-muted))]">Total Impressions</span>
               <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{kpis.totalImpressions.toLocaleString()}</span>
@@ -416,16 +412,26 @@ export const ClientDashboardCharts = ({
               <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{kpis.totalClicks.toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
-              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Recurring %</span>
-              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{kpis.recurringPercentage.toFixed(1)}%</span>
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">CTR (Click-Through Rate)</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">
+                {kpis.totalImpressions > 0 ? ((kpis.totalClicks / kpis.totalImpressions) * 100).toFixed(2) : '0.00'}%
+              </span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
-              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Upsell Conversion</span>
-              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{kpis.upsellConversionRate.toFixed(1)}%</span>
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">CPC (Cost Per Click)</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">
+                {kpis.totalClicks > 0 ? formatCurrency(metaSpend / kpis.totalClicks) : '$0'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Meta Conversions</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{metaConversions.toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between py-2">
-              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Total Donations</span>
-              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{kpis.donationCount.toLocaleString()}</span>
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Avg Donation (Meta)</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">
+                {metaConversions > 0 ? formatCurrency(kpis.metaAttributedRevenue / metaConversions) : formatCurrency(kpis.avgDonation)}
+              </span>
             </div>
           </V3CardContent>
         </V3Card>
