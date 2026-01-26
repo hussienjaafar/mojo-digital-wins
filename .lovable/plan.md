@@ -1,262 +1,383 @@
 
-# Fix Attributed ROI - System-Wide Channel Detection Bug
+# Fix Hero KPI Sparklines and New/Returning Donor Metrics
 
 ## Problem Summary
 
-The Attributed ROI is not working for **A New Policy** and several other organizations because the `get_actblue_dashboard_metrics` RPC function **does NOT use the `refcode_mappings` table** for channel detection.
+From the screenshot and code investigation, there are **4 issues** to address:
 
-### Impact Assessment
-
-| Organization | Total Donations (30d) | Incorrectly Categorized as "Other" |
-|-------------|----------------------|-----------------------------------|
-| Michael Blake For Congress | 793 | **444 (56%)** |
-| A New Policy | 234 | **215 (92%)** |
-| Rashid For Illinois | 334 | **32 (10%)** |
-
-**This is a SYSTEM-WIDE BUG affecting all organizations using custom refcodes.**
+| Issue | Current State | Expected State |
+|-------|--------------|----------------|
+| **Attributed ROI sparkline** | Empty (no sparkline) | Day-by-day ROI line graph |
+| **Current Active MRR sparkline** | Shows `recurring_amount` from period | Should show cumulative active MRR day-by-day |
+| **New MRR Added sparkline** | Empty (no sparkline) | Net new MRR added each day |
+| **New/Returning Donors** | Always shows "New 0 / Returning 0" | Correct breakdown of first-time vs repeat donors |
 
 ---
 
-## Root Cause
+## Root Cause Analysis
 
-The `get_actblue_dashboard_metrics` RPC function (created in migration `20260126001754`) uses this channel detection logic:
+### 1. Missing Sparkline Data (`useDashboardMetricsV2.ts`)
 
-```sql
-channel_data AS (
-  SELECT
-    COALESCE(
-      CASE
-        -- Priority 1: Meta click ID (refcode2)
-        WHEN refcode2 IS NOT NULL AND refcode2 != '' THEN 'meta'
-        -- Priority 2: Form contains 'sms'
-        WHEN LOWER(contribution_form) LIKE '%sms%' THEN 'sms'
-        -- Priority 3: Refcode patterns
-        WHEN refcode ILIKE '%fb%' OR refcode ILIKE '%meta%' THEN 'meta'
-        -- ... more patterns ...
-        ELSE 'other'  -- PROBLEM: Falls here for custom refcodes!
-      END,
-      'other'
-    ) as channel
-  FROM filtered_transactions
-)
+Lines 206-214 explicitly set sparklines to empty arrays:
+
+```typescript
+const legacySparklines: SparklineData = {
+  netRevenue: dailyRollup.slice(-7).map(d => ({ date: d.date, value: d.net })),
+  roi: [], // ❌ Not computed per-day
+  refundRate: [], // Not computed per-day
+  recurringHealth: dailyRollup.slice(-7).map(d => ({ date: d.date, value: d.recurring_amount })), // ⚠️ Wrong metric
+  uniqueDonors: dailyRollup.slice(-7).map(d => ({ date: d.date, value: d.donors })),
+  attributionQuality: [], // Not available
+  newMrr: [], // ❌ Not available
+};
 ```
 
-**The problem**: Custom refcodes like `thpgtr`, `jp421`, `thaama` (used by A New Policy) don't match any pattern, so they're categorized as `'other'` even though they ARE correctly mapped to `platform='meta'` in the `refcode_mappings` table.
+### 2. Missing New/Returning Donors (`useDashboardMetricsV2.ts`)
 
-### Why This Happened
+Lines 176-177 hardcode both values to 0:
 
-The `refcode_mappings` table contains proper mappings:
+```typescript
+newDonors: 0, // Not available from unified yet
+returningDonors: 0, // Not available from unified yet
+```
 
-| refcode | platform | ad_id |
-|---------|----------|-------|
-| thpgtr | meta | 120237583841680651 |
-| jp421 | meta | 120237582673480651 |
-| thaama | meta | 120235738682380651 |
-| jpmn | meta | 120235738682390651 |
+### 3. Data Availability Assessment
 
-But the RPC function never joins to this table!
+| Metric | Data Source | Available? |
+|--------|------------|------------|
+| Daily ROI | `meta_ad_metrics.spend` + channel attribution from RPC | **Partially** - need to calculate ROI = attributed_revenue / spend per day |
+| Active MRR | Requires cumulative calculation across recurring donors | **Needs new query** - RPC only returns current snapshot |
+| New MRR Added | First recurring donation per donor per day | **Needs new query** - can be derived from transactions |
+| New/Returning Donors | Compare `transaction_date` to `first_donation_date` | **Available** - needs JOIN with first donation subquery |
 
 ---
 
-## Solution
+## Solution Architecture
 
-Update `get_actblue_dashboard_metrics` to **join to `refcode_mappings`** and use the mapped platform as the highest priority source.
-
-### Updated Channel Detection Logic
-
-```sql
--- Add LEFT JOIN to refcode_mappings in filtered_transactions CTE
-filtered_transactions AS (
-  SELECT t.*, rm.platform as mapped_platform
-  FROM actblue_transactions t
-  LEFT JOIN refcode_mappings rm 
-    ON t.organization_id = rm.organization_id 
-    AND t.refcode = rm.refcode
-  -- ... existing WHERE clauses ...
-),
-
-channel_data AS (
-  SELECT
-    COALESCE(
-      CASE
-        -- Priority 0: Use refcode_mappings if available (NEW!)
-        WHEN mapped_platform IS NOT NULL THEN mapped_platform
-        -- Priority 1: Meta click ID (refcode2)
-        WHEN refcode2 IS NOT NULL AND refcode2 != '' THEN 'meta'
-        -- Priority 2: Contribution form contains 'sms'
-        WHEN LOWER(contribution_form) LIKE '%sms%' THEN 'sms'
-        -- Priority 3: Refcode pattern matching (fallback)
-        WHEN refcode ILIKE '%sms%' OR refcode ILIKE '%text%' OR refcode ILIKE 'txt%' THEN 'sms'
-        WHEN refcode ILIKE '%fb%' OR refcode ILIKE '%facebook%' OR refcode ILIKE '%meta%' THEN 'meta'
-        WHEN refcode ILIKE '%email%' OR refcode ILIKE '%em_%' THEN 'email'
-        WHEN refcode ILIKE '%organic%' OR refcode ILIKE '%direct%' THEN 'organic'
-        -- Priority 4: Contribution form contains 'meta'
-        WHEN LOWER(contribution_form) LIKE '%meta%' THEN 'meta'
-        -- Fallback
-        ELSE 'other'
-      END,
-      'other'
-    ) as channel,
-    -- ... rest of aggregation
-  FROM filtered_transactions
-  GROUP BY ...
-)
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                     ClientDashboard.tsx                         │
+│    - Calls useDashboardMetricsV2()                              │
+│    - Calls useRecurringHealthQuery()                            │
+│    - Calls NEW: useDailySparklineQuery()   <-- NEW HOOK         │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+        ▼                   ▼                   ▼
+┌───────────────┐  ┌────────────────┐  ┌────────────────────────┐
+│useDashboard   │  │useRecurring    │  │useDailySparklineQuery  │
+│MetricsV2      │  │HealthQuery     │  │(NEW)                   │
+│               │  │                │  │                        │
+│Returns:       │  │Returns:        │  │Returns:                │
+│- kpis         │  │- current_mrr   │  │- dailyRoi[]            │
+│- sparklines   │  │- new_mrr       │  │- dailyNewMrr[]         │
+│  (partial)    │  │- donors        │  │- dailyActiveMrr[]      │
+└───────────────┘  └────────────────┘  │- newDonorsCount        │
+                                       │- returningDonorsCount  │
+                                       └────────────────────────┘
 ```
 
 ---
 
-## Database Migration
+## Implementation Plan
 
-Create a new migration to replace the `get_actblue_dashboard_metrics` function:
+### Phase 1: Create New Database RPC Function
+
+Create `get_dashboard_sparkline_data` that returns:
 
 ```sql
--- Drop and recreate the function with refcode_mappings join
-CREATE OR REPLACE FUNCTION public.get_actblue_dashboard_metrics(
-  p_organization_id uuid, 
-  p_start_date date, 
-  p_end_date date, 
-  p_campaign_id text DEFAULT NULL, 
-  p_creative_id text DEFAULT NULL, 
-  p_use_utc boolean DEFAULT true
+CREATE OR REPLACE FUNCTION public.get_dashboard_sparkline_data(
+  p_organization_id UUID,
+  p_start_date DATE,
+  p_end_date DATE
 )
-RETURNS json
+RETURNS JSON
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
 AS $$
 DECLARE
-  v_timezone TEXT;
   v_result JSON;
 BEGIN
-  -- Get org timezone
-  SELECT COALESCE(org_timezone, 'America/New_York')
-  INTO v_timezone
-  FROM client_organizations
-  WHERE id = p_organization_id;
-
-  WITH filtered_transactions AS (
-    SELECT t.*, rm.platform as mapped_platform
+  WITH 
+  -- First donation date for each donor (org-scoped)
+  first_donations AS (
+    SELECT 
+      donor_email,
+      MIN(transaction_date) as first_donation_date
+    FROM actblue_transactions
+    WHERE organization_id = p_organization_id
+      AND transaction_type = 'donation'
+    GROUP BY donor_email
+  ),
+  
+  -- Daily donor breakdown
+  daily_donors AS (
+    SELECT 
+      DATE(t.transaction_date) as day,
+      COUNT(DISTINCT CASE 
+        WHEN DATE(fd.first_donation_date) = DATE(t.transaction_date) 
+        THEN t.donor_email 
+      END) as new_donors,
+      COUNT(DISTINCT CASE 
+        WHEN DATE(fd.first_donation_date) < DATE(t.transaction_date) 
+        THEN t.donor_email 
+      END) as returning_donors
+    FROM actblue_transactions t
+    LEFT JOIN first_donations fd ON t.donor_email = fd.donor_email
+    WHERE t.organization_id = p_organization_id
+      AND DATE(t.transaction_date) BETWEEN p_start_date AND p_end_date
+      AND t.transaction_type = 'donation'
+    GROUP BY DATE(t.transaction_date)
+  ),
+  
+  -- First recurring transaction per donor
+  first_recurring AS (
+    SELECT 
+      donor_email,
+      MIN(transaction_date) as first_recurring_date,
+      (SELECT amount FROM actblue_transactions t2 
+       WHERE t2.donor_email = actblue_transactions.donor_email 
+         AND t2.organization_id = p_organization_id
+         AND t2.is_recurring = true
+       ORDER BY t2.transaction_date ASC LIMIT 1) as first_amount
+    FROM actblue_transactions
+    WHERE organization_id = p_organization_id
+      AND is_recurring = true
+    GROUP BY donor_email
+  ),
+  
+  -- Daily new MRR (from new recurring starters)
+  daily_new_mrr AS (
+    SELECT 
+      DATE(first_recurring_date) as day,
+      COALESCE(SUM(first_amount), 0) as new_mrr_added,
+      COUNT(*) as new_recurring_donors
+    FROM first_recurring
+    WHERE first_recurring_date >= p_start_date
+      AND first_recurring_date <= p_end_date
+    GROUP BY DATE(first_recurring_date)
+  ),
+  
+  -- Daily attributed revenue by channel
+  daily_attributed AS (
+    SELECT 
+      DATE(t.transaction_date) as day,
+      SUM(CASE 
+        WHEN rm.platform = 'meta' 
+          OR (t.refcode2 IS NOT NULL AND t.refcode2 != '') 
+        THEN t.net_amount ELSE 0 
+      END) as meta_attributed_revenue,
+      SUM(CASE 
+        WHEN rm.platform = 'sms' 
+          OR t.refcode ILIKE '%sms%' 
+          OR LOWER(t.contribution_form) LIKE '%sms%'
+        THEN t.net_amount ELSE 0 
+      END) as sms_attributed_revenue
     FROM actblue_transactions t
     LEFT JOIN refcode_mappings rm 
       ON t.organization_id = rm.organization_id 
       AND t.refcode = rm.refcode
-    LEFT JOIN campaign_attribution ca 
-      ON ca.refcode = t.refcode 
-      AND ca.organization_id = t.organization_id
     WHERE t.organization_id = p_organization_id
-      AND CASE 
-        WHEN p_use_utc THEN DATE(t.transaction_date)
-        ELSE DATE(t.transaction_date AT TIME ZONE v_timezone)
-      END BETWEEN p_start_date AND p_end_date
-      AND (p_campaign_id IS NULL OR ca.switchboard_campaign_id = p_campaign_id)
+      AND DATE(t.transaction_date) BETWEEN p_start_date AND p_end_date
+      AND t.transaction_type = 'donation'
+    GROUP BY DATE(t.transaction_date)
   ),
-  summary AS (
-    -- ... existing summary aggregation (unchanged)
+  
+  -- Daily Meta spend
+  daily_meta_spend AS (
+    SELECT date as day, SUM(spend) as meta_spend
+    FROM meta_ad_metrics
+    WHERE organization_id = p_organization_id
+      AND date BETWEEN p_start_date AND p_end_date
+    GROUP BY date
   ),
-  daily_data AS (
-    -- ... existing daily aggregation (unchanged)
+  
+  -- Daily SMS spend
+  daily_sms_spend AS (
+    SELECT DATE(send_date) as day, SUM(cost) as sms_spend
+    FROM sms_campaigns
+    WHERE organization_id = p_organization_id
+      AND DATE(send_date) BETWEEN p_start_date AND p_end_date
+      AND status != 'draft'
+    GROUP BY DATE(send_date)
   ),
-  channel_data AS (
-    SELECT
-      COALESCE(
-        CASE
-          -- NEW: Priority 0 - Use refcode_mappings platform if available
-          WHEN mapped_platform IS NOT NULL THEN mapped_platform
-          -- Priority 1: Meta click ID present (refcode2)
-          WHEN refcode2 IS NOT NULL AND refcode2 != '' THEN 'meta'
-          -- Priority 2: Contribution form indicates SMS
-          WHEN contribution_form IS NOT NULL AND LOWER(contribution_form) LIKE '%sms%' THEN 'sms'
-          -- Priority 3: Refcode patterns (fallback)
-          WHEN refcode ILIKE '%sms%' OR refcode ILIKE '%text%' OR refcode ILIKE 'txt%' THEN 'sms'
-          WHEN refcode ILIKE '%fb%' OR refcode ILIKE '%facebook%' OR refcode ILIKE '%ig%' 
-               OR refcode ILIKE '%instagram%' OR refcode ILIKE '%meta%' THEN 'meta'
-          WHEN refcode ILIKE '%email%' OR refcode ILIKE '%em_%' OR refcode ILIKE 'em%' THEN 'email'
-          WHEN refcode ILIKE '%organic%' OR refcode ILIKE '%direct%' THEN 'organic'
-          -- Priority 4: Contribution form indicates Meta
-          WHEN contribution_form IS NOT NULL AND LOWER(contribution_form) LIKE '%meta%' THEN 'meta'
-          ELSE 'other'
-        END,
-        'other'
-      ) as channel,
-      COALESCE(SUM(amount) FILTER (WHERE transaction_type = 'donation'), 0) as revenue,
-      COALESCE(SUM(net_amount) FILTER (WHERE transaction_type = 'donation'), 0) as net_revenue,
-      COUNT(*) FILTER (WHERE transaction_type = 'donation') as count,
-      COUNT(DISTINCT donor_email) FILTER (WHERE transaction_type = 'donation') as donors
-    FROM filtered_transactions
-    GROUP BY 
-      CASE
-        WHEN mapped_platform IS NOT NULL THEN mapped_platform
-        WHEN refcode2 IS NOT NULL AND refcode2 != '' THEN 'meta'
-        WHEN contribution_form IS NOT NULL AND LOWER(contribution_form) LIKE '%sms%' THEN 'sms'
-        WHEN refcode ILIKE '%sms%' OR refcode ILIKE '%text%' OR refcode ILIKE 'txt%' THEN 'sms'
-        WHEN refcode ILIKE '%fb%' OR refcode ILIKE '%facebook%' OR refcode ILIKE '%ig%' 
-             OR refcode ILIKE '%instagram%' OR refcode ILIKE '%meta%' THEN 'meta'
-        WHEN refcode ILIKE '%email%' OR refcode ILIKE '%em_%' OR refcode ILIKE 'em%' THEN 'email'
-        WHEN refcode ILIKE '%organic%' OR refcode ILIKE '%direct%' THEN 'organic'
-        WHEN contribution_form IS NOT NULL AND LOWER(contribution_form) LIKE '%meta%' THEN 'meta'
-        ELSE 'other'
-      END
+  
+  -- Combine daily ROI
+  daily_roi AS (
+    SELECT 
+      COALESCE(da.day, dms.day, dss.day) as day,
+      COALESCE(da.meta_attributed_revenue, 0) + COALESCE(da.sms_attributed_revenue, 0) as attributed_revenue,
+      COALESCE(dms.meta_spend, 0) + COALESCE(dss.sms_spend, 0) as total_spend,
+      CASE 
+        WHEN COALESCE(dms.meta_spend, 0) + COALESCE(dss.sms_spend, 0) > 0 
+        THEN (COALESCE(da.meta_attributed_revenue, 0) + COALESCE(da.sms_attributed_revenue, 0)) / 
+             (COALESCE(dms.meta_spend, 0) + COALESCE(dss.sms_spend, 0))
+        ELSE 0 
+      END as roi
+    FROM daily_attributed da
+    FULL OUTER JOIN daily_meta_spend dms ON da.day = dms.day
+    FULL OUTER JOIN daily_sms_spend dss ON COALESCE(da.day, dms.day) = dss.day
+  ),
+  
+  -- Aggregate totals for new/returning
+  donor_totals AS (
+    SELECT 
+      SUM(new_donors) as total_new_donors,
+      SUM(returning_donors) as total_returning_donors
+    FROM daily_donors
   )
+  
   SELECT json_build_object(
-    'summary', (SELECT row_to_json(s) FROM summary s),
-    'daily', (SELECT COALESCE(json_agg(d ORDER BY d.day), '[]'::json) FROM daily_data d),
-    'channels', (SELECT COALESCE(json_agg(c), '[]'::json) FROM channel_data c),
-    'timezone', v_timezone
+    'dailyRoi', (
+      SELECT COALESCE(json_agg(
+        json_build_object('date', day, 'value', ROUND(roi::numeric, 2))
+        ORDER BY day
+      ), '[]'::json)
+      FROM daily_roi WHERE day IS NOT NULL
+    ),
+    'dailyNewMrr', (
+      SELECT COALESCE(json_agg(
+        json_build_object('date', day, 'value', new_mrr_added)
+        ORDER BY day
+      ), '[]'::json)
+      FROM daily_new_mrr WHERE day IS NOT NULL
+    ),
+    'newDonors', (SELECT COALESCE(total_new_donors, 0) FROM donor_totals),
+    'returningDonors', (SELECT COALESCE(total_returning_donors, 0) FROM donor_totals)
   ) INTO v_result;
-
+  
   RETURN v_result;
 END;
 $$;
 ```
 
+### Phase 2: Create New React Query Hook
+
+Create `src/hooks/useDailySparklineQuery.ts`:
+
+```typescript
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useDateRange } from "@/stores/dashboardStore";
+import type { SparklineDataPoint } from "@/types/dashboard";
+
+interface DailySparklineData {
+  dailyRoi: SparklineDataPoint[];
+  dailyNewMrr: SparklineDataPoint[];
+  newDonors: number;
+  returningDonors: number;
+}
+
+export function useDailySparklineQuery(organizationId: string | undefined) {
+  const { startDate, endDate } = useDateRange();
+  
+  return useQuery({
+    queryKey: ['daily-sparkline', organizationId, startDate, endDate],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_dashboard_sparkline_data', {
+        p_organization_id: organizationId!,
+        p_start_date: startDate,
+        p_end_date: endDate,
+      });
+      
+      if (error) throw error;
+      return data as DailySparklineData;
+    },
+    enabled: !!organizationId && !!startDate && !!endDate,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+```
+
+### Phase 3: Update `useDashboardMetricsV2.ts`
+
+Merge the new sparkline data into the legacy format:
+
+```typescript
+// In transformToLegacyFormat, accept sparklineExtras parameter
+const legacySparklines: SparklineData = {
+  netRevenue: dailyRollup.slice(-7).map(d => ({ date: d.date, value: d.net })),
+  roi: sparklineExtras?.dailyRoi || [], // From new hook
+  refundRate: [], 
+  recurringHealth: dailyRollup.slice(-7).map(d => ({ date: d.date, value: d.recurring_amount })),
+  uniqueDonors: dailyRollup.slice(-7).map(d => ({ date: d.date, value: d.donors })),
+  attributionQuality: [],
+  newMrr: sparklineExtras?.dailyNewMrr || [], // From new hook
+};
+
+// Update kpis
+newDonors: sparklineExtras?.newDonors || 0,
+returningDonors: sparklineExtras?.returningDonors || 0,
+```
+
+### Phase 4: Update `ClientDashboard.tsx`
+
+Add the new hook and pass data through:
+
+```typescript
+const { data: sparklineExtras } = useDailySparklineQuery(organizationId);
+
+const heroKpis = useMemo(() => {
+  if (!data?.kpis) return [];
+  return buildHeroKpis({
+    kpis: {
+      ...data.kpis,
+      newDonors: sparklineExtras?.newDonors || 0,
+      returningDonors: sparklineExtras?.returningDonors || 0,
+    },
+    // ... rest of props
+    sparklines: {
+      ...data.sparklines,
+      roi: sparklineExtras?.dailyRoi || [],
+      newMrr: sparklineExtras?.dailyNewMrr || [],
+    },
+  });
+}, [data, recurringHealthData, sparklineExtras]);
+```
+
 ---
 
-## Files to Modify
+## Active MRR Sparkline - Special Consideration
 
-| File | Change |
+The "Current Active MRR" sparkline requires a **running total** of active recurring donors, which is expensive to calculate historically. Two options:
+
+**Option A (Simpler)**: Show `recurring_amount` raised per day (current behavior), but relabel the card's sparkline context.
+
+**Option B (Accurate)**: Pre-compute a daily snapshot table via a scheduled edge function that tracks cumulative MRR.
+
+**Recommendation**: Start with Option A for now (keep existing sparkline showing daily recurring revenue) and mark this as a future enhancement. The card already correctly shows the **current** active MRR as the headline value from `recurringHealth.current_active_mrr`.
+
+---
+
+## Files to Create/Modify
+
+| File | Action |
 |------|--------|
-| `supabase/migrations/NEW_migration.sql` | Create new migration with updated RPC function |
-
-**No frontend changes required** - the hook already consumes the channel breakdown correctly.
+| `supabase/migrations/YYYYMMDD_*.sql` | Create `get_dashboard_sparkline_data` RPC |
+| `src/hooks/useDailySparklineQuery.ts` | **NEW** - Hook to fetch sparkline extras |
+| `src/hooks/useDashboardMetricsV2.ts` | Accept sparkline extras, populate newDonors/returningDonors |
+| `src/pages/ClientDashboard.tsx` | Call new hook, merge data into buildHeroKpis |
 
 ---
 
 ## Expected Results After Fix
 
-For A New Policy (current 30 days):
-
-| Metric | Before Fix | After Fix |
-|--------|-----------|-----------|
-| Meta Attributed Revenue | ~$0 | ~$18,000+ |
-| SMS Attributed Revenue | $0 | $0 |
-| Attributed ROI | 0% | Calculated correctly |
-| Attribution Rate | ~8% | ~92%+ |
+| Card | Before | After |
+|------|--------|-------|
+| **Attributed ROI** | No sparkline | Line graph showing daily ROI (attributed revenue / spend) |
+| **Current Active MRR** | Shows daily recurring raised | Unchanged (shows daily recurring, accurate current MRR in headline) |
+| **New MRR Added** | No sparkline | Line graph showing new MRR added each day |
+| **Unique Donors** | "New 0 / Returning 0" | Correct counts like "New 384 / Returning 41" |
 
 ---
 
-## Testing Plan
+## Testing Checklist
 
-1. After migration, verify channel breakdown:
-```sql
-SELECT channel, COUNT(*), SUM(revenue) 
-FROM (SELECT ... channel_data logic ...) 
-WHERE organization_id = '346d6aaf-34b3-435c-8cd1-3420d6a068d6'
-GROUP BY channel;
-```
+After implementation:
 
-2. Refresh dashboard for A New Policy and verify:
-   - Meta Attributed Revenue shows ~$18K+
-   - Attributed ROI is calculated
-   - Attribution Rate is ~92%+
-
-3. Verify no regression for other organizations
-
----
-
-## Risk Assessment
-
-**Low risk** - This is an additive change:
-- Adds a LEFT JOIN (won't break if no mappings exist)
-- Pattern matching still works as fallback
-- No frontend changes needed
-- Easy to verify results match expected values
+1. Verify "Unique Donors" card shows non-zero new/returning counts
+2. Verify "Attributed ROI" sparkline renders when there's spend data
+3. Verify "New MRR Added" sparkline shows new recurring donor MRR per day
+4. Verify sparklines match the selected date range (14D, 30D, etc.)
+5. Verify no performance regression on dashboard load
