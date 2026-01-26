@@ -65,13 +65,23 @@ async function fetchVideoSource(
       };
     }
 
-    // Successfully got source URL
+    // Got response - check if source URL is present
     const thumbnail = data.thumbnails?.data?.length > 0
       ? data.thumbnails.data.sort((a: any, b: any) => (b.height || 0) - (a.height || 0))[0]?.uri
       : data.picture;
 
+    // If API succeeded but source is missing, that's still an issue
+    if (!data.source) {
+      return {
+        source: null,
+        duration: data.length ? Math.round(data.length) : null,
+        thumbnail: thumbnail || null,
+        error: 'Video source URL not returned by API - video may be deleted, expired, or require additional permissions'
+      };
+    }
+
     return {
-      source: data.source || null,
+      source: data.source,
       duration: data.length ? Math.round(data.length) : null,
       thumbnail: thumbnail || null,
       error: null
