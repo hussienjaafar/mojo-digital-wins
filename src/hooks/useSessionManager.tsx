@@ -36,6 +36,7 @@ interface SessionManagerOptions {
 const DEFAULT_WARNING_THRESHOLD = 300; // 5 minutes in seconds
 const EXPIRY_CHECK_INTERVAL = 30000; // Check every 30 seconds
 const MIN_REFRESH_INTERVAL = 60000; // Don't refresh more than once per minute
+const SESSION_HEARTBEAT_INTERVAL = 300000; // Update session activity every 5 minutes
 
 // ============================================================================
 // Hook
@@ -142,7 +143,7 @@ export function useSessionManager(options: SessionManagerOptions = {}): SessionM
   }, [calculateExpiryInfo, onSessionRefreshed, onRefreshError]);
 
   // ============================================================================
-  // Sign Out
+  // Sign Out - with session end tracking
   // ============================================================================
 
   const signOut = useCallback(async () => {
@@ -151,6 +152,25 @@ export function useSessionManager(options: SessionManagerOptions = {}): SessionM
       if (checkIntervalRef.current) {
         clearInterval(checkIntervalRef.current);
         checkIntervalRef.current = null;
+      }
+
+      // Track session end before signing out (non-blocking)
+      if (session?.user?.id) {
+        try {
+          // Get the current session ID from localStorage if stored
+          const currentSessionId = localStorage.getItem('currentSessionId');
+          if (currentSessionId) {
+            await supabase.rpc('end_user_session', { 
+              p_session_id: currentSessionId 
+            });
+            localStorage.removeItem('currentSessionId');
+          }
+        } catch (e) {
+          // Non-blocking - don't fail sign out if tracking fails
+          if (import.meta.env.DEV) {
+            console.warn('[SessionManager] Failed to track session end:', e);
+          }
+        }
       }
 
       const { error } = await supabase.auth.signOut();
@@ -178,7 +198,7 @@ export function useSessionManager(options: SessionManagerOptions = {}): SessionM
       }
       throw error;
     }
-  }, []);
+  }, [session]);
 
   // ============================================================================
   // Auth State Listener
@@ -259,6 +279,39 @@ export function useSessionManager(options: SessionManagerOptions = {}): SessionM
       }
     };
   }, [session, timeUntilExpiry, warningThreshold, calculateExpiryInfo, refreshSession]);
+
+  // ============================================================================
+  // Session Heartbeat - Update session activity periodically
+  // ============================================================================
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      return;
+    }
+
+    const heartbeatInterval = setInterval(async () => {
+      try {
+        const currentSessionId = localStorage.getItem('currentSessionId');
+        if (currentSessionId) {
+          await supabase.rpc('update_session_activity', {
+            p_session_id: currentSessionId,
+          });
+          if (import.meta.env.DEV) {
+            console.log('[SessionManager] Session heartbeat sent');
+          }
+        }
+      } catch (e) {
+        // Non-blocking - don't fail if heartbeat fails
+        if (import.meta.env.DEV) {
+          console.warn('[SessionManager] Heartbeat failed:', e);
+        }
+      }
+    }, SESSION_HEARTBEAT_INTERVAL);
+
+    return () => {
+      clearInterval(heartbeatInterval);
+    };
+  }, [session?.user?.id]);
 
   // ============================================================================
   // Return State

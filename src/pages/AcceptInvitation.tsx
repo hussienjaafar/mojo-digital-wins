@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { parseDeviceInfo } from "@/lib/deviceInfo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +24,61 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { PasswordStrengthMeter } from "@/components/auth/PasswordStrengthMeter";
 import { isPasswordValid, validatePassword } from "@/lib/password-validation";
+
+/**
+ * Track login attempt (success or failure)
+ */
+async function trackLoginAttempt(
+  email: string,
+  success: boolean,
+  failureReason?: string
+) {
+  try {
+    const { data: ipData } = await supabase.functions.invoke('get-client-ip');
+    const ipAddress = ipData?.ip || null;
+
+    await (supabase.rpc as any)('log_login_attempt', {
+      p_email: email,
+      p_success: success,
+      p_ip_address: ipAddress,
+      p_user_agent: navigator.userAgent,
+      p_failure_reason: failureReason || null,
+    });
+  } catch (e) {
+    console.warn('[AcceptInvitation] Failed to track login attempt:', e);
+  }
+}
+
+/**
+ * Create a session record after successful login
+ */
+async function createSessionRecord(userId: string) {
+  try {
+    const { data: ipData } = await supabase.functions.invoke('get-client-ip');
+    const ipAddress = ipData?.ip || null;
+    const deviceInfo = parseDeviceInfo(navigator.userAgent);
+
+    const { data: sessionData } = await (supabase.rpc as any)('create_user_session', {
+      p_user_id: userId,
+      p_device_info: deviceInfo,
+      p_ip_address: ipAddress,
+      p_user_agent: navigator.userAgent,
+    });
+
+    // Store session ID for heartbeat and end tracking
+    if (sessionData?.id) {
+      localStorage.setItem('currentSessionId', sessionData.id);
+    }
+
+    if (ipAddress && ipAddress !== 'unknown') {
+      supabase.functions.invoke('geolocate-ip', {
+        body: { ip_address: ipAddress },
+      }).catch(e => console.warn('[AcceptInvitation] Geolocation failed:', e));
+    }
+  } catch (e) {
+    console.warn('[AcceptInvitation] Failed to create session record:', e);
+  }
+}
 
 interface InvitationDetails {
   id: string;
@@ -266,6 +322,10 @@ export default function AcceptInvitation() {
       }
 
       if (authData.user) {
+        // Track successful login and create session record (non-blocking)
+        trackLoginAttempt(loginEmail, true);
+        createSessionRecord(authData.user.id);
+
         setIsLoggedIn(true);
         setCurrentUser({ id: authData.user.id, email: authData.user.email || "" });
 
@@ -281,6 +341,9 @@ export default function AcceptInvitation() {
         }
       }
     } catch (err: any) {
+      // Track failed login attempt (non-blocking)
+      trackLoginAttempt(loginEmail, false, err.message);
+      
       console.error("Login error:", err);
       setLoginError(err.message || "Failed to log in");
     } finally {

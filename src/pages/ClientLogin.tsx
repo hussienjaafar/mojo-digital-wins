@@ -2,12 +2,74 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { proxyQuery } from "@/lib/supabaseProxy";
+import { parseDeviceInfo } from "@/lib/deviceInfo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, BarChart3, Mail, Lock } from "lucide-react";
+
+/**
+ * Track login attempt (success or failure)
+ */
+async function trackLoginAttempt(
+  email: string,
+  success: boolean,
+  failureReason?: string
+) {
+  try {
+    // Get client IP from edge function
+    const { data: ipData } = await supabase.functions.invoke('get-client-ip');
+    const ipAddress = ipData?.ip || null;
+
+    await (supabase.rpc as any)('log_login_attempt', {
+      p_email: email,
+      p_success: success,
+      p_ip_address: ipAddress,
+      p_user_agent: navigator.userAgent,
+      p_failure_reason: failureReason || null,
+    });
+  } catch (e) {
+    // Non-blocking - don't fail login if tracking fails
+    console.warn('[ClientLogin] Failed to track login attempt:', e);
+  }
+}
+
+/**
+ * Create a session record after successful login
+ */
+async function createSessionRecord(userId: string) {
+  try {
+    // Get client IP from edge function
+    const { data: ipData } = await supabase.functions.invoke('get-client-ip');
+    const ipAddress = ipData?.ip || null;
+
+    const deviceInfo = parseDeviceInfo(navigator.userAgent);
+
+    const { data: sessionData } = await (supabase.rpc as any)('create_user_session', {
+      p_user_id: userId,
+      p_device_info: deviceInfo,
+      p_ip_address: ipAddress,
+      p_user_agent: navigator.userAgent,
+    });
+
+    // Store session ID for heartbeat and end tracking
+    if (sessionData?.id) {
+      localStorage.setItem('currentSessionId', sessionData.id);
+    }
+
+    // Trigger async geolocation lookup if we have an IP
+    if (ipAddress && ipAddress !== 'unknown') {
+      supabase.functions.invoke('geolocate-ip', {
+        body: { ip_address: ipAddress },
+      }).catch(e => console.warn('[ClientLogin] Geolocation failed:', e));
+    }
+  } catch (e) {
+    // Non-blocking - don't fail login if session tracking fails
+    console.warn('[ClientLogin] Failed to create session record:', e);
+  }
+}
 
 const ClientLogin = () => {
   const navigate = useNavigate();
@@ -52,6 +114,10 @@ const ClientLogin = () => {
       if (error) throw error;
 
       if (data.user) {
+        // Track successful login attempt and create session record (non-blocking)
+        trackLoginAttempt(email, true);
+        createSessionRecord(data.user.id);
+
         // Update last login - use direct supabase for writes (proxy only supports reads)
         // This is fine because auth requests work from any domain
         try {
@@ -78,6 +144,9 @@ const ClientLogin = () => {
         navigate('/client/dashboard');
       }
     } catch (error: any) {
+      // Track failed login attempt (non-blocking)
+      trackLoginAttempt(email, false, error.message);
+
       toast({
         title: "Error",
         description: error.message || "Failed to log in",
