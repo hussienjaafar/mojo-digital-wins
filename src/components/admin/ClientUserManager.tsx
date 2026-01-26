@@ -135,42 +135,38 @@ const ClientUserManager = () => {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Build the query with filters
-      let query = (supabase as any)
-        .from('client_users')
-        .select('*', { count: 'exact' });
-
-      // Apply search filter
-      if (searchQuery) {
-        query = query.or(`full_name.ilike.%${searchQuery}%`);
-      }
-
-      // Apply organization filter
-      if (selectedOrgFilter !== 'all') {
-        query = query.eq('organization_id', selectedOrgFilter);
-      }
-
-      // Apply role filter
-      if (selectedRoles.length > 0) {
-        query = query.in('role', selectedRoles);
-      }
-
-      // Apply status filter
-      if (selectedStatus !== 'all') {
-        query = query.eq('status', selectedStatus);
-      }
-
-      // Pagination
+      // Load users with enhanced data using RPC
       const offset = (currentPage - 1) * pageSize;
-      query = query
-        .range(offset, offset + pageSize - 1)
-        .order('created_at', { ascending: false });
-
-      const { data: usersData, count, error: usersError } = await query;
+      const { data: usersData, error: usersError } = await (supabase.rpc as any)('get_user_management_data', {
+        p_search: searchQuery || null,
+        p_org_id: selectedOrgFilter !== 'all' ? selectedOrgFilter : null,
+        p_roles: selectedRoles.length > 0 ? selectedRoles : null,
+        p_status: selectedStatus !== 'all' ? selectedStatus : null,
+        p_limit: pageSize,
+        p_offset: offset
+      });
 
       if (usersError) throw usersError;
-      setUsers(usersData || []);
-      setTotalCount(count || 0);
+      
+      const enhancedUsers: EnhancedUser[] = (usersData || []).map((row: any) => ({
+        id: row.id,
+        full_name: row.full_name,
+        email: row.email,
+        organization_id: row.organization_id,
+        organization_name: row.organization_name || 'Unknown',
+        role: row.role,
+        status: row.status,
+        mfa_enabled: row.mfa_enabled || false,
+        created_at: row.created_at,
+        last_login_at: row.last_login_at,
+        latest_session: row.latest_session,
+        active_sessions_30d: row.active_sessions_30d || 0,
+        failed_logins_24h: row.failed_logins_24h || 0,
+        is_locked: row.is_locked || false
+      }));
+      
+      setUsers(enhancedUsers);
+      setTotalCount(usersData?.[0]?.total_count || 0);
 
       // Load pending invitation count
       const { data: pendingInviteData } = await supabase
@@ -702,51 +698,110 @@ const ClientUserManager = () => {
                       />
                     </TableHead>
                     <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
                     <TableHead>Organization</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Last Login</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead>Security</TableHead>
+                    <TableHead>Last Session</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-[hsl(var(--portal-text-secondary))]">
+                      <TableCell colSpan={9} className="text-center text-[hsl(var(--portal-text-secondary))]">
                         {hasActiveFilters ? "No users match your filters" : "No users yet. Invite your first member!"}
                       </TableCell>
                     </TableRow>
                   ) : (
                     users.map((user) => (
-                      <TableRow key={user.id} className="hover:bg-[hsl(var(--portal-bg-hover))] transition-colors duration-150 border-[hsl(var(--portal-border))]" data-state={selectedUserIds.includes(user.id) ? "selected" : undefined}>
-                        <TableCell>
+                      <TableRow 
+                        key={user.id} 
+                        className="hover:bg-[hsl(var(--portal-bg-hover))] transition-colors duration-150 border-[hsl(var(--portal-border))] cursor-pointer" 
+                        data-state={selectedUserIds.includes(user.id) ? "selected" : undefined}
+                        onClick={() => {
+                          setSelectedUserForDetail(user);
+                          setShowUserDetail(true);
+                        }}
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={selectedUserIds.includes(user.id)}
                             onCheckedChange={() => toggleUserSelection(user.id)}
                           />
                         </TableCell>
                         <TableCell className="font-medium text-[hsl(var(--portal-text-primary))]">{user.full_name}</TableCell>
+                        <TableCell className="text-[hsl(var(--portal-text-secondary))]">{user.email || '-'}</TableCell>
                         <TableCell className="text-[hsl(var(--portal-text-secondary))]">
-                          {getOrganizationName(user.organization_id)}
+                          {user.organization_name || getOrganizationName(user.organization_id)}
                         </TableCell>
                         <TableCell>
                           <V3Badge variant={getRoleBadgeVariant(user.role)} className="capitalize">{user.role}</V3Badge>
                         </TableCell>
                         <TableCell>
-                          <V3Badge variant={getStatusBadgeVariant(user.status)}>
-                            {user.status || 'active'}
-                          </V3Badge>
+                          <div className="flex items-center gap-1">
+                            <V3Badge variant={getStatusBadgeVariant(user.status)}>
+                              {user.status || 'active'}
+                            </V3Badge>
+                            {user.is_locked && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <Lock className="h-3 w-3 text-[hsl(var(--portal-error))]" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>Account Locked</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  {user.mfa_enabled ? (
+                                    <Shield className="h-4 w-4 text-[hsl(var(--portal-success))]" />
+                                  ) : (
+                                    <ShieldOff className="h-4 w-4 text-[hsl(var(--portal-warning))]" />
+                                  )}
+                                </TooltipTrigger>
+                                <TooltipContent>{user.mfa_enabled ? 'MFA Enabled' : 'MFA Disabled'}</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            {user.failed_logins_24h > 0 && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <AlertTriangle className="h-4 w-4 text-[hsl(var(--portal-error))]" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>{user.failed_logins_24h} failed logins (24h)</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-[hsl(var(--portal-text-secondary))]">
-                          {user.last_login_at
-                            ? new Date(user.last_login_at).toLocaleDateString()
-                            : 'Never'}
+                          {user.latest_session ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger className="flex items-center gap-1">
+                                  <Monitor className="h-3 w-3" />
+                                  <span className="text-xs">
+                                    {formatDistanceToNow(new Date(user.latest_session.last_active_at), { addSuffix: true })}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {user.latest_session.city && `${user.latest_session.city}, ${user.latest_session.country}`}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <span className="text-xs text-[hsl(var(--portal-text-muted))]">No sessions</span>
+                          )}
                         </TableCell>
-                        <TableCell className="text-[hsl(var(--portal-text-secondary))]">
-                          {new Date(user.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <V3Button variant="ghost" size="icon-sm">
