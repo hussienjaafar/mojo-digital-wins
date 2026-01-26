@@ -1,212 +1,252 @@
 
-# Fix Meta Ads Performance Overview - Use Correct Link Metrics
+# Add Single-Day View for Meta Ads Performance Overview
 
-## Problem Summary
+## Current Situation
 
-The "Meta Ads Performance Overview" section displays incorrect metrics because:
+When a user selects a **single day** (start date = end date), the dashboard switches from `ClientDashboardCharts` to `TodayViewDashboard`. However:
 
-| Issue | Current Value | Correct Value | Root Cause |
-|-------|--------------|---------------|------------|
-| **Total Clicks** | 12,305 (all clicks) | 1,359 (link clicks) | Using `clicks` instead of `link_clicks` |
-| **CTR** | 7.61% | ~0.84% | Calculated from all clicks, not link clicks |
-| **CPC** | $1 | ~$7 | Calculated from all clicks, not link clicks |
-| **Missing: Attributed Revenue** | Not shown | $7,291 | Need to add to UI |
-| **Missing: Attributed ROI** | Not shown | 0.77 | Need to add to UI |
+- `TodayViewDashboard` only displays **ActBlue donation metrics** (Total Raised, Donations, Unique Donors, Recurring Rate)
+- The **Meta Ads Performance Overview** section (Link Clicks, Link CTR, Link CPC, Attributed Revenue, ROI) is only visible in the multi-day `ClientDashboardCharts` view
+- Users have no visibility into Meta performance when viewing a single day
 
-## Root Cause
+## Solution Overview
 
-The `fetchChannelSpend` function queries `meta_ad_metrics` table, which does NOT have `link_clicks` or `link_ctr` columns:
+Add a **Meta Ads Performance Overview** card to `TodayViewDashboard` that displays the same metrics shown in `ClientDashboardCharts`, but formatted for single-day comparison (current day vs. previous day).
 
-```typescript
-// Current (wrong table)
-const metaQuery = supabase
-  .from('meta_ad_metrics')  // ❌ No link_clicks/link_ctr columns
-  .select('date, spend, conversions, impressions, clicks')
-```
+## Implementation Plan
 
-The correct table is `meta_ad_metrics_daily` which contains `link_clicks` and `link_ctr`.
+### Step 1: Create a New Hook for Single-Day Meta Metrics
 
----
-
-## Solution
-
-### Part 1: Update Data Fetching
-
-Modify `fetchChannelSpend` to query `meta_ad_metrics_daily` instead:
+Create `useSingleDayMetaMetrics` hook that fetches:
+- Current day: Meta spend, impressions, link clicks, conversions, attributed revenue from `meta_ad_metrics_daily`
+- Previous day: Same metrics for comparison
 
 ```typescript
-// Fixed - use correct table with link metrics
-const metaQuery = supabase
-  .from('meta_ad_metrics_daily')  // ✅ Has link_clicks, link_ctr
-  .select('date, spend, conversions, impressions, clicks, link_clicks, link_ctr')
-  .eq('organization_id', organizationId)
-  .gte('date', startDate)
-  .lte('date', endDate)
-  .order('date');
-```
-
-### Part 2: Update ChannelSpendData Interface
-
-Add link-specific metrics:
-
-```typescript
-interface ChannelSpendData {
-  metaSpend: number;
-  smsSpend: number;
-  metaConversions: number;
-  smsConversions: number;
-  metaImpressions: number;
-  metaClicks: number;
-  metaLinkClicks: number;      // NEW
-  dailyMetaSpend: DailySpendPoint[];
-  dailySmsSpend: DailySpendPoint[];
+// src/hooks/useSingleDayMetaMetrics.ts
+interface SingleDayMetaData {
+  current: {
+    spend: number;
+    impressions: number;
+    linkClicks: number;
+    conversions: number;
+    attributedRevenue: number;
+  };
+  previous: {
+    spend: number;
+    impressions: number;
+    linkClicks: number;
+    conversions: number;
+    attributedRevenue: number;
+  };
 }
 ```
 
-### Part 3: Add Aggregation for Link Clicks
+### Step 2: Update TodayViewDashboard Component
 
-```typescript
-// After existing aggregations, add:
-const metaLinkClicks = (metaResult.data || []).reduce(
-  (sum: number, m: any) => sum + Number(m.link_clicks || 0),
-  0
-);
+Add the Meta Ads Performance Overview section after the existing KPI cards:
+
+```text
+Current Layout:
+┌─────────────────────────────────────────────────────┐
+│  Header: "Today's Performance"                      │
+├─────────────────────────────────────────────────────┤
+│  KPI Row: Total Raised | Donations | Donors | Rec%  │
+├─────────────────────────────────────────────────────┤
+│  Hourly Breakdown Chart                             │
+├───────────────────────────┬─────────────────────────┤
+│  Recent Activity Feed     │  Week Comparison        │
+└───────────────────────────┴─────────────────────────┘
+
+New Layout (adding Meta section):
+┌─────────────────────────────────────────────────────┐
+│  Header: "Today's Performance"                      │
+├─────────────────────────────────────────────────────┤
+│  KPI Row: Total Raised | Donations | Donors | Rec%  │
+├─────────────────────────────────────────────────────┤
+│  NEW: Meta Ads Performance Overview                 │
+│  ┌─────────┬─────────┬─────────┬─────────┐         │
+│  │ Spend   │ LinkClk │LinkCTR  │ LinkCPC │         │
+│  ├─────────┼─────────┼─────────┼─────────┤         │
+│  │ Conver. │ Attr Rev│ Attr ROI│ Avg Gift│         │
+│  └─────────┴─────────┴─────────┴─────────┘         │
+├─────────────────────────────────────────────────────┤
+│  Hourly Breakdown Chart                             │
+├───────────────────────────┬─────────────────────────┤
+│  Recent Activity Feed     │  Week Comparison        │
+└───────────────────────────┴─────────────────────────┘
 ```
 
-### Part 4: Update KPIs Mapping
+### Step 3: Use SingleDayMetricGrid Component
 
-The UI needs access to link clicks for proper CTR/CPC calculation:
+Leverage the existing `SingleDayMetricGrid` component (already used in `MetaAdsMetrics.tsx`) to display the Meta performance metrics with trend indicators comparing to the previous day.
 
-```typescript
-// In transformToLegacyFormat, update:
-totalClicks: channelSpend.metaLinkClicks,  // Use link clicks
-```
-
-### Part 5: Update UI in ClientDashboardCharts.tsx
-
-Update the metrics display to use link-specific values and add new rows:
-
-```typescript
-// Meta Ads Performance Overview section
-
-// 1. Change "Total Clicks" to "Link Clicks"
-<span>Link Clicks</span>
-<span>{kpis.totalClicks.toLocaleString()}</span>
-
-// 2. Update CTR label to "Link CTR" (calculation already uses totalClicks)
-<span>Link CTR</span>
-<span>{((kpis.totalClicks / kpis.totalImpressions) * 100).toFixed(2)}%</span>
-
-// 3. Update CPC label to "Link CPC"
-<span>Link CPC</span>
-<span>{formatCurrency(metaSpend / kpis.totalClicks)}</span>
-
-// 4. Add new row: Meta Attributed Revenue
-<div className="flex items-center justify-between py-2 border-b ...">
-  <span>Meta Attributed Revenue</span>
-  <span>{formatCurrency(kpis.metaAttributedRevenue)}</span>
-</div>
-
-// 5. Add new row: Meta Attributed ROI
-<div className="flex items-center justify-between py-2 border-b ...">
-  <span>Meta Attributed ROI</span>
-  <span>
-    {metaSpend > 0 
-      ? (kpis.metaAttributedRevenue / metaSpend).toFixed(2) + 'x'
-      : '0.00x'}
-  </span>
-</div>
-```
+Metrics to display in the grid (2 rows x 4 columns):
+1. **Ad Spend** - Total Meta spend for the day
+2. **Link Clicks** - Number of outbound clicks
+3. **Link CTR** - Click-through rate percentage
+4. **Link CPC** - Cost per link click
+5. **Conversions** - Meta-attributed donations
+6. **Attributed Revenue** - Meta-attributed donation revenue
+7. **Attributed ROI** - Revenue / Spend ratio
+8. **Avg Gift (Meta)** - Average donation amount from Meta
 
 ---
 
-## Files to Modify
+## Files to Create/Modify
 
-| File | Changes |
-|------|---------|
-| `src/hooks/useDashboardMetricsV2.ts` | Change query from `meta_ad_metrics` to `meta_ad_metrics_daily`, add `link_clicks` aggregation, update interface |
-| `src/components/client/ClientDashboardCharts.tsx` | Update labels, add Attributed Revenue and Attributed ROI rows |
+| File | Action | Description |
+|------|--------|-------------|
+| `src/hooks/useSingleDayMetaMetrics.ts` | **CREATE** | Hook to fetch single-day Meta metrics with previous day comparison |
+| `src/components/client/TodayViewDashboard.tsx` | **MODIFY** | Add Meta Ads Performance Overview section using SingleDayMetricGrid |
 
 ---
 
 ## Detailed Code Changes
 
-### useDashboardMetricsV2.ts
+### New Hook: `useSingleDayMetaMetrics.ts`
 
-**1. Update meta query (line 72-78):**
 ```typescript
-const metaQuery = supabase
-  .from('meta_ad_metrics_daily')  // Changed table
-  .select('date, spend, conversions, impressions, clicks, link_clicks')  // Added link_clicks
-  .eq('organization_id', organizationId)
-  .gte('date', startDate)
-  .lte('date', endDate)
-  .order('date');
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useDateRange } from "@/stores/dashboardStore";
+import { subDays, format } from "date-fns";
+
+interface MetaDayMetrics {
+  spend: number;
+  impressions: number;
+  linkClicks: number;
+  conversions: number;
+  conversionValue: number;
+}
+
+interface SingleDayMetaData {
+  current: MetaDayMetrics;
+  previous: MetaDayMetrics;
+}
+
+async function fetchDayMetaMetrics(
+  organizationId: string,
+  date: string
+): Promise<MetaDayMetrics> {
+  const { data, error } = await supabase
+    .from('meta_ad_metrics_daily')
+    .select('spend, impressions, link_clicks, conversions, conversion_value')
+    .eq('organization_id', organizationId)
+    .eq('date', date);
+
+  if (error) throw error;
+
+  // Aggregate all rows for the day
+  return (data || []).reduce(
+    (acc, row) => ({
+      spend: acc.spend + Number(row.spend || 0),
+      impressions: acc.impressions + Number(row.impressions || 0),
+      linkClicks: acc.linkClicks + Number(row.link_clicks || 0),
+      conversions: acc.conversions + Number(row.conversions || 0),
+      conversionValue: acc.conversionValue + Number(row.conversion_value || 0),
+    }),
+    { spend: 0, impressions: 0, linkClicks: 0, conversions: 0, conversionValue: 0 }
+  );
+}
+
+export function useSingleDayMetaMetrics(organizationId: string | undefined) {
+  const { startDate } = useDateRange();
+  const previousDate = format(subDays(new Date(startDate), 1), 'yyyy-MM-dd');
+
+  return useQuery({
+    queryKey: ['single-day-meta', organizationId, startDate],
+    queryFn: async () => {
+      const [current, previous] = await Promise.all([
+        fetchDayMetaMetrics(organizationId!, startDate),
+        fetchDayMetaMetrics(organizationId!, previousDate),
+      ]);
+      return { current, previous };
+    },
+    enabled: !!organizationId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
 ```
 
-**2. Update ChannelSpendData interface (add after line 36):**
+### Updated TodayViewDashboard.tsx
+
+Add after the KPI cards section:
+
 ```typescript
-metaLinkClicks: number;
+// Import the new hook and SingleDayMetricGrid
+import { useSingleDayMetaMetrics } from "@/hooks/useSingleDayMetaMetrics";
+import { SingleDayMetricGrid, type SingleDayMetric } from "./SingleDayMetricGrid";
+
+// Inside the component, after existing data fetching:
+const { data: metaData } = useSingleDayMetaMetrics(organizationId);
+
+// Build Meta metrics for the grid
+const metaMetrics: SingleDayMetric[] = useMemo(() => {
+  if (!metaData) return [];
+  
+  const { current, previous } = metaData;
+  const linkCtr = current.impressions > 0 ? (current.linkClicks / current.impressions) * 100 : 0;
+  const prevLinkCtr = previous.impressions > 0 ? (previous.linkClicks / previous.impressions) * 100 : 0;
+  const linkCpc = current.linkClicks > 0 ? current.spend / current.linkClicks : 0;
+  const prevLinkCpc = previous.linkClicks > 0 ? previous.spend / previous.linkClicks : 0;
+  const roi = current.spend > 0 ? current.conversionValue / current.spend : 0;
+  const prevRoi = previous.spend > 0 ? previous.conversionValue / previous.spend : 0;
+  const avgGift = current.conversions > 0 ? current.conversionValue / current.conversions : 0;
+  const prevAvgGift = previous.conversions > 0 ? previous.conversionValue / previous.conversions : 0;
+
+  return [
+    { label: "Ad Spend", value: current.spend, previousValue: previous.spend, format: "currency", accent: "blue" },
+    { label: "Link Clicks", value: current.linkClicks, previousValue: previous.linkClicks, format: "number", accent: "blue" },
+    { label: "Link CTR", value: linkCtr, previousValue: prevLinkCtr, format: "percent", accent: "default" },
+    { label: "Link CPC", value: linkCpc, previousValue: prevLinkCpc, format: "currency", accent: "default" },
+    { label: "Conversions", value: current.conversions, previousValue: previous.conversions, format: "number", accent: "green" },
+    { label: "Attributed Revenue", value: current.conversionValue, previousValue: previous.conversionValue, format: "currency", accent: "green" },
+    { label: "Attributed ROI", value: roi, previousValue: prevRoi, format: "ratio", accent: "amber" },
+    { label: "Avg Gift (Meta)", value: avgGift, previousValue: prevAvgGift, format: "currency", accent: "purple" },
+  ];
+}, [metaData]);
+
+// In the JSX, add after KPI Cards Row:
+{metaMetrics.length > 0 && (
+  <motion.div variants={itemVariants}>
+    <V3Card className="p-4 sm:p-6">
+      <h3 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))] mb-4">
+        Meta Ads Performance Overview
+      </h3>
+      <SingleDayMetricGrid metrics={metaMetrics} columns={4} />
+    </V3Card>
+  </motion.div>
+)}
 ```
-
-**3. Add link clicks aggregation (after line 112):**
-```typescript
-const metaLinkClicks = (metaResult.data || []).reduce(
-  (sum: number, m: any) => sum + Number(m.link_clicks || 0),
-  0
-);
-```
-
-**4. Update return statement (add after line 153):**
-```typescript
-metaLinkClicks,
-```
-
-**5. Update KPIs mapping (line 210):**
-```typescript
-totalClicks: channelSpend.metaLinkClicks,  // Use link clicks instead of all clicks
-```
-
-### ClientDashboardCharts.tsx
-
-**Update the Meta Ads Performance Overview section (lines 406-435):**
-
-Current order: Impressions, Clicks, CTR, CPC, Conversions, Avg Donation
-
-New order with additions:
-1. Total Impressions (unchanged)
-2. Link Clicks (renamed from "Total Clicks")
-3. Link CTR (renamed)
-4. Link CPC (renamed)
-5. Meta Conversions (unchanged)
-6. **Meta Attributed Revenue** (NEW)
-7. **Meta Attributed ROI** (NEW)
-8. Avg Donation (Meta) (keep at end)
 
 ---
 
-## Expected Results After Fix
+## Expected Results
 
-| Metric | Before | After |
-|--------|--------|-------|
-| Link Clicks | 12,305 | 1,359 |
-| Link CTR | 7.61% | 0.84% |
-| Link CPC | $1 | ~$7.00 |
-| Meta Attributed Revenue | Not shown | $7,291 |
-| Meta Attributed ROI | Not shown | 0.77x |
+When viewing a single day:
+
+| Metric | Display | Comparison |
+|--------|---------|------------|
+| Ad Spend | $114.14 | vs $296.07 yesterday (+trend indicator) |
+| Link Clicks | 45 | vs 82 yesterday |
+| Link CTR | 0.84% | vs 0.92% yesterday |
+| Link CPC | $2.54 | vs $3.61 yesterday |
+| Conversions | 5 | vs 18 yesterday |
+| Attributed Revenue | $67 | vs $189 yesterday |
+| Attributed ROI | 0.59x | vs 0.64x yesterday |
+| Avg Gift (Meta) | $13.40 | vs $10.50 yesterday |
+
+Each metric will show:
+- Current day value (large, primary text)
+- Trend indicator (up/down arrow with percentage)
+- Accent color based on metric type
 
 ---
 
 ## Technical Notes
 
-- The `meta_ad_metrics` table is campaign-level aggregates
-- The `meta_ad_metrics_daily` table contains ad-level daily metrics with accurate link click data
-- Link clicks represent actual clicks that navigate away from Facebook (outbound)
-- Regular clicks include all engagement (likes, comments, shares, etc.)
-- Link CTR and Link CPC are the industry-standard metrics for measuring ad performance
-
----
-
-## No Database Changes Required
-
-This fix only requires frontend/hook changes. The data already exists in `meta_ad_metrics_daily`.
+1. **Data Source**: Uses `meta_ad_metrics_daily` table (same as multi-day view) for accurate link click data
+2. **Comparison Logic**: Always compares to the previous calendar day
+3. **Fallback**: If no Meta data exists for the selected day, the section is hidden rather than showing zeros
+4. **Performance**: Single-day queries are lightweight (2 small queries in parallel)
+5. **Reuse**: Leverages existing `SingleDayMetricGrid` component for consistent styling
