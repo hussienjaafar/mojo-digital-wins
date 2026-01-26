@@ -7,8 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Users, Mail, Eye, Edit, Trash2, Key, MoreVertical, Send, Search, X, Settings } from "lucide-react";
+import { UserPlus, Users, Mail, Eye, Edit, Trash2, Key, MoreVertical, Send, Search, X, Settings, Shield, ShieldOff, Monitor, AlertTriangle, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -27,6 +28,8 @@ import { UserPagination } from "@/components/admin/UserPagination";
 import { BulkUserActions } from "@/components/admin/BulkUserActions";
 import { SeatManagement } from "@/components/admin/SeatManagement";
 import { MemberRequestQueue } from "@/components/admin/MemberRequestQueue";
+import { UserDetailSidebar, type EnhancedUser } from "@/components/admin/user-management";
+import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 
 // Role badge variant helper
@@ -56,16 +59,6 @@ type Organization = {
   name: string;
 };
 
-type ClientUser = {
-  id: string;
-  full_name: string;
-  organization_id: string;
-  role: string;
-  status: 'pending' | 'active' | 'inactive' | 'suspended';
-  created_at: string;
-  last_login_at: string | null;
-};
-
 // Valid org roles
 const ORG_ROLES = ['admin', 'manager', 'editor', 'viewer'] as const;
 type OrgRole = typeof ORG_ROLES[number];
@@ -76,7 +69,7 @@ const ClientUserManager = () => {
   const { setImpersonation } = useImpersonation();
   const isMobile = useIsMobile();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [users, setUsers] = useState<ClientUser[]>([]);
+  const [users, setUsers] = useState<EnhancedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
@@ -84,10 +77,12 @@ const ClientUserManager = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<ClientUser | null>(null);
+  const [selectedUser, setSelectedUser] = useState<EnhancedUser | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [pendingInviteCount, setPendingInviteCount] = useState(0);
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
+  const [showUserDetail, setShowUserDetail] = useState(false);
+  const [selectedUserForDetail, setSelectedUserForDetail] = useState<EnhancedUser | null>(null);
 
   // Filter & pagination state
   const [searchQuery, setSearchQuery] = useState("");
@@ -269,13 +264,13 @@ const ClientUserManager = () => {
     return organizations.find(o => o.id === orgId)?.name || 'Unknown';
   };
 
-  const handleViewPortal = (user: ClientUser) => {
+  const handleViewPortal = (user: EnhancedUser) => {
     const orgName = getOrganizationName(user.organization_id);
     setImpersonation(user.id, user.full_name, user.organization_id, orgName);
     navigate('/client/dashboard');
   };
 
-  const handleEditClick = (user: ClientUser) => {
+  const handleEditClick = (user: EnhancedUser) => {
     setSelectedUser(user);
     setEditFormData({
       full_name: user.full_name,
@@ -321,7 +316,7 @@ const ClientUserManager = () => {
     }
   };
 
-  const handleDeleteClick = (user: ClientUser) => {
+  const handleDeleteClick = (user: EnhancedUser) => {
     setSelectedUser(user);
     setShowDeleteDialog(true);
   };
@@ -358,7 +353,7 @@ const ClientUserManager = () => {
     }
   };
 
-  const handleResetPassword = async (user: ClientUser) => {
+  const handleResetPassword = async (user: EnhancedUser) => {
     setIsProcessing(true);
     try {
       const { data, error } = await supabase.functions.invoke('reset-client-password', {
@@ -400,7 +395,7 @@ const ClientUserManager = () => {
   }
 
   // Mobile card renderer for users
-  const renderMobileUserCard = (user: ClientUser) => (
+  const renderMobileUserCard = (user: EnhancedUser) => (
     <V3Card key={user.id} className="overflow-hidden">
       <V3CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
@@ -1023,6 +1018,17 @@ const ClientUserManager = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* User Detail Sidebar */}
+      <UserDetailSidebar
+        user={selectedUserForDetail}
+        open={showUserDetail}
+        onClose={() => {
+          setShowUserDetail(false);
+          setSelectedUserForDetail(null);
+        }}
+        onUserUpdated={loadData}
+      />
     </V3Card>
   );
 };
