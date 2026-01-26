@@ -5816,68 +5816,138 @@ export type Database = {
       meta_ad_transcripts: {
         Row: {
           ad_id: string
+          analysis_model: string | null
+          analysis_version: string | null
           analyzed_at: string | null
           cta_text: string | null
+          cta_type: string | null
           donor_pain_points: string[] | null
           duration_seconds: number | null
+          emotional_appeals: string[] | null
           emotional_triggers: string[] | null
+          hook_duration_seconds: number | null
+          hook_text: string | null
+          hook_word_count: number | null
           id: string
           issue_specifics: string[] | null
           key_phrases: string[] | null
           language: string | null
+          language_confidence: number | null
           organization_id: string
+          sentiment_label: string | null
+          sentiment_score: number | null
+          silence_percentage: number | null
+          speaker_count: number | null
           tone_primary: string | null
+          tone_tags: string[] | null
           topic_primary: string | null
           topic_tags: string[] | null
           transcribed_at: string | null
+          transcript_segments: Json | null
           transcript_text: string
+          transcription_confidence: number | null
+          transcription_model: string | null
+          updated_at: string | null
           urgency_drivers: string[] | null
+          urgency_level: string | null
           values_appealed: string[] | null
           video_id: string
+          video_ref: string | null
+          words_per_minute: number | null
+          words_total: number | null
         }
         Insert: {
           ad_id: string
+          analysis_model?: string | null
+          analysis_version?: string | null
           analyzed_at?: string | null
           cta_text?: string | null
+          cta_type?: string | null
           donor_pain_points?: string[] | null
           duration_seconds?: number | null
+          emotional_appeals?: string[] | null
           emotional_triggers?: string[] | null
+          hook_duration_seconds?: number | null
+          hook_text?: string | null
+          hook_word_count?: number | null
           id?: string
           issue_specifics?: string[] | null
           key_phrases?: string[] | null
           language?: string | null
+          language_confidence?: number | null
           organization_id: string
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          silence_percentage?: number | null
+          speaker_count?: number | null
           tone_primary?: string | null
+          tone_tags?: string[] | null
           topic_primary?: string | null
           topic_tags?: string[] | null
           transcribed_at?: string | null
+          transcript_segments?: Json | null
           transcript_text: string
+          transcription_confidence?: number | null
+          transcription_model?: string | null
+          updated_at?: string | null
           urgency_drivers?: string[] | null
+          urgency_level?: string | null
           values_appealed?: string[] | null
           video_id: string
+          video_ref?: string | null
+          words_per_minute?: number | null
+          words_total?: number | null
         }
         Update: {
           ad_id?: string
+          analysis_model?: string | null
+          analysis_version?: string | null
           analyzed_at?: string | null
           cta_text?: string | null
+          cta_type?: string | null
           donor_pain_points?: string[] | null
           duration_seconds?: number | null
+          emotional_appeals?: string[] | null
           emotional_triggers?: string[] | null
+          hook_duration_seconds?: number | null
+          hook_text?: string | null
+          hook_word_count?: number | null
           id?: string
           issue_specifics?: string[] | null
           key_phrases?: string[] | null
           language?: string | null
+          language_confidence?: number | null
           organization_id?: string
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          silence_percentage?: number | null
+          speaker_count?: number | null
           tone_primary?: string | null
+          tone_tags?: string[] | null
           topic_primary?: string | null
           topic_tags?: string[] | null
           transcribed_at?: string | null
+          transcript_segments?: Json | null
           transcript_text?: string
+          transcription_confidence?: number | null
+          transcription_model?: string | null
+          updated_at?: string | null
           urgency_drivers?: string[] | null
+          urgency_level?: string | null
           values_appealed?: string[] | null
           video_id?: string
+          video_ref?: string | null
+          words_per_minute?: number | null
+          words_total?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_meta_ad_transcripts_video"
+            columns: ["video_ref"]
+            isOneToOne: false
+            referencedRelation: "meta_ad_videos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "meta_ad_transcripts_organization_id_fkey"
             columns: ["organization_id"]
