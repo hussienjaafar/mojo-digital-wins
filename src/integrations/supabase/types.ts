@@ -5829,15 +5829,21 @@ export type Database = {
           hook_text: string | null
           hook_word_count: number | null
           id: string
+          issue_primary: string | null
           issue_specifics: string[] | null
+          issue_tags: string[] | null
           key_phrases: string[] | null
           language: string | null
           language_confidence: number | null
           organization_id: string
+          policy_positions: string[] | null
+          political_stances: string[] | null
           sentiment_label: string | null
           sentiment_score: number | null
           silence_percentage: number | null
           speaker_count: number | null
+          targets_attacked: string[] | null
+          targets_supported: string[] | null
           tone_primary: string | null
           tone_tags: string[] | null
           topic_primary: string | null
@@ -5871,15 +5877,21 @@ export type Database = {
           hook_text?: string | null
           hook_word_count?: number | null
           id?: string
+          issue_primary?: string | null
           issue_specifics?: string[] | null
+          issue_tags?: string[] | null
           key_phrases?: string[] | null
           language?: string | null
           language_confidence?: number | null
           organization_id: string
+          policy_positions?: string[] | null
+          political_stances?: string[] | null
           sentiment_label?: string | null
           sentiment_score?: number | null
           silence_percentage?: number | null
           speaker_count?: number | null
+          targets_attacked?: string[] | null
+          targets_supported?: string[] | null
           tone_primary?: string | null
           tone_tags?: string[] | null
           topic_primary?: string | null
@@ -5913,15 +5925,21 @@ export type Database = {
           hook_text?: string | null
           hook_word_count?: number | null
           id?: string
+          issue_primary?: string | null
           issue_specifics?: string[] | null
+          issue_tags?: string[] | null
           key_phrases?: string[] | null
           language?: string | null
           language_confidence?: number | null
           organization_id?: string
+          policy_positions?: string[] | null
+          political_stances?: string[] | null
           sentiment_label?: string | null
           sentiment_score?: number | null
           silence_percentage?: number | null
           speaker_count?: number | null
+          targets_attacked?: string[] | null
+          targets_supported?: string[] | null
           tone_primary?: string | null
           tone_tags?: string[] | null
           topic_primary?: string | null
@@ -6551,7 +6569,9 @@ export type Database = {
           image_height: number | null
           image_width: number | null
           impressions: number | null
+          issue_primary: string | null
           issue_specifics: string[] | null
+          issue_tags: string[] | null
           key_quotes: Json | null
           key_themes: string[] | null
           link_clicks: number | null
@@ -6562,6 +6582,8 @@ export type Database = {
           meta_video_id: string | null
           organization_id: string
           performance_tier: string | null
+          policy_positions: string[] | null
+          political_stances: string[] | null
           post_engagement: number | null
           primary_text: string | null
           quality_ranking: string | null
@@ -6575,6 +6597,8 @@ export type Database = {
           sentiment_score: number | null
           shares: number | null
           spend: number | null
+          targets_attacked: string[] | null
+          targets_supported: string[] | null
           thumbnail_url: string | null
           tone: string | null
           topic: string | null
@@ -6636,7 +6660,9 @@ export type Database = {
           image_height?: number | null
           image_width?: number | null
           impressions?: number | null
+          issue_primary?: string | null
           issue_specifics?: string[] | null
+          issue_tags?: string[] | null
           key_quotes?: Json | null
           key_themes?: string[] | null
           link_clicks?: number | null
@@ -6647,6 +6673,8 @@ export type Database = {
           meta_video_id?: string | null
           organization_id: string
           performance_tier?: string | null
+          policy_positions?: string[] | null
+          political_stances?: string[] | null
           post_engagement?: number | null
           primary_text?: string | null
           quality_ranking?: string | null
@@ -6660,6 +6688,8 @@ export type Database = {
           sentiment_score?: number | null
           shares?: number | null
           spend?: number | null
+          targets_attacked?: string[] | null
+          targets_supported?: string[] | null
           thumbnail_url?: string | null
           tone?: string | null
           topic?: string | null
@@ -6721,7 +6751,9 @@ export type Database = {
           image_height?: number | null
           image_width?: number | null
           impressions?: number | null
+          issue_primary?: string | null
           issue_specifics?: string[] | null
+          issue_tags?: string[] | null
           key_quotes?: Json | null
           key_themes?: string[] | null
           link_clicks?: number | null
@@ -6732,6 +6764,8 @@ export type Database = {
           meta_video_id?: string | null
           organization_id?: string
           performance_tier?: string | null
+          policy_positions?: string[] | null
+          political_stances?: string[] | null
           post_engagement?: number | null
           primary_text?: string | null
           quality_ranking?: string | null
@@ -6745,6 +6779,8 @@ export type Database = {
           sentiment_score?: number | null
           shares?: number | null
           spend?: number | null
+          targets_attacked?: string[] | null
+          targets_supported?: string[] | null
           thumbnail_url?: string | null
           tone?: string | null
           topic?: string | null
