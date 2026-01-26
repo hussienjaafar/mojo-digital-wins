@@ -441,8 +441,9 @@ serve(async (req) => {
         employer: safeString(donor.employerData?.employer),
         occupation: safeString(donor.employerData?.occupation),
         amount: amount,
-        // NEW: Capture fee for net revenue calculation
-        fee: safeNumber(lineitem.feeAmount),
+        // Capture fee for net revenue calculation
+        // ActBlue webhooks often don't include feeAmount, so estimate at 3.95% if missing
+        fee: safeNumber(lineitem.feeAmount) ?? (amount ? Math.round(amount * 0.0395 * 100) / 100 : null),
         // NEW: Payment method details for payment quality analysis
         payment_method: safeString(contribution.paymentMethod),
         card_type: safeString(contribution.cardType),
