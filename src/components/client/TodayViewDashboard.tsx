@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { format, parseISO } from "date-fns";
 import { 
   Clock, 
@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { V3Card, V3SectionHeader, V3LoadingState } from "@/components/v3";
 import { HourlyBreakdownChart } from "./HourlyBreakdownChart";
 import { RecentActivityFeed } from "./RecentActivityFeed";
+import { SingleDayMetricGrid, type SingleDayMetric } from "./SingleDayMetricGrid";
 import { 
   useTodayMetrics, 
   useIsTodayView,
@@ -22,6 +23,7 @@ import {
   type TodayMetricsData,
   type ComparisonMetrics 
 } from "@/hooks/useHourlyMetrics";
+import { useSingleDayMetaMetrics } from "@/hooks/useSingleDayMetaMetrics";
 import { useDateRange } from "@/stores/dashboardStore";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
 
@@ -143,8 +145,41 @@ export const TodayViewDashboard: React.FC<TodayViewDashboardProps> = ({
   className,
 }) => {
   const { data, isLoading, error } = useTodayMetrics(organizationId);
+  const { data: metaData } = useSingleDayMetaMetrics(organizationId);
   const isTodayView = useIsTodayView();
   const dateRange = useDateRange();
+
+  // Build Meta metrics for the grid
+  const metaMetrics: SingleDayMetric[] = useMemo(() => {
+    if (!metaData) return [];
+    
+    const { current, previous } = metaData;
+    
+    // Skip if no data for the selected day
+    if (current.spend === 0 && current.impressions === 0 && current.linkClicks === 0) {
+      return [];
+    }
+    
+    const linkCtr = current.impressions > 0 ? (current.linkClicks / current.impressions) * 100 : 0;
+    const prevLinkCtr = previous.impressions > 0 ? (previous.linkClicks / previous.impressions) * 100 : 0;
+    const linkCpc = current.linkClicks > 0 ? current.spend / current.linkClicks : 0;
+    const prevLinkCpc = previous.linkClicks > 0 ? previous.spend / previous.linkClicks : 0;
+    const roi = current.spend > 0 ? current.conversionValue / current.spend : 0;
+    const prevRoi = previous.spend > 0 ? previous.conversionValue / previous.spend : 0;
+    const avgGift = current.conversions > 0 ? current.conversionValue / current.conversions : 0;
+    const prevAvgGift = previous.conversions > 0 ? previous.conversionValue / previous.conversions : 0;
+
+    return [
+      { label: "Ad Spend", value: current.spend, previousValue: previous.spend, format: "currency" as const, accent: "blue" as const },
+      { label: "Link Clicks", value: current.linkClicks, previousValue: previous.linkClicks, format: "number" as const, accent: "blue" as const },
+      { label: "Link CTR", value: linkCtr, previousValue: prevLinkCtr, format: "percent" as const, accent: "default" as const },
+      { label: "Link CPC", value: linkCpc, previousValue: prevLinkCpc, format: "currency" as const, accent: "default" as const },
+      { label: "Conversions", value: current.conversions, previousValue: previous.conversions, format: "number" as const, accent: "green" as const },
+      { label: "Attributed Revenue", value: current.conversionValue, previousValue: previous.conversionValue, format: "currency" as const, accent: "green" as const },
+      { label: "Attributed ROI", value: roi, previousValue: prevRoi, format: "ratio" as const, accent: "amber" as const },
+      { label: "Avg Gift (Meta)", value: avgGift, previousValue: prevAvgGift, format: "currency" as const, accent: "purple" as const },
+    ];
+  }, [metaData]);
 
   // Format the selected date for display
   const selectedDate = parseISO(dateRange.startDate);
@@ -247,6 +282,18 @@ export const TodayViewDashboard: React.FC<TodayViewDashboardProps> = ({
           accent="amber"
         />
       </div>
+
+      {/* Meta Ads Performance Overview */}
+      {metaMetrics.length > 0 && (
+        <motion.div variants={itemVariants}>
+          <V3Card className="p-4 sm:p-6">
+            <h3 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))] mb-4">
+              Meta Ads Performance Overview
+            </h3>
+            <SingleDayMetricGrid metrics={metaMetrics} columns={4} />
+          </V3Card>
+        </motion.div>
+      )}
 
       {/* Hourly Chart */}
       <motion.div variants={itemVariants}>
