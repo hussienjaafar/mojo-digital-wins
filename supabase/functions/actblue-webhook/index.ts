@@ -7,6 +7,7 @@ import {
   calculateMatchScore,
   getMatchQualityLabel,
 } from "../_shared/capi-utils.ts";
+import { normalizeActBlueTimestamp } from "../_shared/actblue-timezone.ts";
 
 // SECURITY: Restrict CORS to known origins
 const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
@@ -366,7 +367,8 @@ serve(async (req) => {
     // Extract data using safe helpers
     const amount = safeNumber(lineitem.amount);
     const lineitemId = safeInt(lineitem.lineitemId);
-    const paidAt = safeString(lineitem.paidAt) || safeString(contribution.createdAt) || new Date().toISOString();
+    // Normalize timestamp to UTC - ActBlue sends Eastern Time without TZ suffix
+    const paidAt = normalizeActBlueTimestamp(lineitem.paidAt) || normalizeActBlueTimestamp(contribution.createdAt) || new Date().toISOString();
 
     if (amount === null || lineitemId === null) {
       console.error('[ACTBLUE] Missing required fields: amount or lineitemId', { amount, lineitemId });

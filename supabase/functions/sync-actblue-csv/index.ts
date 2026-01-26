@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { normalizeActBlueTimestamp } from "../_shared/actblue-timezone.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -803,7 +804,8 @@ serve(async (req) => {
                 // Fixed: recurring if has recurring_total_months > 0 OR weekly recurring is set
                 is_recurring: (parseInt(row.recurring_total_months) > 0) || (row.recur_weekly === 'true' || row.recur_weekly === 'TRUE'),
                 transaction_type: transactionType,
-                transaction_date: row.paid_at || row.date,
+                // Normalize timestamp to UTC - ActBlue CSV uses Eastern Time
+                transaction_date: normalizeActBlueTimestamp(row.paid_at || row.date),
               };
 
               if (existing) {
@@ -879,7 +881,7 @@ serve(async (req) => {
                         phone: row.donor_phone || null,
                         employer: row.donor_employer || null,
                         occupation: row.donor_occupation || null,
-                        last_donation_date: row.paid_at || row.date,
+                        last_donation_date: normalizeActBlueTimestamp(row.paid_at || row.date),
                       }, {
                         onConflict: 'organization_id,donor_email',
                         ignoreDuplicates: false,

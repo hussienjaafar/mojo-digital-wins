@@ -1,9 +1,9 @@
-# Data Architecture Audit Report (v5 - Cleanup Complete)
+# Data Architecture Audit Report (v6 - Timezone Fix)
 
 **Repo:** mojo-digital-wins
 **Branch:** docs/dashboard-architecture
-**Audit Date:** 2026-01-26 (Final)
-**Last Pull:** 83e619e (Cleanup Complete)
+**Audit Date:** 2026-01-26
+**Last Update:** Timezone normalization fix
 **Auditor:** Claude (Data Architecture Specialist)
 **Remediation Report:** [DATA_ARCHITECTURE_REMEDIATION_REPORT.md](./DATA_ARCHITECTURE_REMEDIATION_REPORT.md)
 
@@ -11,9 +11,27 @@
 
 ## 1. REPO AUDIT SUMMARY
 
-### Remediation Status: P0/P1 COMPLETE
+### Remediation Status: P0/P1 COMPLETE + Timezone Fix
 
 All critical (P0) and high-priority (P1) issues identified in the original audit have been resolved.
+
+### Latest Fix: ActBlue Timestamp Timezone Normalization
+
+**Issue Discovered:** $40 discrepancy between ActBlue ($343) and our system ($303) for "Michael Blake for Congress" on Jan 25, 2026.
+
+**Root Cause:** ActBlue sends timestamps in Eastern Time without timezone suffix. PostgreSQL interprets them as UTC, causing a 5-hour offset that shifts day boundaries for late-night donations.
+
+**Solution Applied:**
+| File | Change |
+|------|--------|
+| `supabase/functions/_shared/actblue-timezone.ts` | **NEW** - Shared utility to normalize ActBlue timestamps to UTC |
+| `supabase/functions/actblue-webhook/index.ts` | Updated to normalize `paidAt` before storage |
+| `supabase/functions/sync-actblue-csv/index.ts` | Updated to normalize `paid_at`/`date` fields |
+
+**Behavior:**
+- Timestamps with timezone suffix (e.g., `2026-01-25T23:30:00Z`) → Used as-is
+- Timestamps without timezone suffix (e.g., `2026-01-25T23:30:00`) → Assumed Eastern Time, converted to UTC
+- DST-aware: Uses EST (-05:00) in winter, EDT (-04:00) in summer
 
 | Priority | Issue | Status | Resolution |
 |----------|-------|--------|------------|
