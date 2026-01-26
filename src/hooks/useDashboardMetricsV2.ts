@@ -146,9 +146,18 @@ async function fetchChannelSpend(
 
 // ==================== Data Transformation ====================
 
+// Sparkline extras from the new RPC
+interface SparklineExtras {
+  dailyRoi?: Array<{ date: string; value: number }>;
+  dailyNewMrr?: Array<{ date: string; value: number }>;
+  newDonors?: number;
+  returningDonors?: number;
+}
+
 function transformToLegacyFormat(
   unified: ActBlueMetricsDataWithSparklines,
-  channelSpend: ChannelSpendData
+  channelSpend: ChannelSpendData,
+  sparklineExtras?: SparklineExtras
 ): DashboardMetricsV2Data {
   const { summary, previousPeriod, dailyRollup, sparklines, channelBreakdown } = unified;
 
@@ -173,8 +182,8 @@ function transformToLegacyFormat(
     recurringChurnRate: 0, // Not available from unified yet
     recurringDonations: summary.recurringCount,
     uniqueDonors: summary.uniqueDonors,
-    newDonors: 0, // Not available from unified yet
-    returningDonors: 0, // Not available from unified yet
+    newDonors: sparklineExtras?.newDonors || 0,
+    returningDonors: sparklineExtras?.returningDonors || 0,
     recurringPercentage: summary.recurringRate,
     upsellConversionRate: 0, // Not available from unified yet
     roi,
@@ -205,12 +214,12 @@ function transformToLegacyFormat(
   // The unified hook provides {x, y} coordinates; we need to convert to {date, value}
   const legacySparklines: SparklineData = {
     netRevenue: dailyRollup.slice(-7).map(d => ({ date: d.date, value: d.net })),
-    roi: [], // Not computed per-day
+    roi: sparklineExtras?.dailyRoi?.slice(-7) || [], // Daily ROI from new RPC
     refundRate: [], // Not computed per-day
     recurringHealth: dailyRollup.slice(-7).map(d => ({ date: d.date, value: d.recurring_amount })),
     uniqueDonors: dailyRollup.slice(-7).map(d => ({ date: d.date, value: d.donors })),
     attributionQuality: [], // Not available
-    newMrr: [], // Not available
+    newMrr: sparklineExtras?.dailyNewMrr?.slice(-7) || [], // Daily new MRR from new RPC
   };
 
   // Build lookup maps for daily spend data
@@ -301,9 +310,26 @@ export function useDashboardMetricsV2(organizationId: string | undefined) {
     gcTime: 10 * 60 * 1000,
   });
 
-  // Progressive loading: Don't block on channel spend - show ActBlue data immediately
+  // Fetch sparkline extras (daily ROI, new MRR, donor breakdowns)
+  const sparklineQuery = useQuery({
+    queryKey: ['dashboard-sparkline', organizationId, startDate, endDate],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_dashboard_sparkline_data', {
+        p_organization_id: organizationId!,
+        p_start_date: startDate,
+        p_end_date: endDate,
+      });
+      if (error) throw error;
+      return data as unknown as SparklineExtras;
+    },
+    enabled: !!organizationId,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  // Progressive loading: Don't block on channel spend or sparklines - show ActBlue data immediately
   const isLoading = actBlueQuery.isLoading;
-  const isFetching = actBlueQuery.isFetching || channelSpendQuery.isFetching;
+  const isFetching = actBlueQuery.isFetching || channelSpendQuery.isFetching || sparklineQuery.isFetching;
   const error = actBlueQuery.error; // Only block on ActBlue errors
   const isChannelSpendLoading = channelSpendQuery.isLoading;
 
@@ -322,9 +348,10 @@ export function useDashboardMetricsV2(organizationId: string | undefined) {
     if (!actBlueQuery.data) return undefined;
     return transformToLegacyFormat(
       actBlueQuery.data as ActBlueMetricsDataWithSparklines,
-      channelSpendQuery.data || defaultChannelSpend
+      channelSpendQuery.data || defaultChannelSpend,
+      sparklineQuery.data
     );
-  }, [actBlueQuery.data, channelSpendQuery.data]);
+  }, [actBlueQuery.data, channelSpendQuery.data, sparklineQuery.data]);
 
   return {
     data,
@@ -336,11 +363,13 @@ export function useDashboardMetricsV2(organizationId: string | undefined) {
       await Promise.all([
         actBlueQuery.refetch(),
         channelSpendQuery.refetch(),
+        sparklineQuery.refetch(),
       ]);
     },
     dataUpdatedAt: Math.max(
       actBlueQuery.dataUpdatedAt || 0,
-      channelSpendQuery.dataUpdatedAt || 0
+      channelSpendQuery.dataUpdatedAt || 0,
+      sparklineQuery.dataUpdatedAt || 0
     ),
   };
 }
