@@ -71,7 +71,7 @@ serve(async (req) => {
     // Handle table queries
     else if (table) {
       // Whitelist of allowed tables for security
-      const allowedTables = ["client_users", "client_organizations", "articles", "client_entity_alerts", "trend_events", "user_invitations"];
+      const allowedTables = ["client_users", "client_organizations", "articles", "client_entity_alerts", "trend_events", "user_invitations", "user_locations"];
       if (!allowedTables.includes(table)) {
         return new Response(
           JSON.stringify({ error: `Table '${table}' not allowed` }),
