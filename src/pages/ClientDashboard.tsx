@@ -499,25 +499,27 @@ const ClientDashboard = () => {
                 />
               </motion.section>
 
-              {/* TIME ANALYSIS: Calendar Heatmap */}
-              <motion.section variants={sectionVariants}>
-                <CollapsibleSection
-                  title="Time Analysis"
-                  subtitle="Discover peak donation times by day and hour"
-                  icon={Clock}
-                  accent="blue"
-                  isExpanded={showTimeAnalysis}
-                  onToggle={() => setShowTimeAnalysis(!showTimeAnalysis)}
-                >
-                  <Suspense fallback={<V3SectionSkeleton />}>
-                    <DonationHeatmap
-                      organizationId={organizationId}
-                      startDate={dateRange.startDate}
-                      endDate={dateRange.endDate}
-                    />
-                  </Suspense>
-                </CollapsibleSection>
-              </motion.section>
+              {/* TIME ANALYSIS: Calendar Heatmap - hidden for single day views */}
+              {!isSingleDayView && (
+                <motion.section variants={sectionVariants}>
+                  <CollapsibleSection
+                    title="Time Analysis"
+                    subtitle="Discover peak donation times by day and hour"
+                    icon={Clock}
+                    accent="blue"
+                    isExpanded={showTimeAnalysis}
+                    onToggle={() => setShowTimeAnalysis(!showTimeAnalysis)}
+                  >
+                    <Suspense fallback={<V3SectionSkeleton />}>
+                      <DonationHeatmap
+                        organizationId={organizationId}
+                        startDate={dateRange.startDate}
+                        endDate={dateRange.endDate}
+                      />
+                    </Suspense>
+                  </CollapsibleSection>
+                </motion.section>
+              )}
 
               {/* Sync Controls */}
               <motion.section variants={sectionVariants}>
