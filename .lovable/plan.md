@@ -1,211 +1,53 @@
 
-# Fix Dashboard Metrics: MRR Sparkline, Direct Donations, and Meta Ads Section
+# Fix Meta Ads Performance Overview - Use Correct Link Metrics
 
 ## Problem Summary
 
-| Issue | Root Cause | Fix Required |
-|-------|------------|--------------|
-| **Current Active MRR Sparkline** | Shows daily recurring revenue raised, not cumulative MRR | Add `dailyActiveMrr` to RPC function calculating running total |
-| **Direct Donations shows 73,215.1** | Uses `c.raised` (revenue) instead of `c.donations` (count) | Change to sum donations count |
-| **Campaign Health shows 0 impressions/clicks** | `fetchChannelSpend` doesn't fetch these; hardcoded to 0 | Add impressions/clicks to channel spend fetch |
-| **Section naming** | Currently "Campaign Health" | Rename to "Meta Ads Performance Overview" |
+The "Meta Ads Performance Overview" section displays incorrect metrics because:
 
----
+| Issue | Current Value | Correct Value | Root Cause |
+|-------|--------------|---------------|------------|
+| **Total Clicks** | 12,305 (all clicks) | 1,359 (link clicks) | Using `clicks` instead of `link_clicks` |
+| **CTR** | 7.61% | ~0.84% | Calculated from all clicks, not link clicks |
+| **CPC** | $1 | ~$7 | Calculated from all clicks, not link clicks |
+| **Missing: Attributed Revenue** | Not shown | $7,291 | Need to add to UI |
+| **Missing: Attributed ROI** | Not shown | 0.77 | Need to add to UI |
 
-## Part 1: Fix Direct Donations Attribution Bug
+## Root Cause
 
-### Current Code (Bug)
-```typescript
-// src/hooks/useDashboardMetricsV2.ts lines 250-253
-const directDonations = channelBreakdown
-  .filter((c) => c.channel === 'other' || c.channel === 'unattributed')
-  .reduce((sum, c) => sum + c.raised, 0); // BUG: Uses revenue
-```
-
-### Fix
-Change `c.raised` to `c.donations`:
-```typescript
-const directDonations = channelBreakdown
-  .filter((c) => c.channel === 'other' || c.channel === 'unattributed')
-  .reduce((sum, c) => sum + c.donations, 0); // FIXED: Uses donation count
-```
-
----
-
-## Part 2: Add Meta Impressions and Clicks
-
-### Update `fetchChannelSpend` to Include Impressions/Clicks
-
-Modify the meta query to also fetch impressions and clicks:
+The `fetchChannelSpend` function queries `meta_ad_metrics` table, which does NOT have `link_clicks` or `link_ctr` columns:
 
 ```typescript
+// Current (wrong table)
 const metaQuery = supabase
-  .from('meta_ad_metrics')
-  .select('date, spend, conversions, impressions, clicks')  // Add impressions, clicks
+  .from('meta_ad_metrics')  // ❌ No link_clicks/link_ctr columns
+  .select('date, spend, conversions, impressions, clicks')
+```
+
+The correct table is `meta_ad_metrics_daily` which contains `link_clicks` and `link_ctr`.
+
+---
+
+## Solution
+
+### Part 1: Update Data Fetching
+
+Modify `fetchChannelSpend` to query `meta_ad_metrics_daily` instead:
+
+```typescript
+// Fixed - use correct table with link metrics
+const metaQuery = supabase
+  .from('meta_ad_metrics_daily')  // ✅ Has link_clicks, link_ctr
+  .select('date, spend, conversions, impressions, clicks, link_clicks, link_ctr')
   .eq('organization_id', organizationId)
   .gte('date', startDate)
   .lte('date', endDate)
   .order('date');
 ```
 
-Add aggregation and return fields:
+### Part 2: Update ChannelSpendData Interface
 
-```typescript
-// Aggregate Meta impressions and clicks
-const metaImpressions = (metaResult.data || []).reduce(
-  (sum: number, m: any) => sum + Number(m.impressions || 0),
-  0
-);
-const metaClicks = (metaResult.data || []).reduce(
-  (sum: number, m: any) => sum + Number(m.clicks || 0),
-  0
-);
-```
-
-Update the `ChannelSpendData` interface and return object to include these.
-
-### Update KPIs Mapping
-
-Change hardcoded zeros to use actual data:
-
-```typescript
-// Before (lines 196-197)
-totalImpressions: 0, // Not available from unified yet
-totalClicks: 0, // Not available from unified yet
-
-// After
-totalImpressions: channelSpend.metaImpressions,
-totalClicks: channelSpend.metaClicks,
-```
-
----
-
-## Part 3: Add Cumulative MRR Sparkline
-
-### The Challenge
-"Current Active MRR" is a point-in-time metric representing the expected monthly revenue from **currently active** recurring donors. A true cumulative sparkline would need to calculate MRR at each day in the past, which is computationally expensive.
-
-### Solution: Add Daily Cumulative MRR to RPC
-
-Update `get_dashboard_sparkline_data` to include a cumulative MRR calculation:
-
-```sql
--- Calculate cumulative active MRR as of each date in the range
--- This is an approximation: sum of most recent recurring amount per donor who was active at that date
-daily_cumulative_mrr AS (
-  SELECT 
-    d.day,
-    COALESCE((
-      SELECT SUM(latest_amount) FROM (
-        SELECT DISTINCT ON (donor_email) 
-          donor_email, amount as latest_amount
-        FROM actblue_transactions t
-        WHERE t.organization_id = p_organization_id
-          AND t.is_recurring = true
-          AND t.transaction_type = 'donation'
-          AND t.recurring_status = 'active'
-          AND DATE(t.transaction_date) <= d.day
-        ORDER BY donor_email, transaction_date DESC
-      ) active_at_date
-    ), 0) as cumulative_mrr
-  FROM (
-    SELECT generate_series(p_start_date, p_end_date, '1 day'::interval)::date as day
-  ) d
-)
-```
-
-Add to JSON output:
-```sql
-'dailyActiveMrr', (
-  SELECT COALESCE(json_agg(
-    json_build_object('date', day::text, 'value', cumulative_mrr)
-    ORDER BY day
-  ), '[]'::json)
-  FROM daily_cumulative_mrr WHERE cumulative_mrr > 0
-),
-```
-
-### Update Frontend to Use New Data
-
-Update `useDashboardMetricsV2.ts` to pass `dailyActiveMrr` to sparklines:
-
-```typescript
-// In SparklineExtras interface
-interface SparklineExtras {
-  dailyRoi?: Array<{ date: string; value: number }>;
-  dailyNewMrr?: Array<{ date: string; value: number }>;
-  dailyActiveMrr?: Array<{ date: string; value: number }>;  // NEW
-  newDonors?: number;
-  returningDonors?: number;
-}
-
-// In legacySparklines mapping
-recurringHealth: sparklineExtras?.dailyActiveMrr?.slice(-7) || 
-  dailyRollup.slice(-7).map(d => ({ date: d.date, value: d.recurring_amount })),
-```
-
----
-
-## Part 4: Rename "Campaign Health" to "Meta Ads Performance Overview"
-
-### Update ClientDashboardCharts.tsx
-
-Change the section title and description (lines 400-403):
-
-```typescript
-// Before
-<V3CardTitle>Campaign Health</V3CardTitle>
-<p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">Key efficiency metrics</p>
-
-// After
-<V3CardTitle>Meta Ads Performance Overview</V3CardTitle>
-<p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">Meta ad campaign metrics</p>
-```
-
-### Update Metrics Displayed
-
-Remove non-Meta metrics (Recurring %, Upsell Conversion, Total Donations) and focus on Meta-specific data:
-
-| Current Metric | Action |
-|----------------|--------|
-| Average Donation | Keep (for Meta-attributed) |
-| Total Impressions | Keep |
-| Total Clicks | Keep |
-| Recurring % | Remove (not Meta-specific) |
-| Upsell Conversion | Remove (not Meta-specific) |
-| Total Donations | Replace with "Meta Conversions" |
-
-Add CTR and CPC calculations:
-
-```typescript
-// Calculate CTR and CPC for display
-const ctr = kpis.totalImpressions > 0 ? (kpis.totalClicks / kpis.totalImpressions) * 100 : 0;
-const cpc = kpis.totalClicks > 0 ? metaSpend / kpis.totalClicks : 0;
-```
-
-New section content:
-- Total Impressions
-- Total Clicks
-- CTR (Click-Through Rate)
-- CPC (Cost Per Click)
-- Meta Conversions (from `metaConversions` prop)
-- Avg Donation (Meta-attributed)
-
----
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/hooks/useDashboardMetricsV2.ts` | Fix directDonations (use count), add impressions/clicks to ChannelSpendData and KPIs |
-| `supabase/migrations/NEW.sql` | Update `get_dashboard_sparkline_data` to include `dailyActiveMrr` |
-| `src/components/client/ClientDashboardCharts.tsx` | Rename section, update metrics displayed, add CTR/CPC |
-
----
-
-## Technical Implementation Details
-
-### 1. ChannelSpendData Interface Update
+Add link-specific metrics:
 
 ```typescript
 interface ChannelSpendData {
@@ -213,29 +55,133 @@ interface ChannelSpendData {
   smsSpend: number;
   metaConversions: number;
   smsConversions: number;
-  metaImpressions: number;  // NEW
-  metaClicks: number;       // NEW
+  metaImpressions: number;
+  metaClicks: number;
+  metaLinkClicks: number;      // NEW
   dailyMetaSpend: DailySpendPoint[];
   dailySmsSpend: DailySpendPoint[];
 }
 ```
 
-### 2. Updated transformToLegacyFormat
+### Part 3: Add Aggregation for Link Clicks
 
 ```typescript
-const kpis: DashboardKPIs = {
-  // ... existing fields ...
-  totalImpressions: channelSpend.metaImpressions,
-  totalClicks: channelSpend.metaClicks,
-  deterministicRate: 0, // Still not available
-};
+// After existing aggregations, add:
+const metaLinkClicks = (metaResult.data || []).reduce(
+  (sum: number, m: any) => sum + Number(m.link_clicks || 0),
+  0
+);
 ```
 
-### 3. SQL Migration for Cumulative MRR
+### Part 4: Update KPIs Mapping
 
-The query uses `generate_series` to create all dates in range, then for each date calculates the sum of the most recent recurring donation amount for each donor who was active at that point.
+The UI needs access to link clicks for proper CTR/CPC calculation:
 
-This is an approximation since we don't track MRR changes over time, but it provides a meaningful trend visualization.
+```typescript
+// In transformToLegacyFormat, update:
+totalClicks: channelSpend.metaLinkClicks,  // Use link clicks
+```
+
+### Part 5: Update UI in ClientDashboardCharts.tsx
+
+Update the metrics display to use link-specific values and add new rows:
+
+```typescript
+// Meta Ads Performance Overview section
+
+// 1. Change "Total Clicks" to "Link Clicks"
+<span>Link Clicks</span>
+<span>{kpis.totalClicks.toLocaleString()}</span>
+
+// 2. Update CTR label to "Link CTR" (calculation already uses totalClicks)
+<span>Link CTR</span>
+<span>{((kpis.totalClicks / kpis.totalImpressions) * 100).toFixed(2)}%</span>
+
+// 3. Update CPC label to "Link CPC"
+<span>Link CPC</span>
+<span>{formatCurrency(metaSpend / kpis.totalClicks)}</span>
+
+// 4. Add new row: Meta Attributed Revenue
+<div className="flex items-center justify-between py-2 border-b ...">
+  <span>Meta Attributed Revenue</span>
+  <span>{formatCurrency(kpis.metaAttributedRevenue)}</span>
+</div>
+
+// 5. Add new row: Meta Attributed ROI
+<div className="flex items-center justify-between py-2 border-b ...">
+  <span>Meta Attributed ROI</span>
+  <span>
+    {metaSpend > 0 
+      ? (kpis.metaAttributedRevenue / metaSpend).toFixed(2) + 'x'
+      : '0.00x'}
+  </span>
+</div>
+```
+
+---
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/hooks/useDashboardMetricsV2.ts` | Change query from `meta_ad_metrics` to `meta_ad_metrics_daily`, add `link_clicks` aggregation, update interface |
+| `src/components/client/ClientDashboardCharts.tsx` | Update labels, add Attributed Revenue and Attributed ROI rows |
+
+---
+
+## Detailed Code Changes
+
+### useDashboardMetricsV2.ts
+
+**1. Update meta query (line 72-78):**
+```typescript
+const metaQuery = supabase
+  .from('meta_ad_metrics_daily')  // Changed table
+  .select('date, spend, conversions, impressions, clicks, link_clicks')  // Added link_clicks
+  .eq('organization_id', organizationId)
+  .gte('date', startDate)
+  .lte('date', endDate)
+  .order('date');
+```
+
+**2. Update ChannelSpendData interface (add after line 36):**
+```typescript
+metaLinkClicks: number;
+```
+
+**3. Add link clicks aggregation (after line 112):**
+```typescript
+const metaLinkClicks = (metaResult.data || []).reduce(
+  (sum: number, m: any) => sum + Number(m.link_clicks || 0),
+  0
+);
+```
+
+**4. Update return statement (add after line 153):**
+```typescript
+metaLinkClicks,
+```
+
+**5. Update KPIs mapping (line 210):**
+```typescript
+totalClicks: channelSpend.metaLinkClicks,  // Use link clicks instead of all clicks
+```
+
+### ClientDashboardCharts.tsx
+
+**Update the Meta Ads Performance Overview section (lines 406-435):**
+
+Current order: Impressions, Clicks, CTR, CPC, Conversions, Avg Donation
+
+New order with additions:
+1. Total Impressions (unchanged)
+2. Link Clicks (renamed from "Total Clicks")
+3. Link CTR (renamed)
+4. Link CPC (renamed)
+5. Meta Conversions (unchanged)
+6. **Meta Attributed Revenue** (NEW)
+7. **Meta Attributed ROI** (NEW)
+8. Avg Donation (Meta) (keep at end)
 
 ---
 
@@ -243,17 +189,24 @@ This is an approximation since we don't track MRR changes over time, but it prov
 
 | Metric | Before | After |
 |--------|--------|-------|
-| Current Active MRR sparkline | Daily recurring raised ($35) | Cumulative MRR (~$1.1K) |
-| Direct Donations | 73,215.1 (revenue) | Actual count (e.g., 371) |
-| Total Impressions | 0 | Real count from Meta |
-| Total Clicks | 0 | Real count from Meta |
-| Section title | "Campaign Health" | "Meta Ads Performance Overview" |
+| Link Clicks | 12,305 | 1,359 |
+| Link CTR | 7.61% | 0.84% |
+| Link CPC | $1 | ~$7.00 |
+| Meta Attributed Revenue | Not shown | $7,291 |
+| Meta Attributed ROI | Not shown | 0.77x |
 
 ---
 
-## Performance Considerations
+## Technical Notes
 
-The cumulative MRR calculation uses a correlated subquery for each date, which could be slow for large date ranges. Two mitigations:
+- The `meta_ad_metrics` table is campaign-level aggregates
+- The `meta_ad_metrics_daily` table contains ad-level daily metrics with accurate link click data
+- Link clicks represent actual clicks that navigate away from Facebook (outbound)
+- Regular clicks include all engagement (likes, comments, shares, etc.)
+- Link CTR and Link CPC are the industry-standard metrics for measuring ad performance
 
-1. **Limit to 7-14 days**: The sparkline only shows the last 7 days anyway
-2. **Add index**: Consider adding an index on `(organization_id, is_recurring, recurring_status, transaction_date)` if performance becomes an issue
+---
+
+## No Database Changes Required
+
+This fix only requires frontend/hook changes. The data already exists in `meta_ad_metrics_daily`.
