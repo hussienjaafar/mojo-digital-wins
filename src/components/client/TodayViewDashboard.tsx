@@ -149,7 +149,7 @@ export const TodayViewDashboard: React.FC<TodayViewDashboardProps> = ({
   const isTodayView = useIsTodayView();
   const dateRange = useDateRange();
 
-  // Build Meta metrics for the grid
+  // Build Meta metrics for the grid using OUR attribution system for consistency
   const metaMetrics: SingleDayMetric[] = useMemo(() => {
     if (!metaData) return [];
     
@@ -160,22 +160,26 @@ export const TodayViewDashboard: React.FC<TodayViewDashboardProps> = ({
       return [];
     }
     
+    // CTR and CPC use Meta's ad metrics
     const linkCtr = current.impressions > 0 ? (current.linkClicks / current.impressions) * 100 : 0;
     const prevLinkCtr = previous.impressions > 0 ? (previous.linkClicks / previous.impressions) * 100 : 0;
     const linkCpc = current.linkClicks > 0 ? current.spend / current.linkClicks : 0;
     const prevLinkCpc = previous.linkClicks > 0 ? previous.spend / previous.linkClicks : 0;
-    const roi = current.spend > 0 ? current.conversionValue / current.spend : 0;
-    const prevRoi = previous.spend > 0 ? previous.conversionValue / previous.spend : 0;
-    const avgGift = current.conversions > 0 ? current.conversionValue / current.conversions : 0;
-    const prevAvgGift = previous.conversions > 0 ? previous.conversionValue / previous.conversions : 0;
+    
+    // ROI and Avg Gift use OUR attribution system for consistency with multi-day view
+    const roi = current.spend > 0 ? current.ourAttributedRevenue / current.spend : 0;
+    const prevRoi = previous.spend > 0 ? previous.ourAttributedRevenue / previous.spend : 0;
+    const avgGift = current.ourAttributedDonations > 0 ? current.ourAttributedRevenue / current.ourAttributedDonations : 0;
+    const prevAvgGift = previous.ourAttributedDonations > 0 ? previous.ourAttributedRevenue / previous.ourAttributedDonations : 0;
 
     return [
       { label: "Ad Spend", value: current.spend, previousValue: previous.spend, format: "currency" as const, accent: "blue" as const },
       { label: "Link Clicks", value: current.linkClicks, previousValue: previous.linkClicks, format: "number" as const, accent: "blue" as const },
       { label: "Link CTR", value: linkCtr, previousValue: prevLinkCtr, format: "percent" as const, accent: "default" as const },
       { label: "Link CPC", value: linkCpc, previousValue: prevLinkCpc, format: "currency" as const, accent: "default" as const },
-      { label: "Conversions", value: current.conversions, previousValue: previous.conversions, format: "number" as const, accent: "green" as const },
-      { label: "Attributed Revenue", value: current.conversionValue, previousValue: previous.conversionValue, format: "currency" as const, accent: "green" as const },
+      // Use OUR attribution data for conversions and revenue (matches multi-day view)
+      { label: "Conversions", value: current.ourAttributedDonations, previousValue: previous.ourAttributedDonations, format: "number" as const, accent: "green" as const },
+      { label: "Attributed Revenue", value: current.ourAttributedRevenue, previousValue: previous.ourAttributedRevenue, format: "currency" as const, accent: "green" as const },
       { label: "Attributed ROI", value: roi, previousValue: prevRoi, format: "ratio" as const, accent: "amber" as const },
       { label: "Avg Gift (Meta)", value: avgGift, previousValue: prevAvgGift, format: "currency" as const, accent: "purple" as const },
     ];
