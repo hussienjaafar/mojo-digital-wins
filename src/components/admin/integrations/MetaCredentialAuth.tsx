@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Facebook, Key, Loader2, CheckCircle2, Building2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Facebook, Key, Loader2, CheckCircle2, Building2, AlertCircle, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
 interface MetaAdAccount {
   id: string;
   account_id: string;
@@ -47,6 +46,20 @@ export function MetaCredentialAuth({
   const [manualToken, setManualToken] = useState('');
   const [manualAdAccountId, setManualAdAccountId] = useState('');
   const [manualBusinessManagerId, setManualBusinessManagerId] = useState('');
+  
+  // Search state
+  const [accountSearch, setAccountSearch] = useState('');
+  
+  // Filter accounts based on search
+  const filteredAccounts = useMemo(() => {
+    if (!accountSearch.trim()) return adAccounts;
+    const search = accountSearch.toLowerCase();
+    return adAccounts.filter(account => 
+      account.name.toLowerCase().includes(search) ||
+      account.account_id.toLowerCase().includes(search) ||
+      (account.business_name?.toLowerCase().includes(search) ?? false)
+    );
+  }, [adAccounts, accountSearch]);
   const [showManualToken, setShowManualToken] = useState(false);
 
   // Listen for OAuth callback
@@ -265,37 +278,55 @@ export function MetaCredentialAuth({
                     </AlertDescription>
                   </Alert>
                 ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {adAccounts.map((account) => (
-                      <div
-                        key={account.id}
-                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
-                          selectedAccountId === account.id
-                            ? 'border-blue-500 bg-blue-500/10'
-                            : 'hover:bg-muted/50'
-                        }`}
-                        onClick={() => setSelectedAccountId(account.id)}
-                      >
-                        <div className="min-w-0">
-                          <p className="font-medium truncate">{account.name}</p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className="text-xs text-muted-foreground">
-                              {account.account_id}
-                            </span>
-                            {account.business_name && (
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Building2 className="w-3 h-3" />
-                                {account.business_name}
-                              </span>
-                            )}
-                            <span className="text-xs text-muted-foreground">
-                              {account.currency}
-                            </span>
-                          </div>
-                        </div>
-                        {getAccountStatusBadge(account.account_status)}
+                  <div className="space-y-2">
+                    {adAccounts.length > 3 && (
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search accounts..."
+                          value={accountSearch}
+                          onChange={(e) => setAccountSearch(e.target.value)}
+                          className="pl-9"
+                        />
                       </div>
-                    ))}
+                    )}
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {filteredAccounts.map((account) => (
+                        <div
+                          key={account.id}
+                          className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                            selectedAccountId === account.id
+                              ? 'border-blue-500 bg-blue-500/10'
+                              : 'hover:bg-muted/50'
+                          }`}
+                          onClick={() => setSelectedAccountId(account.id)}
+                        >
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">{account.name}</p>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <span className="text-xs text-muted-foreground">
+                                {account.account_id}
+                              </span>
+                              {account.business_name && (
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Building2 className="w-3 h-3" />
+                                  {account.business_name}
+                                </span>
+                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {account.currency}
+                              </span>
+                            </div>
+                          </div>
+                          {getAccountStatusBadge(account.account_status)}
+                        </div>
+                      ))}
+                      {filteredAccounts.length === 0 && accountSearch && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No accounts match "{accountSearch}"
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
