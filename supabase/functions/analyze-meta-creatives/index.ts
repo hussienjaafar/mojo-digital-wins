@@ -27,7 +27,18 @@ interface MetaCreativeInsight {
 }
 
 interface AIAnalysisResult {
+  // Specific issue extraction (NEW)
+  issue_primary: string;           // e.g., "anti-Israel military aid", "pro-immigration"
+  issue_tags: string[];
+  political_stances: string[];     // e.g., ["anti-AIPAC", "pro-ceasefire"]
+  targets_attacked: string[];      // People/orgs criticized
+  targets_supported: string[];     // People/orgs praised
+  policy_positions: string[];      // Specific policies advocated
+
+  // Generic topic for backwards compatibility
   topic: string;
+
+  // Original fields
   tone: string;
   sentiment_score: number;
   sentiment_label: string;
@@ -35,6 +46,10 @@ interface AIAnalysisResult {
   emotional_appeal: string;
   key_themes: string[];
   verbal_themes?: string[];
+
+  // Donor psychology
+  donor_pain_points?: string[];
+  values_appealed?: string[];
 }
 
 interface VisualAnalysisResult {
@@ -123,25 +138,43 @@ serve(async (req) => {
 
         // Text analysis if we have text
         if (textContent.trim()) {
-          const analysisPrompt = `Analyze this Meta (Facebook/Instagram) ad creative and extract the following information. Return ONLY a valid JSON object with no additional text.
+          const analysisPrompt = `Analyze this Meta (Facebook/Instagram) ad creative and extract SPECIFIC political issues, not generic categories.
+
+CRITICAL: Be VERY SPECIFIC about what the ad is actually about:
+- NOT "foreign policy" but "anti-Israel military aid" or "pro-ceasefire Gaza"
+- NOT "immigration" but "anti-Laken Riley Act pro-immigrant" or "sanctuary city defense"
+- NOT "democracy" but "anti-AIPAC money in politics" or "anti-Ritchie Torres sellout"
 
 Ad Creative Content:
 ${textContent}
 
 Creative Type: ${creative.creative_type}
 
-Extract:
-1. topic: The main topic/subject (e.g., "healthcare", "immigration", "voting rights", "climate", "education", "fundraising general", "candidate promotion")
-2. tone: The emotional tone (e.g., "urgent", "emotional", "factual", "grateful", "angry", "hopeful", "fearful", "inspiring", "celebratory")
-3. sentiment_score: A number from -1.0 (very negative) to 1.0 (very positive)
-4. sentiment_label: "positive", "negative", or "neutral"
-5. urgency_level: "low", "medium", "high", or "critical"
-6. emotional_appeal: Primary emotional appeal type (e.g., "fear", "hope", "anger", "pride", "urgency", "compassion", "solidarity", "outrage")
-7. key_themes: Array of 2-5 key themes/keywords in the creative
-${creative.audio_transcript ? '8. verbal_themes: Array of 2-4 key themes specifically from the spoken audio' : ''}
+Extract and return ONLY valid JSON:
 
-Return only valid JSON in this exact format:
-{"topic":"string","tone":"string","sentiment_score":0.0,"sentiment_label":"string","urgency_level":"string","emotional_appeal":"string","key_themes":["theme1","theme2"]${creative.audio_transcript ? ',"verbal_themes":["theme1"]' : ''}}`;
+SPECIFIC ISSUES (most important):
+- issue_primary: The EXACT issue (e.g., "anti-Israel military aid", "pro-immigration anti-deportation")
+- issue_tags: Array of ALL specific issues mentioned
+- political_stances: Stances taken (e.g., ["anti-AIPAC", "pro-ceasefire", "anti-incumbent"])
+- targets_attacked: People/orgs criticized (e.g., ["Ritchie Torres", "AIPAC", "Netanyahu"])
+- targets_supported: People/orgs praised (e.g., ["Michael Blake", "progressive movement"])
+- policy_positions: Specific policies advocated (e.g., ["end military aid to Israel"])
+
+DONOR PSYCHOLOGY:
+- donor_pain_points: What problems would compel donation? Be specific!
+- values_appealed: Core values triggered (e.g., ["justice", "solidarity", "anti-corruption"])
+
+GENERAL (backwards compatible):
+- topic: General category (healthcare, immigration, foreign_policy, elections, civil_rights, economy, other)
+- tone: Emotional tone (urgent, hopeful, angry, compassionate, fearful, inspiring, informative)
+- sentiment_score: -1.0 to 1.0
+- sentiment_label: "positive", "negative", or "neutral"
+- urgency_level: "low", "medium", "high", or "critical"
+- emotional_appeal: Primary appeal (fear, hope, anger, pride, solidarity, outrage)
+- key_themes: Array of 2-5 key themes
+${creative.audio_transcript ? '- verbal_themes: Array of 2-4 themes from spoken audio' : ''}
+
+Return ONLY valid JSON.`;
 
           const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
             method: 'POST',
@@ -287,6 +320,23 @@ Return only valid JSON:
         };
 
         if (analysis) {
+          // Specific issue extraction (NEW)
+          updateData.issue_primary = analysis.issue_primary || null;
+          updateData.issue_tags = analysis.issue_tags || [];
+          updateData.political_stances = analysis.political_stances || [];
+          updateData.targets_attacked = analysis.targets_attacked || [];
+          updateData.targets_supported = analysis.targets_supported || [];
+          updateData.policy_positions = analysis.policy_positions || [];
+
+          // Donor psychology
+          if (analysis.donor_pain_points) {
+            updateData.donor_pain_points = analysis.donor_pain_points;
+          }
+          if (analysis.values_appealed) {
+            updateData.values_appealed = analysis.values_appealed;
+          }
+
+          // Original fields (backwards compatible)
           updateData.topic = analysis.topic;
           updateData.tone = analysis.tone;
           updateData.sentiment_score = analysis.sentiment_score;

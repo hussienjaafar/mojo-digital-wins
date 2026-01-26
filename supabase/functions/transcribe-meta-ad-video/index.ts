@@ -44,12 +44,30 @@ interface TranscriptionResult {
 }
 
 interface AnalysisResult {
+  // Specific issue extraction (NEW - replaces generic categories)
+  issue_primary: string;           // e.g., "anti-Israel military aid", "pro-immigration anti-Laken Riley"
+  issue_tags: string[];            // All specific issues mentioned
+  political_stances: string[];     // e.g., ["anti-AIPAC", "pro-ceasefire", "anti-incumbent"]
+  targets_attacked: string[];      // People/orgs criticized: ["Ritchie Torres", "AIPAC", "Netanyahu"]
+  targets_supported: string[];     // People/orgs praised: ["Michael Blake", "progressive movement"]
+  policy_positions: string[];      // Specific policies: ["end military aid to Israel", "Medicare for All"]
+
+  // Keep generic topic for backwards compatibility
   topic_primary: string;
   topic_tags: string[];
+
+  // Tone and sentiment
   tone_primary: string;
   tone_tags: string[];
   sentiment_score: number;
   sentiment_label: string;
+
+  // Donor psychology (from analyze-creative-motivation approach)
+  donor_pain_points: string[];     // What problems/injustices compel donation
+  values_appealed: string[];       // Core values triggered
+  urgency_drivers: string[];       // Why donate NOW
+
+  // CTA and structure
   cta_text: string | null;
   cta_type: string | null;
   urgency_level: string;
@@ -142,20 +160,44 @@ async function analyzeTranscript(
     console.log(`[TRANSCRIBE] Analyzing transcript with GPT-4...`);
 
     const systemPrompt = `You are an expert at analyzing political and nonprofit fundraising video ad scripts.
-Analyze the provided transcript and extract key features that correlate with ad performance.
-Be specific and use the exact categories provided.
+Your job is to extract SPECIFIC issues, stances, and targets - NOT generic categories.
 
-Return a JSON object with these exact fields:
-- topic_primary: Main topic (one of: immigration, healthcare, economy, climate, democracy, social_justice, education, gun_safety, reproductive_rights, veterans, other)
-- topic_tags: Array of all relevant topics
-- tone_primary: Primary tone (one of: urgent, hopeful, angry, compassionate, fearful, inspiring, informative, personal_story)
+CRITICAL: Be VERY SPECIFIC about what the ad is actually about:
+- NOT "foreign policy" but "anti-Israel military aid" or "pro-ceasefire Gaza"
+- NOT "immigration" but "anti-Laken Riley Act pro-immigrant" or "sanctuary city defense"
+- NOT "democracy" but "anti-AIPAC money in politics" or "anti-Ritchie Torres sellout"
+
+Return a JSON object with these fields:
+
+SPECIFIC ISSUES (most important):
+- issue_primary: The EXACT issue being discussed (e.g., "anti-Israel military aid", "pro-immigration anti-deportation", "anti-AIPAC corruption")
+- issue_tags: Array of ALL specific issues mentioned
+- political_stances: Array of stances taken (e.g., ["anti-AIPAC", "pro-ceasefire", "anti-incumbent", "pro-immigrant rights"])
+- targets_attacked: People/orgs being criticized (e.g., ["Ritchie Torres", "AIPAC", "Netanyahu", "Trump"])
+- targets_supported: People/orgs being praised (e.g., ["Michael Blake", "progressive movement", "immigrant community"])
+- policy_positions: Specific policies advocated (e.g., ["end military aid to Israel", "stop deportations", "Medicare for All"])
+
+DONOR PSYCHOLOGY:
+- donor_pain_points: What specific problems/injustices would compel someone to donate? Be specific!
+  Examples: "AIPAC buying elections", "immigrants being persecuted", "politicians ignoring constituents"
+- values_appealed: Core values being triggered (e.g., ["justice", "solidarity", "anti-corruption", "community empowerment"])
+- urgency_drivers: Why must they donate NOW? (e.g., ["primary election deadline", "matching gift expires", "crisis moment"])
+
+GENERIC TOPIC (for backwards compatibility):
+- topic_primary: General category (immigration, healthcare, economy, climate, foreign_policy, elections, civil_rights, other)
+- topic_tags: Array of general topics
+
+TONE AND SENTIMENT:
+- tone_primary: Primary tone (urgent, hopeful, angry, compassionate, fearful, inspiring, informative, personal_story)
 - tone_tags: Array of all detected tones
-- sentiment_score: Number from -1 (very negative) to 1 (very positive)
+- sentiment_score: Number from -1 (very negative about status quo) to 1 (very positive/hopeful)
 - sentiment_label: "positive", "negative", or "neutral"
+
+CTA AND STRUCTURE:
 - cta_text: The call-to-action phrase if present, or null
 - cta_type: One of: "donate", "sign_petition", "share", "learn_more", "volunteer", "vote", or null
 - urgency_level: "low", "medium", "high", or "extreme"
-- emotional_appeals: Array of emotions targeted (fear, hope, anger, compassion, pride, guilt, etc.)
+- emotional_appeals: Array of emotions targeted (fear, hope, anger, compassion, pride, guilt, solidarity, outrage)
 - key_phrases: Top 5 most impactful phrases from the transcript
 - hook_text: First 15 words or first sentence, whichever is shorter
 - hook_word_count: Number of words in the hook
@@ -425,21 +467,40 @@ serve(async (req) => {
           hook_text: analysis?.hook_text || hook.text,
           hook_duration_seconds: hook.duration,
           hook_word_count: analysis?.hook_word_count || hook.wordCount,
+
+          // SPECIFIC ISSUE EXTRACTION (NEW)
+          issue_primary: analysis?.issue_primary || null,
+          issue_tags: analysis?.issue_tags || [],
+          political_stances: analysis?.political_stances || [],
+          targets_attacked: analysis?.targets_attacked || [],
+          targets_supported: analysis?.targets_supported || [],
+          policy_positions: analysis?.policy_positions || [],
+          donor_pain_points: analysis?.donor_pain_points || [],
+          values_appealed: analysis?.values_appealed || [],
+          urgency_drivers: analysis?.urgency_drivers || [],
+
+          // Generic topic (backwards compatibility)
           topic_primary: analysis?.topic_primary || null,
           topic_tags: analysis?.topic_tags || [],
+
+          // Tone and sentiment
           tone_primary: analysis?.tone_primary || null,
           tone_tags: analysis?.tone_tags || [],
           sentiment_score: analysis?.sentiment_score || null,
           sentiment_label: analysis?.sentiment_label || null,
+
+          // CTA and structure
           cta_text: analysis?.cta_text || null,
           cta_type: analysis?.cta_type || null,
           urgency_level: analysis?.urgency_level || null,
           emotional_appeals: analysis?.emotional_appeals || [],
           key_phrases: analysis?.key_phrases || [],
+
+          // Metadata
           transcription_model: 'whisper-1',
           transcription_confidence: 0.95,
           analysis_model: analysis ? 'gpt-4-turbo-preview' : null,
-          analysis_version: '1.0',
+          analysis_version: '2.0', // Bumped version for specific issue extraction
           transcribed_at: new Date().toISOString(),
           analyzed_at: analysis ? new Date().toISOString() : null,
           updated_at: new Date().toISOString(),
