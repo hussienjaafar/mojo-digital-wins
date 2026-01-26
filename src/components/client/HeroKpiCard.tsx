@@ -486,8 +486,8 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
       </p>
 
       {/* Sparkline - pushed to bottom with mt-auto for uniform sizing */}
-      {sparklineData && sparklineData.length > 0 ? (
-        <div className="mt-auto pt-2 border-t border-[hsl(var(--portal-border)/0.5)]">
+      {sparklineData && sparklineData.length >= 2 ? (
+        <div className="mt-auto pt-2 border-t border-[hsl(var(--portal-border)/0.5)] min-h-[52px]">
           <Sparkline
             data={sparklineData}
             color={
