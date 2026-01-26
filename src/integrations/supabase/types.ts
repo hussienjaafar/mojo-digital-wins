@@ -15168,6 +15168,7 @@ export type Database = {
         }
         Returns: {
           amount: number
+          channel: string
           donor_first_name: string
           id: string
           is_recurring: boolean
