@@ -1,225 +1,181 @@
 
-# Enhanced User Management System
 
-## Overview
+# Implement Data Tracking for User Management
 
-Transform the Organization Members section into a comprehensive user management hub with full visibility into user activity, security status, and geographic patterns, plus powerful bulk management capabilities.
+## Problem
+
+The Enhanced User Management System UI is built, but all tracking tables are empty because the data collection mechanisms were never integrated into the application.
 
 ---
 
-## Architecture
+## Solution Overview
+
+We need to connect the existing database functions to the actual user flows:
 
 ```text
-+----------------------------------+     +---------------------------+
-|     Enhanced Member Table        |     |    User Detail Sidebar    |
-+----------------------------------+     +---------------------------+
-| - Email (visible)                |     | - Full Profile Info       |
-| - Last Session (from sessions)   | --> | - Session History         |
-| - MFA Badge                      |     | - Login History           |
-| - Status Badge                   |     | - Activity Audit          |
-| - Quick Actions                  |     | - Location Map            |
-+----------------------------------+     +---------------------------+
-              |
-              v
-+----------------------------------+
-|       Bulk Action Bar            |
-+----------------------------------+
-| - Terminate All Sessions         |
-| - Change Status (Multi-select)   |
-| - Export to CSV                  |
-| - Send Notifications             |
-+----------------------------------+
++-------------------+     +----------------------+     +-------------------+
+|   Login Flow      | --> | Track Session/Login  | --> | user_sessions     |
+|   (ClientLogin)   |     | (call RPC functions) |     | login_attempts    |
++-------------------+     +----------------------+     +-------------------+
+
++-------------------+     +----------------------+     +-------------------+
+|   User Activity   | --> | useActivityTracker   | --> | user_activity_logs|
+|   (page views,    |     | (frontend hook)      |     |                   |
+|    exports, etc)  |     +----------+-----------+     +-------------------+
++-------------------+                |
+                                     v
+                        +------------------------+
+                        | log-user-activity      |
+                        | (edge function)        |
+                        +------------------------+
+
++-------------------+     +----------------------+     +-------------------+
+|   Session/Login   | --> | geolocate-ip         | --> | user_locations    |
+|   with IP address |     | (edge function)      |     | (cache)           |
++-------------------+     +----------------------+     +-------------------+
 ```
 
 ---
 
-## Phase 1: Database Enhancements
+## Phase 1: Integrate Session & Login Tracking
 
-### 1.1 Populate Session Data
-Currently, the `user_sessions` table exists but isn't being populated. We need to create a trigger to track sessions on login:
+### 1.1 Update Login Flow
 
-- Create a trigger function that records session data when users authenticate
-- Include device info parsing from user agent (browser, OS, device type)
-- Store IP address and derive approximate location using a geolocation service
-
-### 1.2 New Tables
-
-**user_activity_logs** - Track in-app actions:
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid | Primary key |
-| user_id | uuid | FK to auth.users |
-| organization_id | uuid | FK to client_organizations |
-| action_type | text | e.g., 'viewed_report', 'exported_data' |
-| resource_type | text | e.g., 'dashboard', 'donor_list' |
-| resource_id | text | Specific resource identifier |
-| metadata | jsonb | Additional context |
-| ip_address | inet | Request origin |
-| created_at | timestamptz | Timestamp |
-
-**user_locations** - Cache geolocation lookups:
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid | Primary key |
-| ip_address | inet | Unique IP |
-| city | text | City name |
-| region | text | State/province |
-| country | text | Country code |
-| country_name | text | Full country name |
-| latitude | decimal | For map plotting |
-| longitude | decimal | For map plotting |
-| created_at | timestamptz | Cache timestamp |
-
----
-
-## Phase 2: Enhanced List View
-
-### 2.1 New Table Columns
-
-Update `ClientUserManager.tsx` to display:
-
-| Column | Source | Description |
-|--------|--------|-------------|
-| **Name** | client_users.full_name | User's display name |
-| **Email** | profiles.email | User's email address |
-| **Organization** | client_organizations.name | Organization membership |
-| **Role** | client_users.role | Permission level badge |
-| **Status** | client_users.status | Active/Pending/Suspended badge |
-| **MFA** | profiles.mfa_enabled_at | Shield icon if enabled |
-| **Last Session** | user_sessions.last_active_at | Relative time + device icon |
-| **Actions** | - | Quick action menu |
-
-### 2.2 Visual Indicators
-
-- **MFA Status**: Green shield icon if enabled, yellow warning if disabled
-- **Session Activity**: Green dot for active in last 15 min, gray for inactive
-- **Security Alerts**: Red badge if account locked or suspicious activity detected
-
----
-
-## Phase 3: Quick-View Sidebar
-
-### 3.1 Sidebar Component: `UserDetailSidebar.tsx`
-
-A slide-out panel that appears when clicking a user row, showing:
-
-**Header Section:**
-- User avatar (generated from initials)
-- Full name and email
-- Status badge with quick toggle
-- Role badge
-
-**Tabs:**
-
-1. **Overview Tab**
-   - Account created date
-   - Last login time and location
-   - MFA status with enable/disable action
-   - Total sessions in last 30 days
-   - Organizations with role in each
-
-2. **Sessions Tab**
-   - Active sessions list with:
-     - Device type icon (desktop/mobile/tablet)
-     - Browser and OS
-     - IP address with location
-     - Session start time
-     - "Terminate" button per session
-   - Session history (last 30 days)
-
-3. **Login History Tab**
-   - Recent login attempts (success/failure)
-   - Failed attempt reasons
-   - IP addresses with location
-   - Time of attempt
-   - Flag suspicious patterns (multiple failures, unusual locations)
-
-4. **Activity Tab**
-   - In-app actions audit trail
-   - Action type with icon
-   - Resource accessed
-   - Timestamp
-   - Filter by action type
-
-5. **Location Tab**
-   - Interactive map showing login locations
-   - Cluster markers for frequent locations
-   - Timeline of location changes
-   - Flag unusual geographic patterns
-   - Country/city breakdown
-
----
-
-## Phase 4: Location Map Integration
-
-### 4.1 Geolocation Edge Function: `geolocate-ip`
+Modify `src/pages/ClientLogin.tsx` to call tracking functions after successful login:
 
 ```typescript
-// Lookup IP address and cache results
-// Uses free IP geolocation API (ip-api.com or ipinfo.io)
-// Returns: city, region, country, lat/lng
+// After successful signInWithPassword:
+// 1. Record login attempt
+await supabase.rpc('log_login_attempt', {
+  p_email: email,
+  p_success: true,
+  p_ip_address: null, // Will get from edge function
+  p_user_agent: navigator.userAgent
+});
+
+// 2. Create session record
+await supabase.rpc('create_user_session', {
+  p_user_id: data.user.id,
+  p_device_info: parseDeviceInfo(navigator.userAgent),
+  p_ip_address: null,
+  p_user_agent: navigator.userAgent
+});
 ```
 
-### 4.2 Map Component: `UserLocationMap.tsx`
+### 1.2 Update AcceptInvitation Login
 
-- Use `react-simple-maps` (already installed) for world map
-- Cluster nearby login locations
-- Color-code by recency (recent = brighter)
-- Hover tooltips showing date, device, success/failure
-- Highlight anomalies (new countries, rapid location changes)
+Apply same tracking to `src/pages/AcceptInvitation.tsx` login handler.
 
----
+### 1.3 Add Failed Login Tracking
 
-## Phase 5: Bulk Actions
-
-### 5.1 Selection System
-
-- Checkbox column for multi-select
-- "Select All" toggle (current page / all pages)
-- Selection count indicator
-- Floating action bar when items selected
-
-### 5.2 Bulk Action Bar Component
-
-| Action | Description | Implementation |
-|--------|-------------|----------------|
-| **Terminate Sessions** | Force logout selected users | Call `terminate-user-sessions` for each |
-| **Change Status** | Bulk activate/suspend/deactivate | Update client_users.status |
-| **Export Data** | Download CSV of selected users | Generate CSV with all visible fields |
-| **Send Notification** | Email selected users | Create notification edge function |
-
-### 5.3 New Edge Functions
-
-**bulk-user-operations:**
-- Handle bulk status changes with audit logging
-- Rate-limited to prevent abuse
-- Requires admin role verification
-
-**send-user-notification:**
-- Send custom email notifications to selected users
-- Template options: welcome, reminder, security alert
-- Track delivery status
-
----
-
-## Phase 6: Activity Tracking Implementation
-
-### 6.1 Client-Side Tracking Hook: `useActivityTracker.ts`
+Record failed login attempts with failure reason:
 
 ```typescript
-// Automatically log significant user actions
-// - Page views (dashboard, reports)
-// - Data exports
+} catch (error: any) {
+  await supabase.rpc('log_login_attempt', {
+    p_email: email,
+    p_success: false,
+    p_failure_reason: error.message,
+    p_user_agent: navigator.userAgent
+  });
+}
+```
+
+---
+
+## Phase 2: Create Activity Tracking System
+
+### 2.1 Create `useActivityTracker` Hook
+
+New file: `src/hooks/useActivityTracker.ts`
+
+```typescript
+// Track significant user actions:
+// - Page views (dashboard, reports, settings)
+// - Data exports (CSV downloads)
 // - Settings changes
 // - Search queries (anonymized)
 ```
 
-### 6.2 Activity Logging Edge Function: `log-user-activity`
+Features:
+- Batches events to reduce API calls
+- Debounces rapid events
+- Graceful failure (non-blocking)
+- Respects user privacy (no sensitive data)
 
-- Receives activity events from frontend
+### 2.2 Create `log-user-activity` Edge Function
+
+New file: `supabase/functions/log-user-activity/index.ts`
+
+- Accepts activity events from frontend
 - Validates user session
-- Stores in user_activity_logs table
-- Respects rate limits
+- Inserts into `user_activity_logs` table
+- Rate-limited to prevent abuse
+
+### 2.3 Integrate into Key Components
+
+Add tracking calls to:
+- `ClientShell.tsx` - page navigation
+- Export buttons - data exports
+- Settings pages - configuration changes
+
+---
+
+## Phase 3: Create Geolocation System
+
+### 3.1 Create `geolocate-ip` Edge Function
+
+New file: `supabase/functions/geolocate-ip/index.ts`
+
+- Uses free IP geolocation API (ip-api.com)
+- Caches results in `user_locations` table (24-hour TTL)
+- Called during session creation to enrich location data
+
+### 3.2 Create `get-client-ip` Edge Function
+
+New file: `supabase/functions/get-client-ip/index.ts`
+
+- Returns the client's IP address
+- Used by login flow to get accurate IP (since browser can't access this directly)
+
+### 3.3 Update Session Creation Flow
+
+Modify login to:
+1. Get client IP via edge function
+2. Create session with IP
+3. Trigger async geolocation lookup
+
+---
+
+## Phase 4: Session Activity Updates
+
+### 4.1 Create Session Heartbeat
+
+Add to `useSessionManager.tsx`:
+
+```typescript
+// Every 5 minutes, update session activity
+useEffect(() => {
+  const interval = setInterval(() => {
+    if (session) {
+      supabase.rpc('update_session_activity', { 
+        p_session_id: currentSessionId 
+      });
+    }
+  }, 5 * 60 * 1000);
+  return () => clearInterval(interval);
+}, [session]);
+```
+
+### 4.2 Track Session End
+
+On sign out, mark session as ended:
+
+```typescript
+await supabase.rpc('end_user_session', { 
+  p_session_id: currentSessionId 
+});
+```
 
 ---
 
@@ -227,78 +183,72 @@ A slide-out panel that appears when clicking a user row, showing:
 
 | File | Purpose |
 |------|---------|
-| `src/components/admin/UserDetailSidebar.tsx` | Slide-out panel for user details |
-| `src/components/admin/UserSessionsList.tsx` | Sessions list component |
-| `src/components/admin/UserLoginHistory.tsx` | Login attempts list |
-| `src/components/admin/UserActivityLog.tsx` | Activity audit trail |
-| `src/components/admin/UserLocationMap.tsx` | Geographic visualization |
-| `src/components/admin/BulkActionBar.tsx` | Floating bulk actions bar |
-| `src/hooks/useActivityTracker.ts` | Client-side activity logging |
-| `supabase/functions/geolocate-ip/index.ts` | IP geolocation service |
-| `supabase/functions/bulk-user-operations/index.ts` | Bulk action handler |
-| `supabase/functions/send-user-notification/index.ts` | Email notification sender |
+| `src/hooks/useActivityTracker.ts` | Client-side activity tracking hook |
 | `supabase/functions/log-user-activity/index.ts` | Activity logging endpoint |
+| `supabase/functions/geolocate-ip/index.ts` | IP geolocation service |
+| `supabase/functions/get-client-ip/index.ts` | Client IP retrieval |
+| `src/lib/deviceInfo.ts` | User agent parsing utility |
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/admin/ClientUserManager.tsx` | Add email column, MFA indicator, session info, bulk selection |
-| `src/pages/admin/UserDetail.tsx` | Integrate with sidebar, add location tab |
-| `supabase/functions/db-proxy/index.ts` | Add new tables to whitelist for portal |
+| `src/pages/ClientLogin.tsx` | Add session/login tracking calls |
+| `src/pages/AcceptInvitation.tsx` | Add session/login tracking calls |
+| `src/hooks/useSessionManager.tsx` | Add heartbeat and session end tracking |
+| `src/components/client/ClientShell.tsx` | Integrate activity tracker |
+| `supabase/functions/db-proxy/index.ts` | Add `user_locations` to whitelist |
 
 ---
 
-## Database Migrations
+## Database Updates
 
-1. Create `user_activity_logs` table with RLS
-2. Create `user_locations` table (cache, no RLS needed)
-3. Add trigger to populate `user_sessions` on auth events
-4. Create indexes for efficient querying:
-   - `user_sessions(user_id, last_active_at)`
-   - `login_attempts(email, attempted_at)`
-   - `user_activity_logs(user_id, created_at)`
+### Fix RPC Return Type Issue
 
----
+The network logs show an error with `get_user_login_history`:
+```
+"structure of query does not match function result type"
+"Returned type inet does not match expected type text in column 6"
+```
 
-## Technical Considerations
-
-### Performance
-- Virtual scrolling for large user lists (existing `V3VirtualizedDataTable`)
-- Paginated session and activity loading
-- Cached geolocation lookups (24-hour TTL)
-- Debounced search input
-
-### Security
-- All new tables have RLS policies
-- Bulk operations require admin role verification
-- Activity logging excludes sensitive data (no passwords, no PII in search)
-- IP geolocation uses rate-limited external API
-
-### Privacy
-- Location data shown only to platform admins
-- Option to disable location tracking per organization
-- Activity logs auto-purge after 90 days
+Need to update the function to cast `ip_address` to TEXT.
 
 ---
 
 ## Implementation Order
 
-1. **Week 1**: Database migrations + session tracking trigger
-2. **Week 2**: Enhanced table columns + email/MFA/session display
-3. **Week 3**: User detail sidebar with tabs
-4. **Week 4**: Location tracking + map visualization
-5. **Week 5**: Bulk actions + notification system
-6. **Week 6**: Activity tracking + audit trail
+1. **Immediate** (this session):
+   - Create device info parser utility
+   - Update login pages to track sessions/logins
+   - Create `get-client-ip` edge function
+
+2. **Next** (follow-up):
+   - Create `geolocate-ip` edge function
+   - Create `log-user-activity` edge function
+   - Create `useActivityTracker` hook
+   - Integrate activity tracking
+
+3. **Final**:
+   - Add session heartbeat
+   - Add session end tracking
+   - Fix RPC return type issues
 
 ---
 
 ## Expected Outcome
 
-After implementation, platform admins will have:
+After implementation:
 
-- **At-a-glance visibility**: Email, MFA status, last session, and status visible directly in the member list
-- **Deep user insights**: Click any user to see full session history, login attempts, and in-app activity
-- **Geographic awareness**: Visual map of where users access the platform from, with anomaly detection
-- **Efficient bulk management**: Select multiple users and terminate sessions, change status, export data, or send notifications
-- **Complete audit trail**: Full history of user actions for compliance and security review
+| Data Source | Expected Population |
+|-------------|---------------------|
+| `user_sessions` | Every login creates a session record |
+| `login_attempts` | All login attempts (success/failure) logged |
+| `user_activity_logs` | Key user actions tracked |
+| `user_locations` | IP addresses resolved to city/country |
+
+The User Management UI will then display real data for:
+- Last session info with device/location
+- Login history with success/failure patterns
+- Activity audit trail
+- Location map visualization
+
