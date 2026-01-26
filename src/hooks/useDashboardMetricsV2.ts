@@ -22,11 +22,18 @@ import type {
 
 // ==================== Types ====================
 
+interface DailySpendPoint {
+  date: string;
+  spend: number;
+}
+
 interface ChannelSpendData {
   metaSpend: number;
   smsSpend: number;
   metaConversions: number;
   smsConversions: number;
+  dailyMetaSpend: DailySpendPoint[];
+  dailySmsSpend: DailySpendPoint[];
 }
 
 interface DashboardMetricsV2Data {
@@ -59,22 +66,24 @@ async function fetchChannelSpend(
   startDate: string,
   endDate: string
 ): Promise<ChannelSpendData> {
-  // Build Meta query
+  // Build Meta query - also fetch daily data for graph
   const metaQuery = supabase
     .from('meta_ad_metrics')
-    .select('spend, conversions')
+    .select('date, spend, conversions')
     .eq('organization_id', organizationId)
     .gte('date', startDate)
-    .lte('date', endDate);
+    .lte('date', endDate)
+    .order('date');
 
-  // SMS query (no campaign filter - SMS is independent)
+  // SMS query - also fetch daily data for graph
   const smsQuery = supabase
     .from('sms_campaigns')
-    .select('cost, conversions')
+    .select('send_date, cost, conversions')
     .eq('organization_id', organizationId)
     .gte('send_date', startDate)
     .lte('send_date', endDate)
-    .neq('status', 'draft');
+    .neq('status', 'draft')
+    .order('send_date');
 
   // Fetch in parallel
   const [metaResult, smsResult] = await Promise.all([
@@ -82,7 +91,7 @@ async function fetchChannelSpend(
     smsQuery,
   ]);
 
-  // Aggregate Meta spend
+  // Aggregate Meta spend (total)
   const metaSpend = (metaResult.data || []).reduce(
     (sum: number, m: any) => sum + Number(m.spend || 0),
     0
@@ -92,7 +101,7 @@ async function fetchChannelSpend(
     0
   );
 
-  // Aggregate SMS spend
+  // Aggregate SMS spend (total)
   const smsSpend = (smsResult.data || []).reduce(
     (sum: number, s: any) => sum + Number(s.cost || 0),
     0
@@ -102,7 +111,37 @@ async function fetchChannelSpend(
     0
   );
 
-  return { metaSpend, smsSpend, metaConversions, smsConversions };
+  // Build daily Meta spend map (aggregate by date in case of multiple rows per day)
+  const metaDailyMap = new Map<string, number>();
+  (metaResult.data || []).forEach((m: any) => {
+    const date = m.date;
+    metaDailyMap.set(date, (metaDailyMap.get(date) || 0) + Number(m.spend || 0));
+  });
+  const dailyMetaSpend: DailySpendPoint[] = Array.from(metaDailyMap.entries()).map(
+    ([date, spend]) => ({ date, spend })
+  );
+
+  // Build daily SMS spend map (aggregate by send_date)
+  const smsDailyMap = new Map<string, number>();
+  (smsResult.data || []).forEach((s: any) => {
+    // Extract date portion from send_date (which is timestamptz)
+    const date = s.send_date?.split('T')[0];
+    if (date) {
+      smsDailyMap.set(date, (smsDailyMap.get(date) || 0) + Number(s.cost || 0));
+    }
+  });
+  const dailySmsSpend: DailySpendPoint[] = Array.from(smsDailyMap.entries()).map(
+    ([date, spend]) => ({ date, spend })
+  );
+
+  return { 
+    metaSpend, 
+    smsSpend, 
+    metaConversions, 
+    smsConversions,
+    dailyMetaSpend,
+    dailySmsSpend,
+  };
 }
 
 // ==================== Data Transformation ====================
@@ -174,14 +213,24 @@ function transformToLegacyFormat(
     newMrr: [], // Not available
   };
 
-  // Map daily rollup to timeSeries
+  // Build lookup maps for daily spend data
+  const metaSpendByDate = new Map<string, number>();
+  (channelSpend.dailyMetaSpend || []).forEach((m) => {
+    metaSpendByDate.set(m.date, m.spend);
+  });
+  const smsSpendByDate = new Map<string, number>();
+  (channelSpend.dailySmsSpend || []).forEach((s) => {
+    smsSpendByDate.set(s.date, s.spend);
+  });
+
+  // Map daily rollup to timeSeries with spend data
   const timeSeries: DashboardTimeSeriesPoint[] = dailyRollup.map((d) => ({
     name: d.date,
     donations: d.raised,
     netDonations: d.net,
     refunds: 0, // Would need separate refund data per day
-    metaSpend: 0, // Would need to join with Meta daily data
-    smsSpend: 0, // Would need to join with SMS daily data
+    metaSpend: metaSpendByDate.get(d.date) || 0,
+    smsSpend: smsSpendByDate.get(d.date) || 0,
     donationsPrev: 0,
     netDonationsPrev: 0,
     refundsPrev: 0,
@@ -264,6 +313,8 @@ export function useDashboardMetricsV2(organizationId: string | undefined) {
     smsSpend: 0,
     metaConversions: 0,
     smsConversions: 0,
+    dailyMetaSpend: [],
+    dailySmsSpend: [],
   };
 
   // Transform to legacy format - use defaults for channel spend if not ready
