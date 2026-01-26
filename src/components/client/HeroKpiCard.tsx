@@ -390,6 +390,8 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
         "group relative p-4 rounded-xl border cursor-pointer",
         "bg-[hsl(var(--portal-bg-secondary))]",
         "border-[hsl(var(--portal-border))]",
+        // Fixed height for uniform sizing
+        "min-h-[180px] flex flex-col",
         // Transitions
         "transition-all duration-200",
         // Hover state
@@ -483,8 +485,8 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
         {subtitle || (previousValue ? `Previous: ${previousValue}` : "—")}
       </p>
 
-      {/* Sparkline */}
-      {sparklineData && sparklineData.length > 0 && (
+      {/* Sparkline - pushed to bottom with mt-auto for uniform sizing */}
+      {sparklineData && sparklineData.length > 0 ? (
         <div className="mt-auto pt-2 border-t border-[hsl(var(--portal-border)/0.5)]">
           <Sparkline
             data={sparklineData}
@@ -499,18 +501,23 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
             valueType={KPI_VALUE_TYPE_MAP[kpiKey]}
           />
         </div>
+      ) : (
+        /* Empty spacer when no sparkline to maintain consistent card height */
+        <div className="mt-auto h-[52px]" aria-hidden="true" />
       )}
 
-      {/* Selection indicator */}
-      {isSelected && (
-        <motion.div
-          className="absolute inset-x-0 bottom-0 h-0.5 bg-[hsl(var(--portal-accent-blue))] rounded-b-xl"
-          layoutId="kpi-selection-indicator"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        />
-      )}
+      {/* Selection indicator - independent animation per card (no shared layoutId) */}
+      <AnimatePresence>
+        {isSelected && (
+          <motion.div
+            className="absolute inset-x-0 bottom-0 h-0.5 bg-[hsl(var(--portal-accent-blue))] rounded-b-xl"
+            initial={{ opacity: 0, scaleX: 0 }}
+            animate={{ opacity: 1, scaleX: 1 }}
+            exit={{ opacity: 0, scaleX: 0 }}
+            transition={{ duration: 0.2 }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Expand affordance (chevron) - shows on hover for expandable cards */}
       {isExpandable && (
