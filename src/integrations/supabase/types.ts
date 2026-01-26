@@ -15321,7 +15321,7 @@ export type Database = {
           organization_id: string
           organization_name: string
           role: string
-          status: string
+          status: Database["public"]["Enums"]["user_status"]
           total_count: number
         }[]
       }
