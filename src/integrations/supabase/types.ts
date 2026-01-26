@@ -12144,6 +12144,67 @@ export type Database = {
         }
         Relationships: []
       }
+      user_activity_logs: {
+        Row: {
+          action_type: string
+          created_at: string | null
+          id: string
+          ip_address: unknown
+          metadata: Json | null
+          organization_id: string | null
+          resource_id: string | null
+          resource_type: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          organization_id?: string | null
+          resource_id?: string | null
+          resource_type?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          organization_id?: string | null
+          resource_id?: string | null
+          resource_type?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_activity_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_activity_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "user_activity_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       user_article_preferences: {
         Row: {
           created_at: string | null
@@ -12253,6 +12314,51 @@ export type Database = {
           },
         ]
       }
+      user_locations: {
+        Row: {
+          city: string | null
+          country: string | null
+          country_name: string | null
+          created_at: string | null
+          id: string
+          ip_address: unknown
+          isp: string | null
+          latitude: number | null
+          longitude: number | null
+          region: string | null
+          timezone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          country_name?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address: unknown
+          isp?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          region?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          country_name?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown
+          isp?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          region?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -12276,6 +12382,8 @@ export type Database = {
       }
       user_sessions: {
         Row: {
+          city: string | null
+          country: string | null
           created_at: string | null
           device_info: Json | null
           ended_at: string | null
@@ -12286,6 +12394,8 @@ export type Database = {
           is_valid: boolean | null
           last_active_at: string | null
           last_refresh_at: string | null
+          location_id: string | null
+          organization_id: string | null
           refresh_count: number | null
           started_at: string | null
           updated_at: string | null
@@ -12293,6 +12403,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          city?: string | null
+          country?: string | null
           created_at?: string | null
           device_info?: Json | null
           ended_at?: string | null
@@ -12303,6 +12415,8 @@ export type Database = {
           is_valid?: boolean | null
           last_active_at?: string | null
           last_refresh_at?: string | null
+          location_id?: string | null
+          organization_id?: string | null
           refresh_count?: number | null
           started_at?: string | null
           updated_at?: string | null
@@ -12310,6 +12424,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          city?: string | null
+          country?: string | null
           created_at?: string | null
           device_info?: Json | null
           ended_at?: string | null
@@ -12320,13 +12436,44 @@ export type Database = {
           is_valid?: boolean | null
           last_active_at?: string | null
           last_refresh_at?: string | null
+          location_id?: string | null
+          organization_id?: string | null
           refresh_count?: number | null
           started_at?: string | null
           updated_at?: string | null
           user_agent?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "user_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "user_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
       }
       watchlist_usage_log: {
         Row: {
@@ -12968,6 +13115,47 @@ export type Database = {
           used_by?: string | null
         }
         Relationships: []
+      }
+      admin_user_overview: {
+        Row: {
+          active_sessions_30d: number | null
+          created_at: string | null
+          email: string | null
+          failed_logins_24h: number | null
+          full_name: string | null
+          id: string | null
+          is_locked: boolean | null
+          last_login_at: string | null
+          latest_session: Json | null
+          mfa_enabled_at: string | null
+          organization_id: string | null
+          organization_name: string | null
+          role: string | null
+          status: Database["public"]["Enums"]["user_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_users_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_users_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "client_users_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
       }
       attribution_quality_metrics: {
         Row: {
@@ -15079,6 +15267,64 @@ export type Database = {
           started_at: string
         }[]
       }
+      get_user_activity_logs: {
+        Args: {
+          p_action_types?: string[]
+          p_limit?: number
+          p_offset?: number
+          p_user_id: string
+        }
+        Returns: {
+          action_type: string
+          activity_id: string
+          created_at: string
+          ip_address: unknown
+          metadata: Json
+          resource_id: string
+          resource_type: string
+        }[]
+      }
+      get_user_login_history: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: {
+          attempt_id: string
+          attempted_at: string
+          city: string
+          country: string
+          email: string
+          failure_reason: string
+          ip_address: string
+          success: boolean
+          user_agent: string
+        }[]
+      }
+      get_user_management_data: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_org_id?: string
+          p_roles?: string[]
+          p_search?: string
+          p_status?: string
+        }
+        Returns: {
+          active_sessions_30d: number
+          created_at: string
+          email: string
+          failed_logins_24h: number
+          full_name: string
+          id: string
+          is_locked: boolean
+          last_login_at: string
+          latest_session: Json
+          mfa_enabled: boolean
+          organization_id: string
+          organization_name: string
+          role: string
+          status: string
+          total_count: number
+        }[]
+      }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_organization_id_safe: { Args: never; Returns: string }
       get_user_organizations: {
@@ -15091,6 +15337,31 @@ export type Database = {
           organization_name: string
           role: string
           status: string
+        }[]
+      }
+      get_user_sessions_detailed: {
+        Args: {
+          p_include_expired?: boolean
+          p_limit?: number
+          p_user_id: string
+        }
+        Returns: {
+          city: string
+          country: string
+          country_name: string
+          device_info: Json
+          ended_at: string
+          expires_at: string
+          ip_address: string
+          is_current: boolean
+          is_valid: boolean
+          last_active_at: string
+          latitude: number
+          longitude: number
+          region: string
+          session_id: string
+          started_at: string
+          user_agent: string
         }[]
       }
       get_users_with_roles: {
@@ -15270,6 +15541,8 @@ export type Database = {
           rule_id: string
         }[]
       }
+      purge_old_activity_logs: { Args: never; Returns: undefined }
+      purge_old_location_cache: { Args: never; Returns: undefined }
       record_login_attempt: {
         Args: {
           p_email: string
