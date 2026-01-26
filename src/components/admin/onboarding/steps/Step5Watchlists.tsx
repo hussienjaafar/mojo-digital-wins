@@ -30,9 +30,10 @@ interface Step5WatchlistsProps {
   stepData: Record<string, unknown>;
   onComplete: (step: WizardStep, data: Record<string, unknown>) => Promise<void>;
   onBack: () => void;
+  onDataChange?: (data: Record<string, unknown>) => void;
 }
 
-export function Step5Watchlists({ organizationId, stepData, onComplete, onBack }: Step5WatchlistsProps) {
+export function Step5Watchlists({ organizationId, stepData, onComplete, onBack, onDataChange }: Step5WatchlistsProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isSuggestingEntities, setIsSuggestingEntities] = useState(false);
@@ -56,6 +57,11 @@ export function Step5Watchlists({ organizationId, stepData, onComplete, onBack }
     entity_type: 'politician',
     is_ai_suggested: false
   });
+
+  // Report data changes to parent for persistence on back navigation
+  useEffect(() => {
+    onDataChange?.({ entities, alert_thresholds: alertThresholds });
+  }, [entities, alertThresholds, onDataChange]);
 
   useEffect(() => {
     const fetchSuggestions = async () => {

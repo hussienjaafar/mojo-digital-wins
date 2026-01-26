@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,15 +21,21 @@ interface Step3UsersProps {
   stepData: Record<string, unknown>;
   onComplete: (step: WizardStep, data: Record<string, unknown>) => Promise<void>;
   onBack: () => void;
+  onDataChange?: (data: Record<string, unknown>) => void;
 }
 
-export function Step3Users({ organizationId, organizationName, stepData, onComplete, onBack }: Step3UsersProps) {
+export function Step3Users({ organizationId, organizationName, stepData, onComplete, onBack, onDataChange }: Step3UsersProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [users, setUsers] = useState<UserInvite[]>(
     (stepData.users as UserInvite[]) || []
   );
   const [bulkInput, setBulkInput] = useState('');
+
+  // Report data changes to parent for persistence on back navigation
+  useEffect(() => {
+    onDataChange?.({ users });
+  }, [users, onDataChange]);
   const [showBulkInput, setShowBulkInput] = useState(false);
   
   const [newUser, setNewUser] = useState<UserInvite>({

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,6 +43,7 @@ interface Step4IntegrationsProps {
   stepData: Record<string, unknown>;
   onComplete: (step: WizardStep, data: Record<string, unknown>) => Promise<void>;
   onBack: () => void;
+  onDataChange?: (data: Record<string, unknown>) => void;
 }
 
 interface IntegrationFormState {
@@ -70,7 +71,7 @@ interface IntegrationFormState {
   };
 }
 
-export function Step4Integrations({ organizationId, stepData, onComplete, onBack }: Step4IntegrationsProps) {
+export function Step4Integrations({ organizationId, stepData, onComplete, onBack, onDataChange }: Step4IntegrationsProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [testingIntegration, setTestingIntegration] = useState<string | null>(null);
@@ -93,6 +94,11 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
     switchboard: { api_key: '', account_id: '', isOpen: false, showKey: false },
     actblue: { webhook_username: '', webhook_password: '', entity_id: '', csv_username: '', csv_password: '', isOpen: false, showWebhookPassword: false, showCsvPassword: false }
   });
+
+  // Report data changes to parent for persistence on back navigation
+  useEffect(() => {
+    onDataChange?.({ integrations });
+  }, [integrations, onDataChange]);
   
   const copyEndpointUrl = async () => {
     await navigator.clipboard.writeText(webhookEndpointUrl);

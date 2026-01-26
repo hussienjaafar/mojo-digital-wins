@@ -752,7 +752,10 @@ const ClientOrganizationManager = () => {
                                   size="sm"
                                   variant="outline"
                                   className="gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={() => navigate(`/admin?tab=onboarding-wizard&org=${org.id}`)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/admin?tab=onboarding-wizard&org=${org.id}`);
+                                  }}
                                 >
                                   <Rocket className="h-3 w-3" />
                                   Start
@@ -763,7 +766,10 @@ const ClientOrganizationManager = () => {
                                   size="sm"
                                   variant="outline"
                                   className="gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={() => navigate(`/admin?tab=onboarding-wizard&org=${org.id}`)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/admin?tab=onboarding-wizard&org=${org.id}`);
+                                  }}
                                 >
                                   <PlayCircle className="h-3 w-3" />
                                   Continue
@@ -774,7 +780,10 @@ const ClientOrganizationManager = () => {
                                   size="sm"
                                   variant="destructive"
                                   className="gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={() => navigate(`/admin?tab=onboarding-wizard&org=${org.id}`)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/admin?tab=onboarding-wizard&org=${org.id}`);
+                                  }}
                                 >
                                   <AlertTriangle className="h-3 w-3" />
                                   Resolve
