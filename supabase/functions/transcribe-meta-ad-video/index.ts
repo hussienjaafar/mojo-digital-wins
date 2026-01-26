@@ -1,23 +1,23 @@
 /**
  * =============================================================================
- * TRANSCRIBE META AD VIDEO
+ * TRANSCRIBE META AD VIDEO - v2.0
  * =============================================================================
  *
  * Downloads a video from its source URL and transcribes it using OpenAI Whisper.
- * Then analyzes the transcript for tone, topic, hook structure, and other features.
+ * Then analyzes the transcript for specific political issues, stances, and targets.
  *
  * Modes:
  * - Single video: Provide video_id to transcribe one video
  * - Batch: Provide organization_id + limit to process pending videos
  *
- * Features analyzed:
- * - Speaker count and words per minute
- * - Hook (first 3 seconds)
- * - Topic classification
- * - Tone analysis (urgent, hopeful, angry, etc.)
- * - Sentiment score
- * - Call-to-action detection
- * - Key phrases extraction
+ * Features analyzed (v2.0 - Specific Issue Extraction):
+ * - issue_primary: Specific issue position (not generic topics)
+ * - political_stances: Specific policy positions taken
+ * - targets_attacked: People/organizations criticized
+ * - targets_supported: People/organizations endorsed
+ * - donor_pain_points: Fears/frustrations targeted
+ * - values_appealed: Core values referenced
+ * - urgency_drivers: Why action needed now
  *
  * =============================================================================
  */
@@ -44,30 +44,24 @@ interface TranscriptionResult {
 }
 
 interface AnalysisResult {
-  // Specific issue extraction (NEW - replaces generic categories)
-  issue_primary: string;           // e.g., "anti-Israel military aid", "pro-immigration anti-Laken Riley"
-  issue_tags: string[];            // All specific issues mentioned
-  political_stances: string[];     // e.g., ["anti-AIPAC", "pro-ceasefire", "anti-incumbent"]
-  targets_attacked: string[];      // People/orgs criticized: ["Ritchie Torres", "AIPAC", "Netanyahu"]
-  targets_supported: string[];     // People/orgs praised: ["Michael Blake", "progressive movement"]
-  policy_positions: string[];      // Specific policies: ["end military aid to Israel", "Medicare for All"]
-
-  // Keep generic topic for backwards compatibility
+  // Specific issue extraction (v2.0)
+  issue_primary: string;
+  issue_tags: string[];
+  political_stances: string[];
+  targets_attacked: string[];
+  targets_supported: string[];
+  policy_positions: string[];
+  donor_pain_points: string[];
+  values_appealed: string[];
+  urgency_drivers: string[];
+  
+  // Original fields
   topic_primary: string;
   topic_tags: string[];
-
-  // Tone and sentiment
   tone_primary: string;
   tone_tags: string[];
   sentiment_score: number;
   sentiment_label: string;
-
-  // Donor psychology (from analyze-creative-motivation approach)
-  donor_pain_points: string[];     // What problems/injustices compel donation
-  values_appealed: string[];       // Core values triggered
-  urgency_drivers: string[];       // Why donate NOW
-
-  // CTA and structure
   cta_text: string | null;
   cta_type: string | null;
   urgency_level: string;
@@ -150,58 +144,73 @@ async function transcribeWithWhisper(
 }
 
 /**
- * Analyze transcript using GPT-4 for content features
+ * Analyze transcript using GPT-4 for content features (v2.0 - Specific Issue Extraction)
  */
 async function analyzeTranscript(
   transcript: string,
   openaiApiKey: string
 ): Promise<AnalysisResult | null> {
   try {
-    console.log(`[TRANSCRIBE] Analyzing transcript with GPT-4...`);
+    console.log(`[TRANSCRIBE] Analyzing transcript with GPT-4 (v2.0)...`);
 
-    const systemPrompt = `You are an expert at analyzing political and nonprofit fundraising video ad scripts.
-Your job is to extract SPECIFIC issues, stances, and targets - NOT generic categories.
+    const systemPrompt = `You are an expert political ad analyst. Analyze this video transcript and extract SPECIFIC insights that can be correlated with fundraising performance.
 
-CRITICAL: Be VERY SPECIFIC about what the ad is actually about:
-- NOT "foreign policy" but "anti-Israel military aid" or "pro-ceasefire Gaza"
-- NOT "immigration" but "anti-Laken Riley Act pro-immigrant" or "sanctuary city defense"
-- NOT "democracy" but "anti-AIPAC money in politics" or "anti-Ritchie Torres sellout"
+CRITICAL: Be SPECIFIC, not generic. Instead of "immigration", say "pro-immigrant anti-deportation" or "anti-illegal-immigration border-security".
 
-Return a JSON object with these fields:
+Return a JSON object with:
 
-SPECIFIC ISSUES (most important):
-- issue_primary: The EXACT issue being discussed (e.g., "anti-Israel military aid", "pro-immigration anti-deportation", "anti-AIPAC corruption")
-- issue_tags: Array of ALL specific issues mentioned
-- political_stances: Array of stances taken (e.g., ["anti-AIPAC", "pro-ceasefire", "anti-incumbent", "pro-immigrant rights"])
-- targets_attacked: People/orgs being criticized (e.g., ["Ritchie Torres", "AIPAC", "Netanyahu", "Trump"])
-- targets_supported: People/orgs being praised (e.g., ["Michael Blake", "progressive movement", "immigrant community"])
-- policy_positions: Specific policies advocated (e.g., ["end military aid to Israel", "stop deportations", "Medicare for All"])
+## SPECIFIC ISSUE FIELDS (most important for v2.0):
+- issue_primary: The SPECIFIC issue stance, not generic category. Examples:
+  * "pro-immigrant anti-persecution" (not just "immigration")
+  * "anti-corporate price-gouging" (not just "economy")
+  * "pro-choice abortion-access" (not just "healthcare")
+  * "anti-MAGA democracy-defense" (not just "democracy")
+  
+- issue_tags: Array of 2-5 specific issue positions taken in this ad
 
-DONOR PSYCHOLOGY:
-- donor_pain_points: What specific problems/injustices would compel someone to donate? Be specific!
-  Examples: "AIPAC buying elections", "immigrants being persecuted", "politicians ignoring constituents"
-- values_appealed: Core values being triggered (e.g., ["justice", "solidarity", "anti-corruption", "community empowerment"])
-- urgency_drivers: Why must they donate NOW? (e.g., ["primary election deadline", "matching gift expires", "crisis moment"])
+- political_stances: Array of specific policy positions. Examples:
+  * "anti-deportation", "pro-sanctuary-cities", "path-to-citizenship"
+  * "medicare-for-all", "public-option", "drug-price-caps"
+  * "assault-weapons-ban", "universal-background-checks"
+  
+- targets_attacked: People or organizations criticized. Examples:
+  * "Donald Trump", "MAGA Republicans", "Project 2025"
+  * "Big Pharma", "Insurance Companies", "Billionaires"
+  
+- targets_supported: People or organizations endorsed/defended. Examples:
+  * "immigrants", "working families", "veterans"
+  * Specific candidate names if mentioned
+  
+- policy_positions: Specific policies advocated for:
+  * "$15 minimum wage", "Green New Deal", "Roe codification"
+  
+- donor_pain_points: What fears/frustrations does this target?
+  * "fear of family separation", "healthcare bankruptcy", "democracy collapse"
+  * "children's safety", "economic insecurity", "loss of rights"
+  
+- values_appealed: Core values referenced:
+  * "patriotism", "family", "freedom", "equality", "justice"
+  * "faith", "community", "opportunity", "security"
+  
+- urgency_drivers: Why action is needed NOW:
+  * "election deadline", "legislation pending", "crisis escalating"
+  * "matching gift expiring", "milestone goal"
 
-GENERIC TOPIC (for backwards compatibility):
-- topic_primary: General category (immigration, healthcare, economy, climate, foreign_policy, elections, civil_rights, other)
-- topic_tags: Array of general topics
-
-TONE AND SENTIMENT:
+## ORIGINAL FIELDS (for backwards compatibility):
+- topic_primary: Generic category (immigration, healthcare, economy, climate, democracy, social_justice, education, gun_safety, reproductive_rights, veterans, other)
+- topic_tags: Array of generic topic categories
 - tone_primary: Primary tone (urgent, hopeful, angry, compassionate, fearful, inspiring, informative, personal_story)
 - tone_tags: Array of all detected tones
-- sentiment_score: Number from -1 (very negative about status quo) to 1 (very positive/hopeful)
+- sentiment_score: Number from -1 to 1
 - sentiment_label: "positive", "negative", or "neutral"
-
-CTA AND STRUCTURE:
-- cta_text: The call-to-action phrase if present, or null
-- cta_type: One of: "donate", "sign_petition", "share", "learn_more", "volunteer", "vote", or null
+- cta_text: The call-to-action phrase if present
+- cta_type: "donate", "sign_petition", "share", "learn_more", "volunteer", "vote", or null
 - urgency_level: "low", "medium", "high", or "extreme"
-- emotional_appeals: Array of emotions targeted (fear, hope, anger, compassion, pride, guilt, solidarity, outrage)
-- key_phrases: Top 5 most impactful phrases from the transcript
-- hook_text: First 15 words or first sentence, whichever is shorter
-- hook_word_count: Number of words in the hook
-- speaker_count: Estimated number of distinct speakers (1 if single narrator)`;
+- emotional_appeals: Array of emotions targeted
+- key_phrases: Top 5 most impactful phrases
+- hook_text: First 15 words or first sentence
+- hook_word_count: Number of words in hook
+- speaker_count: Estimated number of distinct speakers`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -213,7 +222,7 @@ CTA AND STRUCTURE:
         model: 'gpt-4-turbo-preview',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Analyze this video ad transcript:\n\n${transcript}` },
+          { role: 'user', content: `Analyze this political video ad transcript:\n\n${transcript}` },
         ],
         response_format: { type: 'json_object' },
         temperature: 0.3,
@@ -235,7 +244,7 @@ CTA AND STRUCTURE:
     }
 
     const analysis = JSON.parse(content);
-    console.log(`[TRANSCRIBE] Analysis complete. Topic: ${analysis.topic_primary}, Tone: ${analysis.tone_primary}`);
+    console.log(`[TRANSCRIBE] Analysis complete. Issue: ${analysis.issue_primary}, Topic: ${analysis.topic_primary}, Tone: ${analysis.tone_primary}`);
 
     return analysis;
   } catch (err) {
@@ -434,7 +443,7 @@ serve(async (req) => {
         continue;
       }
 
-      // Analyze transcript
+      // Analyze transcript with v2.0 prompt
       const analysis = await analyzeTranscript(transcription.text, openaiApiKey);
 
       // Calculate speaking metrics
@@ -447,7 +456,7 @@ serve(async (req) => {
       // Extract hook
       const hook = extractHook(transcription.segments);
 
-      // Store transcript
+      // Store transcript with v2.0 fields
       const { error: transcriptError } = await supabase
         .from('meta_ad_transcripts')
         .upsert({
@@ -457,18 +466,20 @@ serve(async (req) => {
           video_ref: video.id,
           transcript_text: transcription.text,
           transcript_segments: transcription.segments,
-          duration_seconds: transcription.duration,
+          duration_seconds: Math.round(transcription.duration), // Round to integer to avoid type error
           language: transcription.language,
-          language_confidence: 0.95, // Whisper doesn't return confidence, assume high
+          language_confidence: 0.95,
           speaker_count: analysis?.speaker_count || 1,
           words_total: speakingMetrics.wordsTotal,
-          words_per_minute: speakingMetrics.wordsPerMinute,
+          words_per_minute: Math.round(speakingMetrics.wordsPerMinute),
           silence_percentage: speakingMetrics.silencePercentage,
+          
+          // Hook fields
           hook_text: analysis?.hook_text || hook.text,
           hook_duration_seconds: hook.duration,
           hook_word_count: analysis?.hook_word_count || hook.wordCount,
-
-          // SPECIFIC ISSUE EXTRACTION (NEW)
+          
+          // v2.0 SPECIFIC ISSUE FIELDS
           issue_primary: analysis?.issue_primary || null,
           issue_tags: analysis?.issue_tags || [],
           political_stances: analysis?.political_stances || [],
@@ -478,29 +489,25 @@ serve(async (req) => {
           donor_pain_points: analysis?.donor_pain_points || [],
           values_appealed: analysis?.values_appealed || [],
           urgency_drivers: analysis?.urgency_drivers || [],
-
-          // Generic topic (backwards compatibility)
+          
+          // Original fields (backwards compatibility)
           topic_primary: analysis?.topic_primary || null,
           topic_tags: analysis?.topic_tags || [],
-
-          // Tone and sentiment
           tone_primary: analysis?.tone_primary || null,
           tone_tags: analysis?.tone_tags || [],
           sentiment_score: analysis?.sentiment_score || null,
           sentiment_label: analysis?.sentiment_label || null,
-
-          // CTA and structure
           cta_text: analysis?.cta_text || null,
           cta_type: analysis?.cta_type || null,
           urgency_level: analysis?.urgency_level || null,
           emotional_appeals: analysis?.emotional_appeals || [],
           key_phrases: analysis?.key_phrases || [],
-
+          
           // Metadata
           transcription_model: 'whisper-1',
           transcription_confidence: 0.95,
           analysis_model: analysis ? 'gpt-4-turbo-preview' : null,
-          analysis_version: '2.0', // Bumped version for specific issue extraction
+          analysis_version: '2.0', // Updated to v2.0
           transcribed_at: new Date().toISOString(),
           analyzed_at: analysis ? new Date().toISOString() : null,
           updated_at: new Date().toISOString(),
@@ -511,7 +518,7 @@ serve(async (req) => {
       if (transcriptError) {
         console.error(`[TRANSCRIBE] Error storing transcript:`, transcriptError);
         failed++;
-        results.push({ video_id: video.video_id, status: 'failed', error: 'Database error' });
+        results.push({ video_id: video.video_id, status: 'failed', error: `Database error: ${transcriptError.message}` });
         continue;
       }
 
@@ -520,7 +527,7 @@ serve(async (req) => {
         .from('meta_ad_videos')
         .update({
           status: 'TRANSCRIBED',
-          duration_seconds: transcription.duration,
+          duration_seconds: Math.round(transcription.duration),
           transcribed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -528,7 +535,7 @@ serve(async (req) => {
 
       transcribed++;
       results.push({ video_id: video.video_id, status: 'transcribed' });
-      console.log(`[TRANSCRIBE] Successfully transcribed video ${video.video_id}`);
+      console.log(`[TRANSCRIBE] Successfully transcribed video ${video.video_id} with v2.0 analysis`);
     }
 
     console.log(`[TRANSCRIBE] Complete. Transcribed: ${transcribed}, Failed: ${failed}`);
@@ -536,6 +543,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
+        version: '2.0',
         stats: {
           processed: videosToProcess.length,
           transcribed,
