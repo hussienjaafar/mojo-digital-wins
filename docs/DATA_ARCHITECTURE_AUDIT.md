@@ -1,9 +1,9 @@
-# Data Architecture Audit Report (v4 - Final Verification)
+# Data Architecture Audit Report (v5 - Cleanup Complete)
 
 **Repo:** mojo-digital-wins
 **Branch:** docs/dashboard-architecture
-**Audit Date:** 2026-01-25 (Final)
-**Last Pull:** 66e0640 (Latest)
+**Audit Date:** 2026-01-26 (Final)
+**Last Pull:** 83e619e (Cleanup Complete)
 **Auditor:** Claude (Data Architecture Specialist)
 **Remediation Report:** [DATA_ARCHITECTURE_REMEDIATION_REPORT.md](./DATA_ARCHITECTURE_REMEDIATION_REPORT.md)
 
@@ -24,20 +24,27 @@ All critical (P0) and high-priority (P1) issues identified in the original audit
 | P1 | RPC parameter inconsistency | **RESOLVED** | Standardized on `p_use_utc=false` (Eastern Time) |
 | P2 | Meta tables clarified | **CLOSED** | Documented: `meta_ad_metrics` = canonical |
 
-### Latest Updates (66e0640)
+### Latest Updates (83e619e) - MAJOR CLEANUP
 
-| Migration/File | Change | Purpose |
-|----------------|--------|---------|
-| `20260125224435` | Fixed RPC type mismatch | Changed `campaign_id`/`creative_id` from UUID to TEXT |
-| `20260125225147` | Added expression index | Performance optimization for ET timezone queries |
-| `useDashboardMetricsV2.ts` | Added `useMemo` | Performance optimization |
-| Chart components | Enhanced | Improved rendering |
+**Files Deleted (-2,605 lines):**
+| File | Lines | Reason |
+|------|-------|--------|
+| `useClientDashboardMetricsQuery.ts` | 1,193 | Deprecated hook - fully replaced |
+| `ClientDashboardMetrics.tsx` | 639 | Dead code - not imported anywhere |
+| `useClientDashboardMetricsQuery.test.ts` | 310 | Tests for deleted hook |
+| `campaign-filter.test.ts` | 425 | Tests for deleted hook |
 
-### Dead Code Identified
+**Files Created (+199 lines):**
+| File | Lines | Purpose |
+|------|-------|---------|
+| `src/types/dashboard.ts` | 91 | Extracted types from deleted hook |
+| `20260126001754` migration | 108 | Improved channel detection (lowercase, refcode2, contribution_form) |
 
-| File | Status | Notes |
-|------|--------|-------|
-| `src/components/client/ClientDashboardMetrics.tsx` | **DEAD CODE** | Not imported anywhere, uses deprecated hook |
+**Channel Detection Improvements:**
+- Now uses lowercase channel names (`meta`, `sms`, `email`, `organic`, `other`)
+- Detects Meta via `refcode2` field (Facebook click ID suffix)
+- Detects SMS via `contribution_form` pattern (`%sms%`)
+- Better refcode pattern matching
 
 ### Files Added/Changed in Remediation
 
@@ -171,12 +178,12 @@ All query hooks now import from shared client:
 
 | ID | Issue | Priority | Effort | Notes |
 |----|-------|----------|--------|-------|
-| **NEW** | Delete dead `ClientDashboardMetrics.tsx` | P2 | 15m | Component not imported anywhere, uses deprecated hook |
+| ~~NEW~~ | ~~Delete dead `ClientDashboardMetrics.tsx`~~ | ~~P2~~ | - | **DONE** - Deleted in 83e619e |
+| ~~-~~ | ~~Remove deprecated hook~~ | ~~P3~~ | - | **DONE** - `useClientDashboardMetricsQuery` deleted |
 | R6 | Backfill Edge Function Audit | P2 | 2h | 33+ `backfill-*` functions need review |
 | MR-2 | Unified Donor Segment RPC | P2 | 4h | Consolidate 2-stage fetch in `useDonorSegmentQuery` |
 | N3 | Session Table TTL Cleanup | P3 | 1h | Verify cron job for `user_sessions` |
 | LA-2 | Materialized Channel Summary | P3 | 8h | `channel_summary_daily` view for cross-channel queries |
-| - | Remove deprecated hook | P3 | 1h | Delete `useClientDashboardMetricsQuery` after dead code removal |
 
 ---
 
@@ -231,13 +238,18 @@ All query hooks now import from shared client:
 | `src/hooks/useActBlueMetrics.ts` | 717 | **PRIMARY** - Unified metrics hook |
 | `src/hooks/useDashboardMetricsV2.ts` | 283 | **ADAPTER** - ClientDashboard bridge |
 
-### Query Hooks (Migrated)
+### Query Hooks (Final State)
 | File | Status |
 |------|--------|
-| `src/queries/useClientDashboardMetricsQuery.ts` | ⚠️ DEPRECATED - Use `useDashboardMetricsV2` |
+| `src/queries/useClientDashboardMetricsQuery.ts` | **DELETED** - Replaced by `useDashboardMetricsV2` |
 | `src/queries/useDonationMetricsQuery.ts` | ✅ Uses shared RPC client + `actblueKeys` |
 | `src/queries/useActBlueDailyRollupQuery.ts` | ✅ Uses shared RPC client + `actblueKeys` |
 | `src/queries/useChannelSummariesQuery.ts` | ✅ Cleaned (legacy hook removed) |
+
+### Types (Extracted)
+| File | Status |
+|------|--------|
+| `src/types/dashboard.ts` | ✅ **NEW** - Types extracted from deleted hook |
 
 ### New Exports
 ```typescript
