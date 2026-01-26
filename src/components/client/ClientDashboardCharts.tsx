@@ -408,17 +408,17 @@ export const ClientDashboardCharts = ({
               <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{kpis.totalImpressions.toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
-              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Total Clicks</span>
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Link Clicks</span>
               <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{kpis.totalClicks.toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
-              <span className="text-sm text-[hsl(var(--portal-text-muted))]">CTR (Click-Through Rate)</span>
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Link CTR</span>
               <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">
                 {kpis.totalImpressions > 0 ? ((kpis.totalClicks / kpis.totalImpressions) * 100).toFixed(2) : '0.00'}%
               </span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
-              <span className="text-sm text-[hsl(var(--portal-text-muted))]">CPC (Cost Per Click)</span>
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Link CPC</span>
               <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">
                 {kpis.totalClicks > 0 ? formatCurrency(metaSpend / kpis.totalClicks) : '$0'}
               </span>
@@ -426,6 +426,16 @@ export const ClientDashboardCharts = ({
             <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
               <span className="text-sm text-[hsl(var(--portal-text-muted))]">Meta Conversions</span>
               <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{metaConversions.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Meta Attributed Revenue</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">{formatCurrency(kpis.metaAttributedRevenue)}</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-[hsl(var(--portal-border))]">
+              <span className="text-sm text-[hsl(var(--portal-text-muted))]">Meta Attributed ROI</span>
+              <span className="text-sm font-semibold text-[hsl(var(--portal-text-primary))] tabular-nums">
+                {metaSpend > 0 ? (kpis.metaAttributedRevenue / metaSpend).toFixed(2) + 'x' : '0.00x'}
+              </span>
             </div>
             <div className="flex items-center justify-between py-2">
               <span className="text-sm text-[hsl(var(--portal-text-muted))]">Avg Donation (Meta)</span>

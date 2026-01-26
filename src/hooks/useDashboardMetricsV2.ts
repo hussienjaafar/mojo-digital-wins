@@ -34,6 +34,7 @@ interface ChannelSpendData {
   smsConversions: number;
   metaImpressions: number;
   metaClicks: number;
+  metaLinkClicks: number;
   dailyMetaSpend: DailySpendPoint[];
   dailySmsSpend: DailySpendPoint[];
 }
@@ -68,10 +69,10 @@ async function fetchChannelSpend(
   startDate: string,
   endDate: string
 ): Promise<ChannelSpendData> {
-  // Build Meta query - also fetch daily data for graph
+  // Build Meta query - use meta_ad_metrics_daily for link clicks data
   const metaQuery = supabase
-    .from('meta_ad_metrics')
-    .select('date, spend, conversions, impressions, clicks')
+    .from('meta_ad_metrics_daily')
+    .select('date, spend, conversions, impressions, clicks, link_clicks')
     .eq('organization_id', organizationId)
     .gte('date', startDate)
     .lte('date', endDate)
@@ -108,6 +109,10 @@ async function fetchChannelSpend(
   );
   const metaClicks = (metaResult.data || []).reduce(
     (sum: number, m: any) => sum + Number(m.clicks || 0),
+    0
+  );
+  const metaLinkClicks = (metaResult.data || []).reduce(
+    (sum: number, m: any) => sum + Number(m.link_clicks || 0),
     0
   );
 
@@ -151,6 +156,7 @@ async function fetchChannelSpend(
     smsConversions,
     metaImpressions,
     metaClicks,
+    metaLinkClicks,
     dailyMetaSpend,
     dailySmsSpend,
   };
@@ -207,7 +213,7 @@ function transformToLegacyFormat(
     attributionRate: summary.totalNet > 0 ? (totalAttributedRevenue / summary.totalNet) * 100 : 0,
     totalSpend,
     totalImpressions: channelSpend.metaImpressions,
-    totalClicks: channelSpend.metaClicks,
+    totalClicks: channelSpend.metaLinkClicks, // Use link clicks for accurate CTR/CPC
     avgDonation: summary.averageDonation,
     donationCount: summary.totalDonations,
     deterministicRate: 0, // Not available from unified yet
@@ -355,6 +361,7 @@ export function useDashboardMetricsV2(organizationId: string | undefined) {
     smsConversions: 0,
     metaImpressions: 0,
     metaClicks: 0,
+    metaLinkClicks: 0,
     dailyMetaSpend: [],
     dailySmsSpend: [],
   };
