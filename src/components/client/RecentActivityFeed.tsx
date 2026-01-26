@@ -41,15 +41,31 @@ const itemVariants = {
 // Helper Functions
 // ============================================================================
 
-function getChannelFromRefcode(refcode: string | null, sourceCampaign: string | null): string {
-  if (!refcode && !sourceCampaign) return "Direct";
+function getDisplayChannel(
+  serverChannel: string | null, 
+  refcode: string | null
+): string {
+  // If server provided a channel, use it (with proper capitalization)
+  if (serverChannel) {
+    switch (serverChannel.toLowerCase()) {
+      case 'meta': return 'Meta';
+      case 'sms': return 'SMS';
+      case 'email': return 'Email';
+      case 'google': return 'Google';
+      case 'other': return 'Other';
+      case 'unattributed': return 'Direct';
+      default: return 'Other';
+    }
+  }
   
-  const combined = `${refcode || ""} ${sourceCampaign || ""}`.toLowerCase();
+  // Fallback to old logic for backward compatibility
+  if (!refcode) return "Direct";
   
-  if (combined.includes("sms") || combined.includes("text")) return "SMS";
-  if (combined.includes("meta") || combined.includes("facebook") || combined.includes("fb")) return "Meta";
-  if (combined.includes("email") || combined.includes("em_")) return "Email";
-  if (combined.includes("google") || combined.includes("ggl")) return "Google";
+  const lower = refcode.toLowerCase();
+  if (lower.includes("sms") || lower.includes("text")) return "SMS";
+  if (lower.includes("meta") || lower.includes("facebook") || lower.includes("fb")) return "Meta";
+  if (lower.includes("email") || lower.includes("em_")) return "Email";
+  if (lower.includes("google") || lower.includes("ggl")) return "Google";
   
   return "Other";
 }
@@ -80,7 +96,7 @@ interface DonationItemProps {
 
 const DonationItem = React.forwardRef<HTMLDivElement, DonationItemProps>(
   ({ donation, index }, ref) => {
-    const channel = getChannelFromRefcode(donation.refcode, null);
+    const channel = getDisplayChannel(donation.channel, donation.refcode);
     const channelColor = getChannelColor(channel);
     
     const donorDisplay = donation.donor_name || "Anonymous";
