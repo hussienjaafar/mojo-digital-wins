@@ -1,14 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, CheckCircle2, XCircle, Building2, Key, LogIn, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Building2, Key, LogIn, AlertCircle, Eye, EyeOff, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
 interface MetaAdAccount {
   id: string;
   name: string;
@@ -41,6 +40,20 @@ export function MetaAuthOptions({ organizationId, onComplete, onCancel }: MetaAu
   // Manual input state
   const [manualToken, setManualToken] = useState('');
   const [manualAdAccountId, setManualAdAccountId] = useState('');
+  
+  // Search state
+  const [accountSearch, setAccountSearch] = useState('');
+  
+  // Filter accounts based on search
+  const filteredAccounts = useMemo(() => {
+    if (!accountSearch.trim()) return adAccounts;
+    const search = accountSearch.toLowerCase();
+    return adAccounts.filter(account => 
+      account.name.toLowerCase().includes(search) ||
+      account.account_id.toLowerCase().includes(search) ||
+      (account.business_name?.toLowerCase().includes(search) ?? false)
+    );
+  }, [adAccounts, accountSearch]);
   const [showManualToken, setShowManualToken] = useState(false);
 
   // Handle OAuth callback via message from popup OR redirect
@@ -459,8 +472,19 @@ export function MetaAuthOptions({ organizationId, onComplete, onCancel }: MetaAu
               
               <div className="space-y-2">
                 <Label>Select Ad Account(s)</Label>
+                {adAccounts.length > 3 && (
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search accounts..."
+                      value={accountSearch}
+                      onChange={(e) => setAccountSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                )}
                 <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {adAccounts.map((account) => (
+                  {filteredAccounts.map((account) => (
                     <div
                       key={account.id}
                       className={`flex items-center space-x-3 p-3 rounded-lg border transition-colors cursor-pointer ${
@@ -496,6 +520,11 @@ export function MetaAuthOptions({ organizationId, onComplete, onCancel }: MetaAu
                       {getAccountStatusBadge(account.account_status)}
                     </div>
                   ))}
+                  {filteredAccounts.length === 0 && accountSearch && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No accounts match "{accountSearch}"
+                    </p>
+                  )}
                 </div>
               </div>
 
