@@ -235,7 +235,7 @@ export function CreativeIntelligenceDashboard({
   ];
 
   return (
-    <div className="space-y-6" role="main" aria-label="Creative Intelligence Dashboard">
+    <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6" role="main" aria-label="Creative Intelligence Dashboard">
       {/* Header */}
       <header className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-3">
