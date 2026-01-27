@@ -44,7 +44,14 @@ export type KpiKey =
   | 'videos'
   | 'images'
   | 'total'
-  | 'variations';
+  | 'variations'
+  // Creative Intelligence Dashboard KPIs
+  | 'ci_totalCreatives'
+  | 'ci_totalSpend'
+  | 'ci_totalRevenue'
+  | 'ci_overallRoas'
+  | 'ci_scalable'
+  | 'ci_needsAttention';
 
 export type SeriesKey =
   | 'donations'
