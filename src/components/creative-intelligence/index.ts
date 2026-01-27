@@ -5,3 +5,5 @@ export { StancePerformanceChart } from "./StancePerformanceChart";
 export { FatigueAlertsPanel } from "./FatigueAlertsPanel";
 export { LeadingIndicatorsCard } from "./LeadingIndicatorsCard";
 export { RecommendationTable } from "./RecommendationTable";
+export { CreativeGallery } from "./CreativeGallery";
+export { PerformanceQuadrantChart } from "./PerformanceQuadrantChart";
