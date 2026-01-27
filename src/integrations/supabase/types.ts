@@ -15073,17 +15073,32 @@ export type Database = {
           transaction_id: string
         }[]
       }
-      get_creative_intelligence: {
-        Args: {
-          p_early_window_days?: number
-          p_end_date: string
-          p_fatigue_threshold?: number
-          p_min_impressions?: number
-          p_organization_id: string
-          p_start_date: string
-        }
-        Returns: Json
-      }
+      get_creative_intelligence:
+        | {
+            Args: {
+              p_early_window_days?: number
+              p_end_date: string
+              p_fatigue_threshold?: number
+              p_min_creatives_per_issue?: number
+              p_min_early_impressions?: number
+              p_min_impressions?: number
+              p_organization_id: string
+              p_significance_level?: number
+              p_start_date: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_early_window_days?: number
+              p_end_date: string
+              p_fatigue_threshold?: number
+              p_min_impressions?: number
+              p_organization_id: string
+              p_start_date: string
+            }
+            Returns: Json
+          }
       get_daily_metrics_summary: {
         Args: {
           _end_date: string
