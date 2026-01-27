@@ -22,55 +22,17 @@ import { CreativeIntelligenceDashboard } from "@/components/creative-intelligenc
  */
 const ClientCreativeIntelligenceV2 = () => {
   const { organizationId, isLoading: orgLoading } = useClientOrganization();
-  const [electionDate, setElectionDate] = useState<string | null>(null);
-  const [electionName, setElectionName] = useState<string>("Election Day");
-  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  // Election settings - stored locally for now since columns don't exist yet
+  const [electionDate] = useState<string | null>(null);
+  const [electionName] = useState<string>("Election Day");
 
-  // Load election settings from organization
-  useEffect(() => {
-    async function loadElectionSettings() {
-      if (!organizationId) return;
-
-      try {
-        const { data, error } = await supabase
-          .from("client_organizations")
-          .select("election_date, election_name")
-          .eq("id", organizationId)
-          .single();
-
-        if (!error && data) {
-          setElectionDate(data.election_date || null);
-          setElectionName(data.election_name || "Election Day");
-        }
-      } catch (e) {
-        console.error("Error loading election settings:", e);
-      } finally {
-        setIsLoadingSettings(false);
-      }
-    }
-
-    loadElectionSettings();
-  }, [organizationId]);
-
-  // Save election date changes
-  const handleElectionDateChange = async (date: string) => {
-    if (!organizationId) return;
-
-    try {
-      const { error } = await supabase
-        .from("client_organizations")
-        .update({ election_date: date })
-        .eq("id", organizationId);
-
-      if (!error) {
-        setElectionDate(date);
-      }
-    } catch (e) {
-      console.error("Error saving election date:", e);
-    }
+  // Handle election date changes (no-op until columns are added)
+  const handleElectionDateChange = (date: string) => {
+    console.log("Election date change requested:", date);
+    // TODO: Save to database once election_date column is added to client_organizations
   };
 
-  if (orgLoading || isLoadingSettings) {
+  if (orgLoading) {
     return (
       <ClientShell pageTitle="Creative Intelligence V2" showDateControls={false}>
         <div className="space-y-6">

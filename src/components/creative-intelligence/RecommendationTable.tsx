@@ -245,8 +245,8 @@ export function RecommendationTable({ recommendations, isLoading }: Recommendati
           data={filteredData}
           columns={columns}
           pageSize={10}
-          emptyMessage="No recommendations available"
           striped
+          getRowKey={(row) => row.creative_id}
         />
       </V3CardContent>
     </V3Card>
