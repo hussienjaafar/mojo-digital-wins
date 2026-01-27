@@ -221,6 +221,16 @@ export function useCreativeIntelligence({
         throw new Error(error.message);
       }
 
+      // Debug: log raw RPC response to diagnose data flow issues
+      console.log('[useCreativeIntelligence] Raw RPC response type:', typeof data);
+      console.log('[useCreativeIntelligence] Raw RPC response:', data);
+
+      // Handle case where Supabase returns JSON as a string instead of parsed object
+      if (typeof data === 'string') {
+        console.warn('[useCreativeIntelligence] RPC returned string, parsing as JSON');
+        return JSON.parse(data) as CreativeIntelligenceData;
+      }
+
       return data as unknown as CreativeIntelligenceData;
     },
     enabled: enabled && !!organizationId && !!startDate && !!endDate,
