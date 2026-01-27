@@ -1,16 +1,19 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Search, Video, Image as ImageIcon, Filter, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Search, Video, Image as ImageIcon, Pin } from "lucide-react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { V3Card, V3CardContent } from "@/components/v3/V3Card";
-import { V3LoadingState, V3EmptyState, V3Badge } from "@/components/v3";
+import { V3LoadingState, V3EmptyState } from "@/components/v3";
 import type { CreativeRecommendation } from "@/hooks/useCreativeIntelligence";
 
 interface CreativeGalleryProps {
   organizationId: string;
   recommendations: CreativeRecommendation[];
   isLoading?: boolean;
+  pinnedCreatives?: [CreativeRecommendation | null, CreativeRecommendation | null];
+  onPinCreative?: (creative: CreativeRecommendation) => void;
 }
 
 const containerVariants = {
@@ -40,7 +43,7 @@ const recommendationColors: Record<CreativeRecommendation["recommendation"], str
   PAUSE: "bg-[hsl(var(--portal-error)/0.1)] text-[hsl(var(--portal-error))] border-[hsl(var(--portal-error)/0.3)]",
 };
 
-export function CreativeGallery({ recommendations, isLoading }: CreativeGalleryProps) {
+export function CreativeGallery({ recommendations, isLoading, pinnedCreatives, onPinCreative }: CreativeGalleryProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "video" | "image">("all");
   const [recommendationFilter, setRecommendationFilter] = useState<"all" | CreativeRecommendation["recommendation"]>("all");
@@ -146,11 +149,18 @@ export function CreativeGallery({ recommendations, isLoading }: CreativeGalleryP
             animate="visible"
             key={`gallery-${typeFilter}-${recommendationFilter}-${searchQuery}`}
           >
-            {filteredCreatives.map((creative) => (
-              <motion.div key={creative.creative_id} variants={cardVariants}>
-                <CreativeCard creative={creative} />
-              </motion.div>
-            ))}
+            {filteredCreatives.map((creative) => {
+              const isPinned = pinnedCreatives?.some(p => p?.creative_id === creative.creative_id);
+              return (
+                <motion.div key={creative.creative_id} variants={cardVariants}>
+                  <CreativeCard
+                    creative={creative}
+                    isPinned={isPinned}
+                    onPin={onPinCreative ? () => onPinCreative(creative) : undefined}
+                  />
+                </motion.div>
+              );
+            })}
           </motion.div>
         )}
       </V3CardContent>
@@ -158,11 +168,19 @@ export function CreativeGallery({ recommendations, isLoading }: CreativeGalleryP
   );
 }
 
-function CreativeCard({ creative }: { creative: CreativeRecommendation }) {
+function CreativeCard({
+  creative,
+  isPinned,
+  onPin,
+}: {
+  creative: CreativeRecommendation;
+  isPinned?: boolean;
+  onPin?: () => void;
+}) {
   const isVideo = creative.creative_type?.toLowerCase().includes("video");
 
   return (
-    <div className="group rounded-xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))] overflow-hidden hover:shadow-lg hover:border-[hsl(var(--portal-border-hover))] transition-all duration-200">
+    <div className={`group rounded-xl border bg-[hsl(var(--portal-bg-card))] overflow-hidden hover:shadow-lg transition-all duration-200 ${isPinned ? "border-[hsl(var(--portal-accent-blue))] ring-2 ring-[hsl(var(--portal-accent-blue)/0.3)]" : "border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]"}`}>
       {/* Thumbnail */}
       <div className="relative aspect-video bg-[hsl(var(--portal-bg-secondary))]">
         {creative.thumbnail_url ? (
@@ -195,6 +213,24 @@ function CreativeCard({ creative }: { creative: CreativeRecommendation }) {
             {creative.recommendation.replace(/_/g, " ")}
           </span>
         </div>
+
+        {/* Pin button */}
+        {onPin && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPin();
+              toast.success(isPinned ? "Creative unpinned" : "Creative pinned for comparison");
+            }}
+            className={`absolute bottom-2 right-2 p-2 rounded-full transition-all ${
+              isPinned
+                ? "bg-[hsl(var(--portal-accent-blue))] text-white"
+                : "bg-black/60 text-white opacity-0 group-hover:opacity-100"
+            }`}
+          >
+            <Pin className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Content */}

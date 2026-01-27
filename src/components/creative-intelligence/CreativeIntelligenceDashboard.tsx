@@ -27,6 +27,9 @@ import { LeadingIndicatorsCard } from "./LeadingIndicatorsCard";
 import { RecommendationTable } from "./RecommendationTable";
 import { CreativeGallery } from "./CreativeGallery";
 import { PerformanceQuadrantChart } from "./PerformanceQuadrantChart";
+import { DataFreshnessIndicator } from "./DataFreshnessIndicator";
+import { CreativeComparisonPanel } from "./CreativeComparisonPanel";
+import type { CreativeRecommendation } from "@/hooks/useCreativeIntelligence";
 
 interface CreativeIntelligenceDashboardProps {
   organizationId: string;
@@ -58,6 +61,7 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [pendingTranscriptions, setPendingTranscriptions] = useState(0);
+  const [pinnedCreatives, setPinnedCreatives] = useState<[CreativeRecommendation | null, CreativeRecommendation | null]>([null, null]);
 
   const { data, isLoading, error, refetch, isFetching } = useCreativeIntelligence({
     organizationId,
@@ -67,6 +71,20 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
   });
 
   const dataQuality = data?.data_quality;
+
+  // Handle pinning creatives for comparison
+  const handlePinCreative = useCallback((creative: CreativeRecommendation) => {
+    setPinnedCreatives((prev) => {
+      // If already pinned, unpin it
+      if (prev[0]?.creative_id === creative.creative_id) return [null, prev[1]];
+      if (prev[1]?.creative_id === creative.creative_id) return [prev[0], null];
+      // Fill first empty slot
+      if (!prev[0]) return [creative, prev[1]];
+      if (!prev[1]) return [prev[0], creative];
+      // Replace first slot if both are full
+      return [creative, prev[1]];
+    });
+  }, []);
 
   // Sync performance data from Meta
   const handleSyncData = useCallback(async () => {
@@ -357,6 +375,14 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
         </div>
       )}
 
+      {/* Data freshness indicator */}
+      <DataFreshnessIndicator
+        organizationId={organizationId}
+        totalCreatives={data?.summary?.total_creatives || 0}
+        analyzedCreatives={dataQuality?.creatives_with_issue_data || 0}
+        lastSyncedAt={lastSyncedAt}
+      />
+
       {/* === INSIGHTS VIEW === */}
       {activeView === "insights" && (
         <>
@@ -393,11 +419,20 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
 
       {/* === GALLERY VIEW === */}
       {activeView === "gallery" && (
-        <CreativeGallery
-          organizationId={organizationId}
-          recommendations={data?.recommendations || []}
-          isLoading={isLoading}
-        />
+        <>
+          <CreativeGallery
+            organizationId={organizationId}
+            recommendations={data?.recommendations || []}
+            isLoading={isLoading}
+            pinnedCreatives={pinnedCreatives}
+            onPinCreative={handlePinCreative}
+          />
+          <CreativeComparisonPanel
+            pinnedCreatives={pinnedCreatives}
+            onRemove={(slot) => setPinnedCreatives((prev) => slot === 0 ? [null, prev[1]] : [prev[0], null])}
+            onClear={() => setPinnedCreatives([null, null])}
+          />
+        </>
       )}
 
       {/* === ANALYSIS VIEW === */}

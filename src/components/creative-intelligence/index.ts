@@ -7,3 +7,5 @@ export { LeadingIndicatorsCard } from "./LeadingIndicatorsCard";
 export { RecommendationTable } from "./RecommendationTable";
 export { CreativeGallery } from "./CreativeGallery";
 export { PerformanceQuadrantChart } from "./PerformanceQuadrantChart";
+export { DataFreshnessIndicator } from "./DataFreshnessIndicator";
+export { CreativeComparisonPanel } from "./CreativeComparisonPanel";
