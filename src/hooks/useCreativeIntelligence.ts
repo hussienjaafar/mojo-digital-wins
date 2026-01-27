@@ -206,7 +206,7 @@ export function useCreativeIntelligence({
       fatigueThreshold,
     ],
     queryFn: async (): Promise<CreativeIntelligenceData> => {
-      const { data, error } = await supabase.rpc('get_creative_intelligence', {
+      const { data, error } = await (supabase.rpc as any)('get_creative_intelligence', {
         p_organization_id: organizationId,
         p_start_date: startDate,
         p_end_date: endDate,
@@ -220,7 +220,7 @@ export function useCreativeIntelligence({
         throw new Error(error.message);
       }
 
-      return data as CreativeIntelligenceData;
+      return data as unknown as CreativeIntelligenceData;
     },
     enabled: enabled && !!organizationId && !!startDate && !!endDate,
     staleTime: 5 * 60 * 1000, // 5 minutes

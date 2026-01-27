@@ -222,7 +222,9 @@ export function CreativeIntelligenceDashboard({
     }
 
     const filename = `creative-intelligence-${dateRange.startDate}-to-${dateRange.endDate}.csv`;
-    exportToCSV(recommendations, filename, CSV_EXPORT_COLUMNS);
+    // Convert to plain objects to satisfy Record<string, unknown>[] type
+    const exportData = recommendations.map(r => ({ ...r }));
+    exportToCSV(exportData, filename, CSV_EXPORT_COLUMNS);
     toast.success(`Exported ${recommendations.length} recommendations to CSV`);
   }, [data?.recommendations, dateRange.startDate, dateRange.endDate]);
 
