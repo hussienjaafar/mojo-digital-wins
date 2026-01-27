@@ -19,6 +19,16 @@ export interface IssuePerformance {
   ci_lower: number;
   ci_upper: number;
   confidence_score: number;
+  // FDR correction fields (from Benjamini-Hochberg)
+  standard_error: number | null;
+  z_score: number | null;
+  p_value: number;
+  p_value_adjusted: number;
+  is_significant: boolean;
+  // Effect size and statistical power
+  effect_size: number | null;
+  statistical_power: number | null;
+  power_interpretation: string | null;
 }
 
 export interface StancePerformance {
@@ -41,8 +51,14 @@ export interface LeadingIndicators {
   correlations: {
     early_ctr_to_roas: number;
     early_cpm_to_roas: number;
+    // Correlation significance testing
+    ctr_correlation_pvalue: number | null;
+    cpm_correlation_pvalue: number | null;
+    ctr_correlation_significant: boolean;
+    cpm_correlation_significant: boolean;
   };
   sample_size: number;
+  avg_early_impressions: number;
   insight: string;
 }
 
@@ -67,6 +83,7 @@ export interface CreativeRecommendation {
   ad_id: string;
   issue_primary: string | null;
   headline: string | null;
+  primary_text: string | null;
   thumbnail_url: string | null;
   creative_type: string;
   total_impressions: number;
@@ -79,6 +96,24 @@ export interface CreativeRecommendation {
   confidence_score: number;
   recommendation: 'SCALE' | 'MAINTAIN' | 'WATCH' | 'GATHER_DATA' | 'REFRESH' | 'PAUSE';
   explanation: string;
+  target_attacked: string | null;
+}
+
+export interface DonorSegmentation {
+  small_donors: {
+    count: number;
+    total_amount: number;
+    percentage_of_total: number;
+  };
+  large_donors: {
+    count: number;
+    total_amount: number;
+    percentage_of_total: number;
+  };
+  average_donation: number;
+  median_donation: number;
+  total_donors: number;
+  total_donations: number;
 }
 
 export interface CreativeIntelligenceData {
@@ -92,6 +127,10 @@ export interface CreativeIntelligenceData {
     min_impressions: number;
     early_window_days: number;
     fatigue_threshold: number;
+    significance_level: number;
+    fdr_correction_method: string;
+    min_creatives_per_issue: number;
+    min_early_impressions: number;
   };
   summary: {
     total_creatives: number;
@@ -100,6 +139,15 @@ export interface CreativeIntelligenceData {
     overall_roas: number;
     total_impressions: number;
     creatives_with_issues: number;
+  };
+  donor_segmentation?: DonorSegmentation;
+  fdr_summary: {
+    total_issues_tested: number;
+    significant_issues: number;
+    mean_raw_p_value: number;
+    mean_adjusted_p_value: number;
+    mean_statistical_power: number | null;
+    adequately_powered_tests: number;
   };
   issue_performance: IssuePerformance[];
   stance_performance: StancePerformance[];
@@ -238,5 +286,16 @@ export function useCreativesNeedingAttention(options: UseCreativeIntelligenceOpt
     data: query.data?.recommendations.filter(
       r => r.recommendation === 'PAUSE' || r.recommendation === 'REFRESH'
     ) ?? [],
+  };
+}
+
+/**
+ * Get donor segmentation data (political campaign feature)
+ */
+export function useDonorSegmentation(options: UseCreativeIntelligenceOptions) {
+  const query = useCreativeIntelligence(options);
+  return {
+    ...query,
+    data: query.data?.donor_segmentation ?? null,
   };
 }

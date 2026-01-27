@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { V3Card, V3CardContent } from "@/components/v3/V3Card";
 import { V3LoadingState, V3EmptyState } from "@/components/v3";
 import type { CreativeRecommendation } from "@/hooks/useCreativeIntelligence";
+import { ComplianceWarningBadge, analyzeComplianceIssues, type ComplianceIssue } from "./ComplianceWarning";
 
 interface CreativeGalleryProps {
   organizationId: string;
@@ -85,22 +86,26 @@ export function CreativeGallery({ recommendations, isLoading, pinnedCreatives, o
   }
 
   return (
-    <V3Card>
+    <V3Card role="region" aria-label="Creative gallery">
       <V3CardContent className="p-6">
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 mb-6" role="search" aria-label="Filter creatives">
           <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" aria-hidden="true" />
             <Input
               placeholder="Search by headline or issue..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]"
+              aria-label="Search creatives by headline or issue"
             />
           </div>
           <div className="flex gap-2 shrink-0">
             <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as typeof typeFilter)}>
-              <SelectTrigger className="w-[130px] bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
+              <SelectTrigger
+                className="w-[130px] bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]"
+                aria-label="Filter by creative type"
+              >
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
@@ -110,7 +115,10 @@ export function CreativeGallery({ recommendations, isLoading, pinnedCreatives, o
               </SelectContent>
             </Select>
             <Select value={recommendationFilter} onValueChange={(v) => setRecommendationFilter(v as typeof recommendationFilter)}>
-              <SelectTrigger className="w-[150px] bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]">
+              <SelectTrigger
+                className="w-[150px] bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))]"
+                aria-label="Filter by recommended action"
+              >
                 <SelectValue placeholder="Action" />
               </SelectTrigger>
               <SelectContent>
@@ -127,7 +135,7 @@ export function CreativeGallery({ recommendations, isLoading, pinnedCreatives, o
         </div>
 
         {/* Results count */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4" aria-live="polite" aria-atomic="true">
           <p className="text-sm text-[hsl(var(--portal-text-muted))]">
             Showing {filteredCreatives.length} of {recommendations.length} creatives
           </p>
@@ -179,22 +187,36 @@ function CreativeCard({
 }) {
   const isVideo = creative.creative_type?.toLowerCase().includes("video");
 
+  // Analyze compliance issues for this creative
+  const complianceIssues = useMemo(() => {
+    return analyzeComplianceIssues(
+      creative.primary_text,
+      creative.headline,
+      creative.target_attacked
+    );
+  }, [creative.primary_text, creative.headline, creative.target_attacked]);
+
+  const creativeTitle = creative.headline || creative.issue_primary || "Untitled Creative";
+
   return (
-    <div className={`group rounded-xl border bg-[hsl(var(--portal-bg-card))] overflow-hidden hover:shadow-lg transition-all duration-200 ${isPinned ? "border-[hsl(var(--portal-accent-blue))] ring-2 ring-[hsl(var(--portal-accent-blue)/0.3)]" : "border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]"}`}>
+    <article
+      className={`group rounded-xl border bg-[hsl(var(--portal-bg-card))] overflow-hidden hover:shadow-lg transition-all duration-200 ${isPinned ? "border-[hsl(var(--portal-accent-blue))] ring-2 ring-[hsl(var(--portal-accent-blue)/0.3)]" : "border-[hsl(var(--portal-border))] hover:border-[hsl(var(--portal-border-hover))]"}`}
+      aria-label={`${creativeTitle} - ${isVideo ? "Video" : "Image"} creative with ${creative.recommendation.replace(/_/g, " ")} recommendation`}
+    >
       {/* Thumbnail */}
       <div className="relative aspect-video bg-[hsl(var(--portal-bg-secondary))]">
         {creative.thumbnail_url ? (
           <img
             src={creative.thumbnail_url}
-            alt=""
+            alt={`Thumbnail for ${creativeTitle}`}
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
+          <div className="w-full h-full flex items-center justify-center" aria-label={`No thumbnail available for ${isVideo ? "video" : "image"} creative`}>
             {isVideo ? (
-              <Video className="h-8 w-8 text-[hsl(var(--portal-text-muted))]" />
+              <Video className="h-8 w-8 text-[hsl(var(--portal-text-muted))]" aria-hidden="true" />
             ) : (
-              <ImageIcon className="h-8 w-8 text-[hsl(var(--portal-text-muted))]" />
+              <ImageIcon className="h-8 w-8 text-[hsl(var(--portal-text-muted))]" aria-hidden="true" />
             )}
           </div>
         )}
@@ -202,17 +224,28 @@ function CreativeCard({
         {/* Type badge */}
         <div className="absolute top-2 left-2">
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-black/60 text-white backdrop-blur-sm">
-            {isVideo ? <Video className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+            {isVideo ? <Video className="h-3 w-3" aria-hidden="true" /> : <ImageIcon className="h-3 w-3" aria-hidden="true" />}
             {isVideo ? "Video" : "Image"}
           </span>
         </div>
 
         {/* Recommendation badge */}
         <div className="absolute top-2 right-2">
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${recommendationColors[creative.recommendation]}`}>
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${recommendationColors[creative.recommendation]}`}
+            role="status"
+            aria-label={`Recommendation: ${creative.recommendation.replace(/_/g, " ")}`}
+          >
             {creative.recommendation.replace(/_/g, " ")}
           </span>
         </div>
+
+        {/* Compliance warning badge */}
+        {complianceIssues.length > 0 && (
+          <div className="absolute bottom-2 left-2">
+            <ComplianceWarningBadge issues={complianceIssues} />
+          </div>
+        )}
 
         {/* Pin button */}
         {onPin && (
@@ -222,13 +255,15 @@ function CreativeCard({
               onPin();
               toast.success(isPinned ? "Creative unpinned" : "Creative pinned for comparison");
             }}
+            aria-label={isPinned ? "Unpin creative from comparison" : "Pin creative for comparison"}
+            aria-pressed={isPinned}
             className={`absolute bottom-2 right-2 p-2 rounded-full transition-all ${
               isPinned
                 ? "bg-[hsl(var(--portal-accent-blue))] text-white"
                 : "bg-black/60 text-white opacity-0 group-hover:opacity-100"
             }`}
           >
-            <Pin className="h-4 w-4" />
+            <Pin className="h-4 w-4" aria-hidden="true" />
           </button>
         )}
       </div>
@@ -237,7 +272,7 @@ function CreativeCard({
       <div className="p-4">
         {/* Headline */}
         <h3 className="font-medium text-sm text-[hsl(var(--portal-text-primary))] line-clamp-2 mb-2">
-          {creative.headline || creative.issue_primary || "Untitled Creative"}
+          {creativeTitle}
         </h3>
 
         {/* Issue tag */}
@@ -250,40 +285,48 @@ function CreativeCard({
         )}
 
         {/* Metrics */}
-        <div className="grid grid-cols-2 gap-2 text-xs">
+        <dl className="grid grid-cols-2 gap-2 text-xs" aria-label="Creative performance metrics">
           <div>
-            <div className="text-[hsl(var(--portal-text-muted))]">ROAS</div>
-            <div className={`font-semibold ${creative.roas >= 1.5 ? "text-[hsl(var(--portal-success))]" : creative.roas < 0.5 ? "text-[hsl(var(--portal-error))]" : "text-[hsl(var(--portal-text-primary))]"}`}>
+            <dt className="text-[hsl(var(--portal-text-muted))]">ROAS</dt>
+            <dd className={`font-semibold ${creative.roas >= 1.5 ? "text-[hsl(var(--portal-success))]" : creative.roas < 0.5 ? "text-[hsl(var(--portal-error))]" : "text-[hsl(var(--portal-text-primary))]"}`}>
               {creative.roas.toFixed(2)}x
-            </div>
+              <span className="sr-only">{creative.roas >= 1.5 ? " (high performance)" : creative.roas < 0.5 ? " (low performance)" : ""}</span>
+            </dd>
           </div>
           <div>
-            <div className="text-[hsl(var(--portal-text-muted))]">CTR</div>
-            <div className="font-semibold text-[hsl(var(--portal-text-primary))]">
+            <dt className="text-[hsl(var(--portal-text-muted))]">CTR</dt>
+            <dd className="font-semibold text-[hsl(var(--portal-text-primary))]">
               {(creative.ctr * 100).toFixed(2)}%
-            </div>
+            </dd>
           </div>
           <div>
-            <div className="text-[hsl(var(--portal-text-muted))]">Spend</div>
-            <div className="font-semibold text-[hsl(var(--portal-text-primary))]">
+            <dt className="text-[hsl(var(--portal-text-muted))]">Spend</dt>
+            <dd className="font-semibold text-[hsl(var(--portal-text-primary))]">
               ${creative.total_spend.toLocaleString()}
-            </div>
+            </dd>
           </div>
           <div>
-            <div className="text-[hsl(var(--portal-text-muted))]">Revenue</div>
-            <div className="font-semibold text-[hsl(var(--portal-success))]">
+            <dt className="text-[hsl(var(--portal-text-muted))]">Revenue</dt>
+            <dd className="font-semibold text-[hsl(var(--portal-success))]">
               ${creative.total_revenue.toLocaleString()}
-            </div>
+            </dd>
           </div>
-        </div>
+        </dl>
 
         {/* Confidence bar */}
         <div className="mt-3 pt-3 border-t border-[hsl(var(--portal-border))]">
           <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-[hsl(var(--portal-text-muted))]">Confidence</span>
+            <span className="text-[hsl(var(--portal-text-muted))]" id={`confidence-label-${creative.creative_id}`}>Confidence</span>
             <span className="text-[hsl(var(--portal-text-secondary))]">{creative.confidence_score}%</span>
           </div>
-          <div className="h-1.5 rounded-full bg-[hsl(var(--portal-bg-secondary))]">
+          <div
+            className="h-1.5 rounded-full bg-[hsl(var(--portal-bg-secondary))]"
+            role="progressbar"
+            aria-valuenow={creative.confidence_score}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-labelledby={`confidence-label-${creative.creative_id}`}
+          >
             <div
               className={`h-1.5 rounded-full ${
                 creative.confidence_score >= 70
@@ -297,6 +340,6 @@ function CreativeCard({
           </div>
         </div>
       </div>
-    </div>
+    </article>
   );
 }

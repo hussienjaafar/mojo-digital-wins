@@ -239,9 +239,15 @@ export function PerformanceQuadrantChart({ recommendations, isLoading }: Perform
     return { chartOption, quadrantCounts };
   }, [recommendations]);
 
+  // Generate accessible summary of chart data
+  const getChartSummary = () => {
+    const total = quadrantCounts.scale + quadrantCounts.maintain + quadrantCounts.watch + quadrantCounts.pause;
+    return `Performance quadrant chart showing ${total} creatives: ${quadrantCounts.scale} in Scale (high ROAS, high spend), ${quadrantCounts.maintain} in Maintain (high ROAS, low spend), ${quadrantCounts.watch} in Watch (low ROAS, low spend), ${quadrantCounts.pause} in Pause (low ROAS, high spend)`;
+  };
+
   if (isLoading) {
     return (
-      <V3Card>
+      <V3Card role="region" aria-label="Performance quadrant chart">
         <V3CardHeader>
           <V3CardTitle>Performance Quadrant</V3CardTitle>
         </V3CardHeader>
@@ -253,41 +259,94 @@ export function PerformanceQuadrantChart({ recommendations, isLoading }: Perform
   }
 
   return (
-    <V3Card>
+    <V3Card role="region" aria-label="Performance quadrant chart">
       <V3CardHeader>
         <div className="flex items-center gap-2">
-          <Target className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" />
-          <V3CardTitle>Performance Quadrant</V3CardTitle>
+          <Target className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" aria-hidden="true" />
+          <V3CardTitle id="quadrant-chart-title">Performance Quadrant</V3CardTitle>
         </div>
-        <V3CardDescription>
+        <V3CardDescription id="quadrant-chart-desc">
           Strategic view: Spend vs ROAS mapping. Bubble size indicates relative spend.
         </V3CardDescription>
       </V3CardHeader>
       <V3CardContent>
         {/* Quadrant legend */}
-        <div className="flex flex-wrap gap-4 mb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[hsl(var(--portal-success))]" />
+        <div
+          className="flex flex-wrap gap-4 mb-4"
+          role="list"
+          aria-label="Chart legend showing quadrant categories"
+        >
+          <div className="flex items-center gap-2" role="listitem">
+            <div className="w-3 h-3 rounded-full bg-[hsl(var(--portal-success))]" aria-hidden="true" />
             <span className="text-sm">Scale ({quadrantCounts.scale})</span>
+            <span className="sr-only">: High ROAS and high spend creatives recommended for scaling</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[hsl(var(--portal-accent-blue))]" />
+          <div className="flex items-center gap-2" role="listitem">
+            <div className="w-3 h-3 rounded-full bg-[hsl(var(--portal-accent-blue))]" aria-hidden="true" />
             <span className="text-sm">Maintain ({quadrantCounts.maintain})</span>
+            <span className="sr-only">: High ROAS but low spend creatives to maintain</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[hsl(var(--portal-warning))]" />
+          <div className="flex items-center gap-2" role="listitem">
+            <div className="w-3 h-3 rounded-full bg-[hsl(var(--portal-warning))]" aria-hidden="true" />
             <span className="text-sm">Watch ({quadrantCounts.watch})</span>
+            <span className="sr-only">: Low ROAS and low spend creatives to monitor</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[hsl(var(--portal-error))]" />
+          <div className="flex items-center gap-2" role="listitem">
+            <div className="w-3 h-3 rounded-full bg-[hsl(var(--portal-error))]" aria-hidden="true" />
             <span className="text-sm">Pause ({quadrantCounts.pause})</span>
+            <span className="sr-only">: Low ROAS but high spend creatives to consider pausing</span>
           </div>
         </div>
 
         {chartOption ? (
-          <EChartsBase option={chartOption} height={400} />
+          <div
+            role="img"
+            aria-label={getChartSummary()}
+            aria-describedby="quadrant-chart-desc"
+          >
+            <EChartsBase option={chartOption} height={400} />
+            {/* Screen reader accessible data table */}
+            <div className="sr-only">
+              <table>
+                <caption>Performance quadrant distribution</caption>
+                <thead>
+                  <tr>
+                    <th>Quadrant</th>
+                    <th>Count</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Scale</td>
+                    <td>{quadrantCounts.scale}</td>
+                    <td>High ROAS, high spend - recommended for scaling</td>
+                  </tr>
+                  <tr>
+                    <td>Maintain</td>
+                    <td>{quadrantCounts.maintain}</td>
+                    <td>High ROAS, low spend - maintain current performance</td>
+                  </tr>
+                  <tr>
+                    <td>Watch</td>
+                    <td>{quadrantCounts.watch}</td>
+                    <td>Low ROAS, low spend - monitor for improvement</td>
+                  </tr>
+                  <tr>
+                    <td>Pause</td>
+                    <td>{quadrantCounts.pause}</td>
+                    <td>Low ROAS, high spend - consider pausing</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         ) : (
-          <div className="h-[400px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]">
+          <div
+            className="h-[400px] flex items-center justify-center text-[hsl(var(--portal-text-muted))]"
+            role="status"
+            aria-label="No chart data available"
+          >
             No data available for quadrant analysis
           </div>
         )}

@@ -1,6 +1,10 @@
 import { useState, useCallback } from "react";
-import { format, subDays, formatDistanceToNow } from "date-fns";
+import { format, subDays, formatDistanceToNow, isBefore, startOfDay } from "date-fns";
 import { toast } from "sonner";
+
+// Meta Ads API only allows fetching data from the last 13 months (approximately 395 days)
+const MAX_META_LOOKBACK_DAYS = 395;
+
 import {
   Calendar,
   RefreshCw,
@@ -12,6 +16,7 @@ import {
   BarChart3,
   Gauge,
   Clock,
+  Download,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCreativeIntelligence } from "@/hooks/useCreativeIntelligence";
@@ -19,6 +24,7 @@ import { V3Card, V3CardContent } from "@/components/v3/V3Card";
 import { V3InsightBadge } from "@/components/v3/V3InsightBadge";
 import { V3Button } from "@/components/v3";
 import { cn } from "@/lib/utils";
+import { exportToCSV } from "@/lib/csv-export";
 import { CreativeIntelligenceSummary } from "./CreativeIntelligenceSummary";
 import { IssuePerformanceChart } from "./IssuePerformanceChart";
 import { StancePerformanceChart } from "./StancePerformanceChart";
@@ -29,15 +35,47 @@ import { CreativeGallery } from "./CreativeGallery";
 import { PerformanceQuadrantChart } from "./PerformanceQuadrantChart";
 import { DataFreshnessIndicator } from "./DataFreshnessIndicator";
 import { CreativeComparisonPanel } from "./CreativeComparisonPanel";
+import { DonorSegmentationCard } from "./DonorSegmentationCard";
+import { ElectionDayBadge, ElectionCountdown } from "./ElectionCountdown";
 import type { CreativeRecommendation } from "@/hooks/useCreativeIntelligence";
 
 interface CreativeIntelligenceDashboardProps {
   organizationId: string;
+  /** Election date for political campaigns (ISO format YYYY-MM-DD) */
+  electionDate?: string | null;
+  /** Election name (e.g., "General Election", "Primary") */
+  electionName?: string;
+  /** Callback when election date is updated */
+  onElectionDateChange?: (date: string) => void;
+  /** Whether the user can edit campaign settings */
+  canEditCampaignSettings?: boolean;
 }
 
 type ViewType = "insights" | "gallery" | "analysis";
 
-export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntelligenceDashboardProps) {
+// CSV export column definitions
+const CSV_EXPORT_COLUMNS = [
+  { key: "creative_id", label: "Creative ID" },
+  { key: "headline", label: "Headline" },
+  { key: "issue_primary", label: "Primary Issue" },
+  { key: "recommendation", label: "Recommendation" },
+  { key: "roas", label: "ROAS" },
+  { key: "ctr", label: "CTR" },
+  { key: "total_spend", label: "Total Spend" },
+  { key: "total_revenue", label: "Total Revenue" },
+  { key: "total_impressions", label: "Total Impressions" },
+  { key: "confidence_score", label: "Confidence Score" },
+  { key: "fatigue_status", label: "Fatigue Status" },
+  { key: "explanation", label: "Explanation" },
+];
+
+export function CreativeIntelligenceDashboard({
+  organizationId,
+  electionDate,
+  electionName = "Election Day",
+  onElectionDateChange,
+  canEditCampaignSettings = false,
+}: CreativeIntelligenceDashboardProps) {
   // View state
   const [activeView, setActiveView] = useState<ViewType>("insights");
 
@@ -71,6 +109,25 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
   });
 
   const dataQuality = data?.data_quality;
+
+  // Validate and clamp date range to Meta's 13-month lookback limit
+  const validateAndSetDateRange = useCallback((startDate: string, endDate: string) => {
+    const minAllowedDate = startOfDay(subDays(new Date(), MAX_META_LOOKBACK_DAYS));
+    const parsedStartDate = new Date(startDate);
+
+    // Check if start date is older than 13 months
+    if (isBefore(parsedStartDate, minAllowedDate)) {
+      toast.warning(
+        `Meta Ads API only allows data from the last 13 months. Date range has been adjusted.`,
+        { duration: 5000 }
+      );
+      // Clamp the start date to the minimum allowed date
+      const clampedStartDate = format(minAllowedDate, "yyyy-MM-dd");
+      setDateRange({ startDate: clampedStartDate, endDate });
+    } else {
+      setDateRange({ startDate, endDate });
+    }
+  }, []);
 
   // Handle pinning creatives for comparison
   const handlePinCreative = useCallback((creative: CreativeRecommendation) => {
@@ -156,6 +213,19 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
     }
   }, [organizationId, refetch]);
 
+  // Export recommendations to CSV
+  const handleExportCSV = useCallback(() => {
+    const recommendations = data?.recommendations || [];
+    if (recommendations.length === 0) {
+      toast.warning("No recommendations to export");
+      return;
+    }
+
+    const filename = `creative-intelligence-${dateRange.startDate}-to-${dateRange.endDate}.csv`;
+    exportToCSV(recommendations, filename, CSV_EXPORT_COLUMNS);
+    toast.success(`Exported ${recommendations.length} recommendations to CSV`);
+  }, [data?.recommendations, dateRange.startDate, dateRange.endDate]);
+
   const viewTabs = [
     { key: "insights" as const, label: "Insights", icon: Gauge },
     { key: "gallery" as const, label: "Gallery", icon: LayoutGrid },
@@ -163,11 +233,11 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Creative Intelligence Dashboard">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <header className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-gradient-to-br from-[hsl(var(--portal-accent-purple))] to-[hsl(var(--portal-accent-blue))]">
+          <div className="p-2.5 rounded-xl bg-gradient-to-br from-[hsl(var(--portal-accent-purple))] to-[hsl(var(--portal-accent-blue))]" aria-hidden="true">
             <Brain className="h-6 w-6 text-white" />
           </div>
           <div>
@@ -181,14 +251,24 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
         </div>
 
         {/* Action buttons */}
-        <div className="flex flex-wrap items-center gap-2">
+        <nav className="flex flex-wrap items-center gap-2" aria-label="Dashboard actions">
+          {/* Election Day Badge */}
+          <ElectionDayBadge
+            electionDate={electionDate ?? null}
+            electionName={electionName}
+            onElectionDateChange={onElectionDateChange}
+            canEdit={canEditCampaignSettings}
+          />
+
           <V3Button
             variant="secondary"
             size="sm"
             onClick={handleSyncData}
             disabled={isSyncing}
+            aria-label={isSyncing ? "Syncing performance data from Meta Ads" : "Sync performance data from Meta Ads"}
+            aria-busy={isSyncing}
           >
-            <RefreshCw className={cn("h-4 w-4 mr-2", isSyncing && "animate-spin")} />
+            <RefreshCw className={cn("h-4 w-4 mr-2", isSyncing && "animate-spin")} aria-hidden="true" />
             {isSyncing ? "Syncing..." : "Sync Data"}
           </V3Button>
 
@@ -197,8 +277,10 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
             size="sm"
             onClick={handleAnalyze}
             disabled={isAnalyzing}
+            aria-label={isAnalyzing ? "Analyzing creatives with AI" : "Analyze creatives with AI"}
+            aria-busy={isAnalyzing}
           >
-            <Zap className={cn("h-4 w-4 mr-2", isAnalyzing && "animate-pulse")} />
+            <Zap className={cn("h-4 w-4 mr-2", isAnalyzing && "animate-pulse")} aria-hidden="true" />
             {isAnalyzing ? "Analyzing..." : "Analyze"}
           </V3Button>
 
@@ -208,22 +290,43 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
               size="sm"
               onClick={handleTranscribe}
               disabled={isTranscribing}
+              aria-label={isTranscribing ? `Transcribing ${pendingTranscriptions} video creatives` : `Transcribe ${pendingTranscriptions} video creatives`}
+              aria-busy={isTranscribing}
             >
-              <Play className={cn("h-4 w-4 mr-2", isTranscribing && "animate-pulse")} />
+              <Play className={cn("h-4 w-4 mr-2", isTranscribing && "animate-pulse")} aria-hidden="true" />
               Transcribe ({pendingTranscriptions})
             </V3Button>
           )}
-        </div>
-      </div>
+
+          <V3Button
+            variant="secondary"
+            size="sm"
+            onClick={handleExportCSV}
+            disabled={isLoading || !data?.recommendations?.length}
+            aria-label="Export recommendations to CSV"
+          >
+            <Download className="h-4 w-4 mr-2" aria-hidden="true" />
+            Export
+          </V3Button>
+        </nav>
+      </header>
 
       {/* View tabs + controls row */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         {/* View tabs */}
-        <div className="flex items-center gap-1 p-1 bg-[hsl(var(--portal-bg-elevated))] rounded-xl border border-[hsl(var(--portal-border))] w-fit">
+        <div
+          className="flex items-center gap-1 p-1 bg-[hsl(var(--portal-bg-elevated))] rounded-xl border border-[hsl(var(--portal-border))] w-fit"
+          role="tablist"
+          aria-label="Dashboard view options"
+        >
           {viewTabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveView(tab.key)}
+              role="tab"
+              aria-selected={activeView === tab.key}
+              aria-controls={`${tab.key}-panel`}
+              id={`${tab.key}-tab`}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                 activeView === tab.key
@@ -231,8 +334,9 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
                   : "text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-secondary))]"
               )}
             >
-              <tab.icon className="h-4 w-4" />
+              <tab.icon className="h-4 w-4" aria-hidden="true" />
               <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sr-only sm:hidden">{tab.label}</span>
             </button>
           ))}
         </div>
@@ -249,14 +353,17 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
 
           {/* Date range selector */}
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))]">
-            <Calendar className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+            <Calendar className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" aria-hidden="true" />
+            <label htmlFor="date-range-select" className="sr-only">Select date range</label>
             <select
+              id="date-range-select"
               className="bg-transparent text-sm focus:outline-none cursor-pointer"
               value={`${dateRange.startDate}_${dateRange.endDate}`}
               onChange={(e) => {
                 const [start, end] = e.target.value.split("_");
-                setDateRange({ startDate: start, endDate: end });
+                validateAndSetDateRange(start, end);
               }}
+              aria-label="Date range for creative intelligence data"
             >
               <option value={`${format(subDays(new Date(), 7), "yyyy-MM-dd")}_${format(new Date(), "yyyy-MM-dd")}`}>
                 Last 7 days
@@ -279,6 +386,9 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
           {/* Settings toggle */}
           <button
             onClick={() => setShowSettings(!showSettings)}
+            aria-label={showSettings ? "Hide analysis settings" : "Show analysis settings"}
+            aria-expanded={showSettings}
+            aria-controls="settings-panel"
             className={cn(
               "p-2 rounded-lg border transition-colors",
               showSettings
@@ -286,52 +396,61 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
                 : "bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-secondary))] hover:bg-[hsl(var(--portal-bg-elevated))]"
             )}
           >
-            <Settings2 className="h-4 w-4" />
+            <Settings2 className="h-4 w-4" aria-hidden="true" />
           </button>
 
           {/* Refresh */}
           <button
             onClick={() => refetch()}
             disabled={isFetching}
+            aria-label={isFetching ? "Refreshing data" : "Refresh dashboard data"}
+            aria-busy={isFetching}
             className="p-2 rounded-lg bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-secondary))] hover:bg-[hsl(var(--portal-bg-elevated))] transition-colors disabled:opacity-50"
           >
-            <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+            <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} aria-hidden="true" />
           </button>
         </div>
       </div>
 
       {/* Settings panel */}
       {showSettings && (
-        <V3Card>
+        <V3Card id="settings-panel" role="region" aria-label="Analysis settings">
           <V3CardContent className="py-4">
             <div className="flex flex-wrap gap-6">
               <div>
-                <label className="block text-xs font-medium text-[hsl(var(--portal-text-muted))] mb-1">
+                <label htmlFor="min-impressions" className="block text-xs font-medium text-[hsl(var(--portal-text-muted))] mb-1">
                   Min Impressions
                 </label>
                 <input
+                  id="min-impressions"
                   type="number"
                   value={settings.minImpressions}
                   onChange={(e) => setSettings({ ...settings, minImpressions: parseInt(e.target.value) || 1000 })}
                   className="w-28 px-3 py-1.5 rounded border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] text-sm"
+                  aria-describedby="min-impressions-desc"
                 />
+                <span id="min-impressions-desc" className="sr-only">Minimum impressions required for creative analysis</span>
               </div>
               <div>
-                <label className="block text-xs font-medium text-[hsl(var(--portal-text-muted))] mb-1">
+                <label htmlFor="early-window" className="block text-xs font-medium text-[hsl(var(--portal-text-muted))] mb-1">
                   Early Window (days)
                 </label>
                 <input
+                  id="early-window"
                   type="number"
                   value={settings.earlyWindowDays}
                   onChange={(e) => setSettings({ ...settings, earlyWindowDays: parseInt(e.target.value) || 3 })}
                   className="w-28 px-3 py-1.5 rounded border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] text-sm"
+                  aria-describedby="early-window-desc"
                 />
+                <span id="early-window-desc" className="sr-only">Number of days for early performance window analysis</span>
               </div>
               <div>
-                <label className="block text-xs font-medium text-[hsl(var(--portal-text-muted))] mb-1">
+                <label htmlFor="fatigue-threshold" className="block text-xs font-medium text-[hsl(var(--portal-text-muted))] mb-1">
                   Fatigue Threshold
                 </label>
                 <input
+                  id="fatigue-threshold"
                   type="number"
                   step="0.05"
                   min="0"
@@ -339,7 +458,9 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
                   value={settings.fatigueThreshold}
                   onChange={(e) => setSettings({ ...settings, fatigueThreshold: parseFloat(e.target.value) || 0.2 })}
                   className="w-28 px-3 py-1.5 rounded border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-secondary))] text-sm"
+                  aria-describedby="fatigue-threshold-desc"
                 />
+                <span id="fatigue-threshold-desc" className="sr-only">Threshold percentage for creative fatigue detection, between 0 and 1</span>
               </div>
             </div>
           </V3CardContent>
@@ -370,7 +491,11 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
 
       {/* Error state */}
       {error && (
-        <div className="p-4 rounded-lg bg-[hsl(var(--portal-error)/0.1)] border border-[hsl(var(--portal-error)/0.3)] text-[hsl(var(--portal-error))]">
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="p-4 rounded-lg bg-[hsl(var(--portal-error)/0.1)] border border-[hsl(var(--portal-error)/0.3)] text-[hsl(var(--portal-error))]"
+        >
           Error loading creative intelligence: {error.message}
         </div>
       )}
@@ -385,12 +510,32 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
 
       {/* === INSIGHTS VIEW === */}
       {activeView === "insights" && (
-        <>
+        <div
+          id="insights-panel"
+          role="tabpanel"
+          aria-labelledby="insights-tab"
+          tabIndex={0}
+        >
           {/* Summary KPIs */}
           <CreativeIntelligenceSummary data={data} isLoading={isLoading} />
 
+          {/* Political Campaign Features Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <DonorSegmentationCard
+              data={data?.donor_segmentation}
+              isLoading={isLoading}
+            />
+            <ElectionCountdown
+              electionDate={electionDate ?? null}
+              electionName={electionName}
+              onElectionDateChange={onElectionDateChange}
+              canEdit={canEditCampaignSettings}
+              variant="card"
+            />
+          </div>
+
           {/* Charts row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             <IssuePerformanceChart
               data={data?.issue_performance || []}
               isLoading={isLoading}
@@ -404,22 +549,29 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
           </div>
 
           {/* Insights row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             <LeadingIndicatorsCard data={data?.leading_indicators} isLoading={isLoading} />
             <FatigueAlertsPanel alerts={data?.fatigue_alerts || []} isLoading={isLoading} />
           </div>
 
           {/* Recommendations table */}
-          <RecommendationTable
-            recommendations={data?.recommendations || []}
-            isLoading={isLoading}
-          />
-        </>
+          <div className="mt-6">
+            <RecommendationTable
+              recommendations={data?.recommendations || []}
+              isLoading={isLoading}
+            />
+          </div>
+        </div>
       )}
 
       {/* === GALLERY VIEW === */}
       {activeView === "gallery" && (
-        <>
+        <div
+          id="gallery-panel"
+          role="tabpanel"
+          aria-labelledby="gallery-tab"
+          tabIndex={0}
+        >
           <CreativeGallery
             organizationId={organizationId}
             recommendations={data?.recommendations || []}
@@ -432,12 +584,18 @@ export function CreativeIntelligenceDashboard({ organizationId }: CreativeIntell
             onRemove={(slot) => setPinnedCreatives((prev) => slot === 0 ? [null, prev[1]] : [prev[0], null])}
             onClear={() => setPinnedCreatives([null, null])}
           />
-        </>
+        </div>
       )}
 
       {/* === ANALYSIS VIEW === */}
       {activeView === "analysis" && (
-        <div className="space-y-6">
+        <div
+          id="analysis-panel"
+          role="tabpanel"
+          aria-labelledby="analysis-tab"
+          tabIndex={0}
+          className="space-y-6"
+        >
           <PerformanceQuadrantChart
             recommendations={data?.recommendations || []}
             isLoading={isLoading}

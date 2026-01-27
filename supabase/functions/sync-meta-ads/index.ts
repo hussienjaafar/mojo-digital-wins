@@ -88,6 +88,59 @@ interface DataFreshnessInfo {
   campaignsWithoutData: number;
 }
 
+// Meta API only allows fetching data from the last ~13 months (395 days)
+const MAX_META_LOOKBACK_DAYS = 395;
+
+/**
+ * Fetch with exponential backoff retry for rate limit (429) responses.
+ * Meta API commonly returns 429 when hitting rate limits.
+ * Includes timeout protection to prevent hanging requests.
+ *
+ * @param fn - Function that returns a Promise<Response>
+ * @param maxRetries - Maximum number of retry attempts (default: 3)
+ * @param baseDelay - Base delay in milliseconds (default: 1000)
+ * @param timeoutMs - Request timeout in milliseconds (default: 60000)
+ * @returns Promise<Response>
+ */
+async function fetchWithRetry(
+  fn: () => Promise<Response>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000,
+  timeoutMs: number = 60000
+): Promise<Response> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fn();
+      clearTimeout(timeoutId);
+
+      if (response.status === 429 && attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+        console.log(`[RETRY] Rate limited (429), retrying in ${Math.round(delay)}ms... (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      return response;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        console.log(`[TIMEOUT] Request timed out after ${timeoutMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+        if (attempt < maxRetries) {
+          const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+        throw new Error(`Request timed out after ${maxRetries + 1} attempts`);
+      }
+      throw error;
+    }
+  }
+  throw new Error('Max retries exceeded for Meta API request');
+}
+
 /**
  * Calculate the optimal date range for Meta API requests.
  * Meta typically has a 24-48 hour data processing delay.
@@ -140,7 +193,7 @@ async function checkDataFreshness(adAccountId: string, accessToken: string): Pro
   try {
     // Query account-level insights to check most recent data
     const testUrl = `https://graph.facebook.com/v22.0/${adAccountId}/insights?fields=impressions,date_stop&date_preset=last_7d&access_token=${accessToken}`;
-    const response = await fetch(testUrl);
+    const response = await fetchWithRetry(() => fetch(testUrl));
     const data = await response.json();
     
     if (data.error) {
@@ -203,7 +256,20 @@ serve(async (req) => {
       );
     }
 
-    const { organization_id, start_date, end_date, mode, check_freshness_only } = parsedBody.data;
+    let { organization_id, start_date, end_date, mode, check_freshness_only } = parsedBody.data;
+
+    // --- DATE VALIDATION: Enforce 13-month lookback limit ---
+    // Meta API only allows fetching data from the last ~13 months
+    if (start_date) {
+      const minAllowedDate = new Date();
+      minAllowedDate.setDate(minAllowedDate.getDate() - MAX_META_LOOKBACK_DAYS);
+      const minAllowedStr = minAllowedDate.toISOString().split('T')[0];
+
+      if (start_date < minAllowedStr) {
+        console.log(`[DATE VALIDATION] Requested start_date ${start_date} exceeds 13-month limit. Clamping to ${minAllowedStr}`);
+        start_date = minAllowedStr;
+      }
+    }
 
     // --- SECURITY: Authentication checks ---
     const internalKey = req.headers.get('x-internal-key');
@@ -365,8 +431,8 @@ serve(async (req) => {
 
     // Fetch campaigns
     const campaignsUrl = `https://graph.facebook.com/v22.0/${ad_account_id}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget,start_time,stop_time&access_token=${access_token}`;
-    
-    const campaignsResponse = await fetch(campaignsUrl);
+
+    const campaignsResponse = await fetchWithRetry(() => fetch(campaignsUrl));
     const campaignsData = await campaignsResponse.json();
 
     if (campaignsData.error) {
@@ -405,7 +471,7 @@ serve(async (req) => {
     let adsetsProcessed = 0;
     try {
       const adsetsUrl = `https://graph.facebook.com/v22.0/${ad_account_id}/adsets?fields=id,name,campaign_id,status,targeting&limit=500&access_token=${access_token}`;
-      const adsetsResponse = await fetch(adsetsUrl);
+      const adsetsResponse = await fetchWithRetry(() => fetch(adsetsUrl));
       const adsetsData = await adsetsResponse.json();
       
       if (!adsetsData.error && adsetsData.data) {
@@ -472,8 +538,8 @@ serve(async (req) => {
         const adsUrl = `https://graph.facebook.com/v22.0/${campaign.id}/ads?fields=id,name,creative{id,name,object_story_spec{link_data{link,message,name,description,call_to_action},video_data{video_id,title,link_description,call_to_action,image_url},photo_data{caption}},asset_feed_spec{bodies,titles,descriptions,call_to_action_types,videos,link_urls},video_id,thumbnail_url,effective_object_story_id}&access_token=${access_token}`;
         
         console.log(`[DEBUG][sync-meta-ads] Fetching ads URL: ${adsUrl.replace(access_token, 'REDACTED')}`);
-        
-        const adsResponse = await fetch(adsUrl);
+
+        const adsResponse = await fetchWithRetry(() => fetch(adsUrl));
         const adsData = await adsResponse.json();
         
         if (!adsData.error && adsData.data) {
@@ -571,7 +637,7 @@ serve(async (req) => {
               try {
                 console.log(`[DEBUG][sync-meta-ads] No URL in object_story_spec, fetching creative ${creative.id} directly...`);
                 const creativeUrl = `https://graph.facebook.com/v22.0/${creative.id}?fields=object_story_spec,effective_object_story_id&access_token=${access_token}`;
-                const creativeResponse = await fetch(creativeUrl);
+                const creativeResponse = await fetchWithRetry(() => fetch(creativeUrl));
                 const creativeData = await creativeResponse.json();
                 
                 if (!creativeData.error) {
@@ -591,7 +657,7 @@ serve(async (req) => {
                     console.log(`[DEBUG][sync-meta-ads] Trying effective_object_story_id: ${creativeData.effective_object_story_id}`);
                     try {
                       const postUrl = `https://graph.facebook.com/v22.0/${creativeData.effective_object_story_id}?fields=call_to_action,link&access_token=${access_token}`;
-                      const postResponse = await fetch(postUrl);
+                      const postResponse = await fetchWithRetry(() => fetch(postUrl));
                       const postData = await postResponse.json();
                       
                       if (!postData.error) {
@@ -744,7 +810,7 @@ serve(async (req) => {
                   
                   // Fetch video details including source URL and high-res picture
                   const videoDetailsUrl = `https://graph.facebook.com/v22.0/${videoId}?fields=source,picture,thumbnails{uri,height,width}&access_token=${access_token}`;
-                  const videoDetailsResponse = await fetch(videoDetailsUrl);
+                  const videoDetailsResponse = await fetchWithRetry(() => fetch(videoDetailsUrl));
                   const videoDetails = await videoDetailsResponse.json();
                   
                   console.log(`[VIDEO][DEBUG] Video ${videoId} API response:`, JSON.stringify(videoDetails, null, 2).substring(0, 500));
@@ -755,7 +821,7 @@ serve(async (req) => {
                     // Try alternate approach: fetch without 'source' field (may be restricted)
                     console.log(`[VIDEO][DEBUG] Trying alternate endpoint without source field...`);
                     const altUrl = `https://graph.facebook.com/v22.0/${videoId}?fields=picture,thumbnails{uri,height,width}&access_token=${access_token}`;
-                    const altResponse = await fetch(altUrl);
+                    const altResponse = await fetchWithRetry(() => fetch(altUrl));
                     const altData = await altResponse.json();
                     
                     if (!altData.error) {
@@ -792,7 +858,7 @@ serve(async (req) => {
                 // For image creatives, try to get a higher resolution thumbnail
                 try {
                   const creativeDetailsUrl = `https://graph.facebook.com/v22.0/${creative.id}?fields=thumbnail_url,image_url,object_story_spec&thumbnail_height=720&access_token=${access_token}`;
-                  const creativeDetailsResponse = await fetch(creativeDetailsUrl);
+                  const creativeDetailsResponse = await fetchWithRetry(() => fetch(creativeDetailsUrl));
                   const creativeDetails = await creativeDetailsResponse.json();
                   
                   if (!creativeDetails.error) {
@@ -823,9 +889,9 @@ serve(async (req) => {
               let commentsCount = 0, sharesCount = 0, postEngagement = 0;
               
               try {
-                const adInsightsResponse = await fetch(adInsightsUrl);
+                const adInsightsResponse = await fetchWithRetry(() => fetch(adInsightsUrl));
                 const adInsightsData = await adInsightsResponse.json();
-                
+
                 if (!adInsightsData.error && adInsightsData.data && adInsightsData.data.length > 0) {
                   const insight = adInsightsData.data[0];
                   impressions = parseInt(insight.impressions) || 0;
@@ -1160,8 +1226,8 @@ serve(async (req) => {
         console.log(`Fetching demographic breakdown for campaign ${campaign.id}`);
         
         const demographicUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,actions,action_values&breakdowns=age,gender&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&access_token=${access_token}`;
-        
-        const demographicResponse = await fetch(demographicUrl);
+
+        const demographicResponse = await fetchWithRetry(() => fetch(demographicUrl));
         const demographicData = await demographicResponse.json();
         
         if (!demographicData.error && demographicData.data && demographicData.data.length > 0) {
@@ -1205,8 +1271,8 @@ serve(async (req) => {
         console.log(`Fetching placement breakdown for campaign ${campaign.id}`);
         
         const placementUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,actions&breakdowns=publisher_platform,device_platform&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&access_token=${access_token}`;
-        
-        const placementResponse = await fetch(placementUrl);
+
+        const placementResponse = await fetchWithRetry(() => fetch(placementUrl));
         const placementResult = await placementResponse.json();
         
         if (!placementResult.error && placementResult.data && placementResult.data.length > 0) {
@@ -1233,8 +1299,8 @@ serve(async (req) => {
       
       // ========== Original: Fetch campaign-level insights with enhanced fields ==========
       const insightsUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,reach,actions,action_values,cpc,cpm,ctr,frequency,cost_per_action_type&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&time_increment=1&access_token=${access_token}`;
-      
-      const insightsResponse = await fetch(insightsUrl);
+
+      const insightsResponse = await fetchWithRetry(() => fetch(insightsUrl));
       const insightsData = await insightsResponse.json();
 
       if (insightsData.error) {
@@ -1282,7 +1348,7 @@ serve(async (req) => {
       // Fetch demographic breakdown for campaign-level aggregation
       try {
         const demoAggUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,actions&breakdowns=age,gender&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&access_token=${access_token}`;
-        const demoAggResponse = await fetch(demoAggUrl);
+        const demoAggResponse = await fetchWithRetry(() => fetch(demoAggUrl));
         const demoAggData = await demoAggResponse.json();
         
         if (!demoAggData.error && demoAggData.data) {
@@ -1449,7 +1515,7 @@ serve(async (req) => {
       let nextUrl: string | null = adInsightsUrl;
 
       while (nextUrl) {
-        const adInsightsRes: Response = await fetch(nextUrl);
+        const adInsightsRes: Response = await fetchWithRetry(() => fetch(nextUrl as string));
         const adInsightsData: { error?: { message: string }; data?: any[]; paging?: { next?: string } } = await adInsightsRes.json();
 
         if (adInsightsData.error) {
@@ -1629,7 +1695,7 @@ serve(async (req) => {
             `access_token=${access_token}`;
           
           console.log(`[ASSET BREAKDOWNS][${breakdownType}] Fetching...`);
-          const breakdownRes = await fetch(assetBreakdownUrl);
+          const breakdownRes = await fetchWithRetry(() => fetch(assetBreakdownUrl));
           const breakdownData = await breakdownRes.json();
           
           // ENHANCED LOGGING: Log raw API response for debugging

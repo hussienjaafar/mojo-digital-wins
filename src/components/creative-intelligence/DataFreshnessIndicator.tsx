@@ -58,14 +58,34 @@ export function DataFreshnessIndicator({
     ? Math.round((analyzedCreatives / totalCreatives) * 100)
     : 0;
 
+  // Determine data status for screen readers
+  const getDataStatusDescription = () => {
+    if (isVeryStale) return `Critical: Data is very stale, last synced ${hoursStale}+ hours ago`;
+    if (isStale) return `Warning: Data may be outdated, last synced ${hoursStale}+ hours ago`;
+    if (lastSyncedAt) return `Data is fresh, synced ${formatDistanceToNow(new Date(lastSyncedAt), { addSuffix: true })}`;
+    return "Data sync status unknown";
+  };
+
   return (
-    <V3Card className={isVeryStale ? "border-[hsl(var(--portal-error)/0.5)]" : isStale ? "border-[hsl(var(--portal-warning)/0.5)]" : ""}>
+    <V3Card
+      className={isVeryStale ? "border-[hsl(var(--portal-error)/0.5)]" : isStale ? "border-[hsl(var(--portal-warning)/0.5)]" : ""}
+      role="region"
+      aria-label="Data freshness status"
+    >
       <V3CardContent className="py-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div
+          className="flex flex-col sm:flex-row sm:items-center gap-4"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           {/* Stale data warning */}
           {isVeryStale && (
-            <div className="flex items-center gap-2 text-[hsl(var(--portal-error))]">
-              <AlertTriangle className="h-5 w-5" />
+            <div
+              className="flex items-center gap-2 text-[hsl(var(--portal-error))]"
+              role="alert"
+              aria-label="Critical data freshness warning"
+            >
+              <AlertTriangle className="h-5 w-5" aria-hidden="true" />
               <div>
                 <div className="font-medium text-sm">Data is very stale</div>
                 <div className="text-xs opacity-80">Last synced {hoursStale}+ hours ago</div>
@@ -74,8 +94,12 @@ export function DataFreshnessIndicator({
           )}
 
           {isStale && !isVeryStale && (
-            <div className="flex items-center gap-2 text-[hsl(var(--portal-warning))]">
-              <AlertTriangle className="h-5 w-5" />
+            <div
+              className="flex items-center gap-2 text-[hsl(var(--portal-warning))]"
+              role="alert"
+              aria-label="Data freshness warning"
+            >
+              <AlertTriangle className="h-5 w-5" aria-hidden="true" />
               <div>
                 <div className="font-medium text-sm">Data may be outdated</div>
                 <div className="text-xs opacity-80">Last synced {hoursStale}+ hours ago</div>
@@ -84,8 +108,12 @@ export function DataFreshnessIndicator({
           )}
 
           {!isStale && lastSyncedAt && (
-            <div className="flex items-center gap-2 text-[hsl(var(--portal-success))]">
-              <CheckCircle className="h-5 w-5" />
+            <div
+              className="flex items-center gap-2 text-[hsl(var(--portal-success))]"
+              role="status"
+              aria-label="Data is current"
+            >
+              <CheckCircle className="h-5 w-5" aria-hidden="true" />
               <div>
                 <div className="font-medium text-sm">Data is fresh</div>
                 <div className="text-xs opacity-80">
@@ -96,9 +124,9 @@ export function DataFreshnessIndicator({
           )}
 
           {/* Metrics summary */}
-          <div className="flex flex-wrap items-center gap-4 sm:ml-auto text-sm">
+          <div className="flex flex-wrap items-center gap-4 sm:ml-auto text-sm" aria-label="Analysis progress summary">
             <div className="flex items-center gap-2">
-              <Info className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+              <Info className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" aria-hidden="true" />
               <span className="text-[hsl(var(--portal-text-muted))]">
                 {analyzedCreatives} of {totalCreatives} analyzed
               </span>
@@ -106,12 +134,15 @@ export function DataFreshnessIndicator({
                 type={analysisPercent >= 80 ? "info" : analysisPercent >= 50 ? "anomaly-low" : "anomaly-high"}
               >
                 {analysisPercent}%
+                <span className="sr-only">
+                  {analysisPercent >= 80 ? " - good coverage" : analysisPercent >= 50 ? " - moderate coverage" : " - low coverage, action needed"}
+                </span>
               </V3InsightBadge>
             </div>
 
             {lastMetricDate && (
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+                <Clock className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" aria-hidden="true" />
                 <span className="text-[hsl(var(--portal-text-muted))]">
                   Latest metrics: {lastMetricDate}
                 </span>
@@ -122,7 +153,11 @@ export function DataFreshnessIndicator({
 
         {/* Recommendations based on data state */}
         {(isStale || analysisPercent < 50) && (
-          <div className="mt-3 pt-3 border-t border-[hsl(var(--portal-border))] text-xs text-[hsl(var(--portal-text-muted))]">
+          <div
+            className="mt-3 pt-3 border-t border-[hsl(var(--portal-border))] text-xs text-[hsl(var(--portal-text-muted))]"
+            role="status"
+            aria-label="Recommended actions"
+          >
             {isStale && (
               <span>Click "Sync Data" to refresh metrics from Meta Ads. </span>
             )}
