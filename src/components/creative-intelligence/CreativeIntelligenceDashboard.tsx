@@ -149,10 +149,16 @@ export function CreativeIntelligenceDashboard({
     try {
       toast.info("Syncing performance data from Meta Ads...");
 
-      const { error: syncError } = await supabase.functions.invoke("sync-meta-ads", {
+      const { data: syncResult, error: syncError } = await supabase.functions.invoke("sync-meta-ads", {
         body: { organization_id: organizationId },
       });
       if (syncError) throw syncError;
+
+      // Check if sync was skipped (no Meta credentials configured)
+      if (syncResult?.skipped) {
+        toast.warning("No Meta API credentials configured for this organization. Connect your Meta Ads account to sync data.");
+        return;
+      }
 
       const { error: aggError } = await supabase.functions.invoke("aggregate-creative-metrics", {
         body: { organization_id: organizationId },
@@ -160,7 +166,7 @@ export function CreativeIntelligenceDashboard({
       if (aggError) console.error("Aggregation error (non-fatal):", aggError);
 
       setLastSyncedAt(new Date().toISOString());
-      toast.success("Performance data synced!");
+      toast.success(`Performance data synced! ${syncResult?.insight_records || 0} records updated.`);
       await refetch();
     } catch (error) {
       console.error("Sync error:", error);

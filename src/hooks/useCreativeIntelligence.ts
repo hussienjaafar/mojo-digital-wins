@@ -170,6 +170,7 @@ export interface CreativeIntelligenceData {
     avg_days_active: number;
     overall_confidence: 'HIGH' | 'MEDIUM' | 'LOW';
   };
+  has_daily_metrics: boolean;
 }
 
 // =============================================================================
