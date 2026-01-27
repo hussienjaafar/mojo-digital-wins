@@ -59,7 +59,7 @@ serve(async (req) => {
 
     // Handle RPC calls
     if (rpc) {
-      const allowedRpcs = ["has_role", "get_pending_invitations"]; // Whitelist of allowed RPC functions
+      const allowedRpcs = ["has_role", "get_pending_invitations", "get_creative_intelligence"]; // Whitelist of allowed RPC functions
       if (!allowedRpcs.includes(rpc)) {
         return new Response(
           JSON.stringify({ error: `RPC function '${rpc}' not allowed` }),
