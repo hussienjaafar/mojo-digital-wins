@@ -1,82 +1,93 @@
 
 
-# Fix: $20 Meta Revenue Gap Between Today View and Hero KPI
+# Hide Creative Intelligence V2 from Organization Members
 
-## Problem Summary
+## Current Behavior
+- The **Creative Intelligence V2** page already uses `ProductionGate` to show a "Coming Soon" message to non-admin users
+- However, the **sidebar navigation** still displays "Creative V2 (Test)" to ALL users, which is confusing since clicking it leads to a placeholder
 
-Two dashboard components display conflicting Meta attributed revenue for January 26, 2026:
+## Goal
+Completely hide the Creative Intelligence V2 page from organization members (non-admins) until it's fully operational:
+1. Remove the navigation link from the sidebar for non-admins
+2. Optionally add route-level protection to redirect non-admins who navigate directly
 
-| Component | Value | Data Source |
-|-----------|-------|-------------|
-| Meta Ads Performance Overview | $75.00 (0.55x ROI) | `useSingleDayMetaMetrics` with `p_use_utc: true` |
-| Attributed ROI Details drawer | $55.00 (0.4x ROI) | `useActBlueMetrics` with `p_use_utc: false` (ET) |
+## Implementation Approach
 
-The $20 gap comes from 1 transaction that occurred between midnight and 1 AM UTC on Jan 26, which falls on Jan 25 when using Eastern Time bucketing.
+### Step 1: Add Admin Check to AppSidebar
 
-## Root Cause
+Modify `src/components/client/AppSidebar.tsx` to conditionally include the "Creative V2 (Test)" item only for admins.
 
-The `useSingleDayMetaMetrics` hook explicitly passes `p_use_utc: true` to the RPC (line 48), while the `useActBlueMetrics` hook used by Hero KPIs passes `p_use_utc: false` (line 435). This timezone mismatch causes transactions in the 12-5 AM UTC window to appear in different day buckets.
+**Changes:**
+- Import the `useIsAdmin` hook
+- Filter out admin-only items from the navigation sections
 
-## Solution
+```text
+Location: src/components/client/AppSidebar.tsx
 
-Standardize both hooks to use **Eastern Time** (`p_use_utc: false`) since:
-1. ActBlue's native Fundraising Performance dashboard uses Eastern Time
-2. The Hero KPIs already use Eastern Time
-3. Users expect consistency across all dashboard views
+1. Add import:
+   import { useIsAdmin } from "@/hooks/useIsAdmin";
 
-## Implementation Steps
+2. Inside AppSidebar component, call the hook:
+   const { isAdmin } = useIsAdmin();
 
-### Step 1: Fix the Timezone Parameter
-
-**File: `src/hooks/useSingleDayMetaMetrics.ts`**
-
-Change line 48 from:
-```typescript
-p_use_utc: true, // Use UTC for consistency
-```
-to:
-```typescript
-p_use_utc: false, // Use Eastern Time to match Hero KPIs and ActBlue dashboard
+3. Modify the "Creative Intelligence" section (lines 123-129):
+   - Add an `adminOnly: true` property to the Creative V2 item
+   - Filter items based on admin status before rendering
 ```
 
-### Step 2: Fix Build Errors (Required)
+### Step 2: Add Route Protection (Optional but Recommended)
 
-The following TypeScript errors must be resolved before deployment:
+While `ProductionGate` already shows a "Coming Soon" message, for a cleaner UX we could redirect non-admins who directly navigate to the URL.
 
-**2a. `src/stores/dashboardStore.ts` (line 87)**
-- Add missing KPI keys to `KPI_TO_SERIES_MAP`: `ci_needsAttention`, `ci_overallRoas`, `ci_scalable`, `ci_totalCreatives`, and 2 more
+**Option A - Keep Current Behavior (Recommended):**
+- Non-admins who somehow access `/client/creative-intelligence-v2` see a polished "Coming Soon" message
+- This is already working via `ProductionGate`
 
-**2b. `src/hooks/useCreativeIntelligence.ts` (lines 209, 223)**
-- Fix RPC function name type error by using type assertion
-- Fix the type casting for the response
+**Option B - Redirect Non-Admins:**
+- Add route-level protection that redirects to the main Creative Intelligence page
+- Requires a new wrapper component
 
-**2c. `src/pages/ClientCreativeIntelligenceV2.tsx` (lines 42, 43, 62)**
-- Remove references to non-existent `election_date` and `election_name` columns from the `client_organizations` table query
+I recommend **Option A** since it's already implemented and provides a better UX than a redirect.
 
-**2d. `src/components/creative-intelligence/PerformanceQuadrantChart.tsx` (line 307)**
-- Add type assertion `as const` to the `type: 'value'` in xAxis/yAxis config
+## Technical Details
 
-**2e. `src/components/creative-intelligence/RecommendationTable.tsx` (line 248)**
-- Remove the `emptyMessage` prop which doesn't exist on `V3DataTable`
+### File Changes
 
-**2f. `src/components/creative-intelligence/CreativeIntelligenceDashboard.tsx` (line 225)**
-- Fix the CSV export type by spreading recommendations into plain objects
+**`src/components/client/AppSidebar.tsx`**
+
+```typescript
+// Add to imports (line ~3)
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+
+// Add inside component (after line 45)
+const { isAdmin } = useIsAdmin();
+
+// Modify the Creative Intelligence section (lines 123-129)
+{
+  label: "Creative Intelligence",
+  items: [
+    { title: "Creative Analysis", url: "/client/creative-intelligence", icon: Sparkles },
+    // Only show V2 to admins
+    ...(isAdmin 
+      ? [{ title: "Creative V2 (Test)", url: "/client/creative-intelligence-v2", icon: FlaskConical }]
+      : []),
+    { title: "Ad Performance", url: "/client/ad-performance", icon: Target },
+    { title: "A/B Test Analytics", url: "/client/ab-tests", icon: FlaskConical },
+  ],
+},
+```
 
 ## Expected Outcome
 
-After the fix:
-- Both components will show **$55.00** Meta Revenue for Jan 26 (ET)
-- Attributed ROI will display **0.4x** consistently across all views
-- The "Meta Ads Performance Overview" will match the "Attributed ROI Details" drawer
+| User Type | Sidebar Shows | Direct URL Access |
+|-----------|--------------|-------------------|
+| System Admin | "Creative V2 (Test)" link visible | Full page access |
+| Org Member | Link NOT visible | "Coming Soon" placeholder |
 
-## Technical Notes
+## Future Considerations
 
-### Why Eastern Time?
-ActBlue processes donations in Eastern Time, and their dashboard reports use Eastern Time boundaries. Using UTC would cause:
-1. Late-night EST donations to appear on the "next day"
-2. Discrepancies when users compare our dashboard to ActBlue's native reporting
-3. Inconsistency between different dashboard sections
-
-### Alternative Considered
-We could switch everything to UTC for technical simplicity, but this would break alignment with ActBlue's native reporting and user expectations for US-based fundraising operations.
+When the V2 page is ready for production:
+1. Remove the `isAdmin` conditional from AppSidebar
+2. Remove the `ProductionGate` wrapper from the page
+3. Optionally replace the V1 page with V2
 
