@@ -1,0 +1,242 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+
+// =============================================================================
+// TYPES
+// =============================================================================
+
+export interface IssuePerformance {
+  issue_primary: string;
+  creative_count: number;
+  mean_roas: number;
+  stddev_roas: number | null;
+  median_roas: number;
+  min_roas: number;
+  max_roas: number;
+  total_impressions: number;
+  total_spend: number;
+  total_revenue: number;
+  ci_lower: number;
+  ci_upper: number;
+  confidence_score: number;
+}
+
+export interface StancePerformance {
+  stance: string;
+  creative_count: number;
+  mean_roas: number;
+  total_impressions: number;
+  total_spend: number;
+  total_revenue: number;
+}
+
+export interface TargetPerformance {
+  target: string;
+  creative_count: number;
+  mean_roas: number;
+  total_revenue: number;
+}
+
+export interface LeadingIndicators {
+  correlations: {
+    early_ctr_to_roas: number;
+    early_cpm_to_roas: number;
+  };
+  sample_size: number;
+  insight: string;
+}
+
+export interface FatigueAlert {
+  creative_id: string;
+  issue_primary: string | null;
+  headline: string | null;
+  thumbnail_url: string | null;
+  days_with_data: number;
+  total_impressions: number;
+  roas: number;
+  peak_ctr: number;
+  recent_ctr: number;
+  decline_from_peak: number;
+  trend_slope: number | null;
+  fatigue_status: 'FATIGUED' | 'DECLINING' | 'IMPROVING' | 'STABLE';
+  recommendation: string;
+}
+
+export interface CreativeRecommendation {
+  creative_id: string;
+  ad_id: string;
+  issue_primary: string | null;
+  headline: string | null;
+  thumbnail_url: string | null;
+  creative_type: string;
+  total_impressions: number;
+  total_spend: number;
+  total_revenue: number;
+  roas: number;
+  ctr: number;
+  days_with_data: number;
+  fatigue_status: string;
+  confidence_score: number;
+  recommendation: 'SCALE' | 'MAINTAIN' | 'WATCH' | 'GATHER_DATA' | 'REFRESH' | 'PAUSE';
+  explanation: string;
+}
+
+export interface CreativeIntelligenceData {
+  generated_at: string;
+  organization_id: string;
+  date_range: {
+    start_date: string;
+    end_date: string;
+  };
+  parameters: {
+    min_impressions: number;
+    early_window_days: number;
+    fatigue_threshold: number;
+  };
+  summary: {
+    total_creatives: number;
+    total_spend: number;
+    total_revenue: number;
+    overall_roas: number;
+    total_impressions: number;
+    creatives_with_issues: number;
+  };
+  issue_performance: IssuePerformance[];
+  stance_performance: StancePerformance[];
+  target_attacked_performance: TargetPerformance[];
+  leading_indicators: LeadingIndicators;
+  fatigue_alerts: FatigueAlert[];
+  recommendations: CreativeRecommendation[];
+  recommendation_summary: {
+    scale: number;
+    maintain: number;
+    watch: number;
+    gather_data: number;
+    refresh: number;
+    pause: number;
+  };
+  data_quality: {
+    creatives_with_issue_data: number;
+    creatives_without_issue_data: number;
+    avg_impressions_per_creative: number;
+    avg_days_active: number;
+    overall_confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  };
+}
+
+// =============================================================================
+// HOOK
+// =============================================================================
+
+interface UseCreativeIntelligenceOptions {
+  organizationId: string;
+  startDate: string;
+  endDate: string;
+  minImpressions?: number;
+  earlyWindowDays?: number;
+  fatigueThreshold?: number;
+  enabled?: boolean;
+}
+
+export function useCreativeIntelligence({
+  organizationId,
+  startDate,
+  endDate,
+  minImpressions = 1000,
+  earlyWindowDays = 3,
+  fatigueThreshold = 0.20,
+  enabled = true,
+}: UseCreativeIntelligenceOptions) {
+  return useQuery({
+    queryKey: [
+      'creative-intelligence',
+      organizationId,
+      startDate,
+      endDate,
+      minImpressions,
+      earlyWindowDays,
+      fatigueThreshold,
+    ],
+    queryFn: async (): Promise<CreativeIntelligenceData> => {
+      const { data, error } = await supabase.rpc('get_creative_intelligence', {
+        p_organization_id: organizationId,
+        p_start_date: startDate,
+        p_end_date: endDate,
+        p_min_impressions: minImpressions,
+        p_early_window_days: earlyWindowDays,
+        p_fatigue_threshold: fatigueThreshold,
+      });
+
+      if (error) {
+        console.error('[useCreativeIntelligence] RPC error:', error);
+        throw new Error(error.message);
+      }
+
+      return data as CreativeIntelligenceData;
+    },
+    enabled: enabled && !!organizationId && !!startDate && !!endDate,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes (formerly cacheTime)
+  });
+}
+
+// =============================================================================
+// DERIVED HOOKS (convenience wrappers)
+// =============================================================================
+
+/**
+ * Get just the issue performance rankings
+ */
+export function useIssuePerformance(options: UseCreativeIntelligenceOptions) {
+  const query = useCreativeIntelligence(options);
+  return {
+    ...query,
+    data: query.data?.issue_performance ?? [],
+  };
+}
+
+/**
+ * Get just the recommendations
+ */
+export function useCreativeRecommendations(options: UseCreativeIntelligenceOptions) {
+  const query = useCreativeIntelligence(options);
+  return {
+    ...query,
+    data: query.data?.recommendations ?? [],
+  };
+}
+
+/**
+ * Get just the fatigue alerts
+ */
+export function useFatigueAlerts(options: UseCreativeIntelligenceOptions) {
+  const query = useCreativeIntelligence(options);
+  return {
+    ...query,
+    data: query.data?.fatigue_alerts ?? [],
+  };
+}
+
+/**
+ * Get creatives that should be scaled (high performers)
+ */
+export function useScalableCreatives(options: UseCreativeIntelligenceOptions) {
+  const query = useCreativeIntelligence(options);
+  return {
+    ...query,
+    data: query.data?.recommendations.filter(r => r.recommendation === 'SCALE') ?? [],
+  };
+}
+
+/**
+ * Get creatives that need attention (pause or refresh)
+ */
+export function useCreativesNeedingAttention(options: UseCreativeIntelligenceOptions) {
+  const query = useCreativeIntelligence(options);
+  return {
+    ...query,
+    data: query.data?.recommendations.filter(
+      r => r.recommendation === 'PAUSE' || r.recommendation === 'REFRESH'
+    ) ?? [],
+  };
+}
