@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
-import { Download, MapPin, Briefcase, Users, Clock, Share2, ArrowLeft, Tag, ChevronDown, ChevronUp } from "lucide-react";
+import { Download, MapPin, Briefcase, Users, Clock, Share2, ArrowLeft, Tag, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
 import {
   V3PageContainer,
@@ -17,6 +17,8 @@ import {
   V3PrimaryCell,
   type V3Column,
 } from "@/components/v3";
+import { V3ErrorState } from "@/components/v3/V3ErrorState";
+import { V3DataFreshnessIndicator } from "@/components/v3/V3DataFreshnessIndicator";
 import { V3DonutChart } from "@/components/charts/echarts";
 import { V3BarChart, USChoroplethMap, type ChoroplethDataItem, type MapMetricMode } from "@/components/charts";
 import { getStateName } from "@/lib/us-states";
@@ -92,6 +94,10 @@ const ClientDemographics = () => {
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [mapMetricMode, setMapMetricMode] = useState<MapMetricMode>("revenue");
   const [showAllStates, setShowAllStates] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [calculatedAt, setCalculatedAt] = useState<string | null>(null);
+  const [cacheStatus, setCacheStatus] = useState<'ready' | 'needs_refresh' | 'refreshing' | null>(null);
   
   // City data caching for drilldown
   const [cityCache, setCityCache] = useState<Map<string, CityStats[]>>(new Map());
@@ -111,9 +117,10 @@ const ClientDemographics = () => {
     }
   }, [selectedState, organizationId]);
 
-  const loadData = async (orgId: string) => {
+  const loadData = useCallback(async (orgId: string) => {
     try {
       setIsLoading(true);
+      setError(null);
       
       const { data: org } = await (supabase as any)
         .from('client_organizations')
@@ -123,25 +130,102 @@ const ClientDemographics = () => {
 
       setOrganization(org);
 
-      // Use the new V2 RPC with normalized occupations
-      const { data: summaryData, error } = await supabase.rpc(
-        'get_donor_demographics_v2',
+      // Use the cached RPC for fast loading
+      const { data: cacheResponse, error: cacheError } = await supabase.rpc(
+        'get_donor_demographics_cached',
         { _organization_id: orgId }
       );
 
-      if (error) throw error;
+      if (cacheError) throw cacheError;
 
-      setSummary(summaryData as unknown as DemographicsSummaryV2);
-    } catch (error: any) {
+      const response = cacheResponse as unknown as {
+        status: 'ready' | 'needs_refresh';
+        data?: DemographicsSummaryV2;
+        calculated_at?: string;
+        message?: string;
+        organization_id?: string;
+      };
+
+      setCacheStatus(response.status);
+
+      if (response.status === 'ready' && response.data) {
+        setSummary(response.data);
+        setCalculatedAt(response.calculated_at || null);
+      } else if (response.status === 'needs_refresh') {
+        // Trigger cache refresh via edge function
+        await triggerCacheRefresh(orgId);
+      }
+    } catch (err: any) {
+      console.error('Demographics load error:', err);
+      setError(err.message || 'Failed to load demographics data');
       toast({
         title: "Error",
-        description: error.message,
+        description: err.message,
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  const triggerCacheRefresh = useCallback(async (orgId: string) => {
+    try {
+      setIsRefreshing(true);
+      setCacheStatus('refreshing');
+      
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
+
+      const response = await supabase.functions.invoke('refresh-demographics-cache', {
+        body: { organization_id: orgId },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (response.error) {
+        throw response.error;
+      }
+
+      // Reload cached data after refresh
+      const { data: cacheResponse, error: cacheError } = await supabase.rpc(
+        'get_donor_demographics_cached',
+        { _organization_id: orgId }
+      );
+
+      if (cacheError) throw cacheError;
+
+      const freshData = cacheResponse as unknown as {
+        status: 'ready' | 'needs_refresh';
+        data?: DemographicsSummaryV2;
+        calculated_at?: string;
+      };
+
+      if (freshData.status === 'ready' && freshData.data) {
+        setSummary(freshData.data);
+        setCalculatedAt(freshData.calculated_at || null);
+        setCacheStatus('ready');
+        toast({
+          title: "Success",
+          description: "Demographics data has been refreshed.",
+        });
+      }
+    } catch (err: any) {
+      console.error('Cache refresh error:', err);
+      setError(err.message || 'Failed to refresh demographics cache');
+      setCacheStatus('needs_refresh');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [toast]);
+
+  const handleRetry = useCallback(() => {
+    if (organizationId) {
+      if (cacheStatus === 'needs_refresh') {
+        triggerCacheRefresh(organizationId);
+      } else {
+        loadData(organizationId);
+      }
+    }
+  }, [organizationId, cacheStatus, triggerCacheRefresh, loadData]);
 
   const loadCityData = async (stateAbbr: string) => {
     if (!organizationId) return;
@@ -362,6 +446,43 @@ const ClientDemographics = () => {
     );
   }
 
+  // Error state
+  if (error && !summary) {
+    return (
+      <ClientShell showDateControls={false}>
+        <div className="p-6">
+          <V3ErrorState
+            title="Failed to load demographics"
+            message={error}
+            onRetry={handleRetry}
+            isRetrying={isRefreshing}
+            variant="large"
+          />
+        </div>
+      </ClientShell>
+    );
+  }
+
+  // Refreshing state (cache is being built)
+  if (cacheStatus === 'refreshing' || (cacheStatus === 'needs_refresh' && isRefreshing)) {
+    return (
+      <ClientShell showDateControls={false}>
+        <div className="p-6">
+          <div className="flex flex-col items-center justify-center py-16 px-6 text-center rounded-xl border border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-elevated))]">
+            <RefreshCw className="h-12 w-12 text-[hsl(var(--portal-accent))] animate-spin mb-4" />
+            <h3 className="text-lg font-semibold text-[hsl(var(--portal-text-primary))]">
+              Building Demographics Report
+            </h3>
+            <p className="text-sm text-[hsl(var(--portal-text-secondary))] mt-2 max-w-md">
+              We're analyzing your donor data. This may take a minute for large accounts.
+              The data will be cached for instant loading next time.
+            </p>
+          </div>
+        </div>
+      </ClientShell>
+    );
+  }
+
   // Empty state
   if (!organization || !summary) {
     return (
@@ -392,15 +513,34 @@ const ClientDemographics = () => {
         title="Donor Demographics"
         description="Analyze your donor base by behavior, location, occupation, and acquisition channel"
         actions={
-          <V3Button
-            variant="secondary"
-            size="sm"
-            onClick={handleExportCSV}
-            disabled={isExporting}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            {isExporting ? "Exporting..." : "Export Summary"}
-          </V3Button>
+          <div className="flex items-center gap-3">
+            {calculatedAt && (
+              <V3DataFreshnessIndicator
+                lastSyncedAt={calculatedAt}
+                expectedFreshnessHours={24}
+                source="Demographics Cache"
+              />
+            )}
+            <V3Button
+              variant="ghost"
+              size="sm"
+              onClick={() => organizationId && triggerCacheRefresh(organizationId)}
+              disabled={isRefreshing}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </V3Button>
+            <V3Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportCSV}
+              disabled={isExporting}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {isExporting ? "Exporting..." : "Export Summary"}
+            </V3Button>
+          </div>
         }
       >
         {/* Enhanced KPI Cards with Behavior Metrics */}
