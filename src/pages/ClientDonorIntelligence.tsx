@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Brain, RefreshCw, Play, Zap, Database, LayoutGrid, List, BookMarked } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
@@ -35,6 +35,13 @@ export default function ClientDonorIntelligence() {
       queryClient.invalidateQueries({ queryKey: ['donor-segment'] });
     }
   });
+
+  // Reset state when organization changes to prevent showing stale data
+  useEffect(() => {
+    setActiveTab("builder");
+    setIsRunningJourneys(false);
+    setIsRunningLtv(false);
+  }, [organizationId]);
 
   const handleRunJourneysPipeline = async () => {
     if (!organizationId) return;
