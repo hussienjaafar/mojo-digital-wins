@@ -4,16 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
-
-/**
- * Staleness thresholds (in hours) for triggering external syncs
- * These are more aggressive than the SLA thresholds to ensure freshness
- */
-const SYNC_THRESHOLDS = {
-  meta: 4,        // Sync if Meta data is >4 hours old
-  actblue: 2,     // Sync if ActBlue is >2 hours old  
-  switchboard: 4, // Sync if SMS is >4 hours old
-} as const;
+import { SYNC_THRESHOLDS } from '@/lib/query-config';
 
 export type SyncSource = 'meta' | 'actblue' | 'switchboard';
 
