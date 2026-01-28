@@ -1,93 +1,125 @@
 
 
-# Hide Creative Intelligence V2 from Organization Members
+# Fix Creative Intelligence V2 Console Errors
 
-## Current Behavior
-- The **Creative Intelligence V2** page already uses `ProductionGate` to show a "Coming Soon" message to non-admin users
-- However, the **sidebar navigation** still displays "Creative V2 (Test)" to ALL users, which is confusing since clicking it leads to a placeholder
+## Problem Summary
 
-## Goal
-Completely hide the Creative Intelligence V2 page from organization members (non-admins) until it's fully operational:
-1. Remove the navigation link from the sidebar for non-admins
-2. Optionally add route-level protection to redirect non-admins who navigate directly
+Two persistent console errors on the `/client/creative-intelligence-v2` page:
 
-## Implementation Approach
+| Error | Root Cause |
+|-------|------------|
+| `Refused to apply style from .../src/index.css (MIME type text/html)` | Preview environment quirk - benign warning caused by SPA fallback routing when browser requests the raw source path. Styles actually load via Vite's JS-injected CSS. |
+| `POST get_creative_intelligence 400 - cannot cast type text[] to jsonb` | The PostgreSQL RPC attempts `political_stances::jsonb` and `targets_attacked::jsonb`, but those columns are native `TEXT[]` arrays. PostgreSQL cannot directly cast `TEXT[]` to `JSONB`. |
 
-### Step 1: Add Admin Check to AppSidebar
+The RPC error is the critical issue preventing the dashboard from loading.
 
-Modify `src/components/client/AppSidebar.tsx` to conditionally include the "Creative V2 (Test)" item only for admins.
+---
 
-**Changes:**
-- Import the `useIsAdmin` hook
-- Filter out admin-only items from the navigation sections
+## Solution
 
-```text
-Location: src/components/client/AppSidebar.tsx
+### 1. Fix the Database RPC (Required)
 
-1. Add import:
-   import { useIsAdmin } from "@/hooks/useIsAdmin";
+Update the `get_creative_intelligence` function to convert native arrays properly:
 
-2. Inside AppSidebar component, call the hook:
-   const { isAdmin } = useIsAdmin();
-
-3. Modify the "Creative Intelligence" section (lines 123-129):
-   - Add an `adminOnly: true` property to the Creative V2 item
-   - Filter items based on admin status before rendering
+**Current (broken):**
+```sql
+jsonb_array_elements_text(political_stances::jsonb)
+jsonb_array_elements_text(targets_attacked::jsonb)
 ```
 
-### Step 2: Add Route Protection (Optional but Recommended)
+**Fixed:**
+```sql
+unnest(political_stances)
+unnest(targets_attacked)
+```
 
-While `ProductionGate` already shows a "Coming Soon" message, for a cleaner UX we could redirect non-admins who directly navigate to the URL.
+Since these are already native PostgreSQL arrays, `unnest()` is the correct approach - simpler and more efficient than converting to JSONB.
 
-**Option A - Keep Current Behavior (Recommended):**
-- Non-admins who somehow access `/client/creative-intelligence-v2` see a polished "Coming Soon" message
-- This is already working via `ProductionGate`
+**Locations to fix:**
+- Line 223: `stance_performance` CTE - SELECT clause
+- Line 231: `stance_performance` CTE - GROUP BY clause  
+- Line 236: `target_performance` CTE - SELECT clause
+- Line 242: `target_performance` CTE - GROUP BY clause
+- Line 280: `recommendations` CTE - subquery for `target_attacked`
 
-**Option B - Redirect Non-Admins:**
-- Add route-level protection that redirects to the main Creative Intelligence page
-- Requires a new wrapper component
+**Changes to `WHERE` clauses:**
+- `political_stances != '[]'` becomes `array_length(political_stances, 1) > 0`
+- `targets_attacked != '[]'` becomes `array_length(targets_attacked, 1) > 0`
 
-I recommend **Option A** since it's already implemented and provides a better UX than a redirect.
+### 2. CSS MIME Error (No Code Change Needed)
+
+This is a harmless preview environment artifact:
+- The browser sometimes requests `/src/index.css` directly (bypassing Vite's bundler)
+- The SPA fallback returns `index.html` instead (with MIME `text/html`)
+- The CSS is actually loaded correctly via Vite's JS injection (confirmed by network logs showing successful style loading)
+- **No action required** - it does not affect functionality or production
+
+---
+
+## Implementation Steps
+
+1. **Create database migration** to update the `get_creative_intelligence` function with:
+   - Replace all `jsonb_array_elements_text(column::jsonb)` with `unnest(column)`
+   - Update WHERE clauses to use `array_length(column, 1) > 0` instead of `column != '[]'`
+   - Re-grant EXECUTE permissions to `authenticated` and `service_role`
+
+2. **Verify fix** by refreshing the Creative Intelligence V2 page - the dashboard should load with real data
+
+---
 
 ## Technical Details
 
-### File Changes
+### Modified SQL (Key Sections)
 
-**`src/components/client/AppSidebar.tsx`**
-
-```typescript
-// Add to imports (line ~3)
-import { useIsAdmin } from "@/hooks/useIsAdmin";
-
-// Add inside component (after line 45)
-const { isAdmin } = useIsAdmin();
-
-// Modify the Creative Intelligence section (lines 123-129)
-{
-  label: "Creative Intelligence",
-  items: [
-    { title: "Creative Analysis", url: "/client/creative-intelligence", icon: Sparkles },
-    // Only show V2 to admins
-    ...(isAdmin 
-      ? [{ title: "Creative V2 (Test)", url: "/client/creative-intelligence-v2", icon: FlaskConical }]
-      : []),
-    { title: "Ad Performance", url: "/client/ad-performance", icon: Target },
-    { title: "A/B Test Analytics", url: "/client/ab-tests", icon: FlaskConical },
-  ],
-},
+```text
+stance_performance CTE:
+```
+```sql
+SELECT unnest(political_stances) as stance,
+       COUNT(*) as creative_count,
+       ...
+FROM creative_performance
+WHERE political_stances IS NOT NULL 
+  AND array_length(political_stances, 1) > 0
+GROUP BY unnest(political_stances)
+HAVING COUNT(*) >= 2
 ```
 
-## Expected Outcome
+```text
+target_performance CTE:
+```
+```sql
+SELECT unnest(targets_attacked) as target,
+       COUNT(*) as creative_count,
+       ...
+FROM creative_performance
+WHERE targets_attacked IS NOT NULL 
+  AND array_length(targets_attacked, 1) > 0
+GROUP BY unnest(targets_attacked)
+HAVING COUNT(*) >= 2
+```
 
-| User Type | Sidebar Shows | Direct URL Access |
-|-----------|--------------|-------------------|
-| System Admin | "Creative V2 (Test)" link visible | Full page access |
-| Org Member | Link NOT visible | "Coming Soon" placeholder |
+```text
+recommendations CTE (subquery):
+```
+```sql
+(SELECT unnest(targets_attacked) LIMIT 1) as target_attacked
+```
 
-## Future Considerations
+---
 
-When the V2 page is ready for production:
-1. Remove the `isAdmin` conditional from AppSidebar
-2. Remove the `ProductionGate` wrapper from the page
-3. Optionally replace the V1 page with V2
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `supabase/migrations/<new>.sql` | Updated `get_creative_intelligence` function |
+| `src/integrations/supabase/types.ts` | Auto-regenerated after migration |
+
+---
+
+## Outcome
+
+- RPC returns valid JSON with issue rankings, recommendations, and fatigue alerts
+- Creative Intelligence V2 dashboard loads properly with real data
+- CSS MIME warning remains in preview (harmless) but disappears in production
 
