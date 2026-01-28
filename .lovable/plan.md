@@ -1,142 +1,97 @@
 
-# Fix Organization Context Not Updating on Demographics Page
+# Fix Donor Intelligence Page Organization Context Issue
 
 ## Problem
 
-When viewing the demographics page for "Abdul for Senate", data for "Michael Blake For Congress" is displayed instead. The cached data is correct for both organizations, but the wrong organization ID is being passed to the RPC.
+The Donor Intelligence page has the same organization synchronization issue that was affecting the Demographics page. When switching organizations, the page displays stale data because:
 
-## Root Cause
+1. The `DonorSegmentBuilder` component maintains internal state (`pendingFilters`, `appliedFilters`, `selectedSavedSegment`, `viewMode`) that is not reset when the `organizationId` prop changes
+2. The parent `ClientDonorIntelligence` page does not reset its local state (`activeTab`) when the organization changes
+3. React Query caches may still hold data from the previous organization until the new queries complete
 
-The `useClientOrganization` hook has a race condition and synchronization issue with the impersonation context:
+The fix implemented for Demographics (custom event dispatch + state reset on org change) already provides the infrastructure. We just need to apply the same state-reset pattern to the Donor Intelligence components.
 
-1. When an admin switches organizations via the selector, `handleOrganizationChange` calls:
-   ```typescript
-   setImpersonation(session?.user?.id || '', 'System Admin', newOrg.id, newOrg.name);
-   ```
-
-2. But `isImpersonating` in the context is based on `impersonatedUserId !== null`
-
-3. If the session user ID is an empty string (fallback case), `impersonatedUserId` becomes `''` which is NOT null, so `isImpersonating` becomes `true`
-
-4. However, the `useClientOrganization` hook has a dependency array issue - it only re-runs when `impersonatedOrgId` or `isImpersonating` changes, but if these values are set in the wrong order or the effect doesn't re-run, stale data is used
-
-5. Additionally, the localStorage listener only fires for cross-tab changes (not same-tab changes)
+---
 
 ## Solution
 
-### 1. Fix the useClientOrganization hook to handle same-tab localStorage updates
-
-Add a custom event listener for same-tab organization changes and ensure the hook re-runs when the organization changes.
-
-### 2. Ensure the impersonation context properly syncs
-
-Update the dependency handling so the hook responds to organization changes immediately.
-
-### 3. Add debugging to verify the correct org ID is being used
-
-Add console logging (temporarily) and display the current organization in the UI header for clarity.
+Apply the same pattern used for Demographics: add `useEffect` hooks that reset all local state when `organizationId` changes.
 
 ---
 
 ## Technical Changes
 
-### File 1: `src/hooks/useClientOrganization.tsx`
+### File 1: `src/pages/ClientDonorIntelligence.tsx`
 
-**Changes:**
-- Add a custom event dispatcher pattern for same-tab updates
-- Add `organizationId` state reset when dependencies change
-- Improve effect dependency handling
+Add a `useEffect` to reset page-level state when organization changes:
 
 ```typescript
-// Add custom event listener for same-tab changes
+import { useState, useEffect } from "react";  // Add useEffect import
+
+// Inside the component, after state declarations:
+
+// Reset state when organization changes to prevent showing stale data
 useEffect(() => {
-  const handleOrgChange = () => {
-    const newOrgId = localStorage.getItem('selectedOrganizationId');
-    if (newOrgId && newOrgId !== organizationId) {
-      setOrganizationId(newOrgId);
-    }
-  };
-  
-  // Listen for custom event (same-tab) and storage event (cross-tab)
-  window.addEventListener('organizationChanged', handleOrgChange);
-  window.addEventListener('storage', handleStorageChange);
-  
-  return () => {
-    window.removeEventListener('organizationChanged', handleOrgChange);
-    window.removeEventListener('storage', handleStorageChange);
-  };
+  setActiveTab("builder");
+  setIsRunningJourneys(false);
+  setIsRunningLtv(false);
 }, [organizationId]);
 ```
 
-### File 2: `src/components/client/ClientShell.tsx`
+### File 2: `src/components/client/DonorSegmentBuilder.tsx`
 
-**Changes:**
-- Dispatch a custom event when organization changes (for same-tab updates)
-
-```typescript
-const handleOrganizationChange = (newOrgId: string) => {
-  const newOrg = organizations.find((org) => org.id === newOrgId);
-  if (newOrg) {
-    setOrganization(newOrg);
-    localStorage.setItem("selectedOrganizationId", newOrgId);
-    
-    // Dispatch custom event for same-tab listeners
-    window.dispatchEvent(new CustomEvent('organizationChanged', { detail: newOrgId }));
-    
-    // Also sync to impersonation context
-    if (isAdmin) {
-      setImpersonation(session?.user?.id || '', 'System Admin', newOrg.id, newOrg.name);
-    }
-    // ...
-  }
-};
-```
-
-### File 3: `src/pages/ClientDemographics.tsx`
-
-**Changes:**
-- Add a useEffect to reset state when organizationId changes
-- Clear cached data when switching organizations
+Add a `useEffect` to reset all filter and selection state when `organizationId` changes:
 
 ```typescript
-// Reset state when organization changes
+import React, { useState, useCallback, useMemo, useEffect } from "react";  // Add useEffect
+
+// Inside the component, after state declarations:
+
+// Reset all state when organization changes to prevent stale data
 useEffect(() => {
-  setSummary(null);
-  setCacheStatus(null);
-  setCalculatedAt(null);
-  setCityCache(new Map());
-  setSelectedState(null);
+  setPendingFilters([]);
+  setAppliedFilters([]);
+  setViewMode('aggregate');
+  setIsSaveDialogOpen(false);
+  setSelectedSavedSegment(null);
 }, [organizationId]);
 ```
 
----
+This ensures that when an admin switches from "Michael Blake" to "Abdul for Senate", the segment builder:
+- Clears all pending and applied filters
+- Resets to aggregate view
+- Closes any open dialogs
+- Clears saved segment selection
 
-## Alternative Quick Fix
-
-If you need an immediate workaround before the code changes:
-
-1. **Clear localStorage**: Open browser dev tools, go to Application > Local Storage, and delete the `selectedOrganizationId` entry
-2. **Re-select Abdul For Senate**: Use the organization switcher (⌘K) to select Abdul For Senate again
-3. **Refresh the page**: Force a fresh load of the demographics page
-
----
-
-## Testing Plan
-
-1. Switch to Abdul For Senate using the organization selector
-2. Navigate to the demographics page
-3. Verify the Total Revenue shows ~$4.6M (not $215K)
-4. Switch to Michael Blake For Congress
-5. Verify the demographics update to show ~$215K
-6. Switch back to Abdul For Senate
-7. Verify the data updates correctly without needing a page refresh
+The React Query hooks (`useDonorSegmentQuery`, `useSavedSegmentsQuery`) will automatically refetch with the new `organizationId` since it's part of their query keys.
 
 ---
 
 ## Files to Modify
 
-| File | Change Type |
-|------|-------------|
-| `src/hooks/useClientOrganization.tsx` | Add custom event listener for same-tab org changes |
-| `src/components/client/ClientShell.tsx` | Dispatch custom event when org changes |
-| `src/pages/ClientDemographics.tsx` | Reset state when organizationId changes |
+| File | Change |
+|------|--------|
+| `src/pages/ClientDonorIntelligence.tsx` | Add `useEffect` to reset `activeTab` and pipeline states on org change |
+| `src/components/client/DonorSegmentBuilder.tsx` | Add `useEffect` to reset filters, view mode, and selections on org change |
+
+---
+
+## Why This Works
+
+The `useClientOrganization` hook (already fixed in the previous update) now properly listens for the `organizationChanged` custom event and updates its `organizationId` state immediately. This triggers:
+
+1. The parent page (`ClientDonorIntelligence`) re-renders with the new `organizationId`
+2. The new `useEffect` in the page resets the tab state
+3. The `DonorSegmentBuilder` receives the new `organizationId` as a prop
+4. The new `useEffect` in `DonorSegmentBuilder` resets all filters and selections
+5. React Query detects the changed `organizationId` in query keys and refetches fresh data
+
+---
+
+## Expected Outcome
+
+After this fix:
+- Switching from "Michael Blake" to "Abdul for Senate" will immediately clear the filter panel
+- The segment builder will start fresh with no applied filters
+- Data will reload for the correct organization
+- No stale data from the previous organization will be visible
