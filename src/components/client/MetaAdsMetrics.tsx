@@ -107,13 +107,18 @@ const MetaAdsMetrics = ({
   const { data, isLoading, error, refetch } = useMetaAdsMetricsQuery(organizationId, startDate, endDate);
 
   // Memoized derived data
-  const { campaigns, metrics, dailyMetrics, previousPeriodMetrics, isEstimated, latestDataDate } = useMemo(() => ({
+  const { campaigns, metrics, dailyMetrics, previousPeriodMetrics, isEstimated, latestDataDate, attributedRevenue, attributedROI, previousAttributedRevenue, previousAttributedROI } = useMemo(() => ({
     campaigns: data?.campaigns || [],
     metrics: data?.metrics || {},
     dailyMetrics: data?.dailyMetrics || [],
     previousPeriodMetrics: data?.previousPeriodMetrics || {},
     isEstimated: data?.isEstimated ?? false,
     latestDataDate: data?.latestDataDate ?? null,
+    // Unified attribution data - same source as Hero KPIs
+    attributedRevenue: data?.attributedRevenue ?? 0,
+    attributedROI: data?.attributedROI ?? 0,
+    previousAttributedRevenue: data?.previousAttributedRevenue ?? 0,
+    previousAttributedROI: data?.previousAttributedROI ?? 0,
   }), [data]);
 
   // Check if showing stale data (selected date has no data yet)
@@ -142,10 +147,12 @@ const MetaAdsMetrics = ({
 
   const avgCTR = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
   const avgCPC = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
-  const roas = totals.spend > 0 ? totals.conversion_value / totals.spend : 0;
+  // Use unified attributed ROI instead of Meta's conversion_value for consistency with Hero KPIs
+  const roas = attributedROI;
   const cpm = totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0;
 
-  const prevRoas = previousTotals.spend > 0 ? previousTotals.conversion_value / previousTotals.spend : 0;
+  // Previous period comparison
+  const prevRoas = previousAttributedROI;
   const prevCTR = previousTotals.impressions > 0 ? (previousTotals.clicks / previousTotals.impressions) * 100 : 0;
   const prevCPM = previousTotals.impressions > 0 ? (previousTotals.spend / previousTotals.impressions) * 1000 : 0;
 
