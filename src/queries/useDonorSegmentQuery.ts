@@ -312,7 +312,8 @@ async function fetchSegmentDonors(
       occupation
     `)
     .eq('organization_id', organizationId)
-    .order('total_donated', { ascending: false, nullsFirst: false });
+    .order('total_donated', { ascending: false, nullsFirst: false })
+    .order('id', { ascending: true });  // Stable tiebreaker for pagination
 
   // Apply server-side filters
   for (const filter of filters) {
@@ -469,6 +470,10 @@ async function fetchSegmentDonors(
     const attribution = email ? attributionMap.get(email) : undefined;
     return transformToDonor(row, ltvMap.get(row.donor_key || ''), attribution);
   });
+
+  // Deduplicate by ID (safety net for pagination edge cases)
+  const uniqueMap = new Map(donors.map(d => [d.id, d]));
+  donors = Array.from(uniqueMap.values());
 
   // Step 5: Apply client-side filters
   const clientFilters = filters.filter(f => CLIENT_SIDE_FIELDS.includes(f.field));
