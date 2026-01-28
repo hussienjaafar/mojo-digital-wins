@@ -38,8 +38,15 @@ function formatPhone(phone: string | null): string {
   return phone;
 }
 
-type SortField = 'name' | 'email' | 'phone' | 'state' | 'total_donated' | 'donation_count' | 'segment' | 'churn_risk_label';
+type SortField = 'name' | 'email' | 'phone' | 'state' | 'total_donated' | 'donation_count' | 'last_donation_date' | 'segment' | 'churn_risk_label';
 type SortDirection = 'asc' | 'desc';
+
+// Format date to readable format (e.g., "Jan 15, 2026")
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return '—';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 interface DonorSegmentResultsProps {
   data: {
@@ -457,6 +464,13 @@ function TableView({ donors }: { donors: SegmentDonor[] }) {
       if (aVal === null || aVal === undefined) return 1;
       if (bVal === null || bVal === undefined) return -1;
 
+      // Date comparison
+      if (sortField === 'last_donation_date') {
+        const aDate = aVal ? new Date(aVal).getTime() : 0;
+        const bDate = bVal ? new Date(bVal).getTime() : 0;
+        return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
+      }
+
       // Numeric comparison
       if (sortField === 'total_donated' || sortField === 'donation_count') {
         aVal = Number(aVal) || 0;
@@ -490,14 +504,15 @@ function TableView({ donors }: { donors: SegmentDonor[] }) {
   };
 
   const columns = [
-    { key: 'name' as SortField, label: 'Name', width: '17%' },
-    { key: 'email' as SortField, label: 'Email', width: '18%' },
-    { key: 'phone' as SortField, label: 'Phone', width: '12%' },
-    { key: 'state' as SortField, label: 'State', width: '7%' },
-    { key: 'total_donated' as SortField, label: 'Lifetime $', width: '11%' },
-    { key: 'donation_count' as SortField, label: 'Donations', width: '9%' },
+    { key: 'name' as SortField, label: 'Name', width: '15%' },
+    { key: 'email' as SortField, label: 'Email', width: '16%' },
+    { key: 'phone' as SortField, label: 'Phone', width: '11%' },
+    { key: 'state' as SortField, label: 'State', width: '6%' },
+    { key: 'total_donated' as SortField, label: 'Lifetime $', width: '10%' },
+    { key: 'donation_count' as SortField, label: 'Donations', width: '8%' },
+    { key: 'last_donation_date' as SortField, label: 'Last Gift', width: '9%' },
     { key: 'segment' as SortField, label: 'Segment', width: '14%' },
-    { key: 'churn_risk_label' as SortField, label: 'Risk', width: '8%' },
+    { key: 'churn_risk_label' as SortField, label: 'Risk', width: '7%' },
   ];
 
   const SortIndicator = ({ field }: { field: SortField }) => {
@@ -598,27 +613,30 @@ function TableView({ donors }: { donors: SegmentDonor[] }) {
                         "hover:bg-[hsl(var(--portal-bg-hover))] transition-colors"
                       )}
                     >
-                      <div style={{ width: '17%' }} className="truncate text-sm text-[hsl(var(--portal-text-primary))]">
+                      <div style={{ width: '15%' }} className="truncate text-sm text-[hsl(var(--portal-text-primary))]">
                         {donor.name || '—'}
                       </div>
-                      <div style={{ width: '18%' }} className="truncate text-sm text-[hsl(var(--portal-text-muted))]">
+                      <div style={{ width: '16%' }} className="truncate text-sm text-[hsl(var(--portal-text-muted))]">
                         {donor.email || '—'}
                       </div>
-                      <div style={{ width: '12%' }} className="truncate text-sm text-[hsl(var(--portal-text-muted))]">
+                      <div style={{ width: '11%' }} className="truncate text-sm text-[hsl(var(--portal-text-muted))]">
                         {donor.phone ? (
                           <a href={`tel:${donor.phone}`} className="hover:text-[hsl(var(--portal-accent-blue))] transition-colors">
                             {formatPhone(donor.phone)}
                           </a>
                         ) : '—'}
                       </div>
-                      <div style={{ width: '7%' }} className="text-sm text-[hsl(var(--portal-text-muted))]">
+                      <div style={{ width: '6%' }} className="text-sm text-[hsl(var(--portal-text-muted))]">
                         {donor.state || '—'}
                       </div>
-                      <div style={{ width: '11%' }} className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                      <div style={{ width: '10%' }} className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
                         {formatCurrency(donor.total_donated)}
                       </div>
-                      <div style={{ width: '9%' }} className="text-sm text-[hsl(var(--portal-text-muted))]">
+                      <div style={{ width: '8%' }} className="text-sm text-[hsl(var(--portal-text-muted))]">
                         {donor.donation_count}
+                      </div>
+                      <div style={{ width: '9%' }} className="text-sm text-[hsl(var(--portal-text-muted))]">
+                        {formatDate(donor.last_donation_date)}
                       </div>
                       <div style={{ width: '14%' }}>
                         {donor.segment ? (
@@ -629,7 +647,7 @@ function TableView({ donors }: { donors: SegmentDonor[] }) {
                           <span className="text-sm text-[hsl(var(--portal-text-muted))]">—</span>
                         )}
                       </div>
-                      <div style={{ width: '8%' }}>
+                      <div style={{ width: '7%' }}>
                         {donor.churn_risk_label ? (
                           <span className={cn(
                             "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
