@@ -125,7 +125,7 @@ export default function ClientDonorIntelligence() {
 
   if (orgLoading || !organizationId) {
     return (
-      <ClientShell pageTitle="Donor Intelligence">
+      <ClientShell pageTitle="Donor Intelligence" showDateControls={false}>
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="animate-pulse text-muted-foreground">Loading...</div>
         </div>
@@ -134,7 +134,7 @@ export default function ClientDonorIntelligence() {
   }
 
   return (
-    <ClientShell pageTitle="Donor Intelligence">
+      <ClientShell pageTitle="Donor Intelligence" showDateControls={false}>
       <V3PageContainer
         icon={Brain}
         title="Donor Segmentation"
