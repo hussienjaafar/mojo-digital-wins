@@ -1,186 +1,117 @@
 
+# Add "Last Donation Date" Column to Donor List Table
 
-# Fix Donor Intelligence Page Not Loading After Page Reload
+## Overview
 
-## Problem Summary
+Add a new sortable column showing the date of each donor's most recent donation. This field (`last_donation_date`) already exists in the data model and is being fetched from the database - it just needs to be displayed in the UI.
 
-After the recent changes to add stable pagination sorting (`.order('id')`), refreshing the donor intelligence page causes the data to never load - the page remains stuck in a loading state showing skeleton placeholders.
+## Changes
 
-## Root Cause
+### File: `src/components/client/DonorSegmentResults.tsx`
 
-The `fetchAllWithPagination` function in `src/queries/useDonorSegmentQuery.ts` mutates the same Supabase query object across multiple pagination requests:
-
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                   SUPABASE QUERY MUTATION ISSUE                      │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  fetchAllWithPagination(baseQuery) {                                 │
-│    while (hasMore) {                                                 │
-│      baseQuery.range(0, 999);    ← First call: modifies baseQuery   │
-│      baseQuery.range(1000, 1999); ← Second call: SAME object!       │
-│      baseQuery.range(2000, 2999); ← Third call: accumulated state   │
-│    }                                                                 │
-│  }                                                                   │
-│                                                                      │
-│  Problem: Supabase query builder is MUTABLE                          │
-│  - .order() appends to URL params each time                          │
-│  - With TWO .order() calls, params may double on each iteration     │
-│  - Query state becomes corrupted after multiple iterations          │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
+**1. Add to SortField type (line 41)**
+```typescript
+type SortField = 'name' | 'email' | 'phone' | 'state' | 'total_donated' | 'donation_count' | 'segment' | 'churn_risk_label' | 'last_donation_date';
 ```
 
-When the stable sort fix added `.order('id')` as a secondary sort, it compounded an existing latent bug: the `.order()` method **appends** to the existing order parameters rather than replacing them. After multiple pagination loops, the query URL accumulates duplicate order parameters, leading to malformed requests or server errors.
-
-## Solution
-
-Refactor `fetchAllWithPagination` to use a **query factory function** instead of passing a mutable query object. This ensures each pagination request builds a fresh query from scratch.
-
-### Technical Changes
-
-**File: `src/queries/useDonorSegmentQuery.ts`**
-
-**Change 1: Update `fetchAllWithPagination` to accept a factory function**
-
-Current code (lines 260-286):
+**2. Add date formatting helper function (after line 39)**
 ```typescript
-async function fetchAllWithPagination(
-  baseQuery: any,
-  batchSize: number = 1000
-): Promise<any[]> {
-  let allData: any[] = [];
-  let from = 0;
-  let hasMore = true;
-
-  while (hasMore) {
-    const { data, error } = await baseQuery.range(from, from + batchSize - 1);
-    // ...
-  }
-  return allData;
+// Format date to readable format (e.g., "Jan 15, 2026")
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return '—';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 ```
 
-Updated code:
+**3. Update columns array (lines 492-501)**
+
+Add new column and adjust widths to accommodate:
+| Column | Old Width | New Width |
+|--------|-----------|-----------|
+| Name | 17% | 15% |
+| Email | 18% | 16% |
+| Phone | 12% | 11% |
+| State | 7% | 6% |
+| Lifetime $ | 11% | 10% |
+| Donations | 9% | 8% |
+| **Last Gift** | — | **9%** (new) |
+| Segment | 14% | 14% |
+| Risk | 8% | 7% |
+
+**4. Update sorting logic (around line 461)**
+
+Add date comparison handling:
 ```typescript
-async function fetchAllWithPagination(
-  queryFactory: () => any,
-  batchSize: number = 1000
-): Promise<any[]> {
-  let allData: any[] = [];
-  let from = 0;
-  let hasMore = true;
-
-  while (hasMore) {
-    // Build fresh query for each page to avoid mutation issues
-    const { data, error } = await queryFactory().range(from, from + batchSize - 1);
-    
-    if (error) {
-      console.error('Pagination fetch error:', error);
-      throw error;
-    }
-
-    if (data && data.length > 0) {
-      allData = [...allData, ...data];
-      hasMore = data.length === batchSize;
-      from += batchSize;
-    } else {
-      hasMore = false;
-    }
-  }
-
-  return allData;
+// Date comparison
+if (sortField === 'last_donation_date') {
+  const aDate = aVal ? new Date(aVal).getTime() : 0;
+  const bDate = bVal ? new Date(bVal).getTime() : 0;
+  return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
 }
 ```
 
-**Change 2: Update the caller to pass a factory function**
-
-Current code (lines 288-324):
+**5. Add column rendering in row (after line 621)**
 ```typescript
-async function fetchSegmentDonors(
-  organizationId: string,
-  filters: FilterCondition[]
-): Promise<SegmentQueryResult> {
-  let query = supabase
-    .from('donor_demographics')
-    .select(`...`)
-    .eq('organization_id', organizationId)
-    .order('total_donated', { ascending: false, nullsFirst: false })
-    .order('id', { ascending: true });
+<div style={{ width: '9%' }} className="text-sm text-[hsl(var(--portal-text-muted))]">
+  {formatDate(donor.last_donation_date)}
+</div>
+```
 
-  for (const filter of filters) {
-    query = applyServerFilter(query, filter);
-  }
+---
 
-  const demographics = await fetchAllWithPagination(query);
+### File: `src/components/client/DonorListSheet.tsx`
+
+**1. Add to SortField type**
+```typescript
+type SortField = 'name' | 'email' | 'phone' | 'state' | 'city' | 'total_donated' | 'donation_count' | 'segment' | 'churn_risk_label' | 'employer' | 'last_donation_date';
+```
+
+**2. Add same date formatting helper function**
+
+**3. Update columns array**
+
+Add new column and adjust widths:
+```typescript
+const columns = [
+  { key: 'name' as SortField, label: 'Name', width: '13%' },
+  { key: 'email' as SortField, label: 'Email', width: '15%' },
+  { key: 'phone' as SortField, label: 'Phone', width: '10%' },
+  { key: 'state' as SortField, label: 'State', width: '5%' },
+  { key: 'city' as SortField, label: 'City', width: '9%' },
+  { key: 'total_donated' as SortField, label: 'Lifetime $', width: '8%' },
+  { key: 'donation_count' as SortField, label: 'Donations', width: '6%' },
+  { key: 'last_donation_date' as SortField, label: 'Last Gift', width: '9%' },  // NEW
+  { key: 'segment' as SortField, label: 'Segment', width: '10%' },
+  { key: 'churn_risk_label' as SortField, label: 'Risk', width: '6%' },
+  { key: 'employer' as SortField, label: 'Employer', width: '9%' },
+];
+```
+
+**4. Update sorting logic for date field**
+
+**5. Add column rendering in row**
+
+**6. Update CSV export headers and data**
+```typescript
+const headers = ['Name', 'Email', 'Phone', 'State', 'City', 'ZIP', 'Lifetime $', 'Donations', 'Last Donation Date', 'Segment', 'Churn Risk', 'Employer', 'Occupation'];
+const rows = sortedDonors.map(d => [
+  // ... existing fields
+  d.last_donation_date || '',  // NEW
   // ...
-}
+]);
 ```
 
-Updated code:
-```typescript
-async function fetchSegmentDonors(
-  organizationId: string,
-  filters: FilterCondition[]
-): Promise<SegmentQueryResult> {
-  // Create a query factory that builds a fresh query each time
-  const createQuery = () => {
-    let query = supabase
-      .from('donor_demographics')
-      .select(`
-        id,
-        donor_key,
-        donor_email,
-        phone,
-        first_name,
-        last_name,
-        state,
-        city,
-        zip,
-        total_donated,
-        donation_count,
-        first_donation_date,
-        last_donation_date,
-        is_recurring,
-        employer,
-        occupation
-      `)
-      .eq('organization_id', organizationId)
-      .order('total_donated', { ascending: false, nullsFirst: false })
-      .order('id', { ascending: true });
-
-    // Apply server-side filters
-    for (const filter of filters) {
-      query = applyServerFilter(query, filter);
-    }
-
-    return query;
-  };
-
-  // Fetch ALL records using pagination with fresh queries
-  const demographics = await fetchAllWithPagination(createQuery);
-  // ...
-}
-```
-
-## Why This Fixes the Issue
-
-1. **Fresh Query Each Iteration**: Each pagination request now creates a brand new query object with clean state
-2. **No Mutation Accumulation**: The `.order()` parameters won't accumulate across iterations
-3. **Deterministic Behavior**: Every page request is identical except for the `.range()` offset
-4. **Maintains Stable Sort**: The `.order('id')` secondary sort still works correctly for deterministic pagination
-
-## Files to Modify
+## Summary of Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/queries/useDonorSegmentQuery.ts` | Refactor `fetchAllWithPagination` to use factory pattern; Update `fetchSegmentDonors` to pass query factory |
+| `src/components/client/DonorSegmentResults.tsx` | Add SortField type, date formatter, column definition, sorting logic, row rendering |
+| `src/components/client/DonorListSheet.tsx` | Add SortField type, date formatter, column definition, sorting logic, row rendering, CSV export |
 
-## Expected Outcome
+## Expected Result
 
-After this fix:
-- Page reload will correctly load donor data
-- Pagination will work correctly with 32,417+ donors
-- No query state corruption across pagination iterations
-- Sorting and filtering will continue to work as expected
-
+- New "Last Gift" column appears in both inline table and pop-out sheet
+- Column is sortable (newest/oldest first)
+- Dates display in readable format: "Jan 15, 2026"
+- CSV export includes the last donation date
