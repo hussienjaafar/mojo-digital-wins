@@ -4,7 +4,8 @@
  * Self-healing job that runs every 10 minutes to detect and reset:
  * 1. Chunks stuck in "processing" status for >30 minutes (likely CPU timeout)
  * 2. Parent jobs stuck in "running" with no activity for >1 hour
- * 3. Stale scheduler next_run_at for chunk processor
+ * 3. Parent jobs stuck in "running" but ALL chunks already completed
+ * 4. Stale scheduler next_run_at for chunk processor (5 min threshold)
  * 
  * This prevents backfills from silently stalling when users self-serve.
  */
@@ -14,19 +15,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getCorsHeaders, validateCronSecret } from "../_shared/security.ts";
 import { createLogger } from "../_shared/logger.ts";
 
-/**
- * recover-stuck-chunks
- * 
- * Self-healing job that runs every 10 minutes to detect and reset:
- * 1. Chunks stuck in "processing" status for >30 minutes (likely CPU timeout)
- * 2. Parent jobs stuck in "running" with no activity for >1 hour
- * 3. Stale scheduler next_run_at for chunk processor
- * 
- * This prevents backfills from silently stalling when users self-serve.
- */
-
 const STUCK_CHUNK_THRESHOLD_MINUTES = 30;
-const STUCK_JOB_THRESHOLD_MINUTES = 60;
 
 serve(async (req) => {
   const logger = createLogger("recover-stuck-chunks");
@@ -115,80 +104,86 @@ serve(async (req) => {
       }
     }
 
-    // 2. Check for jobs stuck in "running" with no recent chunk activity
-    const jobStuckThreshold = new Date(Date.now() - STUCK_JOB_THRESHOLD_MINUTES * 60 * 1000).toISOString();
-    
+    // 2. Check for ALL jobs in "running" status (regardless of last_batch_at)
+    // This catches jobs where all chunks completed but the job status wasn't updated
     const { data: runningJobs, error: jobError } = await supabase
       .from("backfill_status")
       .select("id, task_name, last_batch_at, started_at")
-      .eq("status", "running")
-      .lt("last_batch_at", jobStuckThreshold);
+      .eq("status", "running");
 
     if (jobError) {
       results.errors.push(`Job query error: ${jobError.message}`);
     } else if (runningJobs && runningJobs.length > 0) {
       for (const job of runningJobs) {
-        // Check if all chunks are actually done
-        const { data: pendingChunks } = await supabase
+        // Check if all chunks are actually done (no pending/processing/retrying)
+        const { data: activeChunks } = await supabase
           .from("actblue_backfill_chunks")
-          .select("id")
+          .select("id, status")
           .eq("job_id", job.id)
           .in("status", ["pending", "processing", "retrying"])
           .limit(1);
 
-        if (!pendingChunks || pendingChunks.length === 0) {
+        if (!activeChunks || activeChunks.length === 0) {
           // All chunks done but job not updated - fix it
           const { data: chunkStats } = await supabase
             .from("actblue_backfill_chunks")
             .select("status")
             .eq("job_id", job.id);
 
-          const allCompleted = chunkStats?.every(c => c.status === "completed");
-          const hasFailed = chunkStats?.some(c => c.status === "failed");
+          if (chunkStats && chunkStats.length > 0) {
+            const allCompleted = chunkStats.every(c => c.status === "completed");
+            const hasFailed = chunkStats.some(c => c.status === "failed");
 
-          const finalStatus = hasFailed ? "completed_with_errors" : (allCompleted ? "completed" : "failed");
+            const finalStatus = hasFailed ? "completed_with_errors" : (allCompleted ? "completed" : "failed");
 
-          await supabase
-            .from("backfill_status")
-            .update({
-              status: finalStatus,
-              completed_at: new Date().toISOString(),
-              error_message: "Auto-recovered: Job was stuck with all chunks finished",
-            })
-            .eq("id", job.id);
+            await supabase
+              .from("backfill_status")
+              .update({
+                status: finalStatus,
+                completed_at: new Date().toISOString(),
+                processed_items: chunkStats.length,
+                error_message: "Auto-recovered: Job completed but status was not updated",
+              })
+              .eq("id", job.id);
 
-          logger.info(`Auto-completed stuck job ${job.id} with status: ${finalStatus}`);
-          results.stuckJobsDetected++;
+            logger.info(`Auto-completed stuck job ${job.id} with status: ${finalStatus}`);
+            results.stuckJobsDetected++;
+          }
         }
       }
     }
 
     // 3. Ensure scheduler next_run_at isn't stale (prevents scheduler from sleeping)
-    const schedulerStaleThreshold = new Date(Date.now() - 10 * 60 * 1000).toISOString(); // 10 min
+    // Reduced threshold to 5 minutes for faster recovery
+    const schedulerStaleThreshold = new Date(Date.now() - 5 * 60 * 1000).toISOString(); // 5 min
     
     const { data: schedulerJob } = await supabase
       .from("scheduled_jobs")
-      .select("id, next_run_at")
+      .select("id, next_run_at, last_run_at")
       .eq("endpoint", "process-actblue-chunk")
       .eq("is_active", true)
       .single();
 
-    if (schedulerJob && schedulerJob.next_run_at && schedulerJob.next_run_at < schedulerStaleThreshold) {
-      // Check if there are pending chunks that need processing
-      const { data: pendingChunks } = await supabase
-        .from("actblue_backfill_chunks")
-        .select("id")
-        .in("status", ["pending", "retrying"])
-        .limit(1);
+    if (schedulerJob) {
+      const nextRunStale = schedulerJob.next_run_at && schedulerJob.next_run_at < schedulerStaleThreshold;
+      
+      if (nextRunStale) {
+        // Check if there are pending chunks that need processing
+        const { data: pendingChunks } = await supabase
+          .from("actblue_backfill_chunks")
+          .select("id")
+          .in("status", ["pending", "retrying"])
+          .limit(1);
 
-      if (pendingChunks && pendingChunks.length > 0) {
-        await supabase
-          .from("scheduled_jobs")
-          .update({ next_run_at: new Date().toISOString() })
-          .eq("id", schedulerJob.id);
+        if (pendingChunks && pendingChunks.length > 0) {
+          await supabase
+            .from("scheduled_jobs")
+            .update({ next_run_at: new Date().toISOString() })
+            .eq("id", schedulerJob.id);
 
-        logger.warn("Reset stale scheduler next_run_at - pending chunks exist");
-        results.schedulerReset = true;
+          logger.warn(`Reset stale scheduler next_run_at (was ${schedulerJob.next_run_at}) - ${pendingChunks.length}+ pending chunks exist`);
+          results.schedulerReset = true;
+        }
       }
     }
 
