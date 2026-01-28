@@ -1,132 +1,59 @@
 
-# Fix Phone Sorting, Add "Has Phone" Filter, and Fix Pop-Out Sheet
+# Fix Inline Donor List Table Not Loading After Page Reload
 
-## Summary
+## Problem
 
-This plan addresses three issues in the donor list table:
-1. Phone sorting appears broken due to invalid data entries sorting to the top
-2. No ability to filter donors by phone number availability
-3. Pop-out sheet shows empty table due to virtualization race condition
+After page reload, the donor list table in `DonorSegmentResults.tsx` shows an empty container despite the data being successfully fetched (verified via network requests showing 200 status with donor data).
 
----
+The screenshot shows:
+- KPI cards are visible (as placeholders/loading)
+- Table header with "Donor List" title is visible
+- Table content area is completely empty
 
-## Issue 1: Phone Sorting Appears Broken
+## Root Cause
 
-### Root Cause
-The sorting logic is technically correct, but the database contains invalid phone entries:
-- `"--------------"` (14 dashes)
-- `"."` (single period)
-- Other non-phone values
+The inline `TableView` component has the same virtualization race condition that we fixed in `DonorListSheet.tsx`:
 
-When sorting alphabetically, special characters have lower ASCII values than numbers, so these invalid entries appear first when sorting ascending by phone. This makes it look like sorting isn't working.
+```typescript
+// Current code in DonorSegmentResults.tsx (lines 466-471)
+const rowVirtualizer = useVirtualizer({
+  count: sortedDonors.length,
+  getScrollElement: () => parentRef.current,  // Returns null on first render!
+  estimateSize: () => 52,
+  overscan: 10,
+});
+```
 
-### Solution
-Improve the sorting logic to:
-1. Detect invalid phone numbers (less than 7 digits after cleaning)
-2. Treat invalid phones the same as null (push to end of list)
-3. Sort valid phone numbers normally
+When the component mounts, `parentRef.current` is `null` because the ref hasn't been attached to the DOM element yet. The virtualizer calculates that there are zero items to display because it has no scroll container to measure.
 
-### Technical Changes
+Unlike class components with `componentDidMount`, React refs in function components are set **after** the first render, but `useVirtualizer` runs **during** the first render. This creates a timing mismatch.
+
+## Solution
+
+Apply the same callback ref pattern we used in `DonorListSheet.tsx`:
+
+1. Add an `isReady` state to track when the scroll container is mounted
+2. Use a callback ref (`setScrollRef`) to detect when the DOM element is attached
+3. Pass `enabled: isReady` to the virtualizer so it only calculates after the container is ready
+
+## Technical Changes
 
 **File: `src/components/client/DonorSegmentResults.tsx`**
 
-Add a helper function to validate phone numbers and update the sorting logic:
-
-```typescript
-// Helper to check if phone is valid (at least 7 digits)
-function isValidPhone(phone: string | null): boolean {
-  if (!phone) return false;
-  const digits = phone.replace(/\D/g, '');
-  return digits.length >= 7;
-}
-
-// In sortedDonors useMemo, update the phone sorting:
-const sortedDonors = useMemo(() => {
-  return [...filteredDonors].sort((a, b) => {
-    let aVal: any = a[sortField];
-    let bVal: any = b[sortField];
-
-    // Special handling for phone - treat invalid phones as null
-    if (sortField === 'phone') {
-      const aValid = isValidPhone(aVal);
-      const bValid = isValidPhone(bVal);
-      
-      // Both invalid/null - equal
-      if (!aValid && !bValid) return 0;
-      // Push invalid to end
-      if (!aValid) return 1;
-      if (!bValid) return -1;
-      
-      // Both valid - compare strings
-      const comparison = String(aVal).localeCompare(String(bVal));
-      return sortDirection === 'asc' ? comparison : -comparison;
-    }
-
-    // Handle nulls - push to end
-    if (aVal === null || aVal === undefined) return 1;
-    if (bVal === null || bVal === undefined) return -1;
-
-    // ... rest of sorting logic unchanged
-  });
-}, [filteredDonors, sortField, sortDirection]);
-```
-
-**File: `src/components/client/DonorListSheet.tsx`**
-
-Apply the same `isValidPhone` helper and sorting logic.
-
----
-
-## Issue 2: Add "Has Phone Number" Filter
-
-### Solution
-Add a phone filter field to the segment builder that allows filtering by:
-- `is_not_null` - Has a phone number
-- `is_null` - No phone number
-
-### Technical Changes
-
-**File: `src/types/donorSegment.ts`**
-
-Add phone field to `SEGMENT_FILTER_FIELDS`:
-
-```typescript
-// In the Demographics category section, add:
-{
-  key: 'phone',
-  label: 'Phone Number',
-  category: 'Demographics',
-  type: 'string',
-  operators: ['is_null', 'is_not_null', 'contains'],
-  description: 'Donor phone number availability',
-},
-```
-
-**File: `src/queries/useDonorSegmentQuery.ts`**
-
-Ensure `applyServerFilter` handles phone field with `is_null` and `is_not_null` operators (should already work with existing logic).
-
----
-
-## Issue 3: Pop-Out Sheet Shows Empty Table
-
-### Root Cause
-The `useVirtualizer` hook in `DonorListSheet.tsx` initializes with `getScrollElement: () => parentRef.current`, but when the Sheet first mounts, `parentRef.current` is `null`. The virtualizer calculates zero items to render.
-
-### Solution
-Use a callback ref pattern to detect when the scroll container mounts, and only enable the virtualizer after the container is ready.
-
-### Technical Changes
-
-**File: `src/components/client/DonorListSheet.tsx`**
-
+Update imports:
 ```typescript
 import React, { useState, useMemo, useCallback, useEffect } from "react";
+```
 
-export function DonorListSheet({ open, onOpenChange, donors, totalCount }: DonorListSheetProps) {
-  // ... existing state
+Add state and callback ref inside `TableView`:
+```typescript
+function TableView({ donors }: { donors: SegmentDonor[] }) {
+  const [sortField, setSortField] = useState<SortField>('total_donated');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
   const parentRef = React.useRef<HTMLDivElement>(null);
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReady] = useState(false);  // NEW
 
   // Callback ref to detect when scroll container mounts
   const setScrollRef = useCallback((node: HTMLDivElement | null) => {
@@ -136,43 +63,38 @@ export function DonorListSheet({ open, onOpenChange, donors, totalCount }: Donor
     }
   }, []);
 
-  // Reset ready state when sheet closes
-  useEffect(() => {
-    if (!open) {
-      setIsReady(false);
-    }
-  }, [open]);
-
-  const rowVirtualizer = useVirtualizer({
-    count: sortedDonors.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 48,
-    overscan: 15,
-    enabled: isReady,  // Only enable when container is ready
-  });
-
-  // In JSX, use the callback ref:
-  <div
-    ref={setScrollRef}  // Changed from ref={parentRef}
-    className="flex-1 overflow-auto ..."
-  >
+  // ... rest of the component
 ```
 
----
+Update the virtualizer configuration:
+```typescript
+const rowVirtualizer = useVirtualizer({
+  count: sortedDonors.length,
+  getScrollElement: () => parentRef.current,
+  estimateSize: () => 52,
+  overscan: 10,
+  enabled: isReady,  // Only enable when container is ready
+});
+```
+
+Update the scroll container to use the callback ref:
+```typescript
+<div
+  ref={setScrollRef}  // Changed from ref={parentRef}
+  className="h-[500px] overflow-auto"
+>
+```
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/components/client/DonorSegmentResults.tsx` | Add `isValidPhone` helper, update phone sorting logic |
-| `src/components/client/DonorListSheet.tsx` | Add `isValidPhone` helper, update phone sorting, add callback ref pattern for virtualizer |
-| `src/types/donorSegment.ts` | Add phone field to `SEGMENT_FILTER_FIELDS` |
+| File | Change |
+|------|--------|
+| `src/components/client/DonorSegmentResults.tsx` | Add `useCallback`/`useEffect` imports, `isReady` state, callback ref pattern, and `enabled: isReady` to virtualizer |
 
----
+## Expected Outcome
 
-## Expected Outcomes
-
-After implementation:
-1. **Phone sorting works correctly** - Valid phone numbers sort first; invalid entries (dashes, periods) treated as empty and pushed to end
-2. **Filter by phone** - Users can add a filter in the segment builder to show only donors with phone numbers
-3. **Pop-out sheet displays data** - Opening the expanded view shows all 32,417+ donors correctly virtualized
+After this fix:
+- Page reload will correctly display all donor rows
+- Virtualization will work correctly after the scroll container mounts
+- Sorting and filtering will continue to work as expected
+- No visible delay or flicker for users
