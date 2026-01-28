@@ -1,197 +1,142 @@
 
+# Fix Organization Context Not Updating on Demographics Page
 
-# Fix Demographics Page Timeout with Pre-Aggregated Cache
+## Problem
 
-## Problem Summary
+When viewing the demographics page for "Abdul for Senate", data for "Michael Blake For Congress" is displayed instead. The cached data is correct for both organizations, but the wrong organization ID is being passed to the RPC.
 
-The `get_donor_demographics_v2` RPC is timing out (30-second limit) for "Abdul for Senate" because:
+## Root Cause
 
-1. **82,225 transactions** need processing on every page load
-2. **Occupation matching uses a correlated subquery** that runs 82K times against 166 patterns
-3. **COUNT(DISTINCT donor_email)** across multiple CTEs is expensive
-4. **No caching layer** - every page view re-runs the full aggregation
+The `useClientOrganization` hook has a race condition and synchronization issue with the impersonation context:
 
-The current error shows `57014: canceling statement due to statement timeout` even after adding indexes.
+1. When an admin switches organizations via the selector, `handleOrganizationChange` calls:
+   ```typescript
+   setImpersonation(session?.user?.id || '', 'System Admin', newOrg.id, newOrg.name);
+   ```
 
-## Your Requirement
+2. But `isImpersonating` in the context is based on `impersonatedUserId !== null`
 
-You want **All-Time Demographics** with data cached/backfilled so it loads instantly and new donations are appended incrementally over time.
+3. If the session user ID is an empty string (fallback case), `impersonatedUserId` becomes `''` which is NOT null, so `isImpersonating` becomes `true`
 
----
+4. However, the `useClientOrganization` hook has a dependency array issue - it only re-runs when `impersonatedOrgId` or `isImpersonating` changes, but if these values are set in the wrong order or the effect doesn't re-run, stale data is used
 
-## Solution: Pre-Aggregated Demographics Cache Table
+5. Additionally, the localStorage listener only fires for cross-tab changes (not same-tab changes)
 
-We'll create a persistent `donor_demographics_cache` table that stores the pre-computed summary for each organization. A scheduled job will refresh it daily, and new transactions will trigger incremental updates.
+## Solution
 
-```text
-+---------------------+       +---------------------------+       +---------------------+
-| actblue_transactions|  -->  | donor_demographics_cache  |  -->  | Demographics Page   |
-| (82K+ rows)         |       | (1 row per org)           |       | (instant load)      |
-+---------------------+       +---------------------------+       +---------------------+
-         ^                              ^
-         |                              |
-+---------------------+       +---------------------------+
-| Daily Cron Job      |       | refresh_demographics_cache|
-| (full rebuild)      |       | RPC function              |
-+---------------------+       +---------------------------+
-```
+### 1. Fix the useClientOrganization hook to handle same-tab localStorage updates
 
----
+Add a custom event listener for same-tab organization changes and ensure the hook re-runs when the organization changes.
 
-## Implementation Plan
+### 2. Ensure the impersonation context properly syncs
 
-### Phase 1: Create Cache Infrastructure
+Update the dependency handling so the hook responds to organization changes immediately.
 
-**1. Create `donor_demographics_cache` table**
-- One row per organization containing the full JSONB result
-- Columns: `organization_id`, `summary_data` (JSONB), `calculated_at`, `transaction_count`, `version`
+### 3. Add debugging to verify the correct org ID is being used
 
-**2. Create `refresh_demographics_cache` RPC**
-- Same logic as `get_donor_demographics_v2` but writes to cache table instead of returning directly
-- Runs as SECURITY DEFINER with service role to bypass RLS during background jobs
-
-**3. Create `get_donor_demographics_cached` RPC**
-- Fast lookup from cache table (< 10ms)
-- Falls back to live query if cache is stale/missing (with timeout protection)
-
-### Phase 2: Optimize Occupation Matching
-
-**4. Pre-compute occupation categories**
-- Create a trigger or batch job that sets `occupation_category` column on `actblue_transactions` when records are inserted
-- Eliminates the expensive correlated subquery during aggregation
-
-**5. Add occupation_category column to actblue_transactions**
-- New column: `occupation_category TEXT`
-- Backfill existing records in batches
-
-### Phase 3: Scheduled Refresh + Incremental Updates
-
-**6. Add scheduled job for daily cache refresh**
-- Run `refresh_demographics_cache` for all orgs nightly (low-traffic period)
-- Stagger execution to avoid overwhelming the database
-
-**7. Add webhook trigger for incremental updates**
-- When new transactions arrive via webhook, mark cache as "stale" or increment counts
-- Full refresh runs in background, UI shows cached data immediately
-
-### Phase 4: Frontend Changes
-
-**8. Update ClientDemographics.tsx**
-- Call `get_donor_demographics_cached` instead of `get_donor_demographics_v2`
-- Add proper error state with Retry button (per your preference)
-- Show "Data as of [timestamp]" indicator
-
-**9. Add V3ErrorState wrapper for failed queries**
-- Display clear error message with Retry button
-- Prevent blank page when query fails
+Add console logging (temporarily) and display the current organization in the UI header for clarity.
 
 ---
 
-## Technical Details
+## Technical Changes
 
-### New Table Schema
+### File 1: `src/hooks/useClientOrganization.tsx`
 
-```sql
-CREATE TABLE public.donor_demographics_cache (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id uuid NOT NULL UNIQUE REFERENCES client_organizations(id) ON DELETE CASCADE,
-  summary_data jsonb NOT NULL,
-  transaction_count integer NOT NULL DEFAULT 0,
-  calculated_at timestamptz NOT NULL DEFAULT now(),
-  version integer NOT NULL DEFAULT 1,
-  is_stale boolean NOT NULL DEFAULT false,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
+**Changes:**
+- Add a custom event dispatcher pattern for same-tab updates
+- Add `organizationId` state reset when dependencies change
+- Improve effect dependency handling
 
-CREATE INDEX idx_demographics_cache_org ON donor_demographics_cache(organization_id);
-```
-
-### Occupation Pre-Computation
-
-```sql
--- Add column to transactions table
-ALTER TABLE actblue_transactions ADD COLUMN IF NOT EXISTS occupation_category text;
-
--- Create function to compute category
-CREATE OR REPLACE FUNCTION compute_occupation_category(raw_occ text)
-RETURNS text LANGUAGE sql STABLE AS $$
-  SELECT COALESCE(
-    (SELECT category FROM occupation_categories 
-     WHERE lower(trim(raw_occ)) LIKE '%' || pattern || '%'
-     ORDER BY sort_order LIMIT 1),
-    'Other'
-  );
-$$;
-
--- Backfill in batches (run separately, not blocking)
-UPDATE actblue_transactions t
-SET occupation_category = compute_occupation_category(t.occupation)
-WHERE occupation_category IS NULL AND occupation IS NOT NULL;
-```
-
-### Fast Cached Lookup
-
-```sql
-CREATE OR REPLACE FUNCTION get_donor_demographics_cached(_organization_id uuid)
-RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER AS $$
-DECLARE
-  cached_result jsonb;
-BEGIN
-  -- Access check
-  IF NOT (user_belongs_to_organization(_organization_id) OR has_role(auth.uid(), 'admin')) THEN
-    RAISE EXCEPTION 'Access denied';
-  END IF;
+```typescript
+// Add custom event listener for same-tab changes
+useEffect(() => {
+  const handleOrgChange = () => {
+    const newOrgId = localStorage.getItem('selectedOrganizationId');
+    if (newOrgId && newOrgId !== organizationId) {
+      setOrganizationId(newOrgId);
+    }
+  };
   
-  -- Return cached data if available
-  SELECT summary_data INTO cached_result
-  FROM donor_demographics_cache
-  WHERE organization_id = _organization_id
-    AND calculated_at > now() - interval '24 hours';
+  // Listen for custom event (same-tab) and storage event (cross-tab)
+  window.addEventListener('organizationChanged', handleOrgChange);
+  window.addEventListener('storage', handleStorageChange);
+  
+  return () => {
+    window.removeEventListener('organizationChanged', handleOrgChange);
+    window.removeEventListener('storage', handleStorageChange);
+  };
+}, [organizationId]);
+```
+
+### File 2: `src/components/client/ClientShell.tsx`
+
+**Changes:**
+- Dispatch a custom event when organization changes (for same-tab updates)
+
+```typescript
+const handleOrganizationChange = (newOrgId: string) => {
+  const newOrg = organizations.find((org) => org.id === newOrgId);
+  if (newOrg) {
+    setOrganization(newOrg);
+    localStorage.setItem("selectedOrganizationId", newOrgId);
     
-  IF cached_result IS NOT NULL THEN
-    RETURN cached_result;
-  END IF;
-  
-  -- Fallback: trigger async refresh and return empty
-  PERFORM pg_notify('demographics_refresh', _organization_id::text);
-  RETURN '{"status": "refreshing", "message": "Data is being calculated. Please refresh in a few minutes."}'::jsonb;
-END;
-$$;
+    // Dispatch custom event for same-tab listeners
+    window.dispatchEvent(new CustomEvent('organizationChanged', { detail: newOrgId }));
+    
+    // Also sync to impersonation context
+    if (isAdmin) {
+      setImpersonation(session?.user?.id || '', 'System Admin', newOrg.id, newOrg.name);
+    }
+    // ...
+  }
+};
+```
+
+### File 3: `src/pages/ClientDemographics.tsx`
+
+**Changes:**
+- Add a useEffect to reset state when organizationId changes
+- Clear cached data when switching organizations
+
+```typescript
+// Reset state when organization changes
+useEffect(() => {
+  setSummary(null);
+  setCacheStatus(null);
+  setCalculatedAt(null);
+  setCityCache(new Map());
+  setSelectedState(null);
+}, [organizationId]);
 ```
 
 ---
 
-## Files to Create/Modify
+## Alternative Quick Fix
 
-| File | Action |
-|------|--------|
-| Database Migration | CREATE `donor_demographics_cache` table |
-| Database Migration | ALTER `actblue_transactions` add `occupation_category` |
-| Database Migration | CREATE `refresh_demographics_cache` RPC |
-| Database Migration | CREATE `get_donor_demographics_cached` RPC |
-| `supabase/functions/refresh-demographics-cache/index.ts` | New edge function for batch refresh |
-| `src/pages/ClientDemographics.tsx` | Use cached RPC, add error state |
-| Scheduled Jobs | Add nightly refresh job |
+If you need an immediate workaround before the code changes:
+
+1. **Clear localStorage**: Open browser dev tools, go to Application > Local Storage, and delete the `selectedOrganizationId` entry
+2. **Re-select Abdul For Senate**: Use the organization switcher (⌘K) to select Abdul For Senate again
+3. **Refresh the page**: Force a fresh load of the demographics page
 
 ---
 
-## Expected Outcomes
+## Testing Plan
 
-| Metric | Before | After |
-|--------|--------|-------|
-| Page load time | 30s+ timeout | < 500ms |
-| Query complexity | 7 CTEs, correlated subqueries | Single row lookup |
-| Data freshness | Real-time (but broken) | Cached (< 24h old), updated nightly |
-| Error handling | Blank page | Clear error with Retry |
+1. Switch to Abdul For Senate using the organization selector
+2. Navigate to the demographics page
+3. Verify the Total Revenue shows ~$4.6M (not $215K)
+4. Switch to Michael Blake For Congress
+5. Verify the demographics update to show ~$215K
+6. Switch back to Abdul For Senate
+7. Verify the data updates correctly without needing a page refresh
 
 ---
 
-## Risks & Mitigations
+## Files to Modify
 
-| Risk | Mitigation |
-|------|------------|
-| Cache becomes stale | Scheduled daily refresh + "stale" flag for manual refresh |
-| Large orgs overwhelm refresh job | Batch processing with chunking |
-| Occupation backfill takes long | Run async, UI still works with partial data |
-
+| File | Change Type |
+|------|-------------|
+| `src/hooks/useClientOrganization.tsx` | Add custom event listener for same-tab org changes |
+| `src/components/client/ClientShell.tsx` | Dispatch custom event when org changes |
+| `src/pages/ClientDemographics.tsx` | Reset state when organizationId changes |
