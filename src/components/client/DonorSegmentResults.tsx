@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { Users, DollarSign, TrendingUp, RefreshCw, AlertTriangle, MapPin, BarChart3, Megaphone, Heart, Lightbulb, MessageCircle, Search, ChevronUp, ChevronDown, Expand, X } from "lucide-react";
 import { V3Card, V3CardContent, V3CardHeader, V3CardTitle, V3KPICard, V3LoadingState, V3EmptyState } from "@/components/v3";
 import { V3DonutChart } from "@/components/charts/echarts";
@@ -409,6 +409,15 @@ function TableView({ donors }: { donors: SegmentDonor[] }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const parentRef = React.useRef<HTMLDivElement>(null);
+  const [isReady, setIsReady] = useState(false);
+
+  // Callback ref to detect when scroll container mounts
+  const setScrollRef = useCallback((node: HTMLDivElement | null) => {
+    parentRef.current = node;
+    if (node) {
+      setIsReady(true);
+    }
+  }, []);
 
   // Filter by search term
   const filteredDonors = useMemo(() => {
@@ -468,6 +477,7 @@ function TableView({ donors }: { donors: SegmentDonor[] }) {
     getScrollElement: () => parentRef.current,
     estimateSize: () => 52,
     overscan: 10,
+    enabled: isReady,
   });
 
   const handleSort = (field: SortField) => {
@@ -555,7 +565,7 @@ function TableView({ donors }: { donors: SegmentDonor[] }) {
 
           {/* Virtualized rows */}
           <div
-            ref={parentRef}
+            ref={setScrollRef}
             className="h-[500px] overflow-auto"
           >
             {sortedDonors.length === 0 ? (
