@@ -52,6 +52,7 @@ export interface SegmentDonor {
   id: string;
   donor_key: string;
   email: string | null;
+  phone: string | null;
   name: string | null;
   state: string | null;
   city: string | null;
