@@ -1,100 +1,114 @@
 
-# Fix Inline Donor List Table Not Loading After Page Reload
+# Fix Duplicate Donors in Donor List Table
 
-## Problem
+## Problem Summary
 
-After page reload, the donor list table in `DonorSegmentResults.tsx` shows an empty container despite the data being successfully fetched (verified via network requests showing 200 status with donor data).
-
-The screenshot shows:
-- KPI cards are visible (as placeholders/loading)
-- Table header with "Donor List" title is visible
-- Table content area is completely empty
+Users are seeing duplicate donor entries in the Donor List table, despite each donor having a unique ID in the database. React is throwing console warnings: `Encountered two children with the same key, '32e77ae2-d712-4551-ae98-202bbc6349d3'`.
 
 ## Root Cause
 
-The inline `TableView` component has the same virtualization race condition that we fixed in `DonorListSheet.tsx`:
+The issue stems from the pagination logic in `fetchAllWithPagination`:
 
-```typescript
-// Current code in DonorSegmentResults.tsx (lines 466-471)
-const rowVirtualizer = useVirtualizer({
-  count: sortedDonors.length,
-  getScrollElement: () => parentRef.current,  // Returns null on first render!
-  estimateSize: () => 52,
-  overscan: 10,
-});
+### 1. Unstable Sort Order
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│                     PAGE BOUNDARY RACE                        │
+├──────────────────────────────────────────────────────────────┤
+│  Query: ORDER BY total_donated DESC                           │
+│                                                               │
+│  Page 1 (rows 0-999):                     Page 2 (rows 1000-1999):
+│  ┌─────────────────────────┐              ┌─────────────────────────┐
+│  │ ...                     │              │ Donor X ($50)           │  ← Shifted!
+│  │ Donor Y ($50) - row 998 │              │ Donor Y ($50) - row 1000│  ← DUPLICATE!
+│  │ Donor X ($50) - row 999 │              │ ...                     │
+│  └─────────────────────────┘              └─────────────────────────┘
+│                                                               │
+│  Result: Donor Y and Donor X appear in BOTH pages            │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-When the component mounts, `parentRef.current` is `null` because the ref hasn't been attached to the DOM element yet. The virtualizer calculates that there are zero items to display because it has no scroll container to measure.
+The query sorts by `total_donated` only. When multiple donors share the same donation amount (very common - many donors have $50, $25, etc.), the database returns them in a **non-deterministic order**. Between pagination calls, rows can shift positions, causing the same donor to appear on multiple pages.
 
-Unlike class components with `componentDidMount`, React refs in function components are set **after** the first render, but `useVirtualizer` runs **during** the first render. This creates a timing mismatch.
+### 2. Data Verified
+
+Database check confirmed:
+- `Andrew Lewis` (ID: `32e77ae2-d712-4551-ae98-202bbc6349d3`) exists exactly **once** in the database
+- Total rows: 32,417 (unique)
+- Duplicates are occurring in the JavaScript array during fetch
 
 ## Solution
 
-Apply the same callback ref pattern we used in `DonorListSheet.tsx`:
+### Fix 1: Stable Secondary Sort Key
 
-1. Add an `isReady` state to track when the scroll container is mounted
-2. Use a callback ref (`setScrollRef`) to detect when the DOM element is attached
-3. Pass `enabled: isReady` to the virtualizer so it only calculates after the container is ready
+Add `id` as a secondary sort column to guarantee deterministic ordering across all pagination requests.
 
-## Technical Changes
+**File: `src/queries/useDonorSegmentQuery.ts`**
 
-**File: `src/components/client/DonorSegmentResults.tsx`**
-
-Update imports:
+Current code (line 315):
 ```typescript
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+.order('total_donated', { ascending: false, nullsFirst: false });
 ```
 
-Add state and callback ref inside `TableView`:
+Updated code:
 ```typescript
-function TableView({ donors }: { donors: SegmentDonor[] }) {
-  const [sortField, setSortField] = useState<SortField>('total_donated');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isExpanded, setIsExpanded] = useState(false);
-  const parentRef = React.useRef<HTMLDivElement>(null);
-  const [isReady, setIsReady] = useState(false);  // NEW
-
-  // Callback ref to detect when scroll container mounts
-  const setScrollRef = useCallback((node: HTMLDivElement | null) => {
-    parentRef.current = node;
-    if (node) {
-      setIsReady(true);
-    }
-  }, []);
-
-  // ... rest of the component
+.order('total_donated', { ascending: false, nullsFirst: false })
+.order('id', { ascending: true });  // Stable tiebreaker
 ```
 
-Update the virtualizer configuration:
+### Fix 2: Deduplicate After Fetch (Safety Net)
+
+Add a deduplication step after the paginated fetch to prevent any edge cases from causing duplicate entries.
+
+**File: `src/queries/useDonorSegmentQuery.ts`**
+
+After Step 4 transformation (around line 471):
 ```typescript
-const rowVirtualizer = useVirtualizer({
-  count: sortedDonors.length,
-  getScrollElement: () => parentRef.current,
-  estimateSize: () => 52,
-  overscan: 10,
-  enabled: isReady,  // Only enable when container is ready
+// Step 4: Transform and enrich donors with attribution
+let donors = demographics.map(row => {
+  const email = row.donor_email?.toLowerCase().trim();
+  const attribution = email ? attributionMap.get(email) : undefined;
+  return transformToDonor(row, ltvMap.get(row.donor_key || ''), attribution);
 });
-```
 
-Update the scroll container to use the callback ref:
-```typescript
-<div
-  ref={setScrollRef}  // Changed from ref={parentRef}
-  className="h-[500px] overflow-auto"
->
+// Deduplicate by ID (safety net for pagination edge cases)
+const uniqueMap = new Map(donors.map(d => [d.id, d]));
+donors = Array.from(uniqueMap.values());
 ```
 
 ## Files to Modify
 
-| File | Change |
-|------|--------|
-| `src/components/client/DonorSegmentResults.tsx` | Add `useCallback`/`useEffect` imports, `isReady` state, callback ref pattern, and `enabled: isReady` to virtualizer |
+| File | Changes |
+|------|---------|
+| `src/queries/useDonorSegmentQuery.ts` | Add secondary `.order('id')` for stable pagination; Add deduplication step after transformation |
+
+## Technical Details
+
+### Why Secondary Sort Works
+
+PostgreSQL (Supabase) uses an unstable sort algorithm. When multiple rows have the same value for the sort column, their relative order is undefined and may change between queries. Adding a unique secondary sort key (`id`) guarantees the same order every time:
+
+```sql
+-- Before: Unstable
+ORDER BY total_donated DESC
+
+-- After: Stable and deterministic  
+ORDER BY total_donated DESC, id ASC
+```
+
+### Why Deduplication is a Safety Net
+
+Even with stable sorting, edge cases can occur:
+- Concurrent inserts during pagination
+- Cache inconsistencies
+- Network retries
+
+The Map-based deduplication (`new Map(donors.map(d => [d.id, d]))`) ensures uniqueness by ID, keeping only the last occurrence of each donor.
 
 ## Expected Outcome
 
 After this fix:
-- Page reload will correctly display all donor rows
-- Virtualization will work correctly after the scroll container mounts
-- Sorting and filtering will continue to work as expected
-- No visible delay or flicker for users
+- No duplicate donors in the table
+- React console warnings about duplicate keys will disappear
+- Pagination will fetch exactly 32,417 unique donors
+- Sorting will be stable and predictable
