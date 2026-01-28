@@ -18,6 +18,13 @@ const formatSegmentLabel = (name: string): string => {
     .replace(/\b\w/g, l => l.toUpperCase());
 };
 
+// Helper to check if phone is valid (at least 7 digits)
+function isValidPhone(phone: string | null): boolean {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, '');
+  return digits.length >= 7;
+}
+
 // Format phone number to (555) 123-4567 format
 function formatPhone(phone: string | null): string {
   if (!phone) return '—';
@@ -420,6 +427,22 @@ function TableView({ donors }: { donors: SegmentDonor[] }) {
     return [...filteredDonors].sort((a, b) => {
       let aVal: any = a[sortField];
       let bVal: any = b[sortField];
+
+      // Special handling for phone - treat invalid phones as null
+      if (sortField === 'phone') {
+        const aValid = isValidPhone(aVal);
+        const bValid = isValidPhone(bVal);
+        
+        // Both invalid/null - equal
+        if (!aValid && !bValid) return 0;
+        // Push invalid to end
+        if (!aValid) return 1;
+        if (!bValid) return -1;
+        
+        // Both valid - compare strings
+        const comparison = String(aVal).localeCompare(String(bVal));
+        return sortDirection === 'asc' ? comparison : -comparison;
+      }
 
       // Handle nulls - push to end
       if (aVal === null || aVal === undefined) return 1;

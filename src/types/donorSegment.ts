@@ -277,6 +277,14 @@ export const SEGMENT_FILTER_FIELDS: FilterField[] = [
   },
   // Demographics
   {
+    key: 'phone',
+    label: 'Phone Number',
+    category: 'Demographics',
+    type: 'string',
+    operators: ['is_null', 'is_not_null', 'contains'],
+    description: 'Donor phone number availability',
+  },
+  {
     key: 'employer',
     label: 'Employer',
     category: 'Demographics',
