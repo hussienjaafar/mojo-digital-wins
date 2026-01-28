@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
-import { V3Card } from '@/components/v3/V3Card';
 import { V3Button } from '@/components/v3/V3Button';
 import { V3Badge } from '@/components/v3/V3Badge';
-import { V3SectionHeader } from '@/components/v3/V3SectionHeader';
+import { PortalFormInput } from '@/components/admin/forms/PortalFormInput';
+import { PortalFormSelect } from '@/components/admin/forms/PortalFormSelect';
+import { PortalFormTextarea } from '@/components/admin/forms/PortalFormTextarea';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Building2, Save, Loader2, ChevronDown, ChevronUp, Sparkles, X, Plus, Target } from 'lucide-react';
 import { GeoLocationPicker } from '@/components/admin/onboarding/GeoLocationPicker';
@@ -29,20 +27,20 @@ const POLICY_DOMAINS = [
   'Technology',
 ];
 
-const ORG_TYPE_OPTIONS: { value: OrganizationType; label: string; category: string; defaultGeoLevel: GeoLevel }[] = [
-  { value: 'campaign_federal', label: 'Federal Campaign (Congress/Senate/President)', category: 'Political Campaign', defaultGeoLevel: 'congressional_district' },
-  { value: 'campaign_state', label: 'State Campaign (Governor/Legislature)', category: 'Political Campaign', defaultGeoLevel: 'state' },
-  { value: 'campaign_local', label: 'Local Campaign (Mayor/Council/County/School Board)', category: 'Political Campaign', defaultGeoLevel: 'city' },
-  { value: 'c3_national', label: 'National 501(c)(3) Nonprofit', category: '501(c)(3) Nonprofit', defaultGeoLevel: 'national' },
-  { value: 'c3_state', label: 'State 501(c)(3) Nonprofit', category: '501(c)(3) Nonprofit', defaultGeoLevel: 'state' },
-  { value: 'c3_local', label: 'Local 501(c)(3) Nonprofit', category: '501(c)(3) Nonprofit', defaultGeoLevel: 'city' },
-  { value: 'c4_national', label: 'National 501(c)(4) Advocacy Org', category: '501(c)(4) Advocacy', defaultGeoLevel: 'national' },
-  { value: 'c4_state', label: 'State 501(c)(4) Advocacy Org', category: '501(c)(4) Advocacy', defaultGeoLevel: 'state' },
-  { value: 'c4_local', label: 'Local 501(c)(4) Advocacy Org', category: '501(c)(4) Advocacy', defaultGeoLevel: 'city' },
-  { value: 'pac_federal', label: 'Federal PAC', category: 'PAC', defaultGeoLevel: 'national' },
-  { value: 'pac_state', label: 'State PAC', category: 'PAC', defaultGeoLevel: 'state' },
-  { value: 'international', label: 'International Organization/NGO', category: 'International', defaultGeoLevel: 'international' },
-  { value: 'other', label: 'Other', category: 'Other', defaultGeoLevel: 'national' },
+const ORG_TYPE_OPTIONS: { value: OrganizationType; label: string; description: string; defaultGeoLevel: GeoLevel }[] = [
+  { value: 'campaign_federal', label: 'Federal Campaign', description: 'Congress/Senate/President', defaultGeoLevel: 'congressional_district' },
+  { value: 'campaign_state', label: 'State Campaign', description: 'Governor/Legislature', defaultGeoLevel: 'state' },
+  { value: 'campaign_local', label: 'Local Campaign', description: 'Mayor/Council/County/School Board', defaultGeoLevel: 'city' },
+  { value: 'c3_national', label: 'National 501(c)(3)', description: 'Nonprofit', defaultGeoLevel: 'national' },
+  { value: 'c3_state', label: 'State 501(c)(3)', description: 'Nonprofit', defaultGeoLevel: 'state' },
+  { value: 'c3_local', label: 'Local 501(c)(3)', description: 'Nonprofit', defaultGeoLevel: 'city' },
+  { value: 'c4_national', label: 'National 501(c)(4)', description: 'Advocacy Org', defaultGeoLevel: 'national' },
+  { value: 'c4_state', label: 'State 501(c)(4)', description: 'Advocacy Org', defaultGeoLevel: 'state' },
+  { value: 'c4_local', label: 'Local 501(c)(4)', description: 'Advocacy Org', defaultGeoLevel: 'city' },
+  { value: 'pac_federal', label: 'Federal PAC', description: 'Political Action Committee', defaultGeoLevel: 'national' },
+  { value: 'pac_state', label: 'State PAC', description: 'Political Action Committee', defaultGeoLevel: 'state' },
+  { value: 'international', label: 'International', description: 'Organization/NGO', defaultGeoLevel: 'international' },
+  { value: 'other', label: 'Other', description: 'Other organization type', defaultGeoLevel: 'national' },
 ];
 
 const GEO_LEVEL_OPTIONS: { value: GeoLevel; label: string; description: string }[] = [
@@ -114,20 +112,20 @@ export function OrganizationProfileForm({ organizationId, profile, websiteUrl, o
     setHasChanges(changed);
   }, [formData, profile]);
 
-  const handleOrgTypeChange = (newType: OrganizationType) => {
+  const handleOrgTypeChange = (newType: string) => {
     const orgOption = ORG_TYPE_OPTIONS.find(opt => opt.value === newType);
     setFormData(prev => ({
       ...prev,
-      organization_type: newType,
+      organization_type: newType as OrganizationType,
       geo_level: orgOption?.defaultGeoLevel || prev.geo_level,
       geo_locations: [],
     }));
   };
 
-  const handleGeoLevelChange = (newLevel: GeoLevel) => {
+  const handleGeoLevelChange = (newLevel: string) => {
     setFormData(prev => ({
       ...prev,
-      geo_level: newLevel,
+      geo_level: newLevel as GeoLevel,
       geo_locations: [],
     }));
   };
@@ -221,53 +219,41 @@ export function OrganizationProfileForm({ organizationId, profile, websiteUrl, o
   };
 
   return (
-    <V3Card accent="purple">
-      <V3SectionHeader
-        title="Organization Profile"
-        subtitle="Mission, focus areas, and geographic scope"
-        icon={Building2}
-        size="md"
-      />
-
-      <form onSubmit={handleSubmit} className="mt-6 space-y-6">
-        {/* Organization Type */}
-        <div className="space-y-2">
-          <Label className="text-[hsl(var(--portal-text-primary))]">Organization Type</Label>
-          <Select value={formData.organization_type} onValueChange={v => handleOrgTypeChange(v as OrganizationType)}>
-            <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
-              <SelectValue placeholder="Select organization type" />
-            </SelectTrigger>
-            <SelectContent className="bg-[hsl(var(--portal-bg-card))] border-[hsl(var(--portal-border))]">
-              {ORG_TYPE_OPTIONS.map(opt => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  <div className="flex flex-col">
-                    <span>{opt.label}</span>
-                    <span className="text-xs text-[hsl(var(--portal-text-muted))]">{opt.category}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <div className="portal-card p-6">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-purple)/0.1)]">
+          <Building2 className="w-5 h-5 text-[hsl(var(--portal-accent-purple))]" />
         </div>
+        <div>
+          <h3 className="font-semibold text-[hsl(var(--portal-text-primary))]">
+            Organization Profile
+          </h3>
+          <p className="text-sm text-[hsl(var(--portal-text-muted))]">
+            Mission, focus areas, and geographic scope
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Organization Type */}
+        <PortalFormSelect
+          label="Organization Type"
+          value={formData.organization_type}
+          onValueChange={handleOrgTypeChange}
+          options={ORG_TYPE_OPTIONS}
+          placeholder="Select organization type"
+        />
 
         {/* Geographic Scope */}
         <div className="space-y-3">
-          <Label className="text-[hsl(var(--portal-text-primary))]">Geographic Scope</Label>
-          <Select value={formData.geo_level} onValueChange={v => handleGeoLevelChange(v as GeoLevel)}>
-            <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
-              <SelectValue placeholder="Select geographic level" />
-            </SelectTrigger>
-            <SelectContent className="bg-[hsl(var(--portal-bg-card))] border-[hsl(var(--portal-border))]">
-              {GEO_LEVEL_OPTIONS.map(opt => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  <div className="flex flex-col">
-                    <span>{opt.label}</span>
-                    <span className="text-xs text-[hsl(var(--portal-text-muted))]">{opt.description}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <PortalFormSelect
+            label="Geographic Scope"
+            value={formData.geo_level}
+            onValueChange={handleGeoLevelChange}
+            options={GEO_LEVEL_OPTIONS}
+            placeholder="Select geographic level"
+          />
 
           <GeoLocationPicker
             geoLevel={formData.geo_level}
@@ -279,7 +265,7 @@ export function OrganizationProfileForm({ organizationId, profile, websiteUrl, o
         {/* Mission Statement */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="mission" className="text-[hsl(var(--portal-text-primary))]">
+            <Label className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
               Mission Statement
             </Label>
             {websiteUrl && (
@@ -293,19 +279,17 @@ export function OrganizationProfileForm({ organizationId, profile, websiteUrl, o
               </V3Button>
             )}
           </div>
-          <Textarea
-            id="mission"
+          <PortalFormTextarea
             value={formData.mission_statement}
             onChange={e => setFormData(prev => ({ ...prev, mission_statement: e.target.value }))}
             placeholder="Describe the organization's mission and purpose..."
             rows={4}
-            className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]"
           />
         </div>
 
         {/* Focus Areas */}
         <div className="space-y-2">
-          <Label className="text-[hsl(var(--portal-text-primary))]">Focus Areas</Label>
+          <Label className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Focus Areas</Label>
           <div className="flex flex-wrap gap-2 mb-2">
             {formData.focus_areas.map(area => (
               <V3Badge key={area} variant="default" className="gap-1 pr-1">
@@ -321,17 +305,17 @@ export function OrganizationProfileForm({ organizationId, profile, websiteUrl, o
             ))}
           </div>
           <div className="flex gap-2">
-            <Input
+            <PortalFormInput
               value={customFocusArea}
               onChange={e => setCustomFocusArea(e.target.value)}
               placeholder="Add a focus area..."
-              className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]"
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   addFocusArea();
                 }
               }}
+              containerClassName="flex-1"
             />
             <V3Button type="button" variant="secondary" onClick={addFocusArea} disabled={!customFocusArea.trim()}>
               <Plus className="w-4 h-4" />
@@ -341,7 +325,7 @@ export function OrganizationProfileForm({ organizationId, profile, websiteUrl, o
 
         {/* Policy Domains */}
         <div className="space-y-2">
-          <Label className="text-[hsl(var(--portal-text-primary))]">Policy Domains</Label>
+          <Label className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Policy Domains</Label>
           <div className="flex flex-wrap gap-2">
             {POLICY_DOMAINS.map(domain => (
               <V3Badge
@@ -369,38 +353,26 @@ export function OrganizationProfileForm({ organizationId, profile, websiteUrl, o
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4 pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-[hsl(var(--portal-text-primary))]">Sentiment Sensitivity</Label>
-                <Select
-                  value={formData.sentiment_sensitivity}
-                  onValueChange={v => setFormData(prev => ({ ...prev, sentiment_sensitivity: v as 'low' | 'medium' | 'high' }))}
-                >
-                  <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[hsl(var(--portal-bg-card))] border-[hsl(var(--portal-border))]">
-                    <SelectItem value="low">Low - Only major sentiment shifts</SelectItem>
-                    <SelectItem value="medium">Medium - Moderate changes</SelectItem>
-                    <SelectItem value="high">High - All sentiment changes</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[hsl(var(--portal-text-primary))]">Risk Tolerance</Label>
-                <Select
-                  value={formData.risk_tolerance}
-                  onValueChange={v => setFormData(prev => ({ ...prev, risk_tolerance: v as 'low' | 'medium' | 'high' }))}
-                >
-                  <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[hsl(var(--portal-bg-card))] border-[hsl(var(--portal-border))]">
-                    <SelectItem value="low">Low - Alert on all risks</SelectItem>
-                    <SelectItem value="medium">Medium - Moderate risks</SelectItem>
-                    <SelectItem value="high">High - Only critical risks</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <PortalFormSelect
+                label="Sentiment Sensitivity"
+                value={formData.sentiment_sensitivity}
+                onValueChange={v => setFormData(prev => ({ ...prev, sentiment_sensitivity: v as 'low' | 'medium' | 'high' }))}
+                options={[
+                  { value: 'low', label: 'Low', description: 'Only major sentiment shifts' },
+                  { value: 'medium', label: 'Medium', description: 'Moderate changes' },
+                  { value: 'high', label: 'High', description: 'All sentiment changes' },
+                ]}
+              />
+              <PortalFormSelect
+                label="Risk Tolerance"
+                value={formData.risk_tolerance}
+                onValueChange={v => setFormData(prev => ({ ...prev, risk_tolerance: v as 'low' | 'medium' | 'high' }))}
+                options={[
+                  { value: 'low', label: 'Low', description: 'Alert on all risks' },
+                  { value: 'medium', label: 'Medium', description: 'Moderate risks' },
+                  { value: 'high', label: 'High', description: 'Only critical risks' },
+                ]}
+              />
             </div>
           </CollapsibleContent>
         </Collapsible>
@@ -418,6 +390,6 @@ export function OrganizationProfileForm({ organizationId, profile, websiteUrl, o
           </V3Button>
         </div>
       </form>
-    </V3Card>
+    </div>
   );
 }

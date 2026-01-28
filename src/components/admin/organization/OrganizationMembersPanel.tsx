@@ -1,14 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { V3Card } from '@/components/v3/V3Card';
 import { V3Button } from '@/components/v3/V3Button';
 import { V3Badge } from '@/components/v3/V3Badge';
-import { V3SectionHeader } from '@/components/v3/V3SectionHeader';
 import { SeatUsageDisplay } from '@/components/client/SeatUsageDisplay';
 import { InviteUserDialog } from '@/components/admin/InviteUserDialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Input } from '@/components/ui/input';
+import { PortalFormInput } from '@/components/admin/forms/PortalFormInput';
 import {
   Select,
   SelectContent,
@@ -43,7 +41,6 @@ import {
   ShieldCheck,
   Clock,
   Trash2,
-  RefreshCw,
   Loader2,
   X,
 } from 'lucide-react';
@@ -74,9 +71,9 @@ interface PendingInvite {
 }
 
 const ROLE_OPTIONS = [
-  { value: 'admin', label: 'Admin', description: 'Full access' },
-  { value: 'manager', label: 'Manager', description: 'Can edit' },
-  { value: 'viewer', label: 'Viewer', description: 'Read-only' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'viewer', label: 'Viewer' },
 ];
 
 export function OrganizationMembersPanel({ organizationId, organizationName }: OrganizationMembersPanelProps) {
@@ -247,150 +244,161 @@ export function OrganizationMembersPanel({ organizationId, organizationName }: O
       <SeatUsageDisplay organizationId={organizationId} />
 
       {/* Members Section */}
-      <V3Card accent="blue">
-        <V3SectionHeader
-          title="Organization Members"
-          subtitle={`${members.length} member${members.length !== 1 ? 's' : ''}`}
-          icon={Users}
-          size="md"
-          actions={
-            <V3Button onClick={() => setInviteDialogOpen(true)} leftIcon={<UserPlus className="w-4 h-4" />}>
-              Invite Member
-            </V3Button>
-          }
-        />
-
-        <div className="mt-4 space-y-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--portal-text-muted))]" />
-            <Input
-              placeholder="Search members..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-10 bg-[hsl(var(--portal-bg-secondary))]"
-            />
+      <div className="portal-card p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]">
+              <Users className="w-5 h-5 text-[hsl(var(--portal-accent-blue))]" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-[hsl(var(--portal-text-primary))]">
+                Organization Members
+              </h3>
+              <p className="text-sm text-[hsl(var(--portal-text-muted))]">
+                {members.length} member{members.length !== 1 ? 's' : ''}
+              </p>
+            </div>
           </div>
+          <V3Button onClick={() => setInviteDialogOpen(true)} leftIcon={<UserPlus className="w-4 h-4" />}>
+            Invite Member
+          </V3Button>
+        </div>
 
-          {/* Members List */}
-          <div className="divide-y divide-[hsl(var(--portal-border))]">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-[hsl(var(--portal-text-muted))]" />
-              </div>
-            ) : filteredMembers.length === 0 ? (
-              <div className="text-center py-8 text-[hsl(var(--portal-text-muted))]">
-                {searchQuery ? 'No members match your search' : 'No members found'}
-              </div>
-            ) : (
-              <AnimatePresence mode="popLayout">
-                {filteredMembers.map((member, index) => (
-                  <motion.div
-                    key={member.user_id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ delay: index * 0.02 }}
-                    className="flex items-center justify-between py-3 gap-4"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Avatar className="h-9 w-9 shrink-0">
-                        <AvatarImage src={member.avatar_url || undefined} />
-                        <AvatarFallback className="bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))] text-xs">
-                          {getInitials(member.full_name, member.email)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm truncate text-[hsl(var(--portal-text-primary))]">
-                            {member.full_name || member.email.split('@')[0]}
-                          </span>
-                          {member.mfa_enabled ? (
-                            <ShieldCheck className="w-3.5 h-3.5 text-[hsl(var(--portal-success))]" aria-label="MFA Enabled" />
-                          ) : (
-                            <Shield className="w-3.5 h-3.5 text-[hsl(var(--portal-text-muted))]" aria-label="MFA Disabled" />
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-[hsl(var(--portal-text-muted))]">
-                          <Mail className="w-3 h-3" />
-                          <span className="truncate">{member.email}</span>
-                        </div>
+        {/* Search */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--portal-text-muted))]" />
+          <PortalFormInput
+            placeholder="Search members..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        {/* Members List */}
+        <div className="divide-y divide-[hsl(var(--portal-border))]">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-[hsl(var(--portal-text-muted))]" />
+            </div>
+          ) : filteredMembers.length === 0 ? (
+            <div className="text-center py-8 text-[hsl(var(--portal-text-muted))]">
+              {searchQuery ? 'No members match your search' : 'No members found'}
+            </div>
+          ) : (
+            <AnimatePresence mode="popLayout">
+              {filteredMembers.map((member, index) => (
+                <motion.div
+                  key={member.user_id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ delay: index * 0.02 }}
+                  className="flex items-center justify-between py-3 gap-4"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar className="h-9 w-9 shrink-0">
+                      <AvatarImage src={member.avatar_url || undefined} />
+                      <AvatarFallback className="bg-[hsl(var(--portal-accent-blue)/0.1)] text-[hsl(var(--portal-accent-blue))] text-xs">
+                        {getInitials(member.full_name, member.email)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm truncate text-[hsl(var(--portal-text-primary))]">
+                          {member.full_name || member.email.split('@')[0]}
+                        </span>
+                        {member.mfa_enabled ? (
+                          <ShieldCheck className="w-3.5 h-3.5 text-[hsl(var(--portal-success))]" aria-label="MFA Enabled" />
+                        ) : (
+                          <Shield className="w-3.5 h-3.5 text-[hsl(var(--portal-text-muted))]" aria-label="MFA Disabled" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-[hsl(var(--portal-text-muted))]">
+                        <Mail className="w-3 h-3" />
+                        <span className="truncate">{member.email}</span>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="flex items-center gap-3 shrink-0">
-                      {/* Last Session */}
-                      {member.last_session && (
-                        <div className="hidden sm:flex items-center gap-1 text-xs text-[hsl(var(--portal-text-muted))]">
-                          <Clock className="w-3 h-3" />
-                          <span>{formatDistanceToNow(new Date(member.last_session), { addSuffix: true })}</span>
-                        </div>
-                      )}
+                  <div className="flex items-center gap-3 shrink-0">
+                    {/* Last Session */}
+                    {member.last_session && (
+                      <div className="hidden sm:flex items-center gap-1 text-xs text-[hsl(var(--portal-text-muted))]">
+                        <Clock className="w-3 h-3" />
+                        <span>{formatDistanceToNow(new Date(member.last_session), { addSuffix: true })}</span>
+                      </div>
+                    )}
 
-                      {/* Role Selector */}
-                      <Select
-                        value={member.org_role}
-                        onValueChange={v => handleRoleChange(member.user_id, v)}
-                        disabled={updatingRoleId === member.user_id}
-                      >
-                        <SelectTrigger className="w-[110px] h-8 text-xs bg-[hsl(var(--portal-bg-secondary))]">
-                          {updatingRoleId === member.user_id ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <SelectValue />
-                          )}
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ROLE_OPTIONS.map(opt => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    {/* Role Selector */}
+                    <Select
+                      value={member.org_role}
+                      onValueChange={v => handleRoleChange(member.user_id, v)}
+                      disabled={updatingRoleId === member.user_id}
+                    >
+                      <SelectTrigger className="w-[110px] h-8 text-xs bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
+                        {updatingRoleId === member.user_id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <SelectValue />
+                        )}
+                      </SelectTrigger>
+                      <SelectContent className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
+                        {ROLE_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-                      {/* Actions Menu */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <V3Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </V3Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-[hsl(var(--portal-bg-card))] border-[hsl(var(--portal-border))]">
-                          <DropdownMenuItem
-                            className="text-[hsl(var(--portal-error))] focus:text-[hsl(var(--portal-error))]"
-                            onClick={() => setMemberToRemove(member)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Remove from Organization
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            )}
-          </div>
+                    {/* Actions Menu */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <V3Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </V3Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
+                        <DropdownMenuItem
+                          className="text-[hsl(var(--portal-error))] focus:text-[hsl(var(--portal-error))]"
+                          onClick={() => setMemberToRemove(member)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Remove from Organization
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          )}
         </div>
-      </V3Card>
+      </div>
 
       {/* Pending Invitations */}
       {pendingInvites.length > 0 && (
-        <V3Card accent="amber">
-          <V3SectionHeader
-            title="Pending Invitations"
-            subtitle={`${pendingInvites.length} invitation${pendingInvites.length !== 1 ? 's' : ''} waiting for response`}
-            icon={Mail}
-            size="sm"
-            badges={[
-              <V3Badge key="count" variant="warning" size="sm">
-                {pendingInvites.length} pending
-              </V3Badge>,
-            ]}
-          />
+        <div className="portal-card p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-lg bg-[hsl(var(--portal-warning)/0.1)]">
+              <Mail className="w-5 h-5 text-[hsl(var(--portal-warning))]" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-[hsl(var(--portal-text-primary))]">
+                Pending Invitations
+              </h3>
+              <p className="text-sm text-[hsl(var(--portal-text-muted))]">
+                {pendingInvites.length} invitation{pendingInvites.length !== 1 ? 's' : ''} waiting for response
+              </p>
+            </div>
+            <V3Badge variant="warning" size="sm">
+              {pendingInvites.length} pending
+            </V3Badge>
+          </div>
 
-          <div className="mt-4 space-y-2">
+          <div className="space-y-2">
             {pendingInvites.map(invite => {
               const expiresIn = new Date(invite.expires_at);
               const isExpiringSoon = expiresIn.getTime() - Date.now() < 3 * 24 * 60 * 60 * 1000;
@@ -398,7 +406,7 @@ export function OrganizationMembersPanel({ organizationId, organizationName }: O
               return (
                 <div
                   key={invite.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))]"
+                  className="flex items-center justify-between p-3 rounded-lg bg-[hsl(var(--portal-bg-tertiary))] border border-[hsl(var(--portal-border))]"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-[hsl(var(--portal-warning)/0.1)] flex items-center justify-center">
@@ -436,7 +444,7 @@ export function OrganizationMembersPanel({ organizationId, organizationName }: O
               );
             })}
           </div>
-        </V3Card>
+        </div>
       )}
 
       {/* Invite Dialog */}
@@ -453,20 +461,22 @@ export function OrganizationMembersPanel({ organizationId, organizationName }: O
 
       {/* Remove Member Confirmation */}
       <AlertDialog open={!!memberToRemove} onOpenChange={() => setMemberToRemove(null)}>
-        <AlertDialogContent className="bg-[hsl(var(--portal-bg-card))] border-[hsl(var(--portal-border))]">
+        <AlertDialogContent className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Member</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-[hsl(var(--portal-text-primary))]">Remove Member</AlertDialogTitle>
+            <AlertDialogDescription className="text-[hsl(var(--portal-text-muted))]">
               Are you sure you want to remove{' '}
-              <strong>{memberToRemove?.full_name || memberToRemove?.email}</strong> from this
+              <strong className="text-[hsl(var(--portal-text-primary))]">{memberToRemove?.full_name || memberToRemove?.email}</strong> from this
               organization? They will lose access immediately.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRemoveMember}
-              className="bg-[hsl(var(--portal-error))] hover:bg-[hsl(var(--portal-error)/0.9)]"
+              className="bg-[hsl(var(--portal-error))] hover:bg-[hsl(var(--portal-error)/0.9)] text-white"
             >
               {removingMemberId ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />

@@ -1,12 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { V3Card } from '@/components/v3/V3Card';
 import { V3Button } from '@/components/v3/V3Button';
 import { V3Badge } from '@/components/v3/V3Badge';
-import { V3SectionHeader } from '@/components/v3/V3SectionHeader';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Save, Loader2, CheckCircle2, XCircle, Image } from 'lucide-react';
+import { PortalFormInput } from '@/components/admin/forms/PortalFormInput';
+import { PortalFormSelect } from '@/components/admin/forms/PortalFormSelect';
+import { FileText, Save, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 // Common timezones
@@ -163,126 +160,110 @@ export function OrganizationDetailsForm({ organization, onSave }: OrganizationDe
   };
 
   return (
-    <V3Card accent="blue">
-      <V3SectionHeader
-        title="Organization Details"
-        subtitle="Basic information about the organization"
-        icon={FileText}
-        size="md"
-      />
+    <div className="portal-card p-6">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]">
+          <FileText className="w-5 h-5 text-[hsl(var(--portal-accent-blue))]" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-[hsl(var(--portal-text-primary))]">
+            Organization Details
+          </h3>
+          <p className="text-sm text-[hsl(var(--portal-text-muted))]">
+            Basic information about the organization
+          </p>
+        </div>
+      </div>
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Name */}
-          <div className="space-y-2">
-            <Label htmlFor="name" className="text-[hsl(var(--portal-text-primary))]">
-              Organization Name *
-            </Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={e => handleNameChange(e.target.value)}
-              placeholder="Acme Corporation"
-              required
-              className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]"
-            />
-          </div>
+          <PortalFormInput
+            label="Organization Name *"
+            value={formData.name}
+            onChange={e => handleNameChange(e.target.value)}
+            placeholder="Acme Corporation"
+            required
+          />
 
           {/* Slug */}
           <div className="space-y-2">
-            <Label htmlFor="slug" className="text-[hsl(var(--portal-text-primary))]">
-              URL Slug *
-            </Label>
-            <div className="relative">
-              <Input
-                id="slug"
-                value={formData.slug}
-                onChange={e => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-                placeholder="acme-corporation"
-                required
-                className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))] pr-10"
-              />
+            <PortalFormInput
+              label="URL Slug *"
+              value={formData.slug}
+              onChange={e => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+              placeholder="acme-corporation"
+              required
+            />
+            <div className="flex items-center gap-2">
               {slugAvailability === 'checking' && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-[hsl(var(--portal-text-muted))]" />
+                <Loader2 className="w-4 h-4 animate-spin text-[hsl(var(--portal-text-muted))]" />
               )}
               {slugAvailability === 'available' && (
-                <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--portal-success))]" />
+                <CheckCircle2 className="w-4 h-4 text-[hsl(var(--portal-success))]" />
               )}
               {slugAvailability === 'taken' && (
-                <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--portal-error))]" />
+                <XCircle className="w-4 h-4 text-[hsl(var(--portal-error))]" />
+              )}
+              {slugMessage && (
+                <span
+                  className={`text-xs ${
+                    slugAvailability === 'taken'
+                      ? 'text-[hsl(var(--portal-error))]'
+                      : slugAvailability === 'available'
+                      ? 'text-[hsl(var(--portal-success))]'
+                      : 'text-[hsl(var(--portal-text-muted))]'
+                  }`}
+                >
+                  {slugMessage}
+                </span>
               )}
             </div>
-            {slugMessage && (
-              <p
-                className={`text-xs ${
-                  slugAvailability === 'taken'
-                    ? 'text-[hsl(var(--portal-error))]'
-                    : slugAvailability === 'available'
-                    ? 'text-[hsl(var(--portal-success))]'
-                    : 'text-[hsl(var(--portal-text-muted))]'
-                }`}
-              >
-                {slugMessage}
-              </p>
-            )}
           </div>
 
           {/* Primary Contact Email */}
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-[hsl(var(--portal-text-primary))]">
-              Primary Contact Email
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.primary_contact_email}
-              onChange={e => setFormData(prev => ({ ...prev, primary_contact_email: e.target.value }))}
-              placeholder="contact@acme.com"
-              className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]"
-            />
-            {formData.primary_contact_email && !isValidEmail(formData.primary_contact_email) && (
-              <p className="text-xs text-[hsl(var(--portal-error))]">Please enter a valid email address</p>
-            )}
-          </div>
+          <PortalFormInput
+            label="Primary Contact Email"
+            type="email"
+            value={formData.primary_contact_email}
+            onChange={e => setFormData(prev => ({ ...prev, primary_contact_email: e.target.value }))}
+            placeholder="contact@acme.com"
+            error={
+              formData.primary_contact_email && !isValidEmail(formData.primary_contact_email)
+                ? 'Please enter a valid email address'
+                : undefined
+            }
+          />
 
           {/* Timezone */}
-          <div className="space-y-2">
-            <Label htmlFor="timezone" className="text-[hsl(var(--portal-text-primary))]">
-              Timezone
-            </Label>
-            <Select
-              value={formData.timezone}
-              onValueChange={value => setFormData(prev => ({ ...prev, timezone: value }))}
-            >
-              <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
-                <SelectValue placeholder="Select timezone" />
-              </SelectTrigger>
-              <SelectContent className="bg-[hsl(var(--portal-bg-card))] border-[hsl(var(--portal-border))]">
-                {TIMEZONE_OPTIONS.map(tz => (
-                  <SelectItem key={tz.value} value={tz.value}>
-                    {tz.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <PortalFormSelect
+            label="Timezone"
+            value={formData.timezone}
+            onValueChange={value => setFormData(prev => ({ ...prev, timezone: value }))}
+            options={TIMEZONE_OPTIONS}
+            placeholder="Select timezone"
+          />
 
           {/* Logo URL - full width */}
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="logo" className="text-[hsl(var(--portal-text-primary))]">
-              Logo URL
-            </Label>
-            <div className="flex gap-3">
-              <Input
-                id="logo"
-                type="url"
-                value={formData.logo_url}
-                onChange={e => setFormData(prev => ({ ...prev, logo_url: e.target.value }))}
-                placeholder="https://example.com/logo.png"
-                className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))] flex-1"
-              />
+          <div className="md:col-span-2">
+            <div className="flex gap-3 items-end">
+              <div className="flex-1">
+                <PortalFormInput
+                  label="Logo URL"
+                  type="url"
+                  value={formData.logo_url}
+                  onChange={e => setFormData(prev => ({ ...prev, logo_url: e.target.value }))}
+                  placeholder="https://example.com/logo.png"
+                  error={
+                    formData.logo_url && !isValidUrl(formData.logo_url)
+                      ? 'Please enter a valid URL'
+                      : undefined
+                  }
+                />
+              </div>
               {formData.logo_url && isValidUrl(formData.logo_url) && (
-                <div className="w-10 h-10 rounded-lg border border-[hsl(var(--portal-border))] overflow-hidden flex-shrink-0 bg-[hsl(var(--portal-bg-secondary))]">
+                <div className="w-10 h-10 rounded-lg border border-[hsl(var(--portal-border))] overflow-hidden flex-shrink-0 bg-[hsl(var(--portal-bg-tertiary))]">
                   <img
                     src={formData.logo_url}
                     alt="Logo preview"
@@ -294,9 +275,6 @@ export function OrganizationDetailsForm({ organization, onSave }: OrganizationDe
                 </div>
               )}
             </div>
-            {formData.logo_url && !isValidUrl(formData.logo_url) && (
-              <p className="text-xs text-[hsl(var(--portal-error))]">Please enter a valid URL</p>
-            )}
           </div>
         </div>
 
@@ -318,6 +296,6 @@ export function OrganizationDetailsForm({ organization, onSave }: OrganizationDe
           </V3Button>
         </div>
       </form>
-    </V3Card>
+    </div>
   );
 }
