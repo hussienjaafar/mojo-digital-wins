@@ -1,196 +1,178 @@
 
 
-# Investigation: Attributed ROI Data Consistency and Freshness
+# Fix Demographics Page Timeout with Pre-Aggregated Cache
 
 ## Problem Summary
 
-You're experiencing two issues:
-1. **Data misalignment** between Hero KPI "Attributed ROI", Meta Ads Performance Overview, and Meta Ads Channel Details
-2. **Stale data** - information often appears hours old
+The `get_donor_demographics_v2` RPC is timing out (30-second limit) for "Abdul for Senate" because:
 
-## Current Architecture
+1. **82,225 transactions** need processing on every page load
+2. **Occupation matching uses a correlated subquery** that runs 82K times against 166 patterns
+3. **COUNT(DISTINCT donor_email)** across multiple CTEs is expensive
+4. **No caching layer** - every page view re-runs the full aggregation
 
-```text
-+------------------+     +-------------------------+     +----------------------+
-|  Hero KPI Card   |     | Meta Ads Performance    |     | Meta Ads Channel     |
-| (Attributed ROI) |     | Overview (Today View)   |     | Details              |
-+------------------+     +-------------------------+     +----------------------+
-        |                           |                             |
-        v                           v                             v
-+------------------+     +-------------------------+     +----------------------+
-| useDashboardV2   |     | useSingleDayMetaMetrics |     | useMetaAdsMetrics    |
-|                  |     |                         |     | Query                |
-+------------------+     +-------------------------+     +----------------------+
-        |                           |                             |
-        +------------+--------------+                             |
-                     |                                            |
-                     v                                            v
-        +------------------------+              +---------------------------+
-        | get_actblue_dashboard  | <-- SAME --> | meta_ad_metrics_daily     |
-        | _metrics RPC           |    SPEND     | .conversion_value         |
-        | (unified attribution)  |    SOURCE    | (Meta's reported value)   |
-        +------------------------+              +---------------------------+
-                     |                                            |
-                     v                                            |
-        +------------------------+                               |
-        | actblue_transactions   |                               |
-        | + refcode_mappings     |                               |
-        | (OUR attribution)      |                               |
-        +------------------------+                               |
-                                                                 |
-                     REVENUE SOURCE MISMATCH! ------------------+
-```
+The current error shows `57014: canceling statement due to statement timeout` even after adding indexes.
 
-## Root Causes Identified
+## Your Requirement
 
-### Issue 1: Data Misalignment
-
-| Component | Revenue Source | Problem |
-|-----------|---------------|---------|
-| Hero KPI + Performance Overview | `get_actblue_dashboard_metrics` RPC | Uses OUR attribution (ActBlue + refcode mappings) |
-| Meta Ads Channel Details | `meta_ad_metrics_daily.conversion_value` | Uses META'S reported conversions |
-
-**Result**: When Meta's tracked conversions differ from our attributed donations (which they almost always do), the numbers won't match.
-
-### Issue 2: Cache Time Inconsistency
-
-| Hook | Stale Time | Impact |
-|------|------------|--------|
-| `useActBlueMetrics` | 5 minutes | Hero KPIs refresh slower |
-| Channel Spend Query | 2 minutes | Spend data refreshes faster |
-| `useMetaAdsMetricsQuery` | 2 minutes | Channel details refresh faster |
-
-This 3-minute gap means sections can show data from different points in time.
-
-### Issue 3: Data Freshness
-
-| Factor | Current State |
-|--------|--------------|
-| Meta API Delay | 24-48 hours inherent (documented) |
-| Tiered Sync | Runs every 15 mins but only for "due" accounts |
-| Smart Refresh Threshold | Only triggers sync if data > 4 hours old |
-| Scheduled Jobs | Only `process-meta-capi-outbox` found active |
+You want **All-Time Demographics** with data cached/backfilled so it loads instantly and new donations are appended incrementally over time.
 
 ---
 
-## Proposed Solution
+## Solution: Pre-Aggregated Demographics Cache Table
 
-### Fix 1: Unify Revenue Source for Channel Details
+We'll create a persistent `donor_demographics_cache` table that stores the pre-computed summary for each organization. A scheduled job will refresh it daily, and new transactions will trigger incremental updates.
 
-**Goal**: Make MetaAdsMetrics use the same attribution RPC as Hero KPIs
-
-**Changes**:
-- Update `useMetaAdsMetricsQuery` to also call `get_actblue_dashboard_metrics` RPC for revenue
-- Use `conversion_value` from Meta only as a display/comparison metric, not for ROI calculation
-- Add a new field `ourAttributedRevenue` to the query results
-
-**Files**:
-- `src/queries/useMetaAdsMetricsQuery.ts` - Add RPC call for attribution
-- `src/components/client/MetaAdsMetrics.tsx` - Use unified revenue for ROI display
-
-### Fix 2: Standardize Cache Times
-
-**Goal**: All dashboard data refreshes at the same cadence
-
-**Changes**:
-- Align all hooks to use 2-minute `staleTime` (or make it configurable)
-- Add a shared constant for cache configuration
-
-**Files**:
-- `src/hooks/useActBlueMetrics.ts` - Change staleTime from 5 to 2 minutes
-- Create `src/lib/query-config.ts` - Centralized cache settings
-
-### Fix 3: Improve Data Freshness
-
-**Goal**: Reduce perceived staleness from hours to ~30 minutes
-
-**Changes**:
-
-1. **Add scheduled Meta sync job** - Currently missing from `scheduled_jobs`
-   - Run `sync-meta-ads` every 30 minutes via pg_cron
-
-2. **Lower Smart Refresh threshold** from 4 hours to 1 hour
-   - Users clicking refresh will trigger sync more often
-
-3. **Add "Last Synced" indicator** to all three sections
-   - Show when data was last refreshed so users know what they're looking at
-
-4. **Optional: Add polling for active dashboard sessions**
-   - Auto-refresh every 15 minutes while user has dashboard open
-
-**Files**:
-- Database: Add new scheduled job for Meta sync
-- `src/hooks/useSmartRefresh.ts` - Lower threshold to 1 hour
-- `src/components/client/ClientDashboard.tsx` - Add optional polling
-- New migration for scheduled job
+```text
++---------------------+       +---------------------------+       +---------------------+
+| actblue_transactions|  -->  | donor_demographics_cache  |  -->  | Demographics Page   |
+| (82K+ rows)         |       | (1 row per org)           |       | (instant load)      |
++---------------------+       +---------------------------+       +---------------------+
+         ^                              ^
+         |                              |
++---------------------+       +---------------------------+
+| Daily Cron Job      |       | refresh_demographics_cache|
+| (full rebuild)      |       | RPC function              |
++---------------------+       +---------------------------+
+```
 
 ---
 
 ## Implementation Plan
 
-### Phase 1: Fix Data Alignment (Highest Priority)
-1. Modify `useMetaAdsMetricsQuery` to fetch from unified attribution RPC
-2. Update MetaAdsMetrics component to use unified revenue source
-3. Add visual indicator showing data source (e.g., "Based on ActBlue attribution")
+### Phase 1: Create Cache Infrastructure
 
-### Phase 2: Standardize Caching
-1. Create shared cache configuration module
-2. Update all dashboard hooks to use consistent staleTime
-3. Ensure query keys are structured for proper invalidation
+**1. Create `donor_demographics_cache` table**
+- One row per organization containing the full JSONB result
+- Columns: `organization_id`, `summary_data` (JSONB), `calculated_at`, `transaction_count`, `version`
 
-### Phase 3: Improve Freshness
-1. Add `sync-meta-ads` to scheduled_jobs (every 30 min)
-2. Lower Smart Refresh threshold to 1 hour
-3. Add "Last synced X minutes ago" to dashboard header
-4. Consider optional auto-polling for active sessions
+**2. Create `refresh_demographics_cache` RPC**
+- Same logic as `get_donor_demographics_v2` but writes to cache table instead of returning directly
+- Runs as SECURITY DEFINER with service role to bypass RLS during background jobs
+
+**3. Create `get_donor_demographics_cached` RPC**
+- Fast lookup from cache table (< 10ms)
+- Falls back to live query if cache is stale/missing (with timeout protection)
+
+### Phase 2: Optimize Occupation Matching
+
+**4. Pre-compute occupation categories**
+- Create a trigger or batch job that sets `occupation_category` column on `actblue_transactions` when records are inserted
+- Eliminates the expensive correlated subquery during aggregation
+
+**5. Add occupation_category column to actblue_transactions**
+- New column: `occupation_category TEXT`
+- Backfill existing records in batches
+
+### Phase 3: Scheduled Refresh + Incremental Updates
+
+**6. Add scheduled job for daily cache refresh**
+- Run `refresh_demographics_cache` for all orgs nightly (low-traffic period)
+- Stagger execution to avoid overwhelming the database
+
+**7. Add webhook trigger for incremental updates**
+- When new transactions arrive via webhook, mark cache as "stale" or increment counts
+- Full refresh runs in background, UI shows cached data immediately
+
+### Phase 4: Frontend Changes
+
+**8. Update ClientDemographics.tsx**
+- Call `get_donor_demographics_cached` instead of `get_donor_demographics_v2`
+- Add proper error state with Retry button (per your preference)
+- Show "Data as of [timestamp]" indicator
+
+**9. Add V3ErrorState wrapper for failed queries**
+- Display clear error message with Retry button
+- Prevent blank page when query fails
 
 ---
 
 ## Technical Details
 
-### Modified Query (Phase 1)
-
-```typescript
-// In useMetaAdsMetricsQuery.ts
-async function fetchMetaAdsMetrics(...) {
-  const [metaMetrics, attribution] = await Promise.all([
-    // Existing Meta metrics fetch
-    supabase.from('meta_ad_metrics_daily')...,
-    // NEW: Unified attribution
-    supabase.rpc('get_actblue_dashboard_metrics', {
-      p_organization_id: organizationId,
-      p_start_date: startDate,
-      p_end_date: endDate,
-      p_use_utc: false,
-    })
-  ]);
-  
-  // Extract Meta-attributed revenue from unified source
-  const metaChannel = attribution.data?.channels?.find(c => c.channel === 'meta');
-  
-  return {
-    ...existingData,
-    ourAttributedRevenue: metaChannel?.revenue || 0,
-    ourAttributedROI: totals.spend > 0 
-      ? (metaChannel?.revenue || 0) / totals.spend 
-      : 0,
-  };
-}
-```
-
-### New Scheduled Job (Phase 3)
+### New Table Schema
 
 ```sql
--- Add to scheduled_jobs table
-INSERT INTO scheduled_jobs (job_name, schedule, endpoint, job_type, is_active)
-VALUES (
-  'sync-meta-ads-scheduled',
-  '*/30 * * * *',  -- Every 30 minutes
-  'sync-meta-ads',
-  'edge_function',
-  true
+CREATE TABLE public.donor_demographics_cache (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL UNIQUE REFERENCES client_organizations(id) ON DELETE CASCADE,
+  summary_data jsonb NOT NULL,
+  transaction_count integer NOT NULL DEFAULT 0,
+  calculated_at timestamptz NOT NULL DEFAULT now(),
+  version integer NOT NULL DEFAULT 1,
+  is_stale boolean NOT NULL DEFAULT false,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
 );
+
+CREATE INDEX idx_demographics_cache_org ON donor_demographics_cache(organization_id);
 ```
+
+### Occupation Pre-Computation
+
+```sql
+-- Add column to transactions table
+ALTER TABLE actblue_transactions ADD COLUMN IF NOT EXISTS occupation_category text;
+
+-- Create function to compute category
+CREATE OR REPLACE FUNCTION compute_occupation_category(raw_occ text)
+RETURNS text LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(
+    (SELECT category FROM occupation_categories 
+     WHERE lower(trim(raw_occ)) LIKE '%' || pattern || '%'
+     ORDER BY sort_order LIMIT 1),
+    'Other'
+  );
+$$;
+
+-- Backfill in batches (run separately, not blocking)
+UPDATE actblue_transactions t
+SET occupation_category = compute_occupation_category(t.occupation)
+WHERE occupation_category IS NULL AND occupation IS NOT NULL;
+```
+
+### Fast Cached Lookup
+
+```sql
+CREATE OR REPLACE FUNCTION get_donor_demographics_cached(_organization_id uuid)
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER AS $$
+DECLARE
+  cached_result jsonb;
+BEGIN
+  -- Access check
+  IF NOT (user_belongs_to_organization(_organization_id) OR has_role(auth.uid(), 'admin')) THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+  
+  -- Return cached data if available
+  SELECT summary_data INTO cached_result
+  FROM donor_demographics_cache
+  WHERE organization_id = _organization_id
+    AND calculated_at > now() - interval '24 hours';
+    
+  IF cached_result IS NOT NULL THEN
+    RETURN cached_result;
+  END IF;
+  
+  -- Fallback: trigger async refresh and return empty
+  PERFORM pg_notify('demographics_refresh', _organization_id::text);
+  RETURN '{"status": "refreshing", "message": "Data is being calculated. Please refresh in a few minutes."}'::jsonb;
+END;
+$$;
+```
+
+---
+
+## Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| Database Migration | CREATE `donor_demographics_cache` table |
+| Database Migration | ALTER `actblue_transactions` add `occupation_category` |
+| Database Migration | CREATE `refresh_demographics_cache` RPC |
+| Database Migration | CREATE `get_donor_demographics_cached` RPC |
+| `supabase/functions/refresh-demographics-cache/index.ts` | New edge function for batch refresh |
+| `src/pages/ClientDemographics.tsx` | Use cached RPC, add error state |
+| Scheduled Jobs | Add nightly refresh job |
 
 ---
 
@@ -198,21 +180,18 @@ VALUES (
 
 | Metric | Before | After |
 |--------|--------|-------|
-| Revenue source consistency | 2/3 sections aligned | 3/3 sections aligned |
-| Maximum cache staleness | 5 minutes | 2 minutes |
-| Meta data refresh frequency | Manual / 4+ hours | Every 30 minutes |
-| User visibility into freshness | Limited | Clear indicators |
+| Page load time | 30s+ timeout | < 500ms |
+| Query complexity | 7 CTEs, correlated subqueries | Single row lookup |
+| Data freshness | Real-time (but broken) | Cached (< 24h old), updated nightly |
+| Error handling | Blank page | Clear error with Retry |
 
 ---
 
-## Files to Change
+## Risks & Mitigations
 
-| File | Change Type |
-|------|-------------|
-| `src/queries/useMetaAdsMetricsQuery.ts` | Add unified attribution fetch |
-| `src/components/client/MetaAdsMetrics.tsx` | Use ourAttributedRevenue for ROI |
-| `src/hooks/useActBlueMetrics.ts` | Align staleTime to 2 minutes |
-| `src/hooks/useSmartRefresh.ts` | Lower threshold to 1 hour |
-| New: `src/lib/query-config.ts` | Centralized cache settings |
-| Database migration | Add sync-meta-ads scheduled job |
+| Risk | Mitigation |
+|------|------------|
+| Cache becomes stale | Scheduled daily refresh + "stale" flag for manual refresh |
+| Large orgs overwhelm refresh job | Batch processing with chunking |
+| Occupation backfill takes long | Run async, UI still works with partial data |
 
