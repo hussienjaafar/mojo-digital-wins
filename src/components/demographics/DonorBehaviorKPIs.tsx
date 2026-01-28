@@ -36,9 +36,22 @@ export function DonorBehaviorKPIs({
   repeatStats,
   className,
 }: DonorBehaviorKPIsProps) {
+  // Safely access values with defaults
+  const safeTransactionCount = totals?.transaction_count ?? 0;
+  const safeTotalRevenue = totals?.total_revenue ?? 0;
+  const safeUniqueDonorCount = totals?.unique_donor_count ?? 0;
+  const safeRecurringPercentage = totals?.recurring_percentage ?? 0;
+  const safeRecurringDonors = totals?.recurring_donors ?? 0;
+  const safeMobilePercentage = totals?.mobile_percentage ?? 0;
+  
+  const safeRepeatRate = repeatStats?.repeat_rate ?? 0;
+  const safeRepeatDonors = repeatStats?.repeat_donors ?? 0;
+  const safeNewDonorRevenue = repeatStats?.new_donor_revenue ?? 0;
+  const safeNewDonors = repeatStats?.new_donors ?? 0;
+
   // Calculate average donation
-  const avgDonation = totals.transaction_count > 0 
-    ? totals.total_revenue / totals.transaction_count 
+  const avgDonation = safeTransactionCount > 0 
+    ? safeTotalRevenue / safeTransactionCount 
     : 0;
 
   return (
@@ -47,13 +60,13 @@ export function DonorBehaviorKPIs({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <V3KPICard
           label="Unique Donors"
-          value={formatNumber(totals.unique_donor_count)}
+          value={formatNumber(safeUniqueDonorCount)}
           icon={Users}
           accent="blue"
         />
         <V3KPICard
           label="Total Revenue"
-          value={formatCurrency(totals.total_revenue)}
+          value={formatCurrency(safeTotalRevenue)}
           icon={DollarSign}
           accent="green"
         />
@@ -70,8 +83,8 @@ export function DonorBehaviorKPIs({
         {/* Recurring Donors */}
         <V3KPICard
           label="Recurring Donors"
-          value={`${totals.recurring_percentage.toFixed(1)}%`}
-          subtitle={`${formatNumber(totals.recurring_donors)} of ${formatNumber(totals.unique_donor_count)}`}
+          value={`${safeRecurringPercentage.toFixed(1)}%`}
+          subtitle={`${formatNumber(safeRecurringDonors)} of ${formatNumber(safeUniqueDonorCount)}`}
           icon={Repeat}
           accent="blue"
         />
@@ -79,8 +92,8 @@ export function DonorBehaviorKPIs({
         {/* Repeat Donor Rate */}
         <V3KPICard
           label="Repeat Donor Rate"
-          value={`${repeatStats.repeat_rate.toFixed(1)}%`}
-          subtitle={`${formatNumber(repeatStats.repeat_donors)} repeat donors`}
+          value={`${safeRepeatRate.toFixed(1)}%`}
+          subtitle={`${formatNumber(safeRepeatDonors)} repeat donors`}
           icon={UserPlus}
           accent="green"
         />
@@ -88,8 +101,8 @@ export function DonorBehaviorKPIs({
         {/* New Donor Revenue */}
         <V3KPICard
           label="New Donor Revenue"
-          value={formatCurrency(repeatStats.new_donor_revenue)}
-          subtitle={`${formatNumber(repeatStats.new_donors)} new donors`}
+          value={formatCurrency(safeNewDonorRevenue)}
+          subtitle={`${formatNumber(safeNewDonors)} new donors`}
           icon={Users}
           accent="purple"
         />
@@ -102,18 +115,18 @@ export function DonorBehaviorKPIs({
             <div className="flex items-center gap-2">
               <Smartphone className="h-4 w-4 text-[hsl(var(--portal-accent-blue))]" />
               <span className="text-sm text-[hsl(var(--portal-text-secondary))]">
-                Mobile: <span className="font-medium text-[hsl(var(--portal-text-primary))]">{totals.mobile_percentage.toFixed(1)}%</span>
+                Mobile: <span className="font-medium text-[hsl(var(--portal-text-primary))]">{safeMobilePercentage.toFixed(1)}%</span>
               </span>
             </div>
             <div className="flex items-center gap-2">
               <Monitor className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
               <span className="text-sm text-[hsl(var(--portal-text-secondary))]">
-                Desktop: <span className="font-medium text-[hsl(var(--portal-text-primary))]">{(100 - totals.mobile_percentage).toFixed(1)}%</span>
+                Desktop: <span className="font-medium text-[hsl(var(--portal-text-primary))]">{(100 - safeMobilePercentage).toFixed(1)}%</span>
               </span>
             </div>
           </div>
           <span className="text-xs text-[hsl(var(--portal-text-muted))]">
-            {formatNumber(totals.transaction_count)} total donations
+            {formatNumber(safeTransactionCount)} total donations
           </span>
         </div>
       </div>
