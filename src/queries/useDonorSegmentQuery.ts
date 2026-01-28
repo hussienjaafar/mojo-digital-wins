@@ -309,7 +309,8 @@ async function fetchSegmentDonors(
       employer,
       occupation
     `)
-    .eq('organization_id', organizationId);
+    .eq('organization_id', organizationId)
+    .order('total_donated', { ascending: false, nullsFirst: false });
 
   // Apply server-side filters
   for (const filter of filters) {
