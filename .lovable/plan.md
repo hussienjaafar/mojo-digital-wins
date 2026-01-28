@@ -1,114 +1,186 @@
 
-# Fix Duplicate Donors in Donor List Table
+
+# Fix Donor Intelligence Page Not Loading After Page Reload
 
 ## Problem Summary
 
-Users are seeing duplicate donor entries in the Donor List table, despite each donor having a unique ID in the database. React is throwing console warnings: `Encountered two children with the same key, '32e77ae2-d712-4551-ae98-202bbc6349d3'`.
+After the recent changes to add stable pagination sorting (`.order('id')`), refreshing the donor intelligence page causes the data to never load - the page remains stuck in a loading state showing skeleton placeholders.
 
 ## Root Cause
 
-The issue stems from the pagination logic in `fetchAllWithPagination`:
-
-### 1. Unstable Sort Order
+The `fetchAllWithPagination` function in `src/queries/useDonorSegmentQuery.ts` mutates the same Supabase query object across multiple pagination requests:
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│                     PAGE BOUNDARY RACE                        │
-├──────────────────────────────────────────────────────────────┤
-│  Query: ORDER BY total_donated DESC                           │
-│                                                               │
-│  Page 1 (rows 0-999):                     Page 2 (rows 1000-1999):
-│  ┌─────────────────────────┐              ┌─────────────────────────┐
-│  │ ...                     │              │ Donor X ($50)           │  ← Shifted!
-│  │ Donor Y ($50) - row 998 │              │ Donor Y ($50) - row 1000│  ← DUPLICATE!
-│  │ Donor X ($50) - row 999 │              │ ...                     │
-│  └─────────────────────────┘              └─────────────────────────┘
-│                                                               │
-│  Result: Donor Y and Donor X appear in BOTH pages            │
-└──────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                   SUPABASE QUERY MUTATION ISSUE                      │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  fetchAllWithPagination(baseQuery) {                                 │
+│    while (hasMore) {                                                 │
+│      baseQuery.range(0, 999);    ← First call: modifies baseQuery   │
+│      baseQuery.range(1000, 1999); ← Second call: SAME object!       │
+│      baseQuery.range(2000, 2999); ← Third call: accumulated state   │
+│    }                                                                 │
+│  }                                                                   │
+│                                                                      │
+│  Problem: Supabase query builder is MUTABLE                          │
+│  - .order() appends to URL params each time                          │
+│  - With TWO .order() calls, params may double on each iteration     │
+│  - Query state becomes corrupted after multiple iterations          │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-The query sorts by `total_donated` only. When multiple donors share the same donation amount (very common - many donors have $50, $25, etc.), the database returns them in a **non-deterministic order**. Between pagination calls, rows can shift positions, causing the same donor to appear on multiple pages.
-
-### 2. Data Verified
-
-Database check confirmed:
-- `Andrew Lewis` (ID: `32e77ae2-d712-4551-ae98-202bbc6349d3`) exists exactly **once** in the database
-- Total rows: 32,417 (unique)
-- Duplicates are occurring in the JavaScript array during fetch
+When the stable sort fix added `.order('id')` as a secondary sort, it compounded an existing latent bug: the `.order()` method **appends** to the existing order parameters rather than replacing them. After multiple pagination loops, the query URL accumulates duplicate order parameters, leading to malformed requests or server errors.
 
 ## Solution
 
-### Fix 1: Stable Secondary Sort Key
+Refactor `fetchAllWithPagination` to use a **query factory function** instead of passing a mutable query object. This ensures each pagination request builds a fresh query from scratch.
 
-Add `id` as a secondary sort column to guarantee deterministic ordering across all pagination requests.
+### Technical Changes
 
 **File: `src/queries/useDonorSegmentQuery.ts`**
 
-Current code (line 315):
+**Change 1: Update `fetchAllWithPagination` to accept a factory function**
+
+Current code (lines 260-286):
 ```typescript
-.order('total_donated', { ascending: false, nullsFirst: false });
+async function fetchAllWithPagination(
+  baseQuery: any,
+  batchSize: number = 1000
+): Promise<any[]> {
+  let allData: any[] = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await baseQuery.range(from, from + batchSize - 1);
+    // ...
+  }
+  return allData;
+}
 ```
 
 Updated code:
 ```typescript
-.order('total_donated', { ascending: false, nullsFirst: false })
-.order('id', { ascending: true });  // Stable tiebreaker
+async function fetchAllWithPagination(
+  queryFactory: () => any,
+  batchSize: number = 1000
+): Promise<any[]> {
+  let allData: any[] = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    // Build fresh query for each page to avoid mutation issues
+    const { data, error } = await queryFactory().range(from, from + batchSize - 1);
+    
+    if (error) {
+      console.error('Pagination fetch error:', error);
+      throw error;
+    }
+
+    if (data && data.length > 0) {
+      allData = [...allData, ...data];
+      hasMore = data.length === batchSize;
+      from += batchSize;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allData;
+}
 ```
 
-### Fix 2: Deduplicate After Fetch (Safety Net)
+**Change 2: Update the caller to pass a factory function**
 
-Add a deduplication step after the paginated fetch to prevent any edge cases from causing duplicate entries.
-
-**File: `src/queries/useDonorSegmentQuery.ts`**
-
-After Step 4 transformation (around line 471):
+Current code (lines 288-324):
 ```typescript
-// Step 4: Transform and enrich donors with attribution
-let donors = demographics.map(row => {
-  const email = row.donor_email?.toLowerCase().trim();
-  const attribution = email ? attributionMap.get(email) : undefined;
-  return transformToDonor(row, ltvMap.get(row.donor_key || ''), attribution);
-});
+async function fetchSegmentDonors(
+  organizationId: string,
+  filters: FilterCondition[]
+): Promise<SegmentQueryResult> {
+  let query = supabase
+    .from('donor_demographics')
+    .select(`...`)
+    .eq('organization_id', organizationId)
+    .order('total_donated', { ascending: false, nullsFirst: false })
+    .order('id', { ascending: true });
 
-// Deduplicate by ID (safety net for pagination edge cases)
-const uniqueMap = new Map(donors.map(d => [d.id, d]));
-donors = Array.from(uniqueMap.values());
+  for (const filter of filters) {
+    query = applyServerFilter(query, filter);
+  }
+
+  const demographics = await fetchAllWithPagination(query);
+  // ...
+}
 ```
+
+Updated code:
+```typescript
+async function fetchSegmentDonors(
+  organizationId: string,
+  filters: FilterCondition[]
+): Promise<SegmentQueryResult> {
+  // Create a query factory that builds a fresh query each time
+  const createQuery = () => {
+    let query = supabase
+      .from('donor_demographics')
+      .select(`
+        id,
+        donor_key,
+        donor_email,
+        phone,
+        first_name,
+        last_name,
+        state,
+        city,
+        zip,
+        total_donated,
+        donation_count,
+        first_donation_date,
+        last_donation_date,
+        is_recurring,
+        employer,
+        occupation
+      `)
+      .eq('organization_id', organizationId)
+      .order('total_donated', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: true });
+
+    // Apply server-side filters
+    for (const filter of filters) {
+      query = applyServerFilter(query, filter);
+    }
+
+    return query;
+  };
+
+  // Fetch ALL records using pagination with fresh queries
+  const demographics = await fetchAllWithPagination(createQuery);
+  // ...
+}
+```
+
+## Why This Fixes the Issue
+
+1. **Fresh Query Each Iteration**: Each pagination request now creates a brand new query object with clean state
+2. **No Mutation Accumulation**: The `.order()` parameters won't accumulate across iterations
+3. **Deterministic Behavior**: Every page request is identical except for the `.range()` offset
+4. **Maintains Stable Sort**: The `.order('id')` secondary sort still works correctly for deterministic pagination
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/queries/useDonorSegmentQuery.ts` | Add secondary `.order('id')` for stable pagination; Add deduplication step after transformation |
-
-## Technical Details
-
-### Why Secondary Sort Works
-
-PostgreSQL (Supabase) uses an unstable sort algorithm. When multiple rows have the same value for the sort column, their relative order is undefined and may change between queries. Adding a unique secondary sort key (`id`) guarantees the same order every time:
-
-```sql
--- Before: Unstable
-ORDER BY total_donated DESC
-
--- After: Stable and deterministic  
-ORDER BY total_donated DESC, id ASC
-```
-
-### Why Deduplication is a Safety Net
-
-Even with stable sorting, edge cases can occur:
-- Concurrent inserts during pagination
-- Cache inconsistencies
-- Network retries
-
-The Map-based deduplication (`new Map(donors.map(d => [d.id, d]))`) ensures uniqueness by ID, keeping only the last occurrence of each donor.
+| `src/queries/useDonorSegmentQuery.ts` | Refactor `fetchAllWithPagination` to use factory pattern; Update `fetchSegmentDonors` to pass query factory |
 
 ## Expected Outcome
 
 After this fix:
-- No duplicate donors in the table
-- React console warnings about duplicate keys will disappear
-- Pagination will fetch exactly 32,417 unique donors
-- Sorting will be stable and predictable
+- Page reload will correctly load donor data
+- Pagination will work correctly with 32,417+ donors
+- No query state corruption across pagination iterations
+- Sorting and filtering will continue to work as expected
+
