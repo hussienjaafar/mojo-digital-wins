@@ -27,6 +27,7 @@ import {
   OrganizationProfileForm,
   OrganizationSettingsForm,
   OrganizationMembersPanel,
+  OrganizationIntegrationsPanel,
 } from '@/components/admin/organization';
 import type { OrgProfileData } from '@/components/admin/onboarding/types';
 
@@ -432,6 +433,18 @@ export default function OrganizationDetail() {
               ) : null}
             </TabsTrigger>
             <TabsTrigger
+              value="integrations"
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-all gap-2 data-[state=active]:bg-[hsl(var(--portal-bg-secondary))] data-[state=active]:text-[hsl(var(--portal-text-primary))] data-[state=active]:shadow-sm"
+            >
+              <Plug className="w-4 h-4" />
+              <span className="hidden sm:inline">Integrations</span>
+              {onboarding?.integration_count ? (
+                <V3Badge variant="muted" size="sm" className="hidden sm:flex">
+                  {onboarding.integration_count}
+                </V3Badge>
+              ) : null}
+            </TabsTrigger>
+            <TabsTrigger
               value="activity"
               className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-all gap-2 data-[state=active]:bg-[hsl(var(--portal-bg-secondary))] data-[state=active]:text-[hsl(var(--portal-text-primary))] data-[state=active]:shadow-sm"
             >
@@ -468,6 +481,16 @@ export default function OrganizationDetail() {
                 <OrganizationMembersPanel
                   organizationId={organizationId!}
                   organizationName={organization.name}
+                />
+              </motion.div>
+            </TabsContent>
+
+            <TabsContent value="integrations" className="mt-0">
+              <motion.div key="integrations" {...tabAnimation}>
+                <OrganizationIntegrationsPanel
+                  organizationId={organizationId!}
+                  organizationName={organization.name}
+                  organizationSlug={organization.slug}
                 />
               </motion.div>
             </TabsContent>

@@ -3,6 +3,7 @@ import { V3Button } from '@/components/v3/V3Button';
 import { V3Badge } from '@/components/v3/V3Badge';
 import { PortalFormInput } from '@/components/admin/forms/PortalFormInput';
 import { PortalFormSelect } from '@/components/admin/forms/PortalFormSelect';
+import { LogoUploadField } from '@/components/admin/forms/LogoUploadField';
 import { FileText, Save, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -245,36 +246,14 @@ export function OrganizationDetailsForm({ organization, onSave }: OrganizationDe
             placeholder="Select timezone"
           />
 
-          {/* Logo URL - full width */}
+          {/* Logo - full width */}
           <div className="md:col-span-2">
-            <div className="flex gap-3 items-end">
-              <div className="flex-1">
-                <PortalFormInput
-                  label="Logo URL"
-                  type="url"
-                  value={formData.logo_url}
-                  onChange={e => setFormData(prev => ({ ...prev, logo_url: e.target.value }))}
-                  placeholder="https://example.com/logo.png"
-                  error={
-                    formData.logo_url && !isValidUrl(formData.logo_url)
-                      ? 'Please enter a valid URL'
-                      : undefined
-                  }
-                />
-              </div>
-              {formData.logo_url && isValidUrl(formData.logo_url) && (
-                <div className="w-10 h-10 rounded-lg border border-[hsl(var(--portal-border))] overflow-hidden flex-shrink-0 bg-[hsl(var(--portal-bg-tertiary))]">
-                  <img
-                    src={formData.logo_url}
-                    alt="Logo preview"
-                    className="w-full h-full object-contain"
-                    onError={e => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                </div>
-              )}
-            </div>
+            <LogoUploadField
+              value={formData.logo_url}
+              onChange={(url) => setFormData(prev => ({ ...prev, logo_url: url }))}
+              organizationId={organization.id}
+              label="Organization Logo"
+            />
           </div>
         </div>
 
