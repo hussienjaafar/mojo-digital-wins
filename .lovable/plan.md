@@ -1,137 +1,168 @@
-✅ COMPLETED
 
-# Add Organization Management Feature to Admin Panel
+
+# Redesign Organization Management Page with V3 Aesthetic and Member Management
 
 ## Overview
 
-Create a comprehensive organization detail/edit page that allows admins to manage all organization information that was initially collected through the onboarding wizard. This will be accessible via clicking on an organization row in the `ClientOrganizationManager` or through a direct URL.
+Redesign the `OrganizationDetail` page to match the clean, modern aesthetic of the client dashboard (V3 design system) and add a new "Members" tab to manage organization members directly from this page.
 
-## Implementation Approach
+## Current State Analysis
 
-### New Files to Create
+The current `OrganizationDetail.tsx` uses:
+- `AdminPageHeader` for the header (good)
+- Standard shadcn `Card` and `Tabs` components (outdated styling)
+- Portal-themed CSS variables (partially aligned)
 
-#### 1. Organization Detail Page
+The client dashboard uses:
+- V3 design system components (`V3Card`, `V3SectionHeader`, motion animations)
+- Gradient accents and premium visual treatments
+- Clean spacing with CSS custom properties (`--portal-space-md`, etc.)
+- Collapsible sections with smooth animations
+
+## Design Changes
+
+### Visual Redesign
+
+| Current | New V3 Style |
+|---------|--------------|
+| Basic shadcn Card | V3Card with accent borders |
+| Plain tabs | Styled tabs with icons and badges |
+| Static layout | Animated sections with framer-motion |
+| Dense spacing | Portal spacing tokens |
+
+### New Members Tab
+
+Add a dedicated "Members" tab that allows managing organization members without leaving the organization page. This tab will include:
+- Member list with email, role, MFA status, last login
+- Invite member functionality
+- Role management (change role dropdown)
+- Remove member action
+- Pending invitations sub-section
+- Seat usage display
+
+## Implementation Plan
+
+### 1. Create OrganizationMembersPanel Component
+
+**New File: `src/components/admin/organization/OrganizationMembersPanel.tsx`**
+
+A self-contained component that manages members for a specific organization:
+
+```typescript
+interface OrganizationMembersPanelProps {
+  organizationId: string;
+  organizationName: string;
+}
+```
+
+Features:
+- Uses `get_user_management_data` RPC with `p_org_id` locked to the organization
+- Displays member list in V3Card styling
+- Inline role editing via dropdown
+- Quick actions: View details, Remove member
+- Invite button that opens `InviteUserDialog`
+- Shows pending invitations count as badge
+- Integrates `SeatUsageDisplay` component at the top
+
+### 2. Redesign OrganizationDetail Page
+
 **File: `src/pages/admin/OrganizationDetail.tsx`**
 
-A tabbed interface for managing all organization data:
+#### Header Improvements
+- Add organization logo display in header if available
+- Add status badge (active/inactive) with better styling
+- Add quick stats row (members count, integrations, onboarding status)
 
-| Tab | Content |
-|-----|---------|
-| **Details** | Name, slug, logo URL, primary contact email, website URL, timezone |
-| **Profile** | Organization type, geo level, mission statement, focus areas, policy domains |
-| **Settings** | MFA requirements, seat limits, concurrent session limits |
-| **Activity** | Onboarding progress, user count, integration status (read-only) |
+#### Tab Redesign
+- Use V3Card for tab content containers
+- Add "Members" tab between "Settings" and "Activity"
+- Add badges showing counts on tabs (e.g., member count, pending invites)
+- Animate tab content transitions with framer-motion
 
-#### 2. Reusable Edit Forms
-**File: `src/components/admin/organization/OrganizationDetailsForm.tsx`**
-
-Editable form for `client_organizations` table fields:
-- Organization name (with slug auto-generation option)
-- Slug (with availability checker - reuse logic from Step1CreateOrg)
-- Primary contact email
-- Logo URL (with preview)
-- Website URL
-- Timezone selector
-
-**File: `src/components/admin/organization/OrganizationProfileForm.tsx`**
-
-Editable form for `organization_profiles` table fields:
-- Organization type dropdown (reuse ORG_TYPE_OPTIONS from Step2)
-- Geographic level and locations (reuse GeoLocationPicker)
-- Mission statement
-- Focus areas (tag-based selection)
-- Policy domains (checkbox selection)
-- Sensitivity and risk tolerance settings
-
-**File: `src/components/admin/organization/OrganizationSettingsForm.tsx`**
-
-Administrative settings form:
-- MFA required toggle
-- MFA grace period days
-- Seat limit management
-- Max concurrent sessions
-
-### Modifications to Existing Files
-
-#### 1. Add Route
-**File: `src/App.tsx`**
-
-Add new route for organization detail page:
-```typescript
-<Route path="/admin/organizations/:organizationId" element={<OrganizationDetail />} />
+#### Updated Tab Structure
+```text
+[Details] [Profile] [Settings] [Members] [Activity]
+     ^          ^         ^         ^          ^
+     |          |         |         |          |
+  Org info   Mission   Security  Team mgmt  Onboarding
 ```
 
-#### 2. Add Edit Action to Organization List
-**File: `src/components/admin/ClientOrganizationManager.tsx`**
+### 3. V3 Styling Updates for Forms
 
-- Add "Edit" menu item in the actions dropdown
-- Make organization name/row clickable to navigate to detail page
-- Add pencil icon for quick edit access
+**Files to Update:**
+- `OrganizationDetailsForm.tsx`
+- `OrganizationProfileForm.tsx`
+- `OrganizationSettingsForm.tsx`
 
-### Data Flow
+Changes:
+- Replace `Card` with `V3Card` with appropriate accent colors
+- Use `V3SectionHeader` for section titles within forms
+- Add subtle hover/focus states matching portal theme
+- Improve form grid layout for better visual hierarchy
+
+### 4. Activity Tab Enhancement
+
+Redesign the Activity tab content to use V3 components:
+- Use V3Card with stats inside
+- Add KPI-style metrics cards for onboarding, users, integrations
+- Include a timeline of recent organization activity (if data available)
+
+## Technical Implementation Details
+
+### OrganizationMembersPanel Component Structure
 
 ```text
-                                   ┌─────────────────────────────────┐
-                                   │     OrganizationDetail Page     │
-                                   │   /admin/organizations/:id      │
-                                   └─────────────────────────────────┘
-                                              │
-                    ┌─────────────────────────┼─────────────────────────┐
-                    │                         │                         │
-                    ▼                         ▼                         ▼
-    ┌───────────────────────┐  ┌───────────────────────┐  ┌───────────────────────┐
-    │  OrganizationDetails  │  │  OrganizationProfile  │  │ OrganizationSettings  │
-    │        Form           │  │        Form           │  │        Form           │
-    └───────────────────────┘  └───────────────────────┘  └───────────────────────┘
-              │                          │                          │
-              ▼                          ▼                          ▼
-    ┌───────────────────────┐  ┌───────────────────────┐  ┌───────────────────────┐
-    │  client_organizations │  │ organization_profiles │  │  client_organizations │
-    │       (update)        │  │       (upsert)        │  │       (update)        │
-    └───────────────────────┘  └───────────────────────┘  └───────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ SeatUsageDisplay (seats used / total)                       │
+├─────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ Members Header                           [Invite Member]│ │
+│ │ Search input                                            │ │
+│ ├─────────────────────────────────────────────────────────┤ │
+│ │ Member Row: Avatar | Name | Email | Role | Last Login   │ │
+│ │ Member Row: Avatar | Name | Email | Role | Last Login   │ │
+│ │ Member Row: Avatar | Name | Email | Role | Last Login   │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ Pending Invitations (2)                                 │ │
+│ │ - invite@example.com (Expires in 3 days) [Revoke]       │ │
+│ └─────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Shared Components Reuse
+### Data Fetching Strategy
 
-Extract and reuse these from onboarding:
-- Slug availability checker logic from `Step1CreateOrg`
-- Organization type options from `Step2OrgProfile`
-- Geo level options from `Step2OrgProfile`
-- Focus area/policy domain tag pickers
-- `GeoLocationPicker` component
+The members panel will:
+1. Call `get_user_management_data` RPC with `p_org_id` set to the current organization
+2. Fetch pending invitations filtered by `organization_id`
+3. Use `SeatUsageDisplay` which already handles its own data fetching
 
-### UI Design
+### Reusable Components
 
-Match the existing admin panel design system:
-- Use `AdminPageHeader` for consistent header
-- Use `Card`, `CardHeader`, `CardContent` for sections
-- Use `V3Button` for actions
-- Use portal-themed colors and styling
-- Add breadcrumb navigation back to organization list
-
-### Form Validation
-
-- Slug uniqueness check (exclude current org)
-- Email format validation
-- URL format validation (website, logo)
-- Required field validation (name, slug)
+From existing codebase:
+- `SeatUsageDisplay` - for seat allocation display
+- `InviteUserDialog` - for inviting new members (will pass org pre-selected)
+- `UserDetailSidebar` - for viewing member details
+- V3 components: `V3Card`, `V3Button`, `V3Badge`, `V3SectionHeader`
 
 ## Files Summary
 
 | Action | File Path |
 |--------|-----------|
-| Create | `src/pages/admin/OrganizationDetail.tsx` |
-| Create | `src/components/admin/organization/OrganizationDetailsForm.tsx` |
-| Create | `src/components/admin/organization/OrganizationProfileForm.tsx` |
-| Create | `src/components/admin/organization/OrganizationSettingsForm.tsx` |
-| Create | `src/components/admin/organization/index.ts` (barrel export) |
-| Modify | `src/App.tsx` (add route) |
-| Modify | `src/components/admin/ClientOrganizationManager.tsx` (add edit links) |
+| **Create** | `src/components/admin/organization/OrganizationMembersPanel.tsx` |
+| **Update** | `src/components/admin/organization/index.ts` (add export) |
+| **Update** | `src/pages/admin/OrganizationDetail.tsx` (redesign + add Members tab) |
+| **Update** | `src/components/admin/organization/OrganizationDetailsForm.tsx` (V3 styling) |
+| **Update** | `src/components/admin/organization/OrganizationProfileForm.tsx` (V3 styling) |
+| **Update** | `src/components/admin/organization/OrganizationSettingsForm.tsx` (V3 styling) |
 
 ## Expected Outcome
 
-- Admins can click any organization row to view/edit all details
-- All onboarding data can be modified after initial setup
-- Changes are saved immediately with success/error feedback
-- Consistent UI with existing admin panel design
-- Breadcrumb navigation for easy return to organization list
+1. Organization management page has a premium, cohesive look matching the client dashboard
+2. Admins can manage organization members without navigating away
+3. Clean visual hierarchy with V3 design tokens
+4. Smooth animations for tab transitions
+5. Consistent use of accent colors and gradients
+6. Mobile-responsive layout
+
