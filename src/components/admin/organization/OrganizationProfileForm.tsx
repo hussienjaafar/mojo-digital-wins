@@ -1,22 +1,32 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { V3Card } from '@/components/v3/V3Card';
+import { V3Button } from '@/components/v3/V3Button';
+import { V3Badge } from '@/components/v3/V3Badge';
+import { V3SectionHeader } from '@/components/v3/V3SectionHeader';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { V3Button } from '@/components/v3/V3Button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Building2, Save, Loader2, ChevronDown, ChevronUp, Sparkles, X, Plus, Target } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 import { GeoLocationPicker } from '@/components/admin/onboarding/GeoLocationPicker';
-import type { OrgProfileData, OrganizationType, GeoLevel, GeoLocation } from '@/components/admin/onboarding/types';
+import type { OrgProfileData, OrganizationType, GeoLevel } from '@/components/admin/onboarding/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 const POLICY_DOMAINS = [
-  'Healthcare', 'Education', 'Environment', 'Labor & Workers Rights',
-  'Civil Rights', 'Immigration', 'Economic Justice', 'Housing',
-  'Criminal Justice', 'Voting Rights', 'Foreign Policy', 'Technology',
+  'Healthcare',
+  'Education',
+  'Environment',
+  'Labor & Workers Rights',
+  'Civil Rights',
+  'Immigration',
+  'Economic Justice',
+  'Housing',
+  'Criminal Justice',
+  'Voting Rights',
+  'Foreign Policy',
+  'Technology',
 ];
 
 const ORG_TYPE_OPTIONS: { value: OrganizationType; label: string; category: string; defaultGeoLevel: GeoLevel }[] = [
@@ -71,7 +81,7 @@ export function OrganizationProfileForm({ organizationId, profile, websiteUrl, o
   const [isScraping, setIsScraping] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [customFocusArea, setCustomFocusArea] = useState('');
-  
+
   const [formData, setFormData] = useState<OrgProfileData>({
     mission_statement: profile?.mission_statement || '',
     focus_areas: profile?.focus_areas || [],
@@ -90,8 +100,8 @@ export function OrganizationProfileForm({ organizationId, profile, websiteUrl, o
     const originalMission = profile?.mission_statement || '';
     const originalType = profile?.organization_type || 'c4_national';
     const originalGeoLevel = profile?.geo_level || 'national';
-    
-    const changed = 
+
+    const changed =
       formData.mission_statement !== originalMission ||
       formData.organization_type !== originalType ||
       formData.geo_level !== originalGeoLevel ||
@@ -100,7 +110,7 @@ export function OrganizationProfileForm({ organizationId, profile, websiteUrl, o
       JSON.stringify(formData.geo_locations) !== JSON.stringify(profile?.geo_locations || []) ||
       formData.sentiment_sensitivity !== (profile?.sentiment_sensitivity || 'medium') ||
       formData.risk_tolerance !== (profile?.risk_tolerance || 'medium');
-    
+
     setHasChanges(changed);
   }, [formData, profile]);
 
@@ -157,35 +167,32 @@ export function OrganizationProfileForm({ organizationId, profile, websiteUrl, o
       });
       return;
     }
-    
+
     setIsScraping(true);
-    
+
     try {
       const { data, error } = await supabase.functions.invoke('scrape-organization-website', {
-        body: { 
+        body: {
           organizationId,
           websiteUrl,
         },
       });
 
       if (error) throw error;
-      
-      if (data?.error) {
-        throw new Error(data.error);
-      }
+      if (data?.error) throw new Error(data.error);
 
       if (data?.profile) {
         const aiProfile = data.profile;
         const focusAreas = aiProfile.focus_areas || [];
         const keyIssues = aiProfile.key_issues || [];
         const aiExtractedAreas = [...new Set([...focusAreas, ...keyIssues])];
-        
+
         setFormData(prev => ({
           ...prev,
           mission_statement: aiProfile.mission || prev.mission_statement,
           focus_areas: aiExtractedAreas.length > 0 ? aiExtractedAreas : prev.focus_areas,
         }));
-        
+
         toast({
           title: 'Website Analyzed',
           description: `Found ${aiExtractedAreas.length} focus areas.`,
@@ -204,7 +211,7 @@ export function OrganizationProfileForm({ organizationId, profile, websiteUrl, o
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     setIsSaving(true);
     try {
       await onSave(formData);
@@ -214,227 +221,203 @@ export function OrganizationProfileForm({ organizationId, profile, websiteUrl, o
   };
 
   return (
-    <Card className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))]">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Building2 className="w-5 h-5" />
-          Organization Profile
-        </CardTitle>
-        <CardDescription>
-          Mission, focus areas, and geographic scope
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Organization Type */}
-          <div className="space-y-2">
-            <Label>Organization Type</Label>
-            <Select
-              value={formData.organization_type}
-              onValueChange={(v) => handleOrgTypeChange(v as OrganizationType)}
-            >
-              <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))]">
-                <SelectValue placeholder="Select organization type" />
-              </SelectTrigger>
-              <SelectContent>
-                {ORG_TYPE_OPTIONS.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    <div className="flex flex-col">
-                      <span>{opt.label}</span>
-                      <span className="text-xs text-muted-foreground">{opt.category}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+    <V3Card accent="purple">
+      <V3SectionHeader
+        title="Organization Profile"
+        subtitle="Mission, focus areas, and geographic scope"
+        icon={Building2}
+        size="md"
+      />
 
-          {/* Geographic Scope */}
-          <div className="space-y-3">
-            <Label>Geographic Scope</Label>
-            <Select
-              value={formData.geo_level}
-              onValueChange={(v) => handleGeoLevelChange(v as GeoLevel)}
-            >
-              <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))]">
-                <SelectValue placeholder="Select geographic level" />
-              </SelectTrigger>
-              <SelectContent>
-                {GEO_LEVEL_OPTIONS.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    <div className="flex flex-col">
-                      <span>{opt.label}</span>
-                      <span className="text-xs text-muted-foreground">{opt.description}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <GeoLocationPicker
-              geoLevel={formData.geo_level}
-              selectedLocations={formData.geo_locations}
-              onChange={(locations) => setFormData(prev => ({ ...prev, geo_locations: locations }))}
-            />
-          </div>
+      <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+        {/* Organization Type */}
+        <div className="space-y-2">
+          <Label className="text-[hsl(var(--portal-text-primary))]">Organization Type</Label>
+          <Select value={formData.organization_type} onValueChange={v => handleOrgTypeChange(v as OrganizationType)}>
+            <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
+              <SelectValue placeholder="Select organization type" />
+            </SelectTrigger>
+            <SelectContent className="bg-[hsl(var(--portal-bg-card))] border-[hsl(var(--portal-border))]">
+              {ORG_TYPE_OPTIONS.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  <div className="flex flex-col">
+                    <span>{opt.label}</span>
+                    <span className="text-xs text-[hsl(var(--portal-text-muted))]">{opt.category}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-          {/* Mission Statement */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="mission">Mission Statement</Label>
-              {websiteUrl && (
-                <V3Button
+        {/* Geographic Scope */}
+        <div className="space-y-3">
+          <Label className="text-[hsl(var(--portal-text-primary))]">Geographic Scope</Label>
+          <Select value={formData.geo_level} onValueChange={v => handleGeoLevelChange(v as GeoLevel)}>
+            <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
+              <SelectValue placeholder="Select geographic level" />
+            </SelectTrigger>
+            <SelectContent className="bg-[hsl(var(--portal-bg-card))] border-[hsl(var(--portal-border))]">
+              {GEO_LEVEL_OPTIONS.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  <div className="flex flex-col">
+                    <span>{opt.label}</span>
+                    <span className="text-xs text-[hsl(var(--portal-text-muted))]">{opt.description}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <GeoLocationPicker
+            geoLevel={formData.geo_level}
+            selectedLocations={formData.geo_locations}
+            onChange={locations => setFormData(prev => ({ ...prev, geo_locations: locations }))}
+          />
+        </div>
+
+        {/* Mission Statement */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="mission" className="text-[hsl(var(--portal-text-primary))]">
+              Mission Statement
+            </Label>
+            {websiteUrl && (
+              <V3Button type="button" variant="ghost" size="sm" onClick={handleScrapeWebsite} disabled={isScraping}>
+                {isScraping ? (
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4 mr-1" />
+                )}
+                Extract from website
+              </V3Button>
+            )}
+          </div>
+          <Textarea
+            id="mission"
+            value={formData.mission_statement}
+            onChange={e => setFormData(prev => ({ ...prev, mission_statement: e.target.value }))}
+            placeholder="Describe the organization's mission and purpose..."
+            rows={4}
+            className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]"
+          />
+        </div>
+
+        {/* Focus Areas */}
+        <div className="space-y-2">
+          <Label className="text-[hsl(var(--portal-text-primary))]">Focus Areas</Label>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {formData.focus_areas.map(area => (
+              <V3Badge key={area} variant="default" className="gap-1 pr-1">
+                {area}
+                <button
                   type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleScrapeWebsite}
-                  disabled={isScraping}
+                  onClick={() => removeFocusArea(area)}
+                  className="ml-1 hover:bg-black/20 rounded-full p-0.5"
                 >
-                  {isScraping ? (
-                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-4 h-4 mr-1" />
-                  )}
-                  Extract from website
-                </V3Button>
-              )}
-            </div>
-            <Textarea
-              id="mission"
-              value={formData.mission_statement}
-              onChange={(e) => setFormData(prev => ({ ...prev, mission_statement: e.target.value }))}
-              placeholder="Describe the organization's mission and purpose..."
-              rows={4}
-              className="bg-[hsl(var(--portal-bg-secondary))]"
+                  <X className="w-3 h-3" />
+                </button>
+              </V3Badge>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={customFocusArea}
+              onChange={e => setCustomFocusArea(e.target.value)}
+              placeholder="Add a focus area..."
+              className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]"
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addFocusArea();
+                }
+              }}
             />
-          </div>
-
-          {/* Focus Areas */}
-          <div className="space-y-2">
-            <Label>Focus Areas</Label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {formData.focus_areas.map(area => (
-                <Badge key={area} variant="default" className="gap-1">
-                  {area}
-                  <button
-                    type="button"
-                    onClick={() => removeFocusArea(area)}
-                    className="ml-1 hover:bg-black/20 rounded-full p-0.5"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                value={customFocusArea}
-                onChange={(e) => setCustomFocusArea(e.target.value)}
-                placeholder="Add a focus area..."
-                className="bg-[hsl(var(--portal-bg-secondary))]"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addFocusArea();
-                  }
-                }}
-              />
-              <V3Button
-                type="button"
-                variant="secondary"
-                onClick={addFocusArea}
-                disabled={!customFocusArea.trim()}
-              >
-                <Plus className="w-4 h-4" />
-              </V3Button>
-            </div>
-          </div>
-
-          {/* Policy Domains */}
-          <div className="space-y-2">
-            <Label>Policy Domains</Label>
-            <div className="flex flex-wrap gap-2">
-              {POLICY_DOMAINS.map(domain => (
-                <Badge
-                  key={domain}
-                  variant={formData.policy_domains.includes(domain) ? 'default' : 'outline'}
-                  className="cursor-pointer transition-all hover:opacity-80"
-                  onClick={() => togglePolicyDomain(domain)}
-                >
-                  {domain}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          {/* Advanced Settings */}
-          <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-            <CollapsibleTrigger asChild>
-              <V3Button type="button" variant="ghost" className="w-full justify-between">
-                <span className="flex items-center gap-2">
-                  <Target className="w-4 h-4" />
-                  Advanced Settings
-                </span>
-                {advancedOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </V3Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-4 pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Sentiment Sensitivity</Label>
-                  <Select
-                    value={formData.sentiment_sensitivity}
-                    onValueChange={(v) => setFormData(prev => ({ ...prev, sentiment_sensitivity: v as 'low' | 'medium' | 'high' }))}
-                  >
-                    <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low - Only major sentiment shifts</SelectItem>
-                      <SelectItem value="medium">Medium - Moderate changes</SelectItem>
-                      <SelectItem value="high">High - All sentiment changes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Risk Tolerance</Label>
-                  <Select
-                    value={formData.risk_tolerance}
-                    onValueChange={(v) => setFormData(prev => ({ ...prev, risk_tolerance: v as 'low' | 'medium' | 'high' }))}
-                  >
-                    <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low - Alert on all risks</SelectItem>
-                      <SelectItem value="medium">Medium - Moderate risks</SelectItem>
-                      <SelectItem value="high">High - Only critical risks</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-
-          <div className="flex items-center justify-between pt-4 border-t border-[hsl(var(--portal-border))]">
-            <div>
-              {hasChanges && (
-                <Badge variant="outline" className="text-[hsl(var(--portal-warning))]">
-                  Unsaved changes
-                </Badge>
-              )}
-            </div>
-            <V3Button
-              type="submit"
-              disabled={isSaving || !hasChanges}
-              isLoading={isSaving}
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Save Profile
+            <V3Button type="button" variant="secondary" onClick={addFocusArea} disabled={!customFocusArea.trim()}>
+              <Plus className="w-4 h-4" />
             </V3Button>
           </div>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+
+        {/* Policy Domains */}
+        <div className="space-y-2">
+          <Label className="text-[hsl(var(--portal-text-primary))]">Policy Domains</Label>
+          <div className="flex flex-wrap gap-2">
+            {POLICY_DOMAINS.map(domain => (
+              <V3Badge
+                key={domain}
+                variant={formData.policy_domains.includes(domain) ? 'default' : 'muted'}
+                className="cursor-pointer transition-all hover:opacity-80"
+                onClick={() => togglePolicyDomain(domain)}
+              >
+                {domain}
+              </V3Badge>
+            ))}
+          </div>
+        </div>
+
+        {/* Advanced Settings */}
+        <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+          <CollapsibleTrigger asChild>
+            <V3Button type="button" variant="ghost" className="w-full justify-between">
+              <span className="flex items-center gap-2">
+                <Target className="w-4 h-4" />
+                Advanced Settings
+              </span>
+              {advancedOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </V3Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-4 pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[hsl(var(--portal-text-primary))]">Sentiment Sensitivity</Label>
+                <Select
+                  value={formData.sentiment_sensitivity}
+                  onValueChange={v => setFormData(prev => ({ ...prev, sentiment_sensitivity: v as 'low' | 'medium' | 'high' }))}
+                >
+                  <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[hsl(var(--portal-bg-card))] border-[hsl(var(--portal-border))]">
+                    <SelectItem value="low">Low - Only major sentiment shifts</SelectItem>
+                    <SelectItem value="medium">Medium - Moderate changes</SelectItem>
+                    <SelectItem value="high">High - All sentiment changes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[hsl(var(--portal-text-primary))]">Risk Tolerance</Label>
+                <Select
+                  value={formData.risk_tolerance}
+                  onValueChange={v => setFormData(prev => ({ ...prev, risk_tolerance: v as 'low' | 'medium' | 'high' }))}
+                >
+                  <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[hsl(var(--portal-bg-card))] border-[hsl(var(--portal-border))]">
+                    <SelectItem value="low">Low - Alert on all risks</SelectItem>
+                    <SelectItem value="medium">Medium - Moderate risks</SelectItem>
+                    <SelectItem value="high">High - Only critical risks</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        <div className="flex items-center justify-between pt-4 border-t border-[hsl(var(--portal-border))]">
+          <div>
+            {hasChanges && (
+              <V3Badge variant="warning" size="sm">
+                Unsaved changes
+              </V3Badge>
+            )}
+          </div>
+          <V3Button type="submit" disabled={isSaving || !hasChanges} isLoading={isSaving} leftIcon={<Save className="w-4 h-4" />}>
+            Save Profile
+          </V3Button>
+        </div>
+      </form>
+    </V3Card>
   );
 }
