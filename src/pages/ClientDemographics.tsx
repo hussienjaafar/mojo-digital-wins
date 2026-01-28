@@ -103,6 +103,16 @@ const ClientDemographics = () => {
   const [cityCache, setCityCache] = useState<Map<string, CityStats[]>>(new Map());
   const [isCityLoading, setIsCityLoading] = useState(false);
 
+  // Reset state when organization changes to prevent showing stale data
+  useEffect(() => {
+    setSummary(null);
+    setCacheStatus(null);
+    setCalculatedAt(null);
+    setCityCache(new Map());
+    setSelectedState(null);
+    setError(null);
+  }, [organizationId]);
+
   // Load data when organizationId is available
   useEffect(() => {
     if (organizationId) {

@@ -61,17 +61,30 @@ export const useClientOrganization = () => {
     loadOrganizationId();
   }, [impersonatedOrgId, isImpersonating]);
 
-  // Listen for storage changes (when admin switches org via selector)
+  // Listen for organization changes (both same-tab custom events and cross-tab storage events)
   useEffect(() => {
+    // Handle same-tab organization changes via custom event
+    const handleOrgChange = () => {
+      const newOrgId = localStorage.getItem('selectedOrganizationId');
+      if (newOrgId && newOrgId !== organizationId) {
+        setOrganizationId(newOrgId);
+      }
+    };
+    
+    // Handle cross-tab storage changes
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'selectedOrganizationId' && e.newValue) {
         setOrganizationId(e.newValue);
       }
     };
     
+    window.addEventListener('organizationChanged', handleOrgChange);
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    return () => {
+      window.removeEventListener('organizationChanged', handleOrgChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [organizationId]);
 
   return { organizationId, isLoading, isImpersonating };
 };

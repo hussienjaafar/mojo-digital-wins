@@ -388,6 +388,9 @@ export const ClientShell = ({
       setOrganization(newOrg);
       localStorage.setItem("selectedOrganizationId", newOrgId);
 
+      // Dispatch custom event for same-tab listeners (e.g., useClientOrganization hook)
+      window.dispatchEvent(new CustomEvent('organizationChanged', { detail: newOrgId }));
+
       // Sync to impersonation context so child pages using useClientOrganization
       // automatically pick up the new organization
       if (isAdmin) {
