@@ -15741,6 +15741,10 @@ export type Database = {
           rule_id: string
         }[]
       }
+      populate_donor_demographics_bulk: {
+        Args: { _organization_id: string }
+        Returns: Json
+      }
       purge_old_activity_logs: { Args: never; Returns: undefined }
       purge_old_location_cache: { Args: never; Returns: undefined }
       record_login_attempt: {
