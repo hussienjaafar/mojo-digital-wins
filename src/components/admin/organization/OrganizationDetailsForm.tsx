@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { V3Card } from '@/components/v3/V3Card';
+import { V3Button } from '@/components/v3/V3Button';
+import { V3Badge } from '@/components/v3/V3Badge';
+import { V3SectionHeader } from '@/components/v3/V3SectionHeader';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { V3Button } from '@/components/v3/V3Button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { FileText, Save, Loader2, CheckCircle2, XCircle, Image } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -25,7 +26,6 @@ interface OrganizationData {
   slug: string;
   logo_url: string | null;
   primary_contact_email: string | null;
-  website_url: string | null;
   timezone: string | null;
 }
 
@@ -42,10 +42,9 @@ export function OrganizationDetailsForm({ organization, onSave }: OrganizationDe
     slug: organization.slug,
     logo_url: organization.logo_url || '',
     primary_contact_email: organization.primary_contact_email || '',
-    website_url: organization.website_url || '',
     timezone: organization.timezone || 'America/New_York',
   });
-  
+
   const [isSaving, setIsSaving] = useState(false);
   const [slugAvailability, setSlugAvailability] = useState<SlugAvailability>('idle');
   const [slugMessage, setSlugMessage] = useState('');
@@ -53,12 +52,11 @@ export function OrganizationDetailsForm({ organization, onSave }: OrganizationDe
 
   // Track changes
   useEffect(() => {
-    const changed = 
+    const changed =
       formData.name !== organization.name ||
       formData.slug !== organization.slug ||
       formData.logo_url !== (organization.logo_url || '') ||
       formData.primary_contact_email !== (organization.primary_contact_email || '') ||
-      formData.website_url !== (organization.website_url || '') ||
       formData.timezone !== (organization.timezone || 'America/New_York');
     setHasChanges(changed);
   }, [formData, organization]);
@@ -70,40 +68,43 @@ export function OrganizationDetailsForm({ organization, onSave }: OrganizationDe
       .replace(/^-+|-+$/g, '');
   };
 
-  const checkSlugAvailability = useCallback(async (slug: string) => {
-    const candidate = slug.trim();
-    if (!candidate || candidate === organization.slug) {
-      setSlugAvailability('idle');
-      setSlugMessage('');
-      return;
-    }
-
-    setSlugAvailability('checking');
-    setSlugMessage('Checking availability…');
-
-    try {
-      const { data, error } = await (supabase as any)
-        .from('client_organizations')
-        .select('id')
-        .eq('slug', candidate)
-        .neq('id', organization.id) // Exclude current org
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data?.id) {
-        setSlugAvailability('taken');
-        setSlugMessage('Slug is already in use.');
-      } else {
-        setSlugAvailability('available');
-        setSlugMessage('Slug is available.');
+  const checkSlugAvailability = useCallback(
+    async (slug: string) => {
+      const candidate = slug.trim();
+      if (!candidate || candidate === organization.slug) {
+        setSlugAvailability('idle');
+        setSlugMessage('');
+        return;
       }
-    } catch (err: any) {
-      console.warn('[OrganizationDetailsForm] slug check failed', err);
-      setSlugAvailability('idle');
-      setSlugMessage('');
-    }
-  }, [organization.id, organization.slug]);
+
+      setSlugAvailability('checking');
+      setSlugMessage('Checking availability…');
+
+      try {
+        const { data, error } = await (supabase as any)
+          .from('client_organizations')
+          .select('id')
+          .eq('slug', candidate)
+          .neq('id', organization.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data?.id) {
+          setSlugAvailability('taken');
+          setSlugMessage('Slug is already in use.');
+        } else {
+          setSlugAvailability('available');
+          setSlugMessage('Slug is available.');
+        }
+      } catch (err: any) {
+        console.warn('[OrganizationDetailsForm] slug check failed', err);
+        setSlugAvailability('idle');
+        setSlugMessage('');
+      }
+    },
+    [organization.id, organization.slug]
+  );
 
   // Debounced slug check
   useEffect(() => {
@@ -119,18 +120,17 @@ export function OrganizationDetailsForm({ organization, onSave }: OrganizationDe
     setFormData(prev => ({
       ...prev,
       name,
-      // Auto-generate slug only if slug hasn't been manually edited
       slug: prev.slug === generateSlug(organization.name) ? generateSlug(name) : prev.slug,
     }));
   };
 
   const isValidEmail = (email: string) => {
-    if (!email) return true; // Optional field
+    if (!email) return true;
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
   const isValidUrl = (url: string) => {
-    if (!url) return true; // Optional field
+    if (!url) return true;
     try {
       new URL(url);
       return true;
@@ -141,26 +141,12 @@ export function OrganizationDetailsForm({ organization, onSave }: OrganizationDe
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.name.trim()) {
-      return;
-    }
 
-    if (!formData.slug.trim()) {
-      return;
-    }
-
-    if (slugAvailability === 'taken') {
-      return;
-    }
-
-    if (!isValidEmail(formData.primary_contact_email)) {
-      return;
-    }
-
-    if (!isValidUrl(formData.website_url) || !isValidUrl(formData.logo_url)) {
-      return;
-    }
+    if (!formData.name.trim()) return;
+    if (!formData.slug.trim()) return;
+    if (slugAvailability === 'taken') return;
+    if (!isValidEmail(formData.primary_contact_email)) return;
+    if (!isValidUrl(formData.logo_url)) return;
 
     setIsSaving(true);
     try {
@@ -169,7 +155,6 @@ export function OrganizationDetailsForm({ organization, onSave }: OrganizationDe
         slug: formData.slug.trim(),
         logo_url: formData.logo_url.trim() || null,
         primary_contact_email: formData.primary_contact_email.trim() || null,
-        website_url: formData.website_url.trim() || null,
         timezone: formData.timezone,
       });
     } finally {
@@ -178,163 +163,161 @@ export function OrganizationDetailsForm({ organization, onSave }: OrganizationDe
   };
 
   return (
-    <Card className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))]">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <FileText className="w-5 h-5" />
-          Organization Details
-        </CardTitle>
-        <CardDescription>
-          Basic information about the organization
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Name */}
-            <div className="space-y-2">
-              <Label htmlFor="name">Organization Name *</Label>
+    <V3Card accent="blue">
+      <V3SectionHeader
+        title="Organization Details"
+        subtitle="Basic information about the organization"
+        icon={FileText}
+        size="md"
+      />
+
+      <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Name */}
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-[hsl(var(--portal-text-primary))]">
+              Organization Name *
+            </Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={e => handleNameChange(e.target.value)}
+              placeholder="Acme Corporation"
+              required
+              className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]"
+            />
+          </div>
+
+          {/* Slug */}
+          <div className="space-y-2">
+            <Label htmlFor="slug" className="text-[hsl(var(--portal-text-primary))]">
+              URL Slug *
+            </Label>
+            <div className="relative">
               <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="Acme Corporation"
+                id="slug"
+                value={formData.slug}
+                onChange={e => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                placeholder="acme-corporation"
                 required
-                className="bg-[hsl(var(--portal-bg-secondary))]"
+                className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))] pr-10"
               />
-            </div>
-
-            {/* Slug */}
-            <div className="space-y-2">
-              <Label htmlFor="slug">URL Slug *</Label>
-              <div className="relative">
-                <Input
-                  id="slug"
-                  value={formData.slug}
-                  onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-                  placeholder="acme-corporation"
-                  required
-                  className="bg-[hsl(var(--portal-bg-secondary))] pr-10"
-                />
-                {slugAvailability === 'checking' && (
-                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
-                )}
-                {slugAvailability === 'available' && (
-                  <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--portal-success))]" />
-                )}
-                {slugAvailability === 'taken' && (
-                  <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--portal-error))]" />
-                )}
-              </div>
-              {slugMessage && (
-                <p className={`text-xs ${slugAvailability === 'taken' ? 'text-[hsl(var(--portal-error))]' : slugAvailability === 'available' ? 'text-[hsl(var(--portal-success))]' : 'text-muted-foreground'}`}>
-                  {slugMessage}
-                </p>
+              {slugAvailability === 'checking' && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-[hsl(var(--portal-text-muted))]" />
+              )}
+              {slugAvailability === 'available' && (
+                <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--portal-success))]" />
+              )}
+              {slugAvailability === 'taken' && (
+                <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--portal-error))]" />
               )}
             </div>
-
-            {/* Primary Contact Email */}
-            <div className="space-y-2">
-              <Label htmlFor="email">Primary Contact Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.primary_contact_email}
-                onChange={(e) => setFormData(prev => ({ ...prev, primary_contact_email: e.target.value }))}
-                placeholder="contact@acme.com"
-                className="bg-[hsl(var(--portal-bg-secondary))]"
-              />
-              {formData.primary_contact_email && !isValidEmail(formData.primary_contact_email) && (
-                <p className="text-xs text-[hsl(var(--portal-error))]">Please enter a valid email address</p>
-              )}
-            </div>
-
-            {/* Website URL */}
-            <div className="space-y-2">
-              <Label htmlFor="website">Website URL</Label>
-              <Input
-                id="website"
-                type="url"
-                value={formData.website_url}
-                onChange={(e) => setFormData(prev => ({ ...prev, website_url: e.target.value }))}
-                placeholder="https://www.acme.com"
-                className="bg-[hsl(var(--portal-bg-secondary))]"
-              />
-              {formData.website_url && !isValidUrl(formData.website_url) && (
-                <p className="text-xs text-[hsl(var(--portal-error))]">Please enter a valid URL</p>
-              )}
-            </div>
-
-            {/* Logo URL */}
-            <div className="space-y-2">
-              <Label htmlFor="logo">Logo URL</Label>
-              <div className="flex gap-3">
-                <Input
-                  id="logo"
-                  type="url"
-                  value={formData.logo_url}
-                  onChange={(e) => setFormData(prev => ({ ...prev, logo_url: e.target.value }))}
-                  placeholder="https://example.com/logo.png"
-                  className="bg-[hsl(var(--portal-bg-secondary))] flex-1"
-                />
-                {formData.logo_url && isValidUrl(formData.logo_url) && (
-                  <div className="w-10 h-10 rounded border border-[hsl(var(--portal-border))] overflow-hidden flex-shrink-0">
-                    <img 
-                      src={formData.logo_url} 
-                      alt="Logo preview" 
-                      className="w-full h-full object-contain"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-              {formData.logo_url && !isValidUrl(formData.logo_url) && (
-                <p className="text-xs text-[hsl(var(--portal-error))]">Please enter a valid URL</p>
-              )}
-            </div>
-
-            {/* Timezone */}
-            <div className="space-y-2">
-              <Label htmlFor="timezone">Timezone</Label>
-              <Select
-                value={formData.timezone}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, timezone: value }))}
+            {slugMessage && (
+              <p
+                className={`text-xs ${
+                  slugAvailability === 'taken'
+                    ? 'text-[hsl(var(--portal-error))]'
+                    : slugAvailability === 'available'
+                    ? 'text-[hsl(var(--portal-success))]'
+                    : 'text-[hsl(var(--portal-text-muted))]'
+                }`}
               >
-                <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))]">
-                  <SelectValue placeholder="Select timezone" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIMEZONE_OPTIONS.map(tz => (
-                    <SelectItem key={tz.value} value={tz.value}>
-                      {tz.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                {slugMessage}
+              </p>
+            )}
           </div>
 
-          <div className="flex items-center justify-between pt-4 border-t border-[hsl(var(--portal-border))]">
-            <div>
-              {hasChanges && (
-                <Badge variant="outline" className="text-[hsl(var(--portal-warning))]">
-                  Unsaved changes
-                </Badge>
+          {/* Primary Contact Email */}
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-[hsl(var(--portal-text-primary))]">
+              Primary Contact Email
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.primary_contact_email}
+              onChange={e => setFormData(prev => ({ ...prev, primary_contact_email: e.target.value }))}
+              placeholder="contact@acme.com"
+              className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]"
+            />
+            {formData.primary_contact_email && !isValidEmail(formData.primary_contact_email) && (
+              <p className="text-xs text-[hsl(var(--portal-error))]">Please enter a valid email address</p>
+            )}
+          </div>
+
+          {/* Timezone */}
+          <div className="space-y-2">
+            <Label htmlFor="timezone" className="text-[hsl(var(--portal-text-primary))]">
+              Timezone
+            </Label>
+            <Select
+              value={formData.timezone}
+              onValueChange={value => setFormData(prev => ({ ...prev, timezone: value }))}
+            >
+              <SelectTrigger className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
+                <SelectValue placeholder="Select timezone" />
+              </SelectTrigger>
+              <SelectContent className="bg-[hsl(var(--portal-bg-card))] border-[hsl(var(--portal-border))]">
+                {TIMEZONE_OPTIONS.map(tz => (
+                  <SelectItem key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Logo URL - full width */}
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="logo" className="text-[hsl(var(--portal-text-primary))]">
+              Logo URL
+            </Label>
+            <div className="flex gap-3">
+              <Input
+                id="logo"
+                type="url"
+                value={formData.logo_url}
+                onChange={e => setFormData(prev => ({ ...prev, logo_url: e.target.value }))}
+                placeholder="https://example.com/logo.png"
+                className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))] flex-1"
+              />
+              {formData.logo_url && isValidUrl(formData.logo_url) && (
+                <div className="w-10 h-10 rounded-lg border border-[hsl(var(--portal-border))] overflow-hidden flex-shrink-0 bg-[hsl(var(--portal-bg-secondary))]">
+                  <img
+                    src={formData.logo_url}
+                    alt="Logo preview"
+                    className="w-full h-full object-contain"
+                    onError={e => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
               )}
             </div>
-            <V3Button
-              type="submit"
-              disabled={isSaving || slugAvailability === 'taken' || !hasChanges}
-              isLoading={isSaving}
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Save Changes
-            </V3Button>
+            {formData.logo_url && !isValidUrl(formData.logo_url) && (
+              <p className="text-xs text-[hsl(var(--portal-error))]">Please enter a valid URL</p>
+            )}
           </div>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+
+        <div className="flex items-center justify-between pt-4 border-t border-[hsl(var(--portal-border))]">
+          <div>
+            {hasChanges && (
+              <V3Badge variant="warning" size="sm">
+                Unsaved changes
+              </V3Badge>
+            )}
+          </div>
+          <V3Button
+            type="submit"
+            disabled={isSaving || slugAvailability === 'taken' || !hasChanges}
+            isLoading={isSaving}
+            leftIcon={<Save className="w-4 h-4" />}
+          >
+            Save Changes
+          </V3Button>
+        </div>
+      </form>
+    </V3Card>
   );
 }

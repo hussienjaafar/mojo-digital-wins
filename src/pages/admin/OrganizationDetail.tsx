@@ -3,16 +3,31 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { V3Button } from '@/components/v3/V3Button';
+import { V3Card } from '@/components/v3/V3Card';
+import { V3Badge } from '@/components/v3/V3Badge';
+import { V3SectionHeader } from '@/components/v3/V3SectionHeader';
 import { AdminPageHeader, AdminLoadingState } from '@/components/admin/v3';
-import { Building2, ArrowLeft, Settings2, FileText, Activity, Users, Plug, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Building2,
+  ArrowLeft,
+  Settings2,
+  FileText,
+  Activity,
+  Users,
+  Plug,
+  CheckCircle2,
+  AlertTriangle,
+  Globe,
+  Calendar,
+} from 'lucide-react';
 import {
   OrganizationDetailsForm,
   OrganizationProfileForm,
   OrganizationSettingsForm,
+  OrganizationMembersPanel,
 } from '@/components/admin/organization';
 import type { OrgProfileData } from '@/components/admin/onboarding/types';
 
@@ -22,7 +37,6 @@ interface OrganizationData {
   slug: string;
   logo_url: string | null;
   primary_contact_email: string | null;
-  website_url: string | null;
   timezone: string | null;
   is_active: boolean;
   created_at: string;
@@ -57,12 +71,19 @@ interface OnboardingSummary {
   error_count: number;
 }
 
+const tabAnimation = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -12 },
+  transition: { duration: 0.2 },
+};
+
 export default function OrganizationDetail() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
-  
+
   const [organization, setOrganization] = useState<OrganizationData | null>(null);
   const [profile, setProfile] = useState<OrganizationProfile | null>(null);
   const [onboarding, setOnboarding] = useState<OnboardingSummary | null>(null);
@@ -77,7 +98,7 @@ export default function OrganizationDetail() {
 
   const loadOrganization = async () => {
     if (!organizationId) return;
-    
+
     setIsLoading(true);
     try {
       // Load organization details
@@ -97,7 +118,7 @@ export default function OrganizationDetail() {
         navigate('/admin');
         return;
       }
-      
+
       setOrganization(orgData);
 
       // Load organization profile
@@ -168,7 +189,7 @@ export default function OrganizationDetail() {
 
       if (error) throw error;
 
-      setOrganization(prev => prev ? { ...prev, ...data } : null);
+      setOrganization(prev => (prev ? { ...prev, ...data } : null));
       toast({
         title: 'Success',
         description: 'Organization details updated',
@@ -199,9 +220,9 @@ export default function OrganizationDetail() {
 
       const { data: upsertedProfile, error } = await (supabase as any)
         .from('organization_profiles')
-        .upsert(profilePayload, { 
+        .upsert(profilePayload, {
           onConflict: 'organization_id',
-          ignoreDuplicates: false 
+          ignoreDuplicates: false,
         })
         .select()
         .single();
@@ -232,7 +253,7 @@ export default function OrganizationDetail() {
 
       if (error) throw error;
 
-      setOrganization(prev => prev ? { ...prev, ...data } : null);
+      setOrganization(prev => (prev ? { ...prev, ...data } : null));
       toast({
         title: 'Success',
         description: 'Organization settings updated',
@@ -248,141 +269,282 @@ export default function OrganizationDetail() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Header */}
       <AdminPageHeader
         title={organization.name}
-        description={`Manage organization details, profile, and settings`}
+        description="Manage organization details, profile, members, and settings"
         icon={Building2}
         iconColor="blue"
         onRefresh={loadOrganization}
         actions={
-          <V3Button
-            variant="secondary"
-            onClick={() => navigate('/admin?tab=clients')}
-          >
+          <V3Button variant="secondary" onClick={() => navigate('/admin?tab=clients')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Organizations
           </V3Button>
         }
       >
-        {/* Breadcrumb / Status */}
+        {/* Status & Quick Info */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Badge variant={organization.is_active ? 'default' : 'secondary'}>
+          <V3Badge variant={organization.is_active ? 'success' : 'muted'}>
             {organization.is_active ? 'Active' : 'Inactive'}
-          </Badge>
-          <span className="text-sm text-[hsl(var(--portal-text-muted))]">
-            Slug: <code className="bg-[hsl(var(--portal-bg-tertiary))] px-1 rounded">{organization.slug}</code>
-          </span>
+          </V3Badge>
+          <div className="flex items-center gap-1.5 text-sm text-[hsl(var(--portal-text-muted))]">
+            <Globe className="w-3.5 h-3.5" />
+            <code className="bg-[hsl(var(--portal-bg-tertiary))] px-1.5 py-0.5 rounded text-xs">
+              {organization.slug}
+            </code>
+          </div>
+          {organization.logo_url && (
+            <img
+              src={organization.logo_url}
+              alt={`${organization.name} logo`}
+              className="h-6 w-6 rounded object-contain bg-[hsl(var(--portal-bg-secondary))]"
+              onError={e => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          )}
         </div>
       </AdminPageHeader>
 
+      {/* Quick Stats Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="p-4 rounded-xl bg-[hsl(var(--portal-bg-card))] border border-[hsl(var(--portal-border))]"
+        >
+          <div className="flex items-center gap-2 text-[hsl(var(--portal-text-muted))] mb-1">
+            <Users className="w-4 h-4" />
+            <span className="text-xs font-medium">Members</span>
+          </div>
+          <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
+            {onboarding?.user_count || 0}
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="p-4 rounded-xl bg-[hsl(var(--portal-bg-card))] border border-[hsl(var(--portal-border))]"
+        >
+          <div className="flex items-center gap-2 text-[hsl(var(--portal-text-muted))] mb-1">
+            <Plug className="w-4 h-4" />
+            <span className="text-xs font-medium">Integrations</span>
+          </div>
+          <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
+            {onboarding?.integration_count || 0}
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="p-4 rounded-xl bg-[hsl(var(--portal-bg-card))] border border-[hsl(var(--portal-border))]"
+        >
+          <div className="flex items-center gap-2 text-[hsl(var(--portal-text-muted))] mb-1">
+            {onboarding?.effective_status === 'completed' ? (
+              <CheckCircle2 className="w-4 h-4 text-[hsl(var(--portal-success))]" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-[hsl(var(--portal-warning))]" />
+            )}
+            <span className="text-xs font-medium">Onboarding</span>
+          </div>
+          <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))]">
+            {onboarding?.effective_status === 'completed'
+              ? 'Complete'
+              : `Step ${onboarding?.current_step || 1}/6`}
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="p-4 rounded-xl bg-[hsl(var(--portal-bg-card))] border border-[hsl(var(--portal-border))]"
+        >
+          <div className="flex items-center gap-2 text-[hsl(var(--portal-text-muted))] mb-1">
+            <Calendar className="w-4 h-4" />
+            <span className="text-xs font-medium">Created</span>
+          </div>
+          <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+            {new Date(organization.created_at).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })}
+          </p>
+        </motion.div>
+      </div>
+
+      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="bg-[hsl(var(--portal-bg-secondary))]">
-          <TabsTrigger value="details" className="gap-2">
+        <TabsList className="bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))] p-1 h-auto flex-wrap">
+          <TabsTrigger
+            value="details"
+            className="gap-2 data-[state=active]:bg-[hsl(var(--portal-bg-card))] data-[state=active]:shadow-sm"
+          >
             <FileText className="w-4 h-4" />
-            Details
+            <span className="hidden sm:inline">Details</span>
           </TabsTrigger>
-          <TabsTrigger value="profile" className="gap-2">
+          <TabsTrigger
+            value="profile"
+            className="gap-2 data-[state=active]:bg-[hsl(var(--portal-bg-card))] data-[state=active]:shadow-sm"
+          >
             <Building2 className="w-4 h-4" />
-            Profile
+            <span className="hidden sm:inline">Profile</span>
           </TabsTrigger>
-          <TabsTrigger value="settings" className="gap-2">
+          <TabsTrigger
+            value="settings"
+            className="gap-2 data-[state=active]:bg-[hsl(var(--portal-bg-card))] data-[state=active]:shadow-sm"
+          >
             <Settings2 className="w-4 h-4" />
-            Settings
+            <span className="hidden sm:inline">Settings</span>
           </TabsTrigger>
-          <TabsTrigger value="activity" className="gap-2">
+          <TabsTrigger
+            value="members"
+            className="gap-2 data-[state=active]:bg-[hsl(var(--portal-bg-card))] data-[state=active]:shadow-sm"
+          >
+            <Users className="w-4 h-4" />
+            <span className="hidden sm:inline">Members</span>
+            {onboarding?.user_count ? (
+              <V3Badge variant="muted" size="sm" className="hidden sm:flex">
+                {onboarding.user_count}
+              </V3Badge>
+            ) : null}
+          </TabsTrigger>
+          <TabsTrigger
+            value="activity"
+            className="gap-2 data-[state=active]:bg-[hsl(var(--portal-bg-card))] data-[state=active]:shadow-sm"
+          >
             <Activity className="w-4 h-4" />
-            Activity
+            <span className="hidden sm:inline">Activity</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="details">
-          <OrganizationDetailsForm
-            organization={organization}
-            onSave={handleDetailsUpdate}
-          />
-        </TabsContent>
+        <AnimatePresence mode="wait">
+          <TabsContent value="details" className="mt-0">
+            <motion.div key="details" {...tabAnimation}>
+              <OrganizationDetailsForm organization={organization} onSave={handleDetailsUpdate} />
+            </motion.div>
+          </TabsContent>
 
-        <TabsContent value="profile">
-          <OrganizationProfileForm
-            organizationId={organizationId!}
-            profile={profile}
-            websiteUrl={organization.website_url}
-            onSave={handleProfileUpdate}
-          />
-        </TabsContent>
+          <TabsContent value="profile" className="mt-0">
+            <motion.div key="profile" {...tabAnimation}>
+              <OrganizationProfileForm
+                organizationId={organizationId!}
+                profile={profile}
+                onSave={handleProfileUpdate}
+              />
+            </motion.div>
+          </TabsContent>
 
-        <TabsContent value="settings">
-          <OrganizationSettingsForm
-            organization={organization}
-            onSave={handleSettingsUpdate}
-          />
-        </TabsContent>
+          <TabsContent value="settings" className="mt-0">
+            <motion.div key="settings" {...tabAnimation}>
+              <OrganizationSettingsForm organization={organization} onSave={handleSettingsUpdate} />
+            </motion.div>
+          </TabsContent>
 
-        <TabsContent value="activity">
-          <Card className="border-[hsl(var(--portal-border))] bg-[hsl(var(--portal-bg-card))]">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Activity className="w-5 h-5" />
-                Activity Overview
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Onboarding Status */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))]">
-                  <div className="flex items-center gap-2 mb-2">
-                    {onboarding?.effective_status === 'completed' ? (
-                      <CheckCircle2 className="w-5 h-5 text-[hsl(var(--portal-success))]" />
-                    ) : (
-                      <AlertTriangle className="w-5 h-5 text-[hsl(var(--portal-warning))]" />
-                    )}
-                    <span className="font-medium">Onboarding</span>
+          <TabsContent value="members" className="mt-0">
+            <motion.div key="members" {...tabAnimation}>
+              <OrganizationMembersPanel
+                organizationId={organizationId!}
+                organizationName={organization.name}
+              />
+            </motion.div>
+          </TabsContent>
+
+          <TabsContent value="activity" className="mt-0">
+            <motion.div key="activity" {...tabAnimation}>
+              <V3Card>
+                <V3SectionHeader
+                  title="Activity Overview"
+                  subtitle="Organization onboarding progress and activity metrics"
+                  icon={Activity}
+                  size="md"
+                />
+
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Onboarding Status Card */}
+                  <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))]">
+                    <div className="flex items-center gap-2 mb-3">
+                      {onboarding?.effective_status === 'completed' ? (
+                        <div className="p-2 rounded-lg bg-[hsl(var(--portal-success)/0.1)]">
+                          <CheckCircle2 className="w-5 h-5 text-[hsl(var(--portal-success))]" />
+                        </div>
+                      ) : (
+                        <div className="p-2 rounded-lg bg-[hsl(var(--portal-warning)/0.1)]">
+                          <AlertTriangle className="w-5 h-5 text-[hsl(var(--portal-warning))]" />
+                        </div>
+                      )}
+                      <span className="font-medium text-[hsl(var(--portal-text-primary))]">
+                        Onboarding
+                      </span>
+                    </div>
+                    <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
+                      {onboarding?.effective_status === 'completed'
+                        ? 'Complete'
+                        : `Step ${onboarding?.current_step || 1} of 6`}
+                    </p>
+                    <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
+                      {onboarding?.completed_steps?.length || 0} steps completed
+                    </p>
                   </div>
-                  <p className="text-2xl font-bold">
-                    {onboarding?.effective_status === 'completed' ? 'Complete' : `Step ${onboarding?.current_step || 1} of 6`}
-                  </p>
-                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">
-                    {onboarding?.completed_steps?.length || 0} steps completed
-                  </p>
+
+                  {/* Users Card */}
+                  <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))]">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.1)]">
+                        <Users className="w-5 h-5 text-[hsl(var(--portal-accent-blue))]" />
+                      </div>
+                      <span className="font-medium text-[hsl(var(--portal-text-primary))]">
+                        Team Members
+                      </span>
+                    </div>
+                    <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
+                      {onboarding?.user_count || 0}
+                    </p>
+                    <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">Active members</p>
+                  </div>
+
+                  {/* Integrations Card */}
+                  <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))]">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="p-2 rounded-lg bg-[hsl(var(--portal-accent-purple)/0.1)]">
+                        <Plug className="w-5 h-5 text-[hsl(var(--portal-accent-purple))]" />
+                      </div>
+                      <span className="font-medium text-[hsl(var(--portal-text-primary))]">
+                        Integrations
+                      </span>
+                    </div>
+                    <p className="text-2xl font-bold text-[hsl(var(--portal-text-primary))]">
+                      {onboarding?.integration_count || 0}
+                    </p>
+                    <p className="text-sm text-[hsl(var(--portal-text-muted))] mt-1">
+                      Connected services
+                    </p>
+                  </div>
                 </div>
 
-                <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Users className="w-5 h-5 text-[hsl(var(--portal-accent-blue))]" />
-                    <span className="font-medium">Users</span>
-                  </div>
-                  <p className="text-2xl font-bold">{onboarding?.user_count || 0}</p>
+                {/* Created date footer */}
+                <div className="mt-6 pt-4 border-t border-[hsl(var(--portal-border))]">
                   <p className="text-sm text-[hsl(var(--portal-text-muted))]">
-                    Active members
+                    Organization created on{' '}
+                    {new Date(organization.created_at).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
                   </p>
                 </div>
-
-                <div className="p-4 rounded-lg bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Plug className="w-5 h-5 text-[hsl(var(--portal-accent-purple))]" />
-                    <span className="font-medium">Integrations</span>
-                  </div>
-                  <p className="text-2xl font-bold">{onboarding?.integration_count || 0}</p>
-                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">
-                    Connected services
-                  </p>
-                </div>
-              </div>
-
-              {/* Created date */}
-              <div className="pt-4 border-t border-[hsl(var(--portal-border))]">
-                <p className="text-sm text-[hsl(var(--portal-text-muted))]">
-                  Created on {new Date(organization.created_at).toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              </V3Card>
+            </motion.div>
+          </TabsContent>
+        </AnimatePresence>
       </Tabs>
     </div>
   );
