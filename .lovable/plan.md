@@ -1,255 +1,178 @@
 
-
-# Enhanced Donor List Table with Sorting, Filtering, Pop-Out View, and Phone Numbers
+# Fix Phone Sorting, Add "Has Phone" Filter, and Fix Pop-Out Sheet
 
 ## Summary
 
-This plan adds four major improvements to the Donor Intelligence page's donor list table:
-1. **Column Sorting** - Clickable headers to sort by any column
-2. **In-table Search/Filter** - Quick search within the current results
-3. **Pop-Out View** - Expand the table to a full-screen sheet with more details
-4. **Phone Numbers** - Display phone data (already available for ~42% of donors)
+This plan addresses three issues in the donor list table:
+1. Phone sorting appears broken due to invalid data entries sorting to the top
+2. No ability to filter donors by phone number availability
+3. Pop-out sheet shows empty table due to virtualization race condition
 
 ---
 
-## Current State
+## Issue 1: Phone Sorting Appears Broken
 
-- **Table View**: Basic virtualized list with 7 columns (Name, Email, State, Lifetime $, Donations, Segment, Risk)
-- **Phone Data**: Already exists in the database - 13,698 of 32,417 donors (42%) have phone numbers
-- **No Sorting**: Columns are not clickable; data is always sorted by `total_donated DESC`
-- **No In-table Filter**: Users must use the main segment builder to filter
+### Root Cause
+The sorting logic is technically correct, but the database contains invalid phone entries:
+- `"--------------"` (14 dashes)
+- `"."` (single period)
+- Other non-phone values
+
+When sorting alphabetically, special characters have lower ASCII values than numbers, so these invalid entries appear first when sorting ascending by phone. This makes it look like sorting isn't working.
+
+### Solution
+Improve the sorting logic to:
+1. Detect invalid phone numbers (less than 7 digits after cleaning)
+2. Treat invalid phones the same as null (push to end of list)
+3. Sort valid phone numbers normally
+
+### Technical Changes
+
+**File: `src/components/client/DonorSegmentResults.tsx`**
+
+Add a helper function to validate phone numbers and update the sorting logic:
+
+```typescript
+// Helper to check if phone is valid (at least 7 digits)
+function isValidPhone(phone: string | null): boolean {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, '');
+  return digits.length >= 7;
+}
+
+// In sortedDonors useMemo, update the phone sorting:
+const sortedDonors = useMemo(() => {
+  return [...filteredDonors].sort((a, b) => {
+    let aVal: any = a[sortField];
+    let bVal: any = b[sortField];
+
+    // Special handling for phone - treat invalid phones as null
+    if (sortField === 'phone') {
+      const aValid = isValidPhone(aVal);
+      const bValid = isValidPhone(bVal);
+      
+      // Both invalid/null - equal
+      if (!aValid && !bValid) return 0;
+      // Push invalid to end
+      if (!aValid) return 1;
+      if (!bValid) return -1;
+      
+      // Both valid - compare strings
+      const comparison = String(aVal).localeCompare(String(bVal));
+      return sortDirection === 'asc' ? comparison : -comparison;
+    }
+
+    // Handle nulls - push to end
+    if (aVal === null || aVal === undefined) return 1;
+    if (bVal === null || bVal === undefined) return -1;
+
+    // ... rest of sorting logic unchanged
+  });
+}, [filteredDonors, sortField, sortDirection]);
+```
+
+**File: `src/components/client/DonorListSheet.tsx`**
+
+Apply the same `isValidPhone` helper and sorting logic.
 
 ---
 
-## Technical Implementation
+## Issue 2: Add "Has Phone Number" Filter
 
-### 1. Update Type Definitions
+### Solution
+Add a phone filter field to the segment builder that allows filtering by:
+- `is_not_null` - Has a phone number
+- `is_null` - No phone number
+
+### Technical Changes
 
 **File: `src/types/donorSegment.ts`**
 
-Add `phone` field to `SegmentDonor` interface:
-```typescript
-export interface SegmentDonor {
-  id: string;
-  donor_key: string;
-  email: string | null;
-  phone: string | null;  // NEW
-  name: string | null;
-  // ... rest unchanged
-}
-```
+Add phone field to `SEGMENT_FILTER_FIELDS`:
 
-### 2. Update Query to Fetch Phone Numbers
+```typescript
+// In the Demographics category section, add:
+{
+  key: 'phone',
+  label: 'Phone Number',
+  category: 'Demographics',
+  type: 'string',
+  operators: ['is_null', 'is_not_null', 'contains'],
+  description: 'Donor phone number availability',
+},
+```
 
 **File: `src/queries/useDonorSegmentQuery.ts`**
 
-Add `phone` to the select statement:
-```typescript
-let query = supabase
-  .from('donor_demographics')
-  .select(`
-    id,
-    donor_key,
-    donor_email,
-    phone,  // ADD THIS
-    first_name,
-    last_name,
-    ...
-  `)
-```
+Ensure `applyServerFilter` handles phone field with `is_null` and `is_not_null` operators (should already work with existing logic).
 
-Update the `transformToDonor` function to include phone:
-```typescript
-function transformToDonor(row: any, ltvData: any, attribution?: DonorAttribution): SegmentDonor {
-  return {
-    // ...
-    phone: row.phone || null,  // ADD THIS
-    // ...
-  };
-}
-```
+---
 
-### 3. Enhanced Table Component with Sorting
+## Issue 3: Pop-Out Sheet Shows Empty Table
 
-**File: `src/components/client/DonorSegmentResults.tsx`**
+### Root Cause
+The `useVirtualizer` hook in `DonorListSheet.tsx` initializes with `getScrollElement: () => parentRef.current`, but when the Sheet first mounts, `parentRef.current` is `null`. The virtualizer calculates zero items to render.
 
-Replace the basic `TableView` with an enhanced version that includes:
+### Solution
+Use a callback ref pattern to detect when the scroll container mounts, and only enable the virtualizer after the container is ready.
+
+### Technical Changes
+
+**File: `src/components/client/DonorListSheet.tsx`**
 
 ```typescript
-type SortField = 'name' | 'email' | 'phone' | 'state' | 'total_donated' | 'donation_count' | 'segment' | 'churn_risk_label';
-type SortDirection = 'asc' | 'desc';
-
-function TableView({ donors, onExpandClick }: { donors: SegmentDonor[]; onExpandClick: () => void }) {
-  const [sortField, setSortField] = useState<SortField>('total_donated');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [searchTerm, setSearchTerm] = useState('');
-
-  // Filter by search term
-  const filteredDonors = useMemo(() => {
-    if (!searchTerm) return donors;
-    const lower = searchTerm.toLowerCase();
-    return donors.filter(d => 
-      d.name?.toLowerCase().includes(lower) ||
-      d.email?.toLowerCase().includes(lower) ||
-      d.phone?.includes(searchTerm)
-    );
-  }, [donors, searchTerm]);
-
-  // Sort filtered results
-  const sortedDonors = useMemo(() => {
-    return [...filteredDonors].sort((a, b) => {
-      const aVal = a[sortField];
-      const bVal = b[sortField];
-      // Handle nulls, compare values, apply direction
-    });
-  }, [filteredDonors, sortField, sortDirection]);
-
-  // Clickable column headers
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('desc');
-    }
-  };
-}
-```
-
-**Column Headers** with sort indicators:
-```typescript
-<div onClick={() => handleSort('total_donated')} className="cursor-pointer flex items-center gap-1">
-  Lifetime $
-  {sortField === 'total_donated' && (
-    <ChevronUp className={cn("h-3 w-3", sortDirection === 'desc' && "rotate-180")} />
-  )}
-</div>
-```
-
-### 4. Pop-Out Sheet Component
-
-**File: `src/components/client/DonorListSheet.tsx` (NEW)**
-
-Create a full-screen sheet that displays the donor list with enhanced features:
-
-```typescript
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { Expand, Search, ChevronUp, ChevronDown } from "lucide-react";
-
-interface DonorListSheetProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  donors: SegmentDonor[];
-  totalCount: number;
-}
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 
 export function DonorListSheet({ open, onOpenChange, donors, totalCount }: DonorListSheetProps) {
-  // Same sorting/filtering logic as inline table
-  // Full-height virtualized list
-  // Additional columns: Phone, City, ZIP, Employer, Occupation
-  // Export button within sheet
-}
-```
+  // ... existing state
+  const parentRef = React.useRef<HTMLDivElement>(null);
+  const [isReady, setIsReady] = useState(false);
 
-### 5. Integration in Results Component
+  // Callback ref to detect when scroll container mounts
+  const setScrollRef = useCallback((node: HTMLDivElement | null) => {
+    parentRef.current = node;
+    if (node) {
+      setIsReady(true);
+    }
+  }, []);
 
-**File: `src/components/client/DonorSegmentResults.tsx`**
+  // Reset ready state when sheet closes
+  useEffect(() => {
+    if (!open) {
+      setIsReady(false);
+    }
+  }, [open]);
 
-Add pop-out button and sheet:
+  const rowVirtualizer = useVirtualizer({
+    count: sortedDonors.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 48,
+    overscan: 15,
+    enabled: isReady,  // Only enable when container is ready
+  });
 
-```typescript
-function TableView({ donors }: { donors: SegmentDonor[] }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  
-  return (
-    <>
-      <V3Card>
-        <V3CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <V3CardTitle>Donor List ({donors.length.toLocaleString()})</V3CardTitle>
-            <div className="flex items-center gap-2">
-              {/* Search input */}
-              <Input 
-                placeholder="Search donors..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              {/* Expand button */}
-              <V3Button variant="ghost" size="sm" onClick={() => setIsExpanded(true)}>
-                <Expand className="h-4 w-4" />
-              </V3Button>
-            </div>
-          </div>
-        </V3CardHeader>
-        {/* ... table content */}
-      </V3Card>
-      
-      <DonorListSheet 
-        open={isExpanded} 
-        onOpenChange={setIsExpanded}
-        donors={donors}
-        totalCount={donors.length}
-      />
-    </>
-  );
-}
-```
-
-### 6. Update Column Configuration
-
-Add Phone column to both inline and pop-out views:
-
-```typescript
-const columns = [
-  { key: 'name', label: 'Name', width: '18%', sortable: true },
-  { key: 'email', label: 'Email', width: '18%', sortable: true },
-  { key: 'phone', label: 'Phone', width: '12%', sortable: true },  // NEW
-  { key: 'state', label: 'State', width: '7%', sortable: true },
-  { key: 'total_donated', label: 'Lifetime $', width: '11%', sortable: true },
-  { key: 'donation_count', label: 'Donations', width: '9%', sortable: true },
-  { key: 'segment', label: 'Segment', width: '13%', sortable: true },
-  { key: 'churn_risk', label: 'Risk', width: '8%', sortable: true },
-];
+  // In JSX, use the callback ref:
+  <div
+    ref={setScrollRef}  // Changed from ref={parentRef}
+    className="flex-1 overflow-auto ..."
+  >
 ```
 
 ---
 
-## UI/UX Design
+## Files to Modify
 
-### Inline Table Enhancements
-- **Search Bar**: Small input above the table for quick filtering
-- **Sortable Headers**: Cursor pointer on hover, up/down chevron indicating sort direction
-- **Expand Button**: Icon button to pop out the table
-
-### Pop-Out Sheet
-- **Full Width**: Uses `max-w-7xl` instead of default `sm:max-w-sm`
-- **Additional Columns**: Shows Phone, City, ZIP, Employer, Occupation
-- **Sticky Header**: Table header stays visible while scrolling
-- **Export Button**: In-sheet export for convenience
-
-### Phone Display
-- Format: `(555) 123-4567` or raw if invalid format
-- Shows "—" for missing phone numbers
-- Clickable for mobile: `tel:` link
+| File | Changes |
+|------|---------|
+| `src/components/client/DonorSegmentResults.tsx` | Add `isValidPhone` helper, update phone sorting logic |
+| `src/components/client/DonorListSheet.tsx` | Add `isValidPhone` helper, update phone sorting, add callback ref pattern for virtualizer |
+| `src/types/donorSegment.ts` | Add phone field to `SEGMENT_FILTER_FIELDS` |
 
 ---
 
-## Files to Create/Modify
-
-| File | Action | Description |
-|------|--------|-------------|
-| `src/types/donorSegment.ts` | Modify | Add `phone` field to `SegmentDonor` |
-| `src/queries/useDonorSegmentQuery.ts` | Modify | Fetch phone column, include in transform |
-| `src/components/client/DonorSegmentResults.tsx` | Modify | Add sorting, search, expand button, phone column |
-| `src/components/client/DonorListSheet.tsx` | Create | Full-screen pop-out sheet component |
-
----
-
-## Expected Outcome
+## Expected Outcomes
 
 After implementation:
-1. **Sorting**: Click any column header to sort ascending/descending
-2. **Search**: Type in the search box to filter by name, email, or phone
-3. **Pop-Out**: Click expand icon to open full-screen sheet with more columns
-4. **Phone Numbers**: Visible for ~42% of donors who provided phone data
-
+1. **Phone sorting works correctly** - Valid phone numbers sort first; invalid entries (dashes, periods) treated as empty and pushed to end
+2. **Filter by phone** - Users can add a filter in the segment builder to show only donors with phone numbers
+3. **Pop-out sheet displays data** - Opening the expanded view shows all 32,417+ donors correctly virtualized
