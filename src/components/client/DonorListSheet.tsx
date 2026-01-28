@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Search, ChevronUp, ChevronDown, Phone, Mail, MapPin, Briefcase, Download, X } from "lucide-react";
@@ -15,6 +15,13 @@ interface DonorListSheetProps {
   onOpenChange: (open: boolean) => void;
   donors: SegmentDonor[];
   totalCount: number;
+}
+
+// Helper to check if phone is valid (at least 7 digits)
+function isValidPhone(phone: string | null): boolean {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, '');
+  return digits.length >= 7;
 }
 
 // Format phone number to (555) 123-4567 format
@@ -56,6 +63,22 @@ export function DonorListSheet({ open, onOpenChange, donors, totalCount }: Donor
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchTerm, setSearchTerm] = useState('');
   const parentRef = React.useRef<HTMLDivElement>(null);
+  const [isReady, setIsReady] = useState(false);
+
+  // Callback ref to detect when scroll container mounts
+  const setScrollRef = useCallback((node: HTMLDivElement | null) => {
+    parentRef.current = node;
+    if (node) {
+      setIsReady(true);
+    }
+  }, []);
+
+  // Reset ready state when sheet closes
+  useEffect(() => {
+    if (!open) {
+      setIsReady(false);
+    }
+  }, [open]);
 
   // Filter by search term
   const filteredDonors = useMemo(() => {
@@ -76,6 +99,22 @@ export function DonorListSheet({ open, onOpenChange, donors, totalCount }: Donor
     return [...filteredDonors].sort((a, b) => {
       let aVal: any = a[sortField];
       let bVal: any = b[sortField];
+
+      // Special handling for phone - treat invalid phones as null
+      if (sortField === 'phone') {
+        const aValid = isValidPhone(aVal);
+        const bValid = isValidPhone(bVal);
+        
+        // Both invalid/null - equal
+        if (!aValid && !bValid) return 0;
+        // Push invalid to end
+        if (!aValid) return 1;
+        if (!bValid) return -1;
+        
+        // Both valid - compare strings
+        const comparison = String(aVal).localeCompare(String(bVal));
+        return sortDirection === 'asc' ? comparison : -comparison;
+      }
 
       // Handle nulls - push to end
       if (aVal === null || aVal === undefined) return 1;
@@ -101,6 +140,7 @@ export function DonorListSheet({ open, onOpenChange, donors, totalCount }: Donor
     getScrollElement: () => parentRef.current,
     estimateSize: () => 48,
     overscan: 15,
+    enabled: isReady,  // Only enable when container is ready
   });
 
   const handleSort = (field: SortField) => {
@@ -215,7 +255,7 @@ export function DonorListSheet({ open, onOpenChange, donors, totalCount }: Donor
 
           {/* Virtualized rows */}
           <div
-            ref={parentRef}
+            ref={setScrollRef}
             className="flex-1 overflow-auto border-x border-b border-[hsl(var(--portal-border))] rounded-b-md"
           >
             {sortedDonors.length === 0 ? (
