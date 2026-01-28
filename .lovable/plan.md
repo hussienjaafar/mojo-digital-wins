@@ -1,168 +1,130 @@
 
+# Complete Visual Redesign of Organization Management Page
 
-# Redesign Organization Management Page with V3 Aesthetic and Member Management
+## Problem Statement
 
-## Overview
+The organization detail page at `/admin/organizations/:organizationId` does not match the premier V3 aesthetic of the client dashboard for several reasons:
 
-Redesign the `OrganizationDetail` page to match the clean, modern aesthetic of the client dashboard (V3 design system) and add a new "Members" tab to manage organization members directly from this page.
+1. **Missing Portal Theme Wrapper**: The page is accessed via a standalone route and lacks the `portal-theme` class wrapper that provides CSS variables
+2. **Inconsistent Input Styling**: Form inputs appear as solid dark boxes instead of using the subtle, bordered portal styling
+3. **Missing Page Shell**: Unlike client pages (which use `ClientShell`), this admin detail page has no unified layout wrapper
+4. **Outdated Tab Styling**: Tabs don't match the premium collapsible section pattern from the dashboard
+5. **Typography Mismatch**: Label and heading styles don't use portal typography classes
 
-## Current State Analysis
+## Solution Architecture
 
-The current `OrganizationDetail.tsx` uses:
-- `AdminPageHeader` for the header (good)
-- Standard shadcn `Card` and `Tabs` components (outdated styling)
-- Portal-themed CSS variables (partially aligned)
-
-The client dashboard uses:
-- V3 design system components (`V3Card`, `V3SectionHeader`, motion animations)
-- Gradient accents and premium visual treatments
-- Clean spacing with CSS custom properties (`--portal-space-md`, etc.)
-- Collapsible sections with smooth animations
-
-## Design Changes
-
-### Visual Redesign
-
-| Current | New V3 Style |
-|---------|--------------|
-| Basic shadcn Card | V3Card with accent borders |
-| Plain tabs | Styled tabs with icons and badges |
-| Static layout | Animated sections with framer-motion |
-| Dense spacing | Portal spacing tokens |
-
-### New Members Tab
-
-Add a dedicated "Members" tab that allows managing organization members without leaving the organization page. This tab will include:
-- Member list with email, role, MFA status, last login
-- Invite member functionality
-- Role management (change role dropdown)
-- Remove member action
-- Pending invitations sub-section
-- Seat usage display
+Create a comprehensive redesign that:
+1. Wraps the page in proper portal theme context
+2. Uses a new reusable `AdminDetailShell` component for consistent admin detail pages
+3. Applies portal-compliant form input styling
+4. Implements the CollapsibleSection pattern for tabs (optional progressive enhancement)
 
 ## Implementation Plan
 
-### 1. Create OrganizationMembersPanel Component
+### Phase 1: Create Admin Detail Shell Component
 
-**New File: `src/components/admin/organization/OrganizationMembersPanel.tsx`**
+**New File: `src/components/admin/AdminDetailShell.tsx`**
 
-A self-contained component that manages members for a specific organization:
+A layout wrapper for admin detail pages (organization detail, user detail, etc.) that provides:
+- `portal-theme` class wrapper with `portal-bg`
+- Consistent max-width container (`max-w-[1800px]`)
+- Proper padding and scrollbar styling
+- Optional back navigation
 
 ```typescript
-interface OrganizationMembersPanelProps {
-  organizationId: string;
-  organizationName: string;
+interface AdminDetailShellProps {
+  children: ReactNode;
+  className?: string;
 }
 ```
 
-Features:
-- Uses `get_user_management_data` RPC with `p_org_id` locked to the organization
-- Displays member list in V3Card styling
-- Inline role editing via dropdown
-- Quick actions: View details, Remove member
-- Invite button that opens `InviteUserDialog`
-- Shows pending invitations count as badge
-- Integrates `SeatUsageDisplay` component at the top
+### Phase 2: Create Portal-Styled Form Components
 
-### 2. Redesign OrganizationDetail Page
+**New File: `src/components/admin/forms/PortalFormInput.tsx`**
+
+A styled input wrapper that uses portal theme variables correctly:
+- Light mode: White background with visible border
+- Dark mode: `--portal-bg-tertiary` background (not solid black)
+- Focus states with portal accent blue ring
+- Proper label typography
+
+**New File: `src/components/admin/forms/PortalFormSelect.tsx`**
+
+Matching select component with portal styling.
+
+### Phase 3: Redesign OrganizationDetail.tsx
 
 **File: `src/pages/admin/OrganizationDetail.tsx`**
 
-#### Header Improvements
-- Add organization logo display in header if available
-- Add status badge (active/inactive) with better styling
-- Add quick stats row (members count, integrations, onboarding status)
+Major Changes:
+1. Wrap entire page in `AdminDetailShell`
+2. Replace quick stats grid with `V3StatsGrid` component for visual consistency
+3. Redesign tabs to use pill-style buttons instead of underlined tabs
+4. Add subtle gradient backgrounds to section headers
 
-#### Tab Redesign
-- Use V3Card for tab content containers
-- Add "Members" tab between "Settings" and "Activity"
-- Add badges showing counts on tabs (e.g., member count, pending invites)
-- Animate tab content transitions with framer-motion
-
-#### Updated Tab Structure
-```text
-[Details] [Profile] [Settings] [Members] [Activity]
-     ^          ^         ^         ^          ^
-     |          |         |         |          |
-  Org info   Mission   Security  Team mgmt  Onboarding
-```
-
-### 3. V3 Styling Updates for Forms
+### Phase 4: Update Form Components
 
 **Files to Update:**
 - `OrganizationDetailsForm.tsx`
 - `OrganizationProfileForm.tsx`
 - `OrganizationSettingsForm.tsx`
+- `OrganizationMembersPanel.tsx`
 
-Changes:
-- Replace `Card` with `V3Card` with appropriate accent colors
-- Use `V3SectionHeader` for section titles within forms
-- Add subtle hover/focus states matching portal theme
-- Improve form grid layout for better visual hierarchy
+Changes for Each Form:
+1. Replace inline Input className with portal-styled inputs
+2. Use `portal-card` class or PortalCard component instead of V3Card for forms
+3. Update Label components to use `portal-text-secondary` for better contrast
+4. Add proper section dividers using `border-[hsl(var(--portal-border))]`
+5. Replace `bg-[hsl(var(--portal-bg-secondary))]` on inputs with proper input styling
 
-### 4. Activity Tab Enhancement
+### Specific Styling Fixes
 
-Redesign the Activity tab content to use V3 components:
-- Use V3Card with stats inside
-- Add KPI-style metrics cards for onboarding, users, integrations
-- Include a timeline of recent organization activity (if data available)
+#### Input Fields (Current vs Fixed)
 
-## Technical Implementation Details
+| Issue | Current | Fixed |
+|-------|---------|-------|
+| Background | `bg-[hsl(var(--portal-bg-secondary))]` (solid dark) | `bg-transparent` with `border` |
+| Border | Inline HSL | `border-[hsl(var(--portal-border))]` |
+| Focus | Missing | `focus:border-[hsl(var(--portal-accent-blue))] focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.2)]` |
+| Text | Inherits | `text-[hsl(var(--portal-text-primary))]` |
 
-### OrganizationMembersPanel Component Structure
+#### Tab Bar Styling
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ SeatUsageDisplay (seats used / total)                       │
-├─────────────────────────────────────────────────────────────┤
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │ Members Header                           [Invite Member]│ │
-│ │ Search input                                            │ │
-│ ├─────────────────────────────────────────────────────────┤ │
-│ │ Member Row: Avatar | Name | Email | Role | Last Login   │ │
-│ │ Member Row: Avatar | Name | Email | Role | Last Login   │ │
-│ │ Member Row: Avatar | Name | Email | Role | Last Login   │ │
-│ └─────────────────────────────────────────────────────────┘ │
-│                                                             │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │ Pending Invitations (2)                                 │ │
-│ │ - invite@example.com (Expires in 3 days) [Revoke]       │ │
-│ └─────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+Replace the current TabsList with a portal-styled version:
+```typescript
+<TabsList className="inline-flex h-10 items-center justify-center rounded-lg bg-[hsl(var(--portal-bg-tertiary))] p-1 text-[hsl(var(--portal-text-muted))]">
+  <TabsTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-[hsl(var(--portal-bg-secondary))] data-[state=active]:text-[hsl(var(--portal-text-primary))] data-[state=active]:shadow-sm">
 ```
 
-### Data Fetching Strategy
+#### Quick Stats Cards
 
-The members panel will:
-1. Call `get_user_management_data` RPC with `p_org_id` set to the current organization
-2. Fetch pending invitations filtered by `organization_id`
-3. Use `SeatUsageDisplay` which already handles its own data fetching
-
-### Reusable Components
-
-From existing codebase:
-- `SeatUsageDisplay` - for seat allocation display
-- `InviteUserDialog` - for inviting new members (will pass org pre-selected)
-- `UserDetailSidebar` - for viewing member details
-- V3 components: `V3Card`, `V3Button`, `V3Badge`, `V3SectionHeader`
+Use the same styling pattern as the client dashboard HeroKpiCard:
+- Rounded corners with `rounded-xl`
+- Subtle border with `border-[hsl(var(--portal-border))]`
+- Background: `bg-[hsl(var(--portal-bg-card))]` (not bg-secondary)
+- Icon containers with accent-tinted backgrounds
 
 ## Files Summary
 
 | Action | File Path |
 |--------|-----------|
-| **Create** | `src/components/admin/organization/OrganizationMembersPanel.tsx` |
-| **Update** | `src/components/admin/organization/index.ts` (add export) |
-| **Update** | `src/pages/admin/OrganizationDetail.tsx` (redesign + add Members tab) |
-| **Update** | `src/components/admin/organization/OrganizationDetailsForm.tsx` (V3 styling) |
-| **Update** | `src/components/admin/organization/OrganizationProfileForm.tsx` (V3 styling) |
-| **Update** | `src/components/admin/organization/OrganizationSettingsForm.tsx` (V3 styling) |
+| Create | `src/components/admin/AdminDetailShell.tsx` |
+| Create | `src/components/admin/forms/PortalFormInput.tsx` |
+| Create | `src/components/admin/forms/PortalFormSelect.tsx` |
+| Create | `src/components/admin/forms/index.ts` |
+| Update | `src/pages/admin/OrganizationDetail.tsx` |
+| Update | `src/components/admin/organization/OrganizationDetailsForm.tsx` |
+| Update | `src/components/admin/organization/OrganizationProfileForm.tsx` |
+| Update | `src/components/admin/organization/OrganizationSettingsForm.tsx` |
+| Update | `src/components/admin/organization/OrganizationMembersPanel.tsx` |
 
-## Expected Outcome
+## Visual Result
 
-1. Organization management page has a premium, cohesive look matching the client dashboard
-2. Admins can manage organization members without navigating away
-3. Clean visual hierarchy with V3 design tokens
-4. Smooth animations for tab transitions
-5. Consistent use of accent colors and gradients
-6. Mobile-responsive layout
-
+After implementation:
+1. Page background matches the client dashboard (light: #F8FAFC, dark: #121418)
+2. Cards have subtle borders and shadows, not solid dark backgrounds
+3. Input fields appear as outlined boxes, not solid dark rectangles
+4. Tabs look like segmented controls with proper active states
+5. Typography uses consistent portal text colors
+6. Animations and hover states match the dashboard polish
+7. Overall cohesive "premier" feel that matches the client experience
