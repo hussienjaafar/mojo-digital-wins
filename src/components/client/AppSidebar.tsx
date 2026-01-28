@@ -34,6 +34,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useCAPIStatus } from "@/hooks/useCAPIStatus";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type { SidebarNavSection } from "@/lib/design-tokens";
 
 interface AppSidebarProps {
@@ -42,6 +43,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ organizationId }: AppSidebarProps) {
   const { state } = useSidebar();
+  const isMobile = useIsMobile();
   const location = useLocation();
   const { data: capiStatus } = useCAPIStatus(organizationId || null);
   const { isAdmin } = useIsAdmin();
@@ -160,7 +162,8 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
     return baseSections;
   }, [stats, capiStatus, isAdmin]);
 
-  const isCollapsed = state === "collapsed";
+  // On mobile, always show labels (never collapsed)
+  const isCollapsed = !isMobile && state === "collapsed";
 
   return (
     <Sidebar collapsible="icon" className="portal-sidebar">
