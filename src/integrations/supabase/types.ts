@@ -3854,6 +3854,64 @@ export type Database = {
           },
         ]
       }
+      donor_demographics_cache: {
+        Row: {
+          calculated_at: string
+          created_at: string | null
+          id: string
+          is_stale: boolean
+          organization_id: string
+          summary_data: Json
+          transaction_count: number
+          updated_at: string | null
+          version: number
+        }
+        Insert: {
+          calculated_at?: string
+          created_at?: string | null
+          id?: string
+          is_stale?: boolean
+          organization_id: string
+          summary_data?: Json
+          transaction_count?: number
+          updated_at?: string | null
+          version?: number
+        }
+        Update: {
+          calculated_at?: string
+          created_at?: string | null
+          id?: string
+          is_stale?: boolean
+          organization_id?: string
+          summary_data?: Json
+          transaction_count?: number
+          updated_at?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donor_demographics_cache_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "donor_demographics_cache_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "donor_demographics_cache_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       donor_first_donation: {
         Row: {
           created_at: string
@@ -15127,6 +15185,10 @@ export type Database = {
           value: number
         }[]
       }
+      get_donor_demographics_cached: {
+        Args: { _organization_id: string }
+        Returns: Json
+      }
       get_donor_demographics_summary: {
         Args: { _organization_id: string }
         Returns: Json
@@ -15694,6 +15756,10 @@ export type Database = {
       refresh_analytics_views: { Args: never; Returns: undefined }
       refresh_daily_group_sentiment: { Args: never; Returns: undefined }
       refresh_daily_metrics_summary: { Args: never; Returns: undefined }
+      refresh_demographics_cache: {
+        Args: { _organization_id: string }
+        Returns: Json
+      }
       refresh_materialized_view: {
         Args: { view_name: string }
         Returns: undefined
