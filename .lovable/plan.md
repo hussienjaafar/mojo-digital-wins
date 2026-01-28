@@ -1,117 +1,136 @@
 
-# Add "Last Donation Date" Column to Donor List Table
+# Add Organization Management Feature to Admin Panel
 
 ## Overview
 
-Add a new sortable column showing the date of each donor's most recent donation. This field (`last_donation_date`) already exists in the data model and is being fetched from the database - it just needs to be displayed in the UI.
+Create a comprehensive organization detail/edit page that allows admins to manage all organization information that was initially collected through the onboarding wizard. This will be accessible via clicking on an organization row in the `ClientOrganizationManager` or through a direct URL.
 
-## Changes
+## Implementation Approach
 
-### File: `src/components/client/DonorSegmentResults.tsx`
+### New Files to Create
 
-**1. Add to SortField type (line 41)**
+#### 1. Organization Detail Page
+**File: `src/pages/admin/OrganizationDetail.tsx`**
+
+A tabbed interface for managing all organization data:
+
+| Tab | Content |
+|-----|---------|
+| **Details** | Name, slug, logo URL, primary contact email, website URL, timezone |
+| **Profile** | Organization type, geo level, mission statement, focus areas, policy domains |
+| **Settings** | MFA requirements, seat limits, concurrent session limits |
+| **Activity** | Onboarding progress, user count, integration status (read-only) |
+
+#### 2. Reusable Edit Forms
+**File: `src/components/admin/organization/OrganizationDetailsForm.tsx`**
+
+Editable form for `client_organizations` table fields:
+- Organization name (with slug auto-generation option)
+- Slug (with availability checker - reuse logic from Step1CreateOrg)
+- Primary contact email
+- Logo URL (with preview)
+- Website URL
+- Timezone selector
+
+**File: `src/components/admin/organization/OrganizationProfileForm.tsx`**
+
+Editable form for `organization_profiles` table fields:
+- Organization type dropdown (reuse ORG_TYPE_OPTIONS from Step2)
+- Geographic level and locations (reuse GeoLocationPicker)
+- Mission statement
+- Focus areas (tag-based selection)
+- Policy domains (checkbox selection)
+- Sensitivity and risk tolerance settings
+
+**File: `src/components/admin/organization/OrganizationSettingsForm.tsx`**
+
+Administrative settings form:
+- MFA required toggle
+- MFA grace period days
+- Seat limit management
+- Max concurrent sessions
+
+### Modifications to Existing Files
+
+#### 1. Add Route
+**File: `src/App.tsx`**
+
+Add new route for organization detail page:
 ```typescript
-type SortField = 'name' | 'email' | 'phone' | 'state' | 'total_donated' | 'donation_count' | 'segment' | 'churn_risk_label' | 'last_donation_date';
+<Route path="/admin/organizations/:organizationId" element={<OrganizationDetail />} />
 ```
 
-**2. Add date formatting helper function (after line 39)**
-```typescript
-// Format date to readable format (e.g., "Jan 15, 2026")
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—';
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
+#### 2. Add Edit Action to Organization List
+**File: `src/components/admin/ClientOrganizationManager.tsx`**
+
+- Add "Edit" menu item in the actions dropdown
+- Make organization name/row clickable to navigate to detail page
+- Add pencil icon for quick edit access
+
+### Data Flow
+
+```text
+                                   ┌─────────────────────────────────┐
+                                   │     OrganizationDetail Page     │
+                                   │   /admin/organizations/:id      │
+                                   └─────────────────────────────────┘
+                                              │
+                    ┌─────────────────────────┼─────────────────────────┐
+                    │                         │                         │
+                    ▼                         ▼                         ▼
+    ┌───────────────────────┐  ┌───────────────────────┐  ┌───────────────────────┐
+    │  OrganizationDetails  │  │  OrganizationProfile  │  │ OrganizationSettings  │
+    │        Form           │  │        Form           │  │        Form           │
+    └───────────────────────┘  └───────────────────────┘  └───────────────────────┘
+              │                          │                          │
+              ▼                          ▼                          ▼
+    ┌───────────────────────┐  ┌───────────────────────┐  ┌───────────────────────┐
+    │  client_organizations │  │ organization_profiles │  │  client_organizations │
+    │       (update)        │  │       (upsert)        │  │       (update)        │
+    └───────────────────────┘  └───────────────────────┘  └───────────────────────┘
 ```
 
-**3. Update columns array (lines 492-501)**
+### Shared Components Reuse
 
-Add new column and adjust widths to accommodate:
-| Column | Old Width | New Width |
-|--------|-----------|-----------|
-| Name | 17% | 15% |
-| Email | 18% | 16% |
-| Phone | 12% | 11% |
-| State | 7% | 6% |
-| Lifetime $ | 11% | 10% |
-| Donations | 9% | 8% |
-| **Last Gift** | — | **9%** (new) |
-| Segment | 14% | 14% |
-| Risk | 8% | 7% |
+Extract and reuse these from onboarding:
+- Slug availability checker logic from `Step1CreateOrg`
+- Organization type options from `Step2OrgProfile`
+- Geo level options from `Step2OrgProfile`
+- Focus area/policy domain tag pickers
+- `GeoLocationPicker` component
 
-**4. Update sorting logic (around line 461)**
+### UI Design
 
-Add date comparison handling:
-```typescript
-// Date comparison
-if (sortField === 'last_donation_date') {
-  const aDate = aVal ? new Date(aVal).getTime() : 0;
-  const bDate = bVal ? new Date(bVal).getTime() : 0;
-  return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
-}
-```
+Match the existing admin panel design system:
+- Use `AdminPageHeader` for consistent header
+- Use `Card`, `CardHeader`, `CardContent` for sections
+- Use `V3Button` for actions
+- Use portal-themed colors and styling
+- Add breadcrumb navigation back to organization list
 
-**5. Add column rendering in row (after line 621)**
-```typescript
-<div style={{ width: '9%' }} className="text-sm text-[hsl(var(--portal-text-muted))]">
-  {formatDate(donor.last_donation_date)}
-</div>
-```
+### Form Validation
 
----
+- Slug uniqueness check (exclude current org)
+- Email format validation
+- URL format validation (website, logo)
+- Required field validation (name, slug)
 
-### File: `src/components/client/DonorListSheet.tsx`
+## Files Summary
 
-**1. Add to SortField type**
-```typescript
-type SortField = 'name' | 'email' | 'phone' | 'state' | 'city' | 'total_donated' | 'donation_count' | 'segment' | 'churn_risk_label' | 'employer' | 'last_donation_date';
-```
+| Action | File Path |
+|--------|-----------|
+| Create | `src/pages/admin/OrganizationDetail.tsx` |
+| Create | `src/components/admin/organization/OrganizationDetailsForm.tsx` |
+| Create | `src/components/admin/organization/OrganizationProfileForm.tsx` |
+| Create | `src/components/admin/organization/OrganizationSettingsForm.tsx` |
+| Create | `src/components/admin/organization/index.ts` (barrel export) |
+| Modify | `src/App.tsx` (add route) |
+| Modify | `src/components/admin/ClientOrganizationManager.tsx` (add edit links) |
 
-**2. Add same date formatting helper function**
+## Expected Outcome
 
-**3. Update columns array**
-
-Add new column and adjust widths:
-```typescript
-const columns = [
-  { key: 'name' as SortField, label: 'Name', width: '13%' },
-  { key: 'email' as SortField, label: 'Email', width: '15%' },
-  { key: 'phone' as SortField, label: 'Phone', width: '10%' },
-  { key: 'state' as SortField, label: 'State', width: '5%' },
-  { key: 'city' as SortField, label: 'City', width: '9%' },
-  { key: 'total_donated' as SortField, label: 'Lifetime $', width: '8%' },
-  { key: 'donation_count' as SortField, label: 'Donations', width: '6%' },
-  { key: 'last_donation_date' as SortField, label: 'Last Gift', width: '9%' },  // NEW
-  { key: 'segment' as SortField, label: 'Segment', width: '10%' },
-  { key: 'churn_risk_label' as SortField, label: 'Risk', width: '6%' },
-  { key: 'employer' as SortField, label: 'Employer', width: '9%' },
-];
-```
-
-**4. Update sorting logic for date field**
-
-**5. Add column rendering in row**
-
-**6. Update CSV export headers and data**
-```typescript
-const headers = ['Name', 'Email', 'Phone', 'State', 'City', 'ZIP', 'Lifetime $', 'Donations', 'Last Donation Date', 'Segment', 'Churn Risk', 'Employer', 'Occupation'];
-const rows = sortedDonors.map(d => [
-  // ... existing fields
-  d.last_donation_date || '',  // NEW
-  // ...
-]);
-```
-
-## Summary of Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/client/DonorSegmentResults.tsx` | Add SortField type, date formatter, column definition, sorting logic, row rendering |
-| `src/components/client/DonorListSheet.tsx` | Add SortField type, date formatter, column definition, sorting logic, row rendering, CSV export |
-
-## Expected Result
-
-- New "Last Gift" column appears in both inline table and pop-out sheet
-- Column is sortable (newest/oldest first)
-- Dates display in readable format: "Jan 15, 2026"
-- CSV export includes the last donation date
+- Admins can click any organization row to view/edit all details
+- All onboarding data can be modified after initial setup
+- Changes are saved immediately with success/error feedback
+- Consistent UI with existing admin panel design
+- Breadcrumb navigation for easy return to organization list
