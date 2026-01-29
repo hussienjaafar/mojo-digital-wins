@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -715,8 +715,8 @@ const ClientOrganizationManager = () => {
                     const currentStep = onboarding?.current_step || 1;
                     
                     return (
-                      <>
-                        <TableRow key={org.id} className="group">
+                      <Fragment key={org.id}>
+                        <TableRow className="group">
                           <TableCell className="p-2">
                             <V3Button
                               variant="ghost"
@@ -862,13 +862,13 @@ const ClientOrganizationManager = () => {
                           </TableCell>
                         </TableRow>
                         {isExpanded && (
-                          <TableRow key={`${org.id}-stats`}>
+                          <TableRow>
                             <TableCell colSpan={7} className="p-0">
                               <OrgStatsRow org={org} />
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })
                 )}
