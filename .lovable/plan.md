@@ -1,142 +1,145 @@
 
-
-# Fix: Refresh Button Not Updating All Dashboard Sections
+# Fix: Persistent "ActBlue Historical Import - Cancelled" Banner Bug
 
 ## Problem Summary
 
-When clicking the refresh button in the date range selector, some dashboard sections do not update. This is because the `useSmartRefresh` hook only invalidates a limited set of query keys, while the dashboard components use many additional query keys that are not included in the invalidation logic.
+The "ActBlue Historical Import - Cancelled" notification keeps reappearing for organizations (like "A New Policy") even though the import was cancelled days ago. This happens because:
+
+1. **No persistence for dismissal**: When users click the "X" to dismiss the banner, it only sets local React state that resets on every page load
+2. **No age threshold**: Terminal jobs (cancelled/failed) show indefinitely, regardless of how old they are
+3. **Wrong label**: The banner always says "ActBlue Historical Import" even for Meta Ads backfill jobs
 
 ## Root Cause Analysis
 
-### Current Invalidation List (useSmartRefresh.ts lines 151-164)
+| Issue | Current Behavior | Expected Behavior |
+|-------|-----------------|-------------------|
+| Dismissal State | Uses `useState(false)` - resets on mount | Should persist using `localStorage` |
+| Age Threshold | No limit - old jobs show forever | Should auto-hide after 24-48 hours |
+| Job Type Label | Always shows "ActBlue Historical Import" | Should detect job type from `task_name` |
+| Auto-dismiss | Only applies to "completed" jobs | Should also apply to old cancelled/failed jobs |
 
-The refresh button currently only invalidates these query keys:
+### Current Code Issues
 
-| Query Key | What It Covers |
-|-----------|----------------|
-| `['dashboard']` | Main dashboard summary data |
-| `['actblue']` | ActBlue transaction queries |
-| `['meta-metrics']` | Meta performance metrics |
-| `['sms']` | SMS campaign data |
-| `['attribution']` | Attribution analytics |
-| `['recurring-health']` | Legacy recurring health |
-
-### Missing Query Keys (Not Invalidated)
-
-The following query keys are used by dashboard components but are **NOT invalidated** when refresh is clicked:
-
-| Missing Key | Used By | Impact |
-|-------------|---------|--------|
-| `['hourly-metrics']` | TodayViewDashboard (hourly breakdown, comparison data) | Today view doesn't refresh |
-| `['single-day-meta']` | useSingleDayMetaMetrics | Meta Ads section in Today view doesn't refresh |
-| `['recurring-health-v2']` | useRecurringHealthQuery | Modern recurring donor health section doesn't refresh |
-| `['creative-intelligence']` | useCreativeIntelligence | Creative Intelligence V2 doesn't refresh |
-| `['donations']` | Donation list/timeseries queries | Donation tables don't refresh |
-| `['meta']` | Meta campaign/creative queries | Meta ads detail views don't refresh |
-| `['channels']` | Channel comparison views | Channel summaries don't refresh |
-| `['kpis']` | KPI drilldown queries | KPI details don't refresh |
-| `['intelligence']` | Donor intelligence queries | Attribution/donor segments don't refresh |
-| `['alerts']` | Alert queries | Alert sections don't refresh |
-
-### Why This Happens
-
-The query key system in TanStack Query uses prefix matching. Invalidating `['dashboard']` will invalidate all queries starting with `['dashboard', ...]`, but it will **NOT** invalidate queries starting with `['hourly-metrics', ...]` or `['single-day-meta', ...]`.
-
----
+```text
+src/components/client/BackfillStatusBanner.tsx
+├── Line 168: const [dismissed, setDismissed] = useState(false)  ← NOT PERSISTED
+├── Line 218: job.status === "cancelled" always shows           ← NO AGE CHECK
+└── Line 255: Always says "ActBlue Historical Import"           ← WRONG FOR META JOBS
+```
 
 ## Solution
 
-Expand the invalidation list in `useSmartRefresh.ts` to include all dashboard-related query keys. This ensures clicking refresh will update every section of the dashboard.
+### Change 1: Persist Dismissal State in localStorage
 
-### Implementation Details
+Replace `useState` with `useLocalStorage` to remember which jobs have been dismissed, keyed by job ID.
 
-**File to Modify**: `src/hooks/useSmartRefresh.ts`
-
-**Change Location**: Lines 157-164 (the invalidation block)
-
-### Current Code
+**File**: `src/components/client/BackfillStatusBanner.tsx`
 
 ```typescript
-await Promise.all([
-  queryClient.invalidateQueries({ queryKey: ['actblue'] }),
-  queryClient.invalidateQueries({ queryKey: ['meta-metrics'] }),
-  queryClient.invalidateQueries({ queryKey: ['sms'] }),
-  queryClient.invalidateQueries({ queryKey: ['attribution'] }),
-  queryClient.invalidateQueries({ queryKey: ['recurring-health'] }),
-]);
+// Before
+const [dismissed, setDismissed] = useState(false);
+
+// After
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+
+// Store dismissed job IDs to persist across sessions
+const [dismissedJobs, setDismissedJobs] = useLocalStorage<string[]>(
+  'backfill-dismissed-jobs',
+  []
+);
+const dismissed = job ? dismissedJobs.includes(job.id) : false;
+
+// When dismissing
+const handleDismiss = () => {
+  if (job) {
+    setDismissedJobs(prev => [...prev, job.id]);
+  }
+};
 ```
 
-### Updated Code
+### Change 2: Add Age-Based Auto-Dismissal for Terminal Jobs
+
+For cancelled/failed jobs, automatically hide them after 24 hours:
 
 ```typescript
-await Promise.all([
-  // Core data sources
-  queryClient.invalidateQueries({ queryKey: ['actblue'] }),
-  queryClient.invalidateQueries({ queryKey: ['meta-metrics'] }),
-  queryClient.invalidateQueries({ queryKey: ['meta'] }),
-  queryClient.invalidateQueries({ queryKey: ['sms'] }),
+// New useEffect for age-based hiding
+useEffect(() => {
+  if (!job) return;
   
-  // Today/Single-day view specific
-  queryClient.invalidateQueries({ queryKey: ['hourly-metrics'] }),
-  queryClient.invalidateQueries({ queryKey: ['single-day-meta'] }),
+  const isTerminal = job.status === "cancelled" || 
+                     job.status === "failed" || 
+                     job.status === "completed_with_errors";
   
-  // Recurring health (both legacy and v2)
-  queryClient.invalidateQueries({ queryKey: ['recurring-health'] }),
-  queryClient.invalidateQueries({ queryKey: ['recurring-health-v2'] }),
-  
-  // Intelligence & analytics
-  queryClient.invalidateQueries({ queryKey: ['attribution'] }),
-  queryClient.invalidateQueries({ queryKey: ['intelligence'] }),
-  queryClient.invalidateQueries({ queryKey: ['creative-intelligence'] }),
-  
-  // Other dashboard sections
-  queryClient.invalidateQueries({ queryKey: ['donations'] }),
-  queryClient.invalidateQueries({ queryKey: ['channels'] }),
-  queryClient.invalidateQueries({ queryKey: ['kpis'] }),
-  queryClient.invalidateQueries({ queryKey: ['alerts'] }),
-]);
+  if (isTerminal && job.completed_at) {
+    const completedTime = new Date(job.completed_at).getTime();
+    const now = Date.now();
+    const hoursElapsed = (now - completedTime) / (1000 * 60 * 60);
+    
+    // Auto-dismiss terminal jobs older than 24 hours
+    const AUTO_DISMISS_HOURS = 24;
+    if (hoursElapsed >= AUTO_DISMISS_HOURS && !dismissedJobs.includes(job.id)) {
+      setDismissedJobs(prev => [...prev, job.id]);
+    }
+  }
+}, [job?.status, job?.completed_at, job?.id]);
 ```
 
----
+### Change 3: Show Correct Import Type Label
 
-## Additional Consideration: Post-Sync Invalidation
-
-The same issue exists in the post-sync invalidation (lines 206-209). After external syncs complete, only `['dashboard']` is invalidated. This should also include the expanded list or simply invalidate all queries to ensure fresh data is displayed.
-
-### Option A: Repeat the full invalidation list
-
-Duplicate the expanded list after syncs complete.
-
-### Option B: Invalidate all queries with a single call
-
-Use a broader invalidation strategy:
+Detect whether the job is ActBlue or Meta Ads from the `task_name`:
 
 ```typescript
-// After syncs complete, invalidate everything for this organization
-await queryClient.invalidateQueries({
-  predicate: (query) => true, // Invalidates ALL queries
-  refetchType: 'all'
-});
+// Derive job type from task_name
+const importType = job?.task_name?.startsWith('actblue') 
+  ? 'ActBlue Historical Import' 
+  : job?.task_name?.startsWith('meta_ads') 
+    ? 'Meta Ads Backfill' 
+    : 'Data Import';
+
+// In JSX
+<span className="font-medium">
+  {importType}
+</span>
 ```
 
-**Recommended**: Option A (repeat the list) to maintain precision and avoid invalidating unrelated queries (like user settings, navigation state, etc.)
+### Change 4: Clean Up Old Dismissed Job IDs
 
----
+Prevent localStorage from growing indefinitely by pruning old dismissed IDs (keep last 50):
+
+```typescript
+// When adding a new dismissed job, prune old entries
+const handleDismiss = () => {
+  if (job) {
+    setDismissedJobs(prev => {
+      const updated = [...prev, job.id];
+      // Keep only the most recent 50 dismissed jobs
+      return updated.slice(-50);
+    });
+  }
+};
+```
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/components/client/BackfillStatusBanner.tsx` | Add localStorage persistence, age-based auto-dismiss, dynamic job type label |
 
 ## Expected Results
 
-After implementation:
-1. Clicking the refresh button will update ALL dashboard sections
-2. The Today View hourly breakdown and Meta metrics will refresh
-3. Creative Intelligence will refresh
-4. Recurring donor health will refresh
-5. All channel and donation views will refresh
+After implementing these changes:
 
----
+| Scenario | Behavior |
+|----------|----------|
+| User dismisses cancelled banner | Stays dismissed across page loads and sessions |
+| Cancelled job is 2+ days old | Auto-hidden without user action |
+| Meta Ads backfill job | Shows "Meta Ads Backfill" label instead of "ActBlue" |
+| New job starts for same org | Previous dismissal is ignored; new job shows normally |
+| User has dismissed 100+ jobs | Only last 50 are remembered (prevents bloat) |
 
-## Files Summary
+## Testing Plan
 
-| Action | File |
-|--------|------|
-| Modify | `src/hooks/useSmartRefresh.ts` |
-
+1. View "A New Policy" dashboard - verify cancelled banner no longer appears (job is 15+ days old)
+2. Click dismiss on any visible cancelled/failed banner - verify it stays dismissed after page refresh
+3. Start a new backfill for an org with a previously dismissed job - verify the new job's banner appears
+4. Verify Meta Ads backfill jobs show correct "Meta Ads Backfill" label
