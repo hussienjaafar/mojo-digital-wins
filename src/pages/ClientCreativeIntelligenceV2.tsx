@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Sparkles, FlaskConical } from "lucide-react";
 import { V3LoadingState, V3Badge } from "@/components/v3";
 import { CreativeIntelligenceDashboard } from "@/components/creative-intelligence";
+import { toast } from "sonner";
 
 /**
  * Creative Intelligence V2 - Test Page
@@ -22,14 +23,62 @@ import { CreativeIntelligenceDashboard } from "@/components/creative-intelligenc
  */
 const ClientCreativeIntelligenceV2 = () => {
   const { organizationId, isLoading: orgLoading } = useClientOrganization();
-  // Election settings - stored locally for now since columns don't exist yet
-  const [electionDate] = useState<string | null>(null);
-  const [electionName] = useState<string>("Election Day");
 
-  // Handle election date changes (no-op until columns are added)
-  const handleElectionDateChange = (date: string) => {
-    console.log("Election date change requested:", date);
-    // TODO: Save to database once election_date column is added to client_organizations
+  // Election settings - now fetched from database
+  const [electionDate, setElectionDate] = useState<string | null>(null);
+  const [electionName, setElectionName] = useState<string>("Election Day");
+
+  // Fetch election settings from database when organizationId is available
+  useEffect(() => {
+    const fetchElectionSettings = async () => {
+      if (!organizationId) return;
+
+      try {
+        const { data, error } = await supabase
+          .from("client_organizations")
+          .select("election_date, election_name")
+          .eq("id", organizationId)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          setElectionDate(data.election_date);
+          setElectionName(data.election_name || "Election Day");
+        }
+      } catch (error) {
+        console.error("Error fetching election settings:", error);
+        // Don't show error toast on initial load - columns may not exist yet
+      }
+    };
+
+    fetchElectionSettings();
+  }, [organizationId]);
+
+  // Save election date changes to database
+  const handleElectionDateChange = async (date: string) => {
+    if (!organizationId) {
+      toast.error("Organization not found");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("client_organizations")
+        .update({
+          election_date: date,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", organizationId);
+
+      if (error) throw error;
+
+      setElectionDate(date);
+      toast.success("Election date updated");
+    } catch (error) {
+      console.error("Error updating election date:", error);
+      toast.error("Failed to update election date");
+    }
   };
 
   if (orgLoading) {

@@ -36,6 +36,7 @@ import { PerformanceQuadrantChart } from "./PerformanceQuadrantChart";
 import { DataFreshnessIndicator } from "./DataFreshnessIndicator";
 import { CreativeComparisonPanel } from "./CreativeComparisonPanel";
 import { DonorSegmentationCard } from "./DonorSegmentationCard";
+import { DonorPsychologyCard } from "./DonorPsychologyCard";
 import { ElectionDayBadge, ElectionCountdown } from "./ElectionCountdown";
 import type { CreativeRecommendation } from "@/hooks/useCreativeIntelligence";
 
@@ -560,6 +561,15 @@ export function CreativeIntelligenceDashboard({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             <LeadingIndicatorsCard data={data?.leading_indicators} isLoading={isLoading} />
             <FatigueAlertsPanel alerts={data?.fatigue_alerts || []} isLoading={isLoading} />
+          </div>
+
+          {/* Donor Psychology row */}
+          <div className="mt-6">
+            <DonorPsychologyCard
+              painPointPerformance={data?.pain_point_performance || []}
+              valuesPerformance={data?.values_performance || []}
+              isLoading={isLoading}
+            />
           </div>
 
           {/* Recommendations table */}

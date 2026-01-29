@@ -47,6 +47,38 @@ export interface TargetPerformance {
   total_revenue: number;
 }
 
+export interface PainPointPerformance {
+  pain_point: string;
+  creative_count: number;
+  mean_roas: number;
+  stddev_roas: number;
+  total_revenue: number;
+}
+
+export interface ValuesPerformance {
+  value: string;
+  creative_count: number;
+  mean_roas: number;
+  stddev_roas: number;
+  total_revenue: number;
+}
+
+export interface IssueTagsPerformance {
+  tag: string;
+  creative_count: number;
+  mean_roas: number;
+  stddev_roas: number;
+  total_revenue: number;
+}
+
+export interface PolicyPerformance {
+  policy: string;
+  creative_count: number;
+  mean_roas: number;
+  stddev_roas: number;
+  total_revenue: number;
+}
+
 export interface LeadingIndicators {
   correlations: {
     early_ctr_to_roas: number;
@@ -152,6 +184,10 @@ export interface CreativeIntelligenceData {
   issue_performance: IssuePerformance[];
   stance_performance: StancePerformance[];
   target_attacked_performance: TargetPerformance[];
+  pain_point_performance: PainPointPerformance[];
+  values_performance: ValuesPerformance[];
+  issue_tags_performance: IssueTagsPerformance[];
+  policy_performance: PolicyPerformance[];
   leading_indicators: LeadingIndicators;
   fatigue_alerts: FatigueAlert[];
   recommendations: CreativeRecommendation[];

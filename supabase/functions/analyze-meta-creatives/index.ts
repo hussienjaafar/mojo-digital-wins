@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import {
+  validateTopicExtraction,
+  calculateDynamicConfidence,
+  combineConfidenceScores,
+  type TopicExtractionResult
+} from '../_shared/topic-validation.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -50,6 +56,9 @@ interface AIAnalysisResult {
   // Donor psychology
   donor_pain_points?: string[];
   values_appealed?: string[];
+
+  // LLM self-evaluation (Task 3: Topic Validation)
+  confidence_rating?: number; // 1-5 scale
 }
 
 interface VisualAnalysisResult {
@@ -174,6 +183,14 @@ GENERAL (backwards compatible):
 - key_themes: Array of 2-5 key themes
 ${creative.audio_transcript ? '- verbal_themes: Array of 2-4 themes from spoken audio' : ''}
 
+CONFIDENCE SELF-EVALUATION:
+- confidence_rating: Rate your confidence in this analysis from 1-5:
+  * 5 = very confident, well-structured ad with clear messaging
+  * 4 = confident, clear content with minor ambiguity
+  * 3 = moderately confident, some unclear elements
+  * 2 = low confidence, significant ambiguity
+  * 1 = very low confidence, unclear or confusing content
+
 Return ONLY valid JSON.`;
 
           const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -214,6 +231,34 @@ Return ONLY valid JSON.`;
               const jsonMatch = responseText.match(/\{[\s\S]*\}/);
               if (jsonMatch) {
                 analysis = JSON.parse(jsonMatch[0]);
+
+                // Task 3: Validate topic extraction
+                if (analysis) {
+                  const topicData: TopicExtractionResult = {
+                    issue_primary: analysis.issue_primary || null,
+                    issue_tags: analysis.issue_tags || null,
+                    political_stances: analysis.political_stances || null,
+                    donor_pain_points: analysis.donor_pain_points || null,
+                    policy_positions: analysis.policy_positions || null,
+                    targets_attacked: analysis.targets_attacked || null,
+                    targets_supported: analysis.targets_supported || null,
+                    values_appealed: analysis.values_appealed || null,
+                  };
+
+                  const validation = validateTopicExtraction(topicData);
+
+                  if (!validation.isValid) {
+                    console.warn(`[analyze-meta-creatives] Low coherence for creative ${creative.id}:`, {
+                      creative_id: creative.id,
+                      coherence_score: validation.coherenceScore,
+                      diversity_score: validation.diversityScore,
+                      issues: validation.issues
+                    });
+                  }
+
+                  // Store validation metrics in analysis for later use
+                  (analysis as any).validation = validation;
+                }
               }
             } catch (parseError) {
               console.error(`Error parsing AI response for creative ${creative.id}:`, parseError);
@@ -314,12 +359,38 @@ Return only valid JSON:
         const updateData: any = {
           analyzed_at: new Date().toISOString(),
           ai_model_used: 'google/gemini-2.5-flash',
-          analysis_confidence: 0.85,
           effectiveness_score: effectivenessScore,
           performance_tier: performanceTier,
         };
 
         if (analysis) {
+          // Task 3: Calculate dynamic confidence from LLM self-rating
+          const llmConfidence = calculateDynamicConfidence(analysis.confidence_rating, 3);
+
+          // Get validation results
+          const validation = (analysis as any).validation || {
+            coherenceScore: 0.5, // Default fallback
+            diversityScore: 0.5,
+            issues: []
+          };
+
+          // Combine LLM confidence and coherence score
+          const finalConfidence = combineConfidenceScores(llmConfidence, validation.coherenceScore);
+
+          updateData.analysis_confidence = finalConfidence;
+          updateData.topic_coherence_score = validation.coherenceScore;
+
+          // Log validation metrics for monitoring
+          console.log(`[analyze-meta-creatives] Validation metrics for ${creative.id}:`, {
+            creative_id: creative.id,
+            llm_confidence_rating: analysis.confidence_rating,
+            llm_confidence: llmConfidence,
+            coherence_score: validation.coherenceScore,
+            diversity_score: validation.diversityScore,
+            final_confidence: finalConfidence,
+            validation_issues: validation.issues
+          });
+
           // Specific issue extraction (NEW)
           updateData.issue_primary = analysis.issue_primary || null;
           updateData.issue_tags = analysis.issue_tags || [];
@@ -369,7 +440,7 @@ Return only valid JSON:
         }
 
         analyzed++;
-        console.log(`Successfully analyzed creative ${creative.id}: topic=${analysis?.topic || 'N/A'}, tier=${performanceTier}`);
+        console.log(`Successfully analyzed creative ${creative.id}: topic=${analysis?.topic || 'N/A'}, tier=${performanceTier}, confidence=${updateData.analysis_confidence?.toFixed(2) || 'N/A'}`);
 
         // Small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 300));
