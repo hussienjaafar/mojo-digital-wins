@@ -122,6 +122,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { title: "Platform Admins", icon: UserCog, value: "users", requiredRole: 'admin' },
       { title: "Platform Invites", icon: Mail, value: "invite-codes", requiredRole: 'admin' },
+      { title: "Contact Submissions", icon: MessageSquare, value: "contacts", requiredRole: 'admin' },
       { title: "Operations", icon: Activity, value: "scheduler", requiredRole: 'admin' },
       { title: "Coverage Governance", icon: Layers, value: "coverage-governance", requiredRole: 'admin' },
       { title: "Sessions", icon: Shield, value: "sessions", requiredRole: 'admin' },
