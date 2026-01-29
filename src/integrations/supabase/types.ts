@@ -2714,6 +2714,8 @@ export type Database = {
           bonus_reason: string | null
           bonus_seats: number
           created_at: string | null
+          election_date: string | null
+          election_name: string | null
           id: string
           is_active: boolean | null
           logo_url: string | null
@@ -2732,6 +2734,8 @@ export type Database = {
           bonus_reason?: string | null
           bonus_seats?: number
           created_at?: string | null
+          election_date?: string | null
+          election_name?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
@@ -2750,6 +2754,8 @@ export type Database = {
           bonus_reason?: string | null
           bonus_seats?: number
           created_at?: string | null
+          election_date?: string | null
+          election_name?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
@@ -6660,6 +6666,7 @@ export type Database = {
           thumbnail_url: string | null
           tone: string | null
           topic: string | null
+          topic_coherence_score: number | null
           total_conversion_value: number | null
           total_conversions: number | null
           total_impressions: number | null
@@ -6751,6 +6758,7 @@ export type Database = {
           thumbnail_url?: string | null
           tone?: string | null
           topic?: string | null
+          topic_coherence_score?: number | null
           total_conversion_value?: number | null
           total_conversions?: number | null
           total_impressions?: number | null
@@ -6842,6 +6850,7 @@ export type Database = {
           thumbnail_url?: string | null
           tone?: string | null
           topic?: string | null
+          topic_coherence_score?: number | null
           total_conversion_value?: number | null
           total_conversions?: number | null
           total_impressions?: number | null
