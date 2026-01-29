@@ -1,234 +1,166 @@
 
 
-# Organization Management Enhancement - COMPLETED ✅
+# Fix Console Errors: React Key Warning and RPC 400 Error
 
-## Status: Fully Implemented
+## Summary
 
-This plan enhances the Organization Management page (`/admin/organizations/:organizationId`) with three key features:
-1. **Logo Upload** - Both file upload and URL input with live preview
-2. **Integrations Tab** - Full integration management embedded in the organization page
-3. **UX Consolidation Analysis** - Recommendations on whether separate pages are still needed
+Two distinct issues need to be resolved:
 
----
-
-## Part 1: UX/UI Investigation - Page Consolidation Analysis
-
-### Current Architecture
-
-The admin dashboard uses a **tabbed hub pattern** for most management:
-
-| Management Area | Current Location | Standalone Page |
-|-----------------|------------------|-----------------|
-| Organizations | `/admin?tab=clients` | `/admin/organizations/:id` |
-| All Users | `/admin?tab=client-users` | `/admin/users/:id` |
-| All Integrations | `/admin?tab=integration-center` | None |
-| Members (per org) | Embedded in Org Detail | None |
-| Integrations (per org) | Global center only | None |
-
-### UX Best Practices Analysis
-
-**1. Information Density Principle**
-- The Organization Detail page currently has 5 tabs: Details, Profile, Settings, Members, Activity
-- Adding a 6th "Integrations" tab maintains usability (recommended limit is 6-7 tabs)
-- This follows the "progressive disclosure" pattern - detailed org-specific info in one place
-
-**2. Context Switching Reduction**
-- Currently, admins must navigate to the global Integration Center to manage a specific org's integrations
-- This requires mental context switching and extra navigation
-- Consolidating reduces clicks from 4+ to 1 (direct tab access)
-
-**3. Consistency with Member Management**
-- Members are already managed within the Organization Detail page
-- Applying the same pattern to Integrations creates a consistent mental model
-
-**4. Role of Global Views**
-- Global views (`/admin?tab=integration-center`, `/admin?tab=client-users`) serve as **dashboards** for cross-organization monitoring
-- Organization-specific views serve as **management hubs** for deep configuration
-- These serve complementary purposes and should both exist
-
-### Recommendation: Keep Both, Refine Purposes
-
-| View | Purpose | Action |
-|------|---------|--------|
-| **Global Integration Center** | Health monitoring dashboard across all clients | Keep, but add "Edit" links to Org Detail |
-| **Org-Specific Integrations Tab** | Deep configuration and troubleshooting | Add as new tab |
-| **Global User Manager** | Cross-org user administration | Keep for bulk operations |
-| **Org-Specific Members Tab** | Team management within one org | Already exists, no change |
-
-**Result**: No pages need to be removed. The global views remain valuable for monitoring and bulk operations, while organization-specific management is consolidated for efficiency.
+1. **React Key Warning in ClientOrganizationManager** - Missing key prop on Fragment elements
+2. **RPC 400 Error in get_creative_intelligence** - Function references non-existent column `purchase_roas` (should be `roas`)
 
 ---
 
-## Part 2: Logo Upload Implementation
+## Issue 1: React Key Warning
 
-### Current State
-- `OrganizationDetailsForm.tsx` has a URL input field with preview
-- No file upload capability exists
-- No storage bucket configured for organization logos
+### Root Cause
 
-### Implementation Approach
-
-**Option A: File Upload with Storage Bucket**
-- Create `organization-logos` storage bucket
-- Upload file to storage, get public URL, save to `logo_url` column
-- Pros: Full control, consistent hosting
-- Cons: Requires bucket creation, storage costs
-
-**Option B: Enhanced URL + Drag-Drop URL Extractor**
-- Keep URL-based approach but add drag-drop that extracts URLs from images
-- Pros: No storage needed, simpler
-- Cons: Relies on external image hosting
-
-**Recommended: Option A (File Upload with Storage)**
-
-### Storage Bucket Requirements
-
-```text
-Bucket Name: organization-logos
-Public: true (logos need public access)
-RLS Policy: Admin-only upload/delete
-```
-
-### New Component: LogoUploadField
-
-A hybrid component that provides:
-- URL text input (existing)
-- File upload via click or drag-drop
-- Live preview with loading state
-- Delete/clear option
-- Portal-themed styling
-
-```text
-+--------------------------------------------------+
-|  Organization Logo                               |
-+--------------------------------------------------+
-|  +------------------+  +----------------------+  |
-|  |                  |  | Drag & drop an image |  |
-|  |   [Preview]      |  | or click to upload   |  |
-|  |                  |  |                      |  |
-|  +------------------+  | -- OR --             |  |
-|                        |                      |  |
-|                        | [Paste URL here... ] |  |
-|                        +----------------------+  |
-|                        [Remove] [Save Changes]   |
-+--------------------------------------------------+
-```
-
----
-
-## Part 3: Integrations Tab Implementation
-
-### New Component: OrganizationIntegrationsPanel
-
-Similar to `OrganizationMembersPanel`, this will be a self-contained panel that:
-
-1. **Fetches integrations** for the specific organization from `v_integration_summary`
-2. **Displays integration cards** using existing `IntegrationDetailCard` component
-3. **Provides actions**: Test, Toggle, Edit (opens `CredentialSlideOver`)
-4. **Includes collapsible sections** for Meta CAPI and Campaign URL Generator
-5. **Shows add integration button** that opens the same flow as onboarding
-
-### Data Fetching Strategy
+In `src/components/admin/ClientOrganizationManager.tsx` lines 717-871, the map function returns a React Fragment (`<>...</>`) containing two TableRows. However, the key is placed on the inner `<TableRow>` instead of the Fragment wrapper.
 
 ```typescript
-// Filter v_integration_summary by organization_id
-const { data } = await supabase
-  .from('v_integration_summary')
-  .select('*')
-  .eq('organization_id', organizationId)
-  .maybeSingle();
+// Current problematic code (lines 717-871)
+filteredOrganizations.map((org) => {
+  return (
+    <>
+      <TableRow key={org.id}>...</TableRow>   // Key is here, but...
+      {isExpanded && (
+        <TableRow key={`${org.id}-stats`}>...</TableRow>
+      )}
+    </>   // ...React needs key on THIS element
+  );
+})
 ```
 
-### UI Structure
+### Solution
 
-```text
-+--------------------------------------------------+
-| Integrations                           [Refresh] |
-+--------------------------------------------------+
-| +----------------------------------------------+ |
-| | Integration Health Summary                    | |
-| | [3 Active] [1 Needs Attention] [0 Disabled]  | |
-| +----------------------------------------------+ |
-|                                                  |
-| +----------------------------------------------+ |
-| | [Meta Ads Icon] Meta Ads                      | |
-| |   Status: Connected | Last sync: 2h ago       | |
-| |   [Test] [Settings] [Disable]                 | |
-| +----------------------------------------------+ |
-|                                                  |
-| +----------------------------------------------+ |
-| | [ActBlue Icon] ActBlue                        | |
-| |   Status: Needs Attention | Error: Auth fail  | |
-| |   [Test] [Reconnect] [Settings] [Disable]     | |
-| +----------------------------------------------+ |
-|                                                  |
-| [+ Add Integration]                              |
-|                                                  |
-| --- Meta CAPI Settings (Collapsible) ---         |
-| --- Campaign URL Generator (Collapsible) ---     |
-+--------------------------------------------------+
+Add the `key` prop to the Fragment using the explicit `<Fragment key={...}>` syntax (since shorthand `<>` cannot accept props).
+
+```typescript
+// Fixed code
+import { Fragment } from "react";
+
+filteredOrganizations.map((org) => {
+  return (
+    <Fragment key={org.id}>
+      <TableRow>...</TableRow>
+      {isExpanded && (
+        <TableRow>...</TableRow>
+      )}
+    </Fragment>
+  );
+})
 ```
 
-### Component Reuse
+---
 
-From existing integration components:
-- `IntegrationDetailCard` - Individual integration display
-- `CredentialSlideOver` - Edit credentials
-- `MetaCAPISettings` - Meta conversion API config
-- `CampaignURLGenerator` - UTM parameter generator
-- `SyncTimeline` - Sync history display
+## Issue 2: RPC 400 Error (Column Does Not Exist)
+
+### Root Cause
+
+The `get_creative_intelligence` function references `mci.purchase_roas` in multiple places, but the actual column in `meta_creative_insights` is named `roas`.
+
+**Database schema shows:**
+- Column exists: `roas` (numeric)
+- Column does NOT exist: `purchase_roas`
+
+**Error from console logs:**
+```
+"column mci.purchase_roas does not exist"
+```
+
+### Affected Lines in Current Function
+
+The migration `20260129020339_b0e2e4d6-cc11-4292-aafa-eb9ae0e8c06a.sql` contains these incorrect references:
+
+| Line | Incorrect | Correct |
+|------|-----------|---------|
+| 42 | `mci.purchase_roas * mci.spend` | `mci.roas * mci.spend` |
+| 90 | `AVG(mci.purchase_roas)` | `AVG(mci.roas)` |
+| 91 | `STDDEV(mci.purchase_roas)` | `STDDEV(mci.roas)` |
+| 92 | `PERCENTILE_CONT... ORDER BY mci.purchase_roas` | `ORDER BY mci.roas` |
+| 93 | `MIN(mci.purchase_roas)` | `MIN(mci.roas)` |
+| 94 | `MAX(mci.purchase_roas)` | `MAX(mci.roas)` |
+| 97 | `mci.purchase_roas * mci.spend` | `mci.roas * mci.spend` |
+| 98-99 | `AVG(mci.purchase_roas)` (confidence interval) | `AVG(mci.roas)` |
+| 101 | `STDDEV(mci.purchase_roas)` | `STDDEV(mci.roas)` |
+| 124 | `AVG(mci.purchase_roas)` | `AVG(mci.roas)` |
+| 127 | `mci.purchase_roas * mci.spend` | `mci.roas * mci.spend` |
+| 143 | `AVG(mci.purchase_roas)` | `AVG(mci.roas)` |
+| 144 | `mci.purchase_roas * mci.spend` | `mci.roas * mci.spend` |
+| 179-180 | `mci.purchase_roas * mci.spend`, `mci.purchase_roas` | `mci.roas * mci.spend`, `mci.roas` |
+| 186-190 | `mci.purchase_roas >= 3.0`, etc. | `mci.roas >= 3.0`, etc. |
+| 203 | `mci.purchase_roas as roas` | `mci.roas as roas` |
+| 207 | `ORDER BY mci.purchase_roas DESC` | `ORDER BY mci.roas DESC` |
+
+### Solution
+
+Create a new database migration that:
+1. Drops the current function
+2. Recreates it with all `purchase_roas` references replaced with `roas`
 
 ---
 
 ## Technical Implementation
 
-### Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/components/admin/organization/OrganizationIntegrationsPanel.tsx` | Main integrations management panel |
-| `src/components/admin/forms/LogoUploadField.tsx` | Combined upload/URL logo input |
-
 ### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/pages/admin/OrganizationDetail.tsx` | Add Integrations tab (between Members and Activity) |
-| `src/components/admin/organization/OrganizationDetailsForm.tsx` | Replace URL input with LogoUploadField |
-| `src/components/admin/organization/index.ts` | Export new panel |
-| `supabase/migrations/` | Create storage bucket for logos |
+| `src/components/admin/ClientOrganizationManager.tsx` | Add Fragment import, replace `<>` with `<Fragment key={org.id}>` |
+| Database migration (new) | Fix `get_creative_intelligence` function to use `roas` column |
 
-### Database Migration
+### Code Changes
 
-```sql
--- Create storage bucket for organization logos
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('organization-logos', 'organization-logos', true);
+#### 1. ClientOrganizationManager.tsx
 
--- RLS: Admins can upload/delete, anyone can read (public bucket)
-CREATE POLICY "Admins can manage organization logos"
-ON storage.objects FOR ALL
-USING (bucket_id = 'organization-logos' AND public.has_role(auth.uid(), 'admin'));
+**Line 1: Add Fragment import**
+```typescript
+import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 ```
 
-### Updated Tab Structure
+**Lines 717-718: Replace shorthand Fragment with keyed Fragment**
+```typescript
+// Before
+return (
+  <>
+    <TableRow key={org.id} className="group">
 
-```text
-[Details] [Profile] [Settings] [Members] [Integrations] [Activity]
-    ^          ^         ^         ^           ^             ^
-    |          |         |         |           |             |
- Basic info  Mission  Security  Team mgmt  Data sources  Progress
+// After  
+return (
+  <Fragment key={org.id}>
+    <TableRow className="group">
 ```
+
+**Line 865: Update the inner row key**
+```typescript
+// Before
+<TableRow key={`${org.id}-stats`}>
+
+// After
+<TableRow>
+```
+
+**Line 871: Close with Fragment**
+```typescript
+// Before
+</>
+
+// After
+</Fragment>
+```
+
+#### 2. Database Migration
+
+Create new migration to fix the RPC function by replacing all 20+ occurrences of `purchase_roas` with `roas`.
 
 ---
 
-## Expected Outcomes
+## Expected Results
 
-1. **Logo Upload**: Admins can upload logos via file or paste URL with instant preview
-2. **Integrations Tab**: Full integration management without leaving the org page
-3. **Preserved Global Views**: Integration Center and User Manager remain for cross-org monitoring
-4. **Consistent UX**: All org-specific management in one tabbed interface
-5. **Reduced Navigation**: ~60% fewer clicks for common integration management tasks
+After implementation:
+1. React key warning will be eliminated
+2. RPC calls to `get_creative_intelligence` will succeed (200 OK)
+3. Creative Intelligence V2 page will load data correctly
 
 ---
 
@@ -236,10 +168,6 @@ USING (bucket_id = 'organization-logos' AND public.has_role(auth.uid(), 'admin')
 
 | Action | File |
 |--------|------|
-| Create | `src/components/admin/organization/OrganizationIntegrationsPanel.tsx` |
-| Create | `src/components/admin/forms/LogoUploadField.tsx` |
-| Modify | `src/pages/admin/OrganizationDetail.tsx` |
-| Modify | `src/components/admin/organization/OrganizationDetailsForm.tsx` |
-| Modify | `src/components/admin/organization/index.ts` |
-| Create | Database migration for storage bucket |
+| Modify | `src/components/admin/ClientOrganizationManager.tsx` |
+| Create | Database migration to fix `get_creative_intelligence` RPC |
 
