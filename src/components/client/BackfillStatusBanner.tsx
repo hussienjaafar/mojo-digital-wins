@@ -6,6 +6,7 @@ import { V3Button } from "@/components/v3/V3Button";
 import { Loader2, CheckCircle2, AlertCircle, Clock, XCircle, ChevronDown, ChevronUp, X, Ban, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBackfillStatus, ChunkSummary, BackfillChunk } from "@/hooks/useBackfillStatus";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -165,7 +166,12 @@ export function BackfillStatusBanner({
   onComplete 
 }: BackfillStatusBannerProps) {
   const [expanded, setExpanded] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
+  
+  // Persist dismissed job IDs in localStorage to survive page reloads
+  const [dismissedJobs, setDismissedJobs] = useLocalStorage<string[]>(
+    'backfill-dismissed-jobs',
+    []
+  );
   
   const { 
     job, 
@@ -185,12 +191,40 @@ export function BackfillStatusBanner({
     enableToasts: true,
   });
 
-  // Reset dismissed state when a new job starts or becomes active
-  useEffect(() => {
-    if (job?.status === "running" || job?.status === "pending") {
-      setDismissed(false);
+  // Compute dismissed state from localStorage
+  const dismissed = job ? dismissedJobs.includes(job.id) : false;
+
+  // Handle dismissal with localStorage persistence and pruning
+  const handleDismiss = () => {
+    if (job) {
+      setDismissedJobs(prev => {
+        const updated = [...prev.filter(id => id !== job.id), job.id];
+        // Keep only the most recent 50 dismissed jobs to prevent bloat
+        return updated.slice(-50);
+      });
     }
-  }, [job?.status]);
+  };
+
+  // Auto-dismiss terminal jobs (cancelled/failed) older than 24 hours
+  useEffect(() => {
+    if (!job) return;
+    
+    const isTerminal = job.status === "cancelled" || 
+                       job.status === "failed" || 
+                       job.status === "completed_with_errors";
+    
+    if (isTerminal && job.completed_at) {
+      const completedTime = new Date(job.completed_at).getTime();
+      const now = Date.now();
+      const hoursElapsed = (now - completedTime) / (1000 * 60 * 60);
+      
+      // Auto-dismiss terminal jobs older than 24 hours
+      const AUTO_DISMISS_HOURS = 24;
+      if (hoursElapsed >= AUTO_DISMISS_HOURS && !dismissedJobs.includes(job.id)) {
+        handleDismiss();
+      }
+    }
+  }, [job?.status, job?.completed_at, job?.id, dismissedJobs]);
 
   // Auto-dismiss completed jobs after 30 seconds
   useEffect(() => {
@@ -200,13 +234,13 @@ export function BackfillStatusBanner({
       const elapsed = now - completedTime;
       
       if (elapsed >= 30_000) {
-        setDismissed(true);
+        handleDismiss();
       } else {
-        const timer = setTimeout(() => setDismissed(true), 30_000 - elapsed);
+        const timer = setTimeout(() => handleDismiss(), 30_000 - elapsed);
         return () => clearTimeout(timer);
       }
     }
-  }, [job?.status, job?.completed_at]);
+  }, [job?.status, job?.completed_at, job?.id]);
 
   // Don't show if no job, loading, or dismissed
   if (isLoading || !job || dismissed) return null;
@@ -252,7 +286,11 @@ export function BackfillStatusBanner({
               />
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-medium text-[hsl(var(--portal-text-primary))]">
-                  ActBlue Historical Import
+                  {job.task_name?.startsWith('actblue') 
+                    ? 'ActBlue Historical Import' 
+                    : job.task_name?.startsWith('meta_ads') 
+                      ? 'Meta Ads Backfill' 
+                      : 'Data Import'}
                 </span>
                 <V3Badge 
                   variant={
@@ -422,7 +460,7 @@ export function BackfillStatusBanner({
             
             {canDismiss && (
               <button
-                onClick={() => setDismissed(true)}
+                onClick={handleDismiss}
                 className="p-1.5 rounded-md text-[hsl(var(--portal-text-muted))] hover:text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-elevated))] transition-colors"
                 aria-label="Dismiss"
               >
