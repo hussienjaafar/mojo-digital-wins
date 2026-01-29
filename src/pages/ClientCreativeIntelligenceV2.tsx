@@ -36,15 +36,21 @@ const ClientCreativeIntelligenceV2 = () => {
       try {
         const { data, error } = await supabase
           .from("client_organizations")
-          .select("election_date, election_name")
+          .select("*")
           .eq("id", organizationId)
           .single();
 
         if (error) throw error;
 
         if (data) {
-          setElectionDate(data.election_date);
-          setElectionName(data.election_name || "Election Day");
+          // Check if election columns exist (they may not be migrated yet)
+          const orgData = data as Record<string, unknown>;
+          if ('election_date' in orgData) {
+            setElectionDate(orgData.election_date as string | null);
+          }
+          if ('election_name' in orgData) {
+            setElectionName((orgData.election_name as string) || "Election Day");
+          }
         }
       } catch (error) {
         console.error("Error fetching election settings:", error);

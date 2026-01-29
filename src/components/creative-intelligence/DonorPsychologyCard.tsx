@@ -71,7 +71,7 @@ export function DonorPsychologyCard({
           </V3CardDescription>
         </V3CardHeader>
         <V3CardContent>
-          <V3LoadingState variant="list" count={5} />
+          <V3LoadingState variant="table" count={5} />
         </V3CardContent>
       </V3Card>
     );
