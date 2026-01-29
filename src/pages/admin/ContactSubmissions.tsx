@@ -628,7 +628,7 @@ export default function ContactSubmissions() {
         <V3Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate("/admin")}
+          onClick={() => navigate("/admin?tab=analytics")}
           className="mb-2"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
