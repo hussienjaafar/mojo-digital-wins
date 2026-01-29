@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Building2, Plus, Eye, LogIn, MoreVertical, Search, Users, Plug, ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, XCircle, Filter, Command, RefreshCw, Trash2, Rocket, PlayCircle } from "lucide-react";
+import { Building2, Plus, Eye, LogIn, MoreVertical, Search, Users, Plug, ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, XCircle, Filter, Command, RefreshCw, Trash2, Rocket, PlayCircle, Pencil } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AdminPageHeader, AdminLoadingState } from "./v3";
@@ -474,6 +474,10 @@ const ClientOrganizationManager = () => {
                   </V3Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => navigate(`/admin/organizations/${org.id}`)}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit Organization
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handlePreviewAsClient(org)}>
                     <LogIn className="h-4 w-4 mr-2" />
                     Preview as Client
@@ -711,8 +715,8 @@ const ClientOrganizationManager = () => {
                     const currentStep = onboarding?.current_step || 1;
                     
                     return (
-                      <>
-                        <TableRow key={org.id} className="group">
+                      <Fragment key={org.id}>
+                        <TableRow className="group">
                           <TableCell className="p-2">
                             <V3Button
                               variant="ghost"
@@ -727,12 +731,15 @@ const ClientOrganizationManager = () => {
                             </V3Button>
                           </TableCell>
                           <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
+                            <div 
+                              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => navigate(`/admin/organizations/${org.id}`)}
+                            >
                               {org.logo_url && (
                                 <img src={org.logo_url} alt={org.name} className="w-8 h-8 rounded" />
                               )}
                               <div>
-                                <p>{org.name}</p>
+                                <p className="hover:underline">{org.name}</p>
                                 <p className="text-xs text-muted-foreground">{org.slug}</p>
                               </div>
                             </div>
@@ -825,6 +832,10 @@ const ClientOrganizationManager = () => {
                                   </V3Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => navigate(`/admin/organizations/${org.id}`)}>
+                                    <Pencil className="h-4 w-4 mr-2" />
+                                    Edit Organization
+                                  </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => setExpandedOrg(isExpanded ? null : org.id)}>
                                     <Eye className="h-4 w-4 mr-2" />
                                     {isExpanded ? 'Hide' : 'Show'} Quick Stats
@@ -851,13 +862,13 @@ const ClientOrganizationManager = () => {
                           </TableCell>
                         </TableRow>
                         {isExpanded && (
-                          <TableRow key={`${org.id}-stats`}>
+                          <TableRow>
                             <TableCell colSpan={7} className="p-0">
                               <OrgStatsRow org={org} />
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })
                 )}

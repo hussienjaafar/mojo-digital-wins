@@ -4,16 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
-
-/**
- * Staleness thresholds (in hours) for triggering external syncs
- * These are more aggressive than the SLA thresholds to ensure freshness
- */
-const SYNC_THRESHOLDS = {
-  meta: 4,        // Sync if Meta data is >4 hours old
-  actblue: 2,     // Sync if ActBlue is >2 hours old  
-  switchboard: 4, // Sync if SMS is >4 hours old
-} as const;
+import { SYNC_THRESHOLDS } from '@/lib/query-config';
 
 export type SyncSource = 'meta' | 'actblue' | 'switchboard';
 
@@ -163,13 +154,32 @@ export function useSmartRefresh({
         refetchType: 'all'
       });
       
-      // Also invalidate related queries
+      // Invalidate all dashboard-related queries for complete refresh
       await Promise.all([
+        // Core data sources
         queryClient.invalidateQueries({ queryKey: ['actblue'] }),
         queryClient.invalidateQueries({ queryKey: ['meta-metrics'] }),
+        queryClient.invalidateQueries({ queryKey: ['meta'] }),
         queryClient.invalidateQueries({ queryKey: ['sms'] }),
-        queryClient.invalidateQueries({ queryKey: ['attribution'] }),
+        
+        // Today/Single-day view specific
+        queryClient.invalidateQueries({ queryKey: ['hourly-metrics'] }),
+        queryClient.invalidateQueries({ queryKey: ['single-day-meta'] }),
+        
+        // Recurring health (both legacy and v2)
         queryClient.invalidateQueries({ queryKey: ['recurring-health'] }),
+        queryClient.invalidateQueries({ queryKey: ['recurring-health-v2'] }),
+        
+        // Intelligence & analytics
+        queryClient.invalidateQueries({ queryKey: ['attribution'] }),
+        queryClient.invalidateQueries({ queryKey: ['intelligence'] }),
+        queryClient.invalidateQueries({ queryKey: ['creative-intelligence'] }),
+        
+        // Other dashboard sections
+        queryClient.invalidateQueries({ queryKey: ['donations'] }),
+        queryClient.invalidateQueries({ queryKey: ['channels'] }),
+        queryClient.invalidateQueries({ queryKey: ['kpis'] }),
+        queryClient.invalidateQueries({ queryKey: ['alerts'] }),
       ]);
       
       // Step 2: Check what's stale (unless forcing)
@@ -211,11 +221,29 @@ export function useSmartRefresh({
       
       await Promise.allSettled(syncPromises);
       
-      // Step 4: Refresh cache again with new data
+      // Step 4: Refresh cache again with new data (same comprehensive list)
       await queryClient.invalidateQueries({ 
         queryKey: ['dashboard'],
         refetchType: 'all'
       });
+      
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['actblue'] }),
+        queryClient.invalidateQueries({ queryKey: ['meta-metrics'] }),
+        queryClient.invalidateQueries({ queryKey: ['meta'] }),
+        queryClient.invalidateQueries({ queryKey: ['sms'] }),
+        queryClient.invalidateQueries({ queryKey: ['hourly-metrics'] }),
+        queryClient.invalidateQueries({ queryKey: ['single-day-meta'] }),
+        queryClient.invalidateQueries({ queryKey: ['recurring-health'] }),
+        queryClient.invalidateQueries({ queryKey: ['recurring-health-v2'] }),
+        queryClient.invalidateQueries({ queryKey: ['attribution'] }),
+        queryClient.invalidateQueries({ queryKey: ['intelligence'] }),
+        queryClient.invalidateQueries({ queryKey: ['creative-intelligence'] }),
+        queryClient.invalidateQueries({ queryKey: ['donations'] }),
+        queryClient.invalidateQueries({ queryKey: ['channels'] }),
+        queryClient.invalidateQueries({ queryKey: ['kpis'] }),
+        queryClient.invalidateQueries({ queryKey: ['alerts'] }),
+      ]);
       
       toast.success('Smart refresh complete', { id: 'smart-refresh' });
       onComplete?.();

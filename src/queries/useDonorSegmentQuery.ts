@@ -229,6 +229,7 @@ function transformToDonor(
     id: row.id,
     donor_key: row.donor_key,
     email: row.donor_email,
+    phone: row.phone || null,
     name: [row.first_name, row.last_name].filter(Boolean).join(' ') || null,
     state: row.state,
     city: row.city,
@@ -256,8 +257,9 @@ function transformToDonor(
 }
 
 // Fetch all records with pagination to bypass Supabase 1000 row limit
+// Uses a query factory to create fresh query objects and avoid mutation issues
 async function fetchAllWithPagination(
-  baseQuery: any,
+  queryFactory: () => any,
   batchSize: number = 1000
 ): Promise<any[]> {
   let allData: any[] = [];
@@ -265,7 +267,8 @@ async function fetchAllWithPagination(
   let hasMore = true;
 
   while (hasMore) {
-    const { data, error } = await baseQuery.range(from, from + batchSize - 1);
+    // Build fresh query for each page to avoid mutation issues
+    const { data, error } = await queryFactory().range(from, from + batchSize - 1);
     
     if (error) {
       console.error('Pagination fetch error:', error);
@@ -289,35 +292,43 @@ async function fetchSegmentDonors(
   organizationId: string,
   filters: FilterCondition[]
 ): Promise<SegmentQueryResult> {
-  // Step 1: Build demographics query with correct column names
-  let query = supabase
-    .from('donor_demographics')
-    .select(`
-      id,
-      donor_key,
-      donor_email,
-      first_name,
-      last_name,
-      state,
-      city,
-      zip,
-      total_donated,
-      donation_count,
-      first_donation_date,
-      last_donation_date,
-      is_recurring,
-      employer,
-      occupation
-    `)
-    .eq('organization_id', organizationId);
+  // Step 1: Create a query factory that builds a fresh query each time
+  // This prevents Supabase query builder mutation issues during pagination
+  const createQuery = () => {
+    let query = supabase
+      .from('donor_demographics')
+      .select(`
+        id,
+        donor_key,
+        donor_email,
+        phone,
+        first_name,
+        last_name,
+        state,
+        city,
+        zip,
+        total_donated,
+        donation_count,
+        first_donation_date,
+        last_donation_date,
+        is_recurring,
+        employer,
+        occupation
+      `)
+      .eq('organization_id', organizationId)
+      .order('total_donated', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: true });  // Stable tiebreaker for pagination
 
-  // Apply server-side filters
-  for (const filter of filters) {
-    query = applyServerFilter(query, filter);
-  }
+    // Apply server-side filters
+    for (const filter of filters) {
+      query = applyServerFilter(query, filter);
+    }
 
-  // Fetch ALL records using pagination
-  const demographics = await fetchAllWithPagination(query);
+    return query;
+  };
+
+  // Fetch ALL records using pagination with fresh queries
+  const demographics = await fetchAllWithPagination(createQuery);
 
   if (!demographics || demographics.length === 0) {
     return { 
@@ -466,6 +477,10 @@ async function fetchSegmentDonors(
     const attribution = email ? attributionMap.get(email) : undefined;
     return transformToDonor(row, ltvMap.get(row.donor_key || ''), attribution);
   });
+
+  // Deduplicate by ID (safety net for pagination edge cases)
+  const uniqueMap = new Map(donors.map(d => [d.id, d]));
+  donors = Array.from(uniqueMap.values());
 
   // Step 5: Apply client-side filters
   const clientFilters = filters.filter(f => CLIENT_SIDE_FIELDS.includes(f.field));

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Brain, RefreshCw, Play, Zap, Database, LayoutGrid, List, BookMarked } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Brain, RefreshCw, Play, Zap, Database, LayoutGrid, BookMarked, Users } from "lucide-react";
 import { ClientShell } from "@/components/client/ClientShell";
 import { useClientOrganization } from "@/hooks/useClientOrganization";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +21,7 @@ export default function ClientDonorIntelligence() {
   const { organizationId, isLoading: orgLoading } = useClientOrganization();
   const [isRunningJourneys, setIsRunningJourneys] = useState(false);
   const [isRunningLtv, setIsRunningLtv] = useState(false);
+  const [isPopulatingDemographics, setIsPopulatingDemographics] = useState(false);
   const [activeTab, setActiveTab] = useState<"builder" | "saved">("builder");
   const queryClient = useQueryClient();
 
@@ -35,6 +36,13 @@ export default function ClientDonorIntelligence() {
       queryClient.invalidateQueries({ queryKey: ['donor-segment'] });
     }
   });
+
+  // Reset state when organization changes to prevent showing stale data
+  useEffect(() => {
+    setActiveTab("builder");
+    setIsRunningJourneys(false);
+    setIsRunningLtv(false);
+  }, [organizationId]);
 
   const handleRunJourneysPipeline = async () => {
     if (!organizationId) return;
@@ -89,11 +97,35 @@ export default function ClientDonorIntelligence() {
     }
   };
 
-  const isPipelineRunning = isRefreshing || isRunningJourneys || isRunningLtv;
+  const handlePopulateDemographics = async () => {
+    if (!organizationId) return;
+    
+    setIsPopulatingDemographics(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke('populate-donor-demographics', {
+        body: { organization_id: organizationId }
+      });
+      
+      if (error) {
+        console.error('Populate demographics error:', error);
+        toast.error('Failed to populate demographics');
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ['donor-segment'] });
+        toast.success(`Demographics populated: ${result?.donors_processed || 0} donors processed`);
+      }
+    } catch (err) {
+      console.error('Populate demographics error:', err);
+      toast.error('Failed to populate demographics');
+    } finally {
+      setIsPopulatingDemographics(false);
+    }
+  };
+
+  const isPipelineRunning = isRefreshing || isRunningJourneys || isRunningLtv || isPopulatingDemographics;
 
   if (orgLoading || !organizationId) {
     return (
-      <ClientShell pageTitle="Donor Intelligence">
+      <ClientShell pageTitle="Donor Intelligence" showDateControls={false}>
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="animate-pulse text-muted-foreground">Loading...</div>
         </div>
@@ -102,13 +134,23 @@ export default function ClientDonorIntelligence() {
   }
 
   return (
-    <ClientShell pageTitle="Donor Intelligence">
+      <ClientShell pageTitle="Donor Intelligence" showDateControls={false}>
       <V3PageContainer
         icon={Brain}
         title="Donor Segmentation"
         description="Build custom donor segments, analyze behavior, and export for campaigns"
         actions={
           <div className="flex items-center gap-2 flex-wrap">
+            <V3Button
+              variant="ghost"
+              size="sm"
+              onClick={handlePopulateDemographics}
+              disabled={isPipelineRunning}
+              title="Populate donor demographics from transactions"
+            >
+              <Users className={cn("h-4 w-4 mr-2", isPopulatingDemographics && "animate-pulse")} />
+              {isPopulatingDemographics ? 'Populating...' : 'Populate'}
+            </V3Button>
             <V3Button
               variant="ghost"
               size="sm"

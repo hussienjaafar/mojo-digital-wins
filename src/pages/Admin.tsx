@@ -359,7 +359,9 @@ const Admin = () => {
       case "users":
         return <UserManagement />;
       case "contacts":
-        return <EnhancedContactManagement />;
+        // Navigate to standalone V3 page
+        navigate("/admin/contacts");
+        return null;
       case "newsletter":
         return (
           <div className="space-y-4">

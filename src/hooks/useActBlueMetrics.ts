@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDateRange } from "@/stores/dashboardStore";
 import type { AttributionChannel } from "@/utils/channelDetection";
+import { STALE_TIMES, GC_TIMES } from "@/lib/query-config";
 
 
 // ==================== Types ====================
@@ -443,8 +444,8 @@ export function useActBlueMetrics(
       false // Always use ET (not UTC)
     ),
     enabled: enabled && !!organizationId,
-    staleTime: 5 * 60 * 1000, // 5 minutes - ActBlue data updates slowly
-    gcTime: 15 * 60 * 1000, // 15 minutes
+    staleTime: STALE_TIMES.dashboard, // Consistent with other dashboard hooks
+    gcTime: GC_TIMES.dashboard,
   });
 }
 

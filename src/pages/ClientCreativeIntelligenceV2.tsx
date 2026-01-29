@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Sparkles, FlaskConical } from "lucide-react";
 import { V3LoadingState, V3Badge } from "@/components/v3";
 import { CreativeIntelligenceDashboard } from "@/components/creative-intelligence";
+import { toast } from "sonner";
 
 /**
  * Creative Intelligence V2 - Test Page
@@ -22,55 +23,71 @@ import { CreativeIntelligenceDashboard } from "@/components/creative-intelligenc
  */
 const ClientCreativeIntelligenceV2 = () => {
   const { organizationId, isLoading: orgLoading } = useClientOrganization();
+
+  // Election settings - now fetched from database
   const [electionDate, setElectionDate] = useState<string | null>(null);
   const [electionName, setElectionName] = useState<string>("Election Day");
-  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
-  // Load election settings from organization
+  // Fetch election settings from database when organizationId is available
   useEffect(() => {
-    async function loadElectionSettings() {
+    const fetchElectionSettings = async () => {
       if (!organizationId) return;
 
       try {
         const { data, error } = await supabase
           .from("client_organizations")
-          .select("election_date, election_name")
+          .select("*")
           .eq("id", organizationId)
           .single();
 
-        if (!error && data) {
-          setElectionDate(data.election_date || null);
-          setElectionName(data.election_name || "Election Day");
-        }
-      } catch (e) {
-        console.error("Error loading election settings:", e);
-      } finally {
-        setIsLoadingSettings(false);
-      }
-    }
+        if (error) throw error;
 
-    loadElectionSettings();
+        if (data) {
+          // Check if election columns exist (they may not be migrated yet)
+          const orgData = data as Record<string, unknown>;
+          if ('election_date' in orgData) {
+            setElectionDate(orgData.election_date as string | null);
+          }
+          if ('election_name' in orgData) {
+            setElectionName((orgData.election_name as string) || "Election Day");
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching election settings:", error);
+        // Don't show error toast on initial load - columns may not exist yet
+      }
+    };
+
+    fetchElectionSettings();
   }, [organizationId]);
 
-  // Save election date changes
+  // Save election date changes to database
   const handleElectionDateChange = async (date: string) => {
-    if (!organizationId) return;
+    if (!organizationId) {
+      toast.error("Organization not found");
+      return;
+    }
 
     try {
       const { error } = await supabase
         .from("client_organizations")
-        .update({ election_date: date })
+        .update({
+          election_date: date,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", organizationId);
 
-      if (!error) {
-        setElectionDate(date);
-      }
-    } catch (e) {
-      console.error("Error saving election date:", e);
+      if (error) throw error;
+
+      setElectionDate(date);
+      toast.success("Election date updated");
+    } catch (error) {
+      console.error("Error updating election date:", error);
+      toast.error("Failed to update election date");
     }
   };
 
-  if (orgLoading || isLoadingSettings) {
+  if (orgLoading) {
     return (
       <ClientShell pageTitle="Creative Intelligence V2" showDateControls={false}>
         <div className="space-y-6">

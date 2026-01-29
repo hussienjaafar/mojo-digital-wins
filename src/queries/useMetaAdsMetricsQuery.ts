@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { metaKeys } from "./queryKeys";
 import { useDateRange } from "@/stores/dashboardStore";
 import { format, subDays, parseISO } from "date-fns";
+import { STALE_TIMES, GC_TIMES } from "@/lib/query-config";
 
 export interface MetaCampaign {
   campaign_id: string;
@@ -71,6 +72,14 @@ export interface MetaAdsMetricsResult {
   isEstimated: boolean;
   /** Latest date with data available */
   latestDataDate: string | null;
+  /** Attributed revenue from unified ActBlue/refcode attribution (our source of truth) */
+  attributedRevenue: number;
+  /** Attributed ROI based on our attribution data */
+  attributedROI: number;
+  /** Previous period attributed revenue */
+  previousAttributedRevenue: number;
+  /** Previous period attributed ROI */
+  previousAttributedROI: number;
 }
 
 function aggregateMetrics(data: any[]): Record<string, MetaMetrics> {
@@ -178,8 +187,8 @@ async function fetchMetaAdsMetrics(
   const prevEnd = subDays(start, 1);
   const prevStart = subDays(prevEnd, daysDiff);
 
-  // Fetch campaigns and try ad-level metrics first (more accurate)
-  const [campaignRes, adLevelMetricsRes] = await Promise.all([
+  // Fetch campaigns, ad-level metrics, and unified attribution in parallel
+  const [campaignRes, adLevelMetricsRes, attributionRes, prevAttributionRes] = await Promise.all([
     supabase
       .from("meta_campaigns")
       .select("*")
@@ -191,6 +200,20 @@ async function fetchMetaAdsMetrics(
       .gte("date", startDate)
       .lte("date", endDate)
       .order("date", { ascending: true }),
+    // Unified attribution RPC - same source as Hero KPIs and Performance Overview
+    supabase.rpc('get_actblue_dashboard_metrics', {
+      p_organization_id: organizationId,
+      p_start_date: startDate,
+      p_end_date: endDate,
+      p_use_utc: false, // Eastern Time for consistency
+    }),
+    // Previous period attribution
+    supabase.rpc('get_actblue_dashboard_metrics', {
+      p_organization_id: organizationId,
+      p_start_date: format(prevStart, "yyyy-MM-dd"),
+      p_end_date: format(prevEnd, "yyyy-MM-dd"),
+      p_use_utc: false,
+    }),
   ]);
 
   if (campaignRes.error) throw campaignRes.error;
@@ -247,6 +270,19 @@ async function fetchMetaAdsMetrics(
   const totals = calculateTotals(metrics);
   const previousTotals = calculateTotals(previousPeriodMetrics);
 
+  // Extract Meta-attributed revenue from unified attribution RPC
+  // This uses the same source of truth as Hero KPIs and Performance Overview
+  const attributionData = attributionRes.data as { channels?: Array<{ channel: string; revenue: number }> } | null;
+  const metaChannel = attributionData?.channels?.find((c: { channel: string }) => c.channel === 'meta');
+  const attributedRevenue = metaChannel?.revenue || 0;
+  const attributedROI = totals.spend > 0 ? attributedRevenue / totals.spend : 0;
+
+  // Previous period attribution
+  const prevAttributionData = prevAttributionRes.data as { channels?: Array<{ channel: string; revenue: number }> } | null;
+  const prevMetaChannel = prevAttributionData?.channels?.find((c: { channel: string }) => c.channel === 'meta');
+  const previousAttributedRevenue = prevMetaChannel?.revenue || 0;
+  const previousAttributedROI = previousTotals.spend > 0 ? previousAttributedRevenue / previousTotals.spend : 0;
+
   return {
     campaigns,
     metrics,
@@ -256,6 +292,10 @@ async function fetchMetaAdsMetrics(
     previousTotals,
     isEstimated,
     latestDataDate,
+    attributedRevenue,
+    attributedROI,
+    previousAttributedRevenue,
+    previousAttributedROI,
   };
 }
 
@@ -275,7 +315,7 @@ export function useMetaAdsMetricsQuery(
     queryFn: () =>
       fetchMetaAdsMetrics(organizationId!, effectiveStartDate, effectiveEndDate),
     enabled: !!organizationId && !!effectiveStartDate && !!effectiveEndDate,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: STALE_TIMES.dashboard, // Consistent with other dashboard hooks
+    gcTime: GC_TIMES.dashboard,
   });
 }

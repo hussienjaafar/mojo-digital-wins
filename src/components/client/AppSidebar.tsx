@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import {
   LayoutDashboard,
   Bell,
@@ -33,6 +34,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useCAPIStatus } from "@/hooks/useCAPIStatus";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type { SidebarNavSection } from "@/lib/design-tokens";
 
 interface AppSidebarProps {
@@ -41,8 +43,10 @@ interface AppSidebarProps {
 
 export function AppSidebar({ organizationId }: AppSidebarProps) {
   const { state } = useSidebar();
+  const isMobile = useIsMobile();
   const location = useLocation();
   const { data: capiStatus } = useCAPIStatus(organizationId || null);
+  const { isAdmin } = useIsAdmin();
   const [stats, setStats] = useState({
     alerts: 0,
     actions: 0,
@@ -123,7 +127,10 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
         label: "Creative Intelligence",
         items: [
           { title: "Creative Analysis", url: "/client/creative-intelligence", icon: Sparkles },
-          { title: "Creative V2 (Test)", url: "/client/creative-intelligence-v2", icon: FlaskConical },
+          // Only show V2 to system admins until fully operational
+          ...(isAdmin 
+            ? [{ title: "Creative V2 (Test)", url: "/client/creative-intelligence-v2", icon: FlaskConical }]
+            : []),
           { title: "Ad Performance", url: "/client/ad-performance", icon: Target },
           { title: "A/B Test Analytics", url: "/client/ab-tests", icon: FlaskConical },
         ],
@@ -153,9 +160,10 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
       },
     ];
     return baseSections;
-  }, [stats, capiStatus]);
+  }, [stats, capiStatus, isAdmin]);
 
-  const isCollapsed = state === "collapsed";
+  // On mobile, always show labels (never collapsed)
+  const isCollapsed = !isMobile && state === "collapsed";
 
   return (
     <Sidebar collapsible="icon" className="portal-sidebar">

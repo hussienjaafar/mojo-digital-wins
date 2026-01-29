@@ -36,6 +36,7 @@ import { PerformanceQuadrantChart } from "./PerformanceQuadrantChart";
 import { DataFreshnessIndicator } from "./DataFreshnessIndicator";
 import { CreativeComparisonPanel } from "./CreativeComparisonPanel";
 import { DonorSegmentationCard } from "./DonorSegmentationCard";
+import { DonorPsychologyCard } from "./DonorPsychologyCard";
 import { ElectionDayBadge, ElectionCountdown } from "./ElectionCountdown";
 import type { CreativeRecommendation } from "@/hooks/useCreativeIntelligence";
 
@@ -149,10 +150,16 @@ export function CreativeIntelligenceDashboard({
     try {
       toast.info("Syncing performance data from Meta Ads...");
 
-      const { error: syncError } = await supabase.functions.invoke("sync-meta-ads", {
+      const { data: syncResult, error: syncError } = await supabase.functions.invoke("sync-meta-ads", {
         body: { organization_id: organizationId },
       });
       if (syncError) throw syncError;
+
+      // Check if sync was skipped (no Meta credentials configured)
+      if (syncResult?.skipped) {
+        toast.warning("No Meta API credentials configured for this organization. Connect your Meta Ads account to sync data.");
+        return;
+      }
 
       const { error: aggError } = await supabase.functions.invoke("aggregate-creative-metrics", {
         body: { organization_id: organizationId },
@@ -160,7 +167,7 @@ export function CreativeIntelligenceDashboard({
       if (aggError) console.error("Aggregation error (non-fatal):", aggError);
 
       setLastSyncedAt(new Date().toISOString());
-      toast.success("Performance data synced!");
+      toast.success(`Performance data synced! ${syncResult?.insight_records || 0} records updated.`);
       await refetch();
     } catch (error) {
       console.error("Sync error:", error);
@@ -222,7 +229,9 @@ export function CreativeIntelligenceDashboard({
     }
 
     const filename = `creative-intelligence-${dateRange.startDate}-to-${dateRange.endDate}.csv`;
-    exportToCSV(recommendations, filename, CSV_EXPORT_COLUMNS);
+    // Convert to plain objects to satisfy Record<string, unknown>[] type
+    const exportData = recommendations.map(r => ({ ...r }));
+    exportToCSV(exportData, filename, CSV_EXPORT_COLUMNS);
     toast.success(`Exported ${recommendations.length} recommendations to CSV`);
   }, [data?.recommendations, dateRange.startDate, dateRange.endDate]);
 
@@ -233,7 +242,7 @@ export function CreativeIntelligenceDashboard({
   ];
 
   return (
-    <div className="space-y-6" role="main" aria-label="Creative Intelligence Dashboard">
+    <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6" role="main" aria-label="Creative Intelligence Dashboard">
       {/* Header */}
       <header className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -552,6 +561,15 @@ export function CreativeIntelligenceDashboard({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             <LeadingIndicatorsCard data={data?.leading_indicators} isLoading={isLoading} />
             <FatigueAlertsPanel alerts={data?.fatigue_alerts || []} isLoading={isLoading} />
+          </div>
+
+          {/* Donor Psychology row */}
+          <div className="mt-6">
+            <DonorPsychologyCard
+              painPointPerformance={data?.pain_point_performance || []}
+              valuesPerformance={data?.values_performance || []}
+              isLoading={isLoading}
+            />
           </div>
 
           {/* Recommendations table */}

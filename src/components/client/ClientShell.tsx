@@ -10,6 +10,7 @@ import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useToast } from "@/hooks/use-toast";
 import { useSessionManager, formatTimeRemaining } from "@/hooks/useSessionManager";
+import { useAutoRefreshOnSync } from "@/hooks/useAutoRefreshOnSync";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/client/AppSidebar";
@@ -135,6 +136,11 @@ export const ClientShell = ({
 
   // Track if expiry warning toast was shown to prevent duplicates
   const expiryToastShown = useRef(false);
+
+  // ============================================================================
+  // Auto-refresh dashboard data when backend syncs complete
+  // ============================================================================
+  useAutoRefreshOnSync(organization?.id);
 
   // ============================================================================
   // Session Manager - Single source of truth for auth state
@@ -387,6 +393,9 @@ export const ClientShell = ({
     if (newOrg) {
       setOrganization(newOrg);
       localStorage.setItem("selectedOrganizationId", newOrgId);
+
+      // Dispatch custom event for same-tab listeners (e.g., useClientOrganization hook)
+      window.dispatchEvent(new CustomEvent('organizationChanged', { detail: newOrgId }));
 
       // Sync to impersonation context so child pages using useClientOrganization
       // automatically pick up the new organization

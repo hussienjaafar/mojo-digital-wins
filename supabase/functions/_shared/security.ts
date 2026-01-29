@@ -12,10 +12,13 @@ export function getCorsHeaders(req?: Request): Record<string, string> {
   const allowedOriginsEnv = Deno.env.get('ALLOWED_ORIGINS');
   const allowedOrigins = allowedOriginsEnv?.split(',').map(o => o.trim()).filter(Boolean) || [];
 
-  // Default fallback origins if not configured - include preview domains
+  // Default fallback origins if not configured - include preview domains and production
   const defaultOrigins = [
     'https://mojo-digital-wins.lovable.app',
-    'https://lovable.dev'
+    'https://lovable.dev',
+    'https://portal.molitico.com',
+    'https://molitico.com',
+    'https://www.molitico.com'
   ];
 
   const origins = allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins;

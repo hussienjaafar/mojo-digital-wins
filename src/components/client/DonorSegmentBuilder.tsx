@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { Filter, Download, Save, RotateCcw, List, BarChart3, Play, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { V3Card, V3CardContent, V3CardHeader, V3CardTitle, V3Button } from "@/components/v3";
@@ -34,6 +34,15 @@ export function DonorSegmentBuilder({ organizationId }: DonorSegmentBuilderProps
   const [viewMode, setViewMode] = useState<'aggregate' | 'table'>('aggregate');
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [selectedSavedSegment, setSelectedSavedSegment] = useState<string | null>(null);
+
+  // Reset all state when organization changes to prevent stale data
+  useEffect(() => {
+    setPendingFilters([]);
+    setAppliedFilters([]);
+    setViewMode('aggregate');
+    setIsSaveDialogOpen(false);
+    setSelectedSavedSegment(null);
+  }, [organizationId]);
 
   // Check if there are unapplied changes
   const hasUnappliedChanges = useMemo(() => 

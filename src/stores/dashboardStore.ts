@@ -120,6 +120,13 @@ export const KPI_TO_SERIES_MAP: Record<KpiKey, SeriesKey[]> = {
   images: [],
   total: [],
   variations: [],
+  // Creative Intelligence Dashboard KPIs
+  ci_totalCreatives: [],
+  ci_totalSpend: [],
+  ci_totalRevenue: [],
+  ci_overallRoas: [],
+  ci_scalable: [],
+  ci_needsAttention: [],
 };
 
 /**

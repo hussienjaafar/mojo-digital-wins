@@ -47,6 +47,38 @@ export interface TargetPerformance {
   total_revenue: number;
 }
 
+export interface PainPointPerformance {
+  pain_point: string;
+  creative_count: number;
+  mean_roas: number;
+  stddev_roas: number;
+  total_revenue: number;
+}
+
+export interface ValuesPerformance {
+  value: string;
+  creative_count: number;
+  mean_roas: number;
+  stddev_roas: number;
+  total_revenue: number;
+}
+
+export interface IssueTagsPerformance {
+  tag: string;
+  creative_count: number;
+  mean_roas: number;
+  stddev_roas: number;
+  total_revenue: number;
+}
+
+export interface PolicyPerformance {
+  policy: string;
+  creative_count: number;
+  mean_roas: number;
+  stddev_roas: number;
+  total_revenue: number;
+}
+
 export interface LeadingIndicators {
   correlations: {
     early_ctr_to_roas: number;
@@ -152,6 +184,10 @@ export interface CreativeIntelligenceData {
   issue_performance: IssuePerformance[];
   stance_performance: StancePerformance[];
   target_attacked_performance: TargetPerformance[];
+  pain_point_performance: PainPointPerformance[];
+  values_performance: ValuesPerformance[];
+  issue_tags_performance: IssueTagsPerformance[];
+  policy_performance: PolicyPerformance[];
   leading_indicators: LeadingIndicators;
   fatigue_alerts: FatigueAlert[];
   recommendations: CreativeRecommendation[];
@@ -170,6 +206,7 @@ export interface CreativeIntelligenceData {
     avg_days_active: number;
     overall_confidence: 'HIGH' | 'MEDIUM' | 'LOW';
   };
+  has_daily_metrics: boolean;
 }
 
 // =============================================================================
@@ -206,7 +243,7 @@ export function useCreativeIntelligence({
       fatigueThreshold,
     ],
     queryFn: async (): Promise<CreativeIntelligenceData> => {
-      const { data, error } = await supabase.rpc('get_creative_intelligence', {
+      const { data, error } = await (supabase.rpc as any)('get_creative_intelligence', {
         p_organization_id: organizationId,
         p_start_date: startDate,
         p_end_date: endDate,
@@ -220,7 +257,17 @@ export function useCreativeIntelligence({
         throw new Error(error.message);
       }
 
-      return data as CreativeIntelligenceData;
+      // Debug: log raw RPC response to diagnose data flow issues
+      console.log('[useCreativeIntelligence] Raw RPC response type:', typeof data);
+      console.log('[useCreativeIntelligence] Raw RPC response:', data);
+
+      // Handle case where Supabase returns JSON as a string instead of parsed object
+      if (typeof data === 'string') {
+        console.warn('[useCreativeIntelligence] RPC returned string, parsing as JSON');
+        return JSON.parse(data) as CreativeIntelligenceData;
+      }
+
+      return data as unknown as CreativeIntelligenceData;
     },
     enabled: enabled && !!organizationId && !!startDate && !!endDate,
     staleTime: 5 * 60 * 1000, // 5 minutes

@@ -45,7 +45,7 @@ async function fetchDayMetaMetrics(
     p_end_date: date,
     p_campaign_id: null,
     p_creative_id: null,
-    p_use_utc: true, // Use UTC for consistency
+    p_use_utc: false, // Use Eastern Time to match Hero KPIs and ActBlue dashboard
   });
 
   const [metricsResult, attributionResult] = await Promise.all([

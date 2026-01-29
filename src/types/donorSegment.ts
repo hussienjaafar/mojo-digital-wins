@@ -52,6 +52,7 @@ export interface SegmentDonor {
   id: string;
   donor_key: string;
   email: string | null;
+  phone: string | null;
   name: string | null;
   state: string | null;
   city: string | null;
@@ -275,6 +276,14 @@ export const SEGMENT_FILTER_FIELDS: FilterField[] = [
     description: 'Donor city (text search)',
   },
   // Demographics
+  {
+    key: 'phone',
+    label: 'Phone Number',
+    category: 'Demographics',
+    type: 'string',
+    operators: ['is_null', 'is_not_null', 'contains'],
+    description: 'Donor phone number availability',
+  },
   {
     key: 'employer',
     label: 'Employer',

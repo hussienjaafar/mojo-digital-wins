@@ -75,7 +75,7 @@ export function PerformanceQuadrantChart({ recommendations, isLoading }: Perform
     const chartOption = {
       animation: true,
       tooltip: {
-        trigger: "item",
+        trigger: "item" as const,
         backgroundColor: "hsl(var(--portal-bg-secondary) / 0.95)",
         borderColor: "hsl(var(--portal-border) / 0.5)",
         borderWidth: 1,
@@ -105,9 +105,9 @@ export function PerformanceQuadrantChart({ recommendations, isLoading }: Perform
         bottom: 60,
       },
       xAxis: {
-        type: "value",
+        type: "value" as const,
         name: "Spend ($)",
-        nameLocation: "middle",
+        nameLocation: "middle" as const,
         nameGap: 35,
         nameTextStyle: {
           color: "hsl(var(--portal-text-muted))",
@@ -122,13 +122,13 @@ export function PerformanceQuadrantChart({ recommendations, isLoading }: Perform
           formatter: (value: number) => `$${value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}`,
         },
         splitLine: {
-          lineStyle: { color: "hsl(var(--portal-border))", type: "dashed" },
+          lineStyle: { color: "hsl(var(--portal-border))", type: "dashed" as const },
         },
       },
       yAxis: {
-        type: "value",
+        type: "value" as const,
         name: "ROAS",
-        nameLocation: "middle",
+        nameLocation: "middle" as const,
         nameGap: 40,
         nameTextStyle: {
           color: "hsl(var(--portal-text-muted))",
@@ -143,7 +143,7 @@ export function PerformanceQuadrantChart({ recommendations, isLoading }: Perform
           formatter: (value: number) => `${value.toFixed(1)}x`,
         },
         splitLine: {
-          lineStyle: { color: "hsl(var(--portal-border))", type: "dashed" },
+          lineStyle: { color: "hsl(var(--portal-border))", type: "dashed" as const },
         },
       },
       // Quadrant lines
@@ -162,7 +162,7 @@ export function PerformanceQuadrantChart({ recommendations, isLoading }: Perform
       },
       series: [
         {
-          type: "scatter",
+          type: "scatter" as const,
           data: scatterData,
           symbolSize: (data: number[]) => {
             // Size based on spend
@@ -172,7 +172,7 @@ export function PerformanceQuadrantChart({ recommendations, isLoading }: Perform
             return minSize + ratio * (maxSize - minSize);
           },
           emphasis: {
-            focus: "self",
+            focus: "self" as const,
             itemStyle: {
               shadowBlur: 10,
               shadowColor: "rgba(0, 0, 0, 0.3)",
@@ -183,7 +183,7 @@ export function PerformanceQuadrantChart({ recommendations, isLoading }: Perform
             symbol: "none",
             lineStyle: {
               color: "hsl(var(--portal-text-muted))",
-              type: "dashed",
+              type: "dashed" as const,
               width: 1,
             },
             data: [
@@ -304,7 +304,7 @@ export function PerformanceQuadrantChart({ recommendations, isLoading }: Perform
             aria-label={getChartSummary()}
             aria-describedby="quadrant-chart-desc"
           >
-            <EChartsBase option={chartOption} height={400} />
+            <EChartsBase option={chartOption as any} height={400} />
             {/* Screen reader accessible data table */}
             <div className="sr-only">
               <table>
