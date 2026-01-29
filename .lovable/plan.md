@@ -1,272 +1,217 @@
 
+# Contact Form Submissions Admin Page - V3 Redesign
 
-# Unified Smart Refresh for All Organizations
+## Summary
 
-## Current State Summary
+The existing `EnhancedContactManagement` component needs to be redesigned to match the V3 design system used throughout the admin dashboard. The component already exists and is wired to the Admin dashboard but uses older UI patterns (basic Card/Table components) that don't match the premium portal theme aesthetic.
 
-Your system **already has** automatic syncing for all organizations:
+## Current State Analysis
 
-| Data Source | Current Schedule | Status |
-|-------------|-----------------|--------|
-| Meta Ads | Every 30 min via `tiered-meta-sync` | Active |
-| SMS/Switchboard | Every 30 min via `sync-switchboard-sms` | Active |
-| ActBlue CSV | Every 6 hours via `sync-actblue-csv` | Inactive |
+**What Exists:**
+- `src/components/EnhancedContactManagement.tsx` (865 lines)
+- Already wired to Admin.tsx under the "contacts" tab (line 362)
+- Has complete functionality: filtering, bulk operations, notes, CSV export, status/priority management
+- Uses some V3 components (V3Button) but mixed with older Card/Table patterns
 
-**Key Finding**: The backend syncs ARE running, but when they complete, **connected clients don't automatically refresh their dashboard data**. The `data_freshness` table updates (and the freshness indicators update via realtime), but the TanStack Query caches remain stale until users manually click refresh.
-
----
-
-## The Gap
-
-```text
-Backend Sync Completes
-        │
-        ▼
-data_freshness table updated
-        │
-        ▼
-useDataFreshness sees realtime event
-        │
-        ▼
-Freshness status bar updates ✓
-        │
-        ✗ Dashboard data caches NOT invalidated
-        ✗ User sees stale numbers until manual refresh
-```
-
----
-
-## Solution: Automatic Cache Invalidation on Sync Completion
-
-Create a hook that bridges the gap: when the backend sync completes and updates `data_freshness`, automatically trigger dashboard cache invalidation so all sections show fresh data.
-
-### Architecture After Implementation
-
-```text
-Backend Sync Completes (every 30 min)
-        │
-        ▼
-data_freshness table updated
-        │
-        ▼
-useAutoRefreshOnSync (NEW)
-        │
-        ├── Detects source update via realtime
-        ├── Invalidates all related query keys
-        └── Shows toast: "Data updated"
-        │
-        ▼
-All dashboard sections refresh automatically ✓
-```
-
----
+**Problems:**
+1. Uses basic `Card` components instead of V3 portal-themed cards
+2. Uses standard `Table` instead of `V3DataTable`
+3. Stats cards use old Card pattern, not `AdminStatsGrid`
+4. Missing `AdminPageHeader` for consistent page layout
+5. Filter inputs don't use `PortalFormInput`/`PortalFormSelect`
+6. Missing portal-theme CSS classes throughout
+7. Not using portal color variables consistently
 
 ## Implementation Plan
 
-### Step 1: Create `useAutoRefreshOnSync` Hook
+### Phase 1: Create New V3 Contact Submissions Page
 
-A new hook that listens to `data_freshness` changes and triggers comprehensive cache invalidation when syncs complete for the current organization.
+Create a new standalone admin page at `/admin/contacts` following the pattern of `OrganizationDetail.tsx`:
 
-**File**: `src/hooks/useAutoRefreshOnSync.ts`
+**File: `src/pages/admin/ContactSubmissions.tsx`**
 
-```typescript
-/**
- * Automatically invalidates dashboard caches when backend syncs complete.
- * Bridges the gap between scheduled syncs and client-side data freshness.
- */
-export function useAutoRefreshOnSync(organizationId: string | undefined) {
-  const queryClient = useQueryClient();
-  const lastSyncRef = useRef<Record<string, string>>({});
+The new page will:
+- Use `AdminDetailShell` wrapper for portal-theme context
+- Use `AdminPageHeader` with Mail icon and refresh functionality
+- Use `AdminStatsGrid` for the 5 stats cards (Total, New, In Progress, Resolved, Urgent)
+- Use `V3DataTable` for the submissions list with proper sorting/pagination
+- Use `PortalFormInput` and `PortalFormSelect` for search and filters
+- Use `V3Button` and `V3Badge` throughout
+- Keep all existing business logic (bulk ops, notes, assignments)
 
-  useEffect(() => {
-    if (!organizationId) return;
+### Phase 2: Update Admin Routing
 
-    const channel = supabase
-      .channel(`auto-refresh-${organizationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'data_freshness',
-          filter: `organization_id=eq.${organizationId}`,
-        },
-        async (payload) => {
-          const { source, last_synced_at, last_sync_status } = payload.new;
-          
-          // Only react to successful syncs
-          if (last_sync_status !== 'success') return;
-          
-          // Prevent duplicate refreshes for same sync
-          if (lastSyncRef.current[source] === last_synced_at) return;
-          lastSyncRef.current[source] = last_synced_at;
-          
-          // Invalidate relevant caches based on source
-          await invalidateCachesForSource(queryClient, source);
-          
-          toast.success(`${sourceLabels[source]} data updated`, { 
-            duration: 3000 
-          });
-        }
-      )
-      .subscribe();
+**File: `src/App.tsx`** (or wherever routes are defined)
+- Add route: `/admin/contacts` → `ContactSubmissions`
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [organizationId, queryClient]);
-}
-```
+**File: `src/pages/Admin.tsx`**
+- Update the "contacts" tab to navigate to `/admin/contacts` instead of rendering inline
 
-### Step 2: Source-Specific Cache Mapping
+### Phase 3: Update Navigation
 
-Map each data source to the query keys it affects:
-
-```typescript
-const SOURCE_QUERY_KEYS: Record<string, string[][]> = {
-  meta: [
-    ['meta'],
-    ['meta-metrics'],
-    ['single-day-meta'],
-    ['creative-intelligence'],
-    ['hourly-metrics'],
-  ],
-  actblue_webhook: [
-    ['actblue'],
-    ['donations'],
-    ['recurring-health'],
-    ['recurring-health-v2'],
-    ['hourly-metrics'],
-  ],
-  actblue_csv: [
-    ['actblue'],
-    ['donations'],
-    ['recurring-health'],
-    ['recurring-health-v2'],
-  ],
-  switchboard: [
-    ['sms'],
-    ['channels'],
-  ],
-};
-
-async function invalidateCachesForSource(
-  queryClient: QueryClient, 
-  source: string
-) {
-  const keys = SOURCE_QUERY_KEYS[source] || [];
-  
-  // Always invalidate dashboard summary
-  await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-  
-  // Invalidate source-specific keys
-  await Promise.all(
-    keys.map(key => queryClient.invalidateQueries({ queryKey: key }))
-  );
-}
-```
-
-### Step 3: Integrate into Dashboard Layout
-
-Add the hook to the main dashboard layout so it's active on all dashboard pages:
-
-**File**: `src/components/client/ClientDashboardLayout.tsx` (or similar)
-
-```typescript
-export function ClientDashboardLayout({ children }) {
-  const { organizationId } = useOrganization();
-  
-  // Auto-refresh when backend syncs complete
-  useAutoRefreshOnSync(organizationId);
-  
-  return (
-    <div className="dashboard-layout">
-      {children}
-    </div>
-  );
-}
-```
-
-### Step 4: Enable Unified Scheduled Job (Optional)
-
-If you want Meta + SMS to sync as a single coordinated job (rather than two separate jobs), add a new entry to `scheduled_jobs`:
-
-```sql
--- Create unified smart refresh job (runs every 30 minutes)
-INSERT INTO public.scheduled_jobs (
-  job_name,
-  job_type,
-  schedule,
-  is_active,
-  endpoint
-) VALUES (
-  'Smart Refresh All Orgs',
-  'edge_function',
-  '*/30 * * * *',
-  true,
-  'smart-refresh-all-orgs'
-);
-
--- Deactivate individual jobs (optional - unified job handles them)
-UPDATE public.scheduled_jobs 
-SET is_active = false 
-WHERE job_type IN ('sync_meta_ads', 'sync_switchboard_sms');
-```
-
-**Note**: The current setup where Meta and SMS run separately every 30 minutes is functionally equivalent. The main fix is the client-side auto-refresh hook.
-
----
-
-## Files to Create/Modify
-
-| Action | File | Purpose |
-|--------|------|---------|
-| **Create** | `src/hooks/useAutoRefreshOnSync.ts` | Auto-invalidate caches when backend syncs complete |
-| **Modify** | `src/components/client/ClientDashboardLayout.tsx` | Integrate auto-refresh hook |
-| **Optional** | Database SQL | Enable unified scheduled job |
-
----
-
-## Expected Results
-
-| Scenario | Before | After |
-|----------|--------|-------|
-| Backend sync completes | Freshness bar updates, data stays stale | All dashboard sections auto-refresh |
-| User on Today View when Meta syncs | Must manually refresh | Hourly metrics auto-update |
-| User on Intelligence page when ActBlue syncs | Must manually refresh | Attribution data auto-updates |
-| ActBlue CSV sync (every 6 hours) | Remains on original schedule | Unchanged - triggers auto-refresh when it runs |
+**File: `src/components/AdminSidebar.tsx`**
+- The "contacts" tab already exists via the keyboard shortcut (g+m)
+- Need to add explicit navigation item in the appropriate group
 
 ---
 
 ## Technical Details
 
-### Throttling and Deduplication
+### New Component Structure
 
-To prevent rapid-fire refreshes if multiple sources sync simultaneously:
-
-```typescript
-// Debounce multiple source updates within 5 seconds
-const lastRefreshRef = useRef<number>(0);
-const REFRESH_COOLDOWN_MS = 5000;
-
-const handleSyncUpdate = async (source: string) => {
-  const now = Date.now();
-  if (now - lastRefreshRef.current < REFRESH_COOLDOWN_MS) {
-    // Queue sources, batch invalidate after cooldown
-    return;
-  }
-  lastRefreshRef.current = now;
-  await invalidateAllDashboardCaches(queryClient);
-};
+```text
+src/pages/admin/ContactSubmissions.tsx
+├── AdminDetailShell (portal-theme wrapper)
+│   ├── AdminPageHeader (Mail icon, title, refresh, actions)
+│   ├── AdminStatsGrid (5 stat cards)
+│   ├── Filter Bar (PortalFormInput + PortalFormSelect)
+│   │   ├── Search input with portal styling
+│   │   ├── Status filter dropdown
+│   │   └── Priority filter dropdown
+│   ├── Bulk Actions Bar (when items selected)
+│   │   └── V3Button actions
+│   ├── V3DataTable
+│   │   ├── Checkbox column
+│   │   ├── Name/Email column (primary)
+│   │   ├── Message column
+│   │   ├── Status column (inline select)
+│   │   ├── Priority column (inline select)
+│   │   ├── Assigned column (inline select)
+│   │   ├── Notes column
+│   │   ├── Date column
+│   │   └── Actions column
+│   └── Dialogs (Notes, Bulk Delete)
 ```
 
-### RLS Consideration
+### V3DataTable Column Definitions
 
-The realtime subscription filters by `organization_id`, ensuring users only receive sync updates for their own organization.
+```typescript
+const columns: V3Column<SubmissionWithDetails>[] = [
+  {
+    key: "select",
+    header: "",
+    width: "48px",
+    render: (row) => <Checkbox ... />
+  },
+  {
+    key: "contact",
+    header: "Contact",
+    primary: true,
+    sortable: true,
+    render: (row) => (
+      <div>
+        <p className="font-medium text-[hsl(var(--portal-text-primary))]">{row.name}</p>
+        <p className="text-sm text-[hsl(var(--portal-text-muted))]">{row.email}</p>
+      </div>
+    )
+  },
+  {
+    key: "message",
+    header: "Message",
+    render: (row) => <p className="truncate max-w-[300px]">{row.message}</p>
+  },
+  {
+    key: "status",
+    header: "Status",
+    sortable: true,
+    render: (row) => <StatusSelect ... />
+  },
+  // ... more columns
+];
+```
+
+### Stats Grid Configuration
+
+```typescript
+const statItems: AdminStatItem[] = [
+  {
+    id: "total",
+    label: "Total Submissions",
+    value: stats.total,
+    icon: MessageSquare,
+    accent: "blue"
+  },
+  {
+    id: "new",
+    label: "New",
+    value: stats.new,
+    icon: AlertCircle,
+    accent: "blue"
+  },
+  {
+    id: "in_progress",
+    label: "In Progress",
+    value: stats.inProgress,
+    icon: Clock,
+    accent: "amber"
+  },
+  {
+    id: "resolved",
+    label: "Resolved",
+    value: stats.resolved,
+    icon: CheckCircle2,
+    accent: "green"
+  },
+  {
+    id: "urgent",
+    label: "Urgent",
+    value: stats.urgent,
+    icon: Flag,
+    accent: "red"
+  }
+];
+```
+
+### Portal-Themed Filter Bar
+
+```typescript
+<div className="portal-card p-4">
+  <div className="flex flex-col sm:flex-row gap-4">
+    <div className="relative flex-1">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+      <PortalFormInput
+        placeholder="Search submissions..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="pl-10"
+      />
+    </div>
+    <PortalFormSelect
+      value={statusFilter}
+      onValueChange={setStatusFilter}
+      options={statusOptions}
+      placeholder="All Status"
+    />
+    <PortalFormSelect
+      value={priorityFilter}
+      onValueChange={setPriorityFilter}
+      options={priorityOptions}
+      placeholder="All Priority"
+    />
+    <V3Button variant="secondary" onClick={exportToCSV}>
+      <Download className="h-4 w-4 mr-2" />
+      Export
+    </V3Button>
+  </div>
+</div>
+```
 
 ---
 
-## Summary
+## Files to Create/Modify
 
-The backend scheduled syncs are already running correctly every 30 minutes. The fix needed is a **client-side auto-refresh hook** that listens to `data_freshness` table updates and triggers cache invalidation, ensuring all dashboard sections show fresh data without requiring manual user intervention.
+| File | Action | Description |
+|------|--------|-------------|
+| `src/pages/admin/ContactSubmissions.tsx` | Create | New V3 contact submissions page |
+| `src/components/AdminSidebar.tsx` | Modify | Add "Contact Submissions" nav item to System or new group |
+| `src/pages/Admin.tsx` | Modify | Update contacts case to navigate or lazy-load new page |
+| `src/App.tsx` | Modify | Add route for `/admin/contacts` |
 
+---
+
+## Migration Notes
+
+1. The existing `EnhancedContactManagement.tsx` can remain temporarily for reference but will be deprecated
+2. All business logic (RPC calls, state management, CRUD operations) will be preserved
+3. The `get_submissions_with_details` RPC function continues to work unchanged
+4. Bulk operations, notes dialog, and CSV export all carry forward
