@@ -155,11 +155,6 @@ export const TodayViewDashboard: React.FC<TodayViewDashboardProps> = ({
     
     const { current, previous } = metaData;
     
-    // Skip if no data for the selected day
-    if (current.spend === 0 && current.impressions === 0 && current.linkClicks === 0) {
-      return [];
-    }
-    
     // CTR and CPC use Meta's ad metrics
     const linkCtr = current.impressions > 0 ? (current.linkClicks / current.impressions) * 100 : 0;
     const prevLinkCtr = previous.impressions > 0 ? (previous.linkClicks / previous.impressions) * 100 : 0;
@@ -184,6 +179,12 @@ export const TodayViewDashboard: React.FC<TodayViewDashboardProps> = ({
       { label: "Avg Gift (Meta)", value: avgGift, previousValue: prevAvgGift, format: "currency" as const, accent: "purple" as const },
     ];
   }, [metaData]);
+  
+  // Check if there's no Meta activity for the day (all zeros)
+  const hasNoMetaActivity = metaData && 
+    metaData.current.spend === 0 && 
+    metaData.current.impressions === 0 && 
+    metaData.current.linkClicks === 0;
 
   // Format the selected date for display
   const selectedDate = parseISO(dateRange.startDate);
@@ -288,13 +289,19 @@ export const TodayViewDashboard: React.FC<TodayViewDashboardProps> = ({
       </div>
 
       {/* Meta Ads Performance Overview */}
-      {metaMetrics.length > 0 && (
+      {metaData && (
         <motion.div variants={itemVariants}>
           <V3Card className="p-4 sm:p-6">
             <h3 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))] mb-4">
               Meta Ads Performance Overview
             </h3>
-            <SingleDayMetricGrid metrics={metaMetrics} columns={4} />
+            {hasNoMetaActivity ? (
+              <div className="flex items-center justify-center py-8 text-[hsl(var(--portal-text-muted))]">
+                <p className="text-sm">No Meta ad activity for this day</p>
+              </div>
+            ) : (
+              <SingleDayMetricGrid metrics={metaMetrics} columns={4} />
+            )}
           </V3Card>
         </motion.div>
       )}
