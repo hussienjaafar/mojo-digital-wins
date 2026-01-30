@@ -367,6 +367,11 @@ Return only valid JSON:
           // Task 3: Calculate dynamic confidence from LLM self-rating
           const llmConfidence = calculateDynamicConfidence(analysis.confidence_rating, 3);
 
+          // Log warning if LLM didn't provide confidence_rating
+          if (analysis.confidence_rating === undefined || analysis.confidence_rating === null) {
+            console.warn(`[analyze-meta-creatives] LLM did not provide confidence_rating for creative ${creative.id}, using default (3)`);
+          }
+
           // Get validation results
           const validation = (analysis as any).validation || {
             coherenceScore: 0.5, // Default fallback
