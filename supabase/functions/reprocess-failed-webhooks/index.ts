@@ -6,6 +6,29 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper functions (same as actblue-webhook)
+const safeString = (val: any): string | null => {
+  if (val === null || val === undefined) return null;
+  return String(val);
+};
+
+const safeNumber = (val: any): number | null => {
+  if (val === null || val === undefined) return null;
+  const num = typeof val === 'number' ? val : parseFloat(String(val));
+  return isNaN(num) ? null : num;
+};
+
+const safeInt = (val: any): number | null => {
+  if (val === null || val === undefined) return null;
+  const num = typeof val === 'number' ? Math.round(val) : parseInt(String(val));
+  return isNaN(num) ? null : num;
+};
+
+const safeBool = (val: any): boolean => {
+  if (val === true || val === 'true') return true;
+  return false;
+};
+
 /**
  * Reprocess Failed Webhooks
  * 
@@ -25,26 +48,34 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const { 
+      organization_id,
       limit = 100,
-      webhook_type = 'actblue',
-      since_date,
-      dry_run = false 
+      dry_run = false,
+      error_filter = 'Authentication failed'
     } = body;
 
-    console.log(`[REPROCESS] Starting for ${webhook_type}, limit=${limit}, dry_run=${dry_run}`);
+    console.log(`[REPROCESS] Starting for org=${organization_id}, limit=${limit}, dry_run=${dry_run}`);
+
+    if (!organization_id) {
+      return new Response(
+        JSON.stringify({ error: 'organization_id is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Get failed webhooks from webhook_logs
     let query = supabase
       .from('webhook_logs')
       .select('*')
-      .eq('platform', webhook_type)
+      .eq('organization_id', organization_id)
+      .eq('platform', 'actblue')
       .eq('processing_status', 'failed')
       .is('reprocessed_at', null)
-      .order('created_at', { ascending: false })
+      .order('received_at', { ascending: true })
       .limit(limit);
 
-    if (since_date) {
-      query = query.gte('created_at', since_date);
+    if (error_filter) {
+      query = query.ilike('error_message', `%${error_filter}%`);
     }
 
     const { data: failedWebhooks, error: queryError } = await query;
@@ -73,7 +104,7 @@ serve(async (req) => {
           message: 'Dry run - would process these webhooks',
           webhooks: failedWebhooks.map(w => ({
             id: w.id,
-            created_at: w.created_at,
+            received_at: w.received_at,
             error_message: w.error_message
           })),
           count: failedWebhooks.length 
@@ -93,101 +124,129 @@ serve(async (req) => {
         
         // Parse the stored payload
         const payload = webhook.payload;
-        if (!payload || !payload.contribution) {
-          console.log(`[REPROCESS] Skipping webhook ${webhook.id} - no contribution data`);
+        if (!payload || !payload.lineitems || !Array.isArray(payload.lineitems)) {
+          console.log(`[REPROCESS] Skipping webhook ${webhook.id} - no lineitems data`);
           continue;
         }
 
-        const contribution = payload.contribution;
+        const contribution = payload;
         const lineitems = contribution.lineitems || [];
         const donor = contribution.donor || {};
+        const refcodes = contribution.refcodes || {};
         
-        // Get organization ID from the webhook or find by entity_id
-        let organizationId = webhook.organization_id;
-        
-        if (!organizationId && contribution.recipient?.name) {
-          // Try to find org by committee name
-          const { data: orgMatch } = await supabase
-            .from('actblue_transactions')
-            .select('organization_id')
-            .eq('committee_name', contribution.recipient.name)
-            .limit(1)
-            .maybeSingle();
-          
-          if (orgMatch) {
-            organizationId = orgMatch.organization_id;
-          }
-        }
-
-        if (!organizationId) {
-          // Default to the known organization
-          organizationId = '346d6aaf-34b3-435c-8cd1-3420d6a068d6';
+        // Get paidAt timestamp - normalize to UTC
+        let paidAt = safeString(contribution.paidAt);
+        if (!paidAt) {
+          paidAt = webhook.received_at;
         }
 
         // Process each lineitem
-        for (const item of lineitems) {
+        for (const lineitem of lineitems) {
+          const lineitemId = safeInt(lineitem.lineitemId);
+          if (!lineitemId) {
+            console.log(`[REPROCESS] Skipping lineitem - no lineitemId`);
+            continue;
+          }
+
+          const amount = safeNumber(lineitem.amount);
+          const donorName = donor.firstname && donor.lastname 
+            ? `${donor.firstname} ${donor.lastname}` 
+            : null;
+
+          // Determine transaction type
+          let transactionType = 'donation';
+          const cancelledAt = safeString(lineitem.cancelledAt);
+          const refundedAt = safeString(lineitem.refundedAt);
+          if (cancelledAt) transactionType = 'cancellation';
+          if (refundedAt) transactionType = 'refund';
+
+          // Get refcode
+          const refcode = safeString(refcodes.refcode) || 
+                         safeString(lineitem.refcode) || 
+                         safeString(contribution.refcode);
+          
+          const clickId = safeString(contribution.clickId);
+          const fbclid = safeString(contribution.fbclid);
+
+          // Determine source from refcode
+          let determinedSource = 'other';
+          if (refcode) {
+            const refLower = refcode.toLowerCase();
+            if (refLower.includes('email') || refLower.includes('em_')) determinedSource = 'email';
+            else if (refLower.includes('sms') || refLower.includes('txt')) determinedSource = 'sms';
+            else if (refLower.includes('fb') || refLower.includes('meta') || fbclid) determinedSource = 'meta';
+            else if (refLower.includes('ggl') || refLower.includes('google')) determinedSource = 'google';
+          }
+
+          // Recurring state
+          let recurringState = null;
+          if (contribution.recurringPeriod && contribution.recurringPeriod !== 'once') {
+            recurringState = cancelledAt ? 'cancelled' : 'active';
+          }
+
           const transactionRecord = {
-            organization_id: organizationId,
-            transaction_id: `${contribution.orderNumber}-${item.lineitemNumber}`,
-            order_number: contribution.orderNumber,
-            lineitem_id: item.lineitemNumber,
-            transaction_date: contribution.createdAt,
-            amount: parseFloat(item.amount || '0'),
-            fee: parseFloat(item.paidFee || '0'),
-            net_amount: parseFloat(item.amount || '0') - parseFloat(item.paidFee || '0'),
-            donor_email: donor.email || null,
-            donor_name: donor.firstname && donor.lastname ? `${donor.firstname} ${donor.lastname}` : null,
-            first_name: donor.firstname || null,
-            last_name: donor.lastname || null,
-            phone: donor.phone || null,
-            addr1: donor.addr1 || null,
-            city: donor.city || null,
-            state: donor.state || null,
-            zip: donor.zip || null,
-            country: donor.country || null,
-            employer: donor.employer || null,
-            occupation: donor.occupation || null,
-            refcode: contribution.refcodes?.refcode || item.recurringRefcode || null,
-            refcode2: contribution.refcodes?.refcode2 || null,
-            refcode_custom: null,
-            source_campaign: contribution.form?.campaignName || null,
-            contribution_form: contribution.form?.name || null,
-            committee_name: contribution.recipient?.name || null,
-            entity_id: contribution.recipient?.entityId || null,
-            fec_id: contribution.recipient?.fecId || null,
-            transaction_type: item.entityType || 'contribution',
-            is_recurring: item.recurringPeriod ? true : false,
-            recurring_period: item.recurringPeriod || null,
-            recurring_duration: item.recurringDuration || null,
-            payment_method: contribution.paymentMethod || null,
-            card_type: contribution.cardType || null,
-            is_express: contribution.isExpress === true,
-            is_mobile: contribution.isMobile === true,
-            text_message_option: contribution.textMessageOption || null,
-            recurring_upsell_shown: contribution.recurringUpsellShown === true,
-            recurring_upsell_succeeded: contribution.recurringUpsellSucceeded === true,
-            double_down: contribution.doubleDown === true,
-            smart_boost_amount: contribution.smartBoostAmount ? parseFloat(contribution.smartBoostAmount) : null,
-            ab_test_name: contribution.abTestName || null,
-            ab_test_variation: contribution.abTestVariation || null,
-            fbclid: contribution.fbclid || null,
-            click_id: contribution.clickId || contribution.fbclid || null,
-            next_charge_date: item.nextChargeDate || null,
-            recurring_state: item.recurringState || null,
-            custom_fields: contribution.customFieldValues ? JSON.stringify(contribution.customFieldValues) : null,
+            organization_id,
+            transaction_id: String(lineitemId),
+            donor_email: safeString(donor.email),
+            donor_name: donorName,
+            first_name: safeString(donor.firstname),
+            last_name: safeString(donor.lastname),
+            addr1: safeString(donor.addr1),
+            city: safeString(donor.city),
+            state: safeString(donor.state),
+            zip: safeString(donor.zip),
+            country: safeString(donor.country),
+            phone: safeString(donor.phone),
+            employer: safeString(donor.employerData?.employer),
+            occupation: safeString(donor.employerData?.occupation),
+            amount: amount,
+            fee: safeNumber(lineitem.feeAmount) ?? (amount ? Math.round(amount * 0.0395 * 100) / 100 : null),
+            payment_method: safeString(contribution.paymentMethod),
+            card_type: safeString(contribution.cardType),
+            smart_boost_amount: safeNumber(contribution.smartBoostAmount),
+            double_down: safeBool(contribution.doubleDown),
+            recurring_upsell_shown: safeBool(contribution.recurringUpsellShown),
+            recurring_upsell_succeeded: safeBool(contribution.recurringUpsellSucceeded),
+            order_number: safeString(contribution.orderNumber),
+            contribution_form: safeString(contribution.contributionForm),
+            refcode: refcode,
+            refcode2: safeString(refcodes.refcode2),
+            refcode_custom: safeString(refcodes.refcodeCustom),
+            click_id: clickId,
+            fbclid,
+            source_campaign: determinedSource,
+            ab_test_name: safeString(contribution.abTestName),
+            ab_test_variation: safeString(contribution.abTestVariation),
+            is_mobile: safeBool(contribution.isMobile),
+            is_express: safeBool(contribution.isExpress),
+            text_message_option: safeString(contribution.textMessageOption),
+            lineitem_id: lineitemId,
+            entity_id: safeString(lineitem.entityId),
+            committee_name: safeString(lineitem.committeeName),
+            fec_id: safeString(lineitem.fecId),
+            recurring_period: safeString(contribution.recurringPeriod),
+            recurring_duration: safeInt(contribution.recurringDuration),
+            is_recurring: !!contribution.recurringPeriod && contribution.recurringPeriod !== 'once',
+            recurring_state: recurringState,
+            next_charge_date: null,
+            custom_fields: contribution.customFields || [],
+            transaction_type: transactionType,
+            transaction_date: paidAt,
           };
 
-          // Upsert the transaction
+          // Upsert the transaction (handle duplicates gracefully)
           const { error: upsertError } = await supabase
             .from('actblue_transactions')
             .upsert(transactionRecord, { 
-              onConflict: 'transaction_id',
+              onConflict: 'transaction_id,organization_id',
               ignoreDuplicates: false 
             });
 
           if (upsertError) {
             throw upsertError;
           }
+
+          console.log(`[REPROCESS] Inserted transaction ${lineitemId}`);
         }
 
         // Mark webhook as reprocessed
@@ -195,7 +254,7 @@ serve(async (req) => {
           .from('webhook_logs')
           .update({ 
             reprocessed_at: new Date().toISOString(),
-            success: true,
+            processing_status: 'reprocessed',
             error_message: null
           })
           .eq('id', webhook.id);
@@ -211,7 +270,6 @@ serve(async (req) => {
         await supabase
           .from('webhook_logs')
           .update({ 
-            reprocessed_at: new Date().toISOString(),
             error_message: `Reprocess failed: ${errorMsg}`
           })
           .eq('id', webhook.id);
