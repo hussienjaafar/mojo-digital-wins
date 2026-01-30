@@ -1,117 +1,203 @@
 
-# ActBlue Credential Form Enhancement
+# Credential Status Feedback Enhancement
 
 ## Summary
-Add the Entity ID field to the Webhook tab so it can be updated alongside webhook credentials without switching tabs.
+Add a status banner to the credential update form that shows users whether existing credentials are working properly or have issues, without requiring them to switch to the Diagnostics tab.
 
 ---
 
 ## Current State
 
-The ActBlue credential form has two tabs:
-- **CSV API Tab**: Entity ID, Username, Password
-- **Webhook Tab**: Basic Auth Username, Basic Auth Password, Secret
-
-The merge-update save logic already works correctly - updating one tab does not affect fields from the other tab.
+| Component | Issue |
+|-----------|-------|
+| **CredentialSlideOver** | `loadCredential()` only fetches `id, organization_id, platform, is_active` - missing status fields |
+| **CredentialForm** | No visual feedback about credential health when editing |
+| **Diagnostics tab** | Shows full health info but requires tab switch |
+| **existingCredentialMask** | Prop exists but is passed as empty object `{}` |
 
 ---
 
-## Proposed Change
+## Proposed Solution
 
-Add a **read-only or editable Entity ID field** to the Webhook tab for convenience. This allows admins to:
-1. See the current Entity ID when configuring webhooks
-2. Optionally update the Entity ID without switching tabs
+Add a **Credential Status Alert** component that displays:
+1. Whether credentials are configured (from `credential_mask`)
+2. Last test result (success/error)
+3. Last sync result (success/error)
+4. Time since last test/sync
+5. Specific error messages when applicable
+
+---
+
+## UI Design
+
+### When credentials are working:
+```text
++-------------------------------------------------------+
+|  [CheckCircle] Credentials verified                   |
+|  Last tested: 2 days ago | Last sync: 5 minutes ago   |
++-------------------------------------------------------+
+```
+
+### When there are issues:
+```text
++-------------------------------------------------------+
+|  [AlertTriangle] Credential issues detected           |
+|  Last sync failed: ActBlue API error 401              |
+|  Recommendation: Update your API credentials          |
++-------------------------------------------------------+
+```
+
+### When never tested:
+```text
++-------------------------------------------------------+
+|  [Clock] Credentials not yet verified                 |
+|  Use the "Test" button to verify your credentials     |
++-------------------------------------------------------+
+```
 
 ---
 
 ## Implementation
 
-### File: `src/components/admin/integrations/CredentialForm.tsx`
+### File 1: `src/components/admin/integrations/CredentialSlideOver.tsx`
 
-Add Entity ID field to the Webhook tab content (after line 343, before the SecureInput fields):
+**Update `loadCredential()` to fetch status fields:**
+```typescript
+const { data, error } = await supabase
+  .from('client_api_credentials')
+  .select(`
+    id, 
+    organization_id, 
+    platform, 
+    is_active,
+    credential_mask,
+    last_tested_at,
+    last_test_status,
+    last_test_error,
+    last_sync_at,
+    last_sync_status,
+    last_sync_error
+  `)
+  .eq('id', id)
+  .single();
+```
 
-```text
-<TabsContent value="webhook" className="space-y-4">
-  {isEditing && (
-    <Alert>
-      <ShieldCheck className="h-4 w-4" />
-      <AlertDescription>
-        Only fill in fields you want to update. Leave empty to keep existing values.
-      </AlertDescription>
-    </Alert>
-  )}
-  
-  {/* NEW: Entity ID field for webhook tab */}
-  <div className="space-y-2">
-    <Label htmlFor="actblue_entity_id_webhook">Entity ID</Label>
-    <Input
-      id="actblue_entity_id_webhook"
-      value={formData.actblue?.entity_id || ''}
-      onChange={(e) => updateActblue('entity_id', e.target.value)}
-      placeholder={existingCredentialMask.entity_id || "Your ActBlue entity ID"}
-      disabled={disabled}
-    />
-    {existingCredentialMask.entity_id && (
-      <p className="text-xs text-muted-foreground">
-        Current: {existingCredentialMask.entity_id}
-      </p>
-    )}
-    <p className="text-xs text-muted-foreground">
-      Used to identify your organization in ActBlue webhooks
-    </p>
-  </div>
-
-  {/* Existing webhook endpoint URL alert */}
-  <Alert className="bg-accent/50 border-accent">
-    ...
-  </Alert>
-  
-  {/* Existing SecureInput fields */}
-  ...
-</TabsContent>
+**Pass credential status data to CredentialForm:**
+```typescript
+<CredentialForm
+  platform={platform}
+  formData={formData}
+  onFormDataChange={setFormData}
+  onPlatformChange={setPlatform}
+  organizationId={selectedOrg}
+  disabled={false}
+  isEditing={true}
+  existingCredentialMask={existingCredential?.credential_mask || {}}
+  credentialStatus={{
+    lastTestedAt: existingCredential?.last_tested_at,
+    lastTestStatus: existingCredential?.last_test_status,
+    lastTestError: existingCredential?.last_test_error,
+    lastSyncAt: existingCredential?.last_sync_at,
+    lastSyncStatus: existingCredential?.last_sync_status,
+    lastSyncError: existingCredential?.last_sync_error,
+  }}
+/>
 ```
 
 ---
 
-## Technical Notes
+### File 2: `src/components/admin/integrations/CredentialForm.tsx`
 
-### Why this is safe:
-1. **Same form field key**: Both tabs will update the same `formData.actblue.entity_id` value
-2. **Merge logic handles it**: The `mapActBlueCredentials` function in `CredentialSlideOver.tsx` already maps `entity_id` correctly
-3. **No duplication in database**: Only one `entity_id` value exists in `encrypted_credentials`
+**Add new prop types:**
+```typescript
+interface CredentialStatus {
+  lastTestedAt?: string | null;
+  lastTestStatus?: string | null;
+  lastTestError?: string | null;
+  lastSyncAt?: string | null;
+  lastSyncStatus?: string | null;
+  lastSyncError?: string | null;
+}
 
-### Edge case handled:
-If a user enters Entity ID in both tabs before saving, the last value entered wins (both update the same field in state).
+interface CredentialFormProps {
+  // ... existing props
+  credentialStatus?: CredentialStatus;
+}
+```
+
+**Create new CredentialStatusBanner component:**
+```typescript
+function CredentialStatusBanner({ status }: { status?: CredentialStatus }) {
+  if (!status) return null;
+  
+  const hasTestError = status.lastTestStatus?.includes('error');
+  const hasSyncError = status.lastSyncStatus?.includes('error');
+  const neverTested = !status.lastTestedAt;
+  const hasIssues = hasTestError || hasSyncError;
+  
+  // Render appropriate alert based on status
+}
+```
+
+**Add the banner at the top of each platform's TabsContent when editing:**
+```typescript
+{isEditing && credentialStatus && (
+  <CredentialStatusBanner status={credentialStatus} />
+)}
+```
+
+---
+
+## Visual Component Design
+
+The `CredentialStatusBanner` will be a styled Alert component with:
+
+| Status | Icon | Background | Message |
+|--------|------|------------|---------|
+| **All Good** | CheckCircle (green) | Green/10 | "Credentials verified and working" |
+| **Sync Error** | AlertTriangle (yellow) | Yellow/10 | Shows sync error + recommendation |
+| **Test Error** | XCircle (red) | Red/10 | Shows test error + recommendation |
+| **Not Tested** | Clock (muted) | Gray/10 | "Click Test to verify credentials" |
 
 ---
 
 ## Files to Modify
 
-| File | Change |
-|------|--------|
-| `src/components/admin/integrations/CredentialForm.tsx` | Add Entity ID input to webhook tab content |
+| File | Changes |
+|------|---------|
+| `src/components/admin/integrations/CredentialSlideOver.tsx` | Expand `loadCredential()` query; pass status to CredentialForm |
+| `src/components/admin/integrations/CredentialForm.tsx` | Add `credentialStatus` prop; add `CredentialStatusBanner` component |
 
 ---
 
-## Visual Preview
+## Technical Notes
 
-After implementation, the Webhook tab will show:
+### ActBlue-Specific Feedback
+For ActBlue, the banner should differentiate between CSV API and Webhook status:
+- CSV API uses `last_sync_status` from sync-actblue-csv
+- Webhook uses webhook_events table (already handled by IntegrationHealthPanel)
 
-```text
-Webhook Tab
------------
-Entity ID: [168679              ]
-Current: 168679
+The banner will parse the error message to provide actionable guidance:
+- "401" errors → "Invalid credentials. Please verify your username and password."
+- "Entity ID" errors → "Entity ID mismatch. Check your ActBlue entity ID."
 
-[Webhook Endpoint URL info box]
+### State Management
+The status data is fetched once when editing and stored in `existingCredential` state. No additional queries needed since we already have the ID.
 
-Username (Basic Auth): [***********     ]
-Current: ****name
+---
 
-Password (Basic Auth): [***********     ]
-Current: ****word
+## Expected Behavior
 
-Secret (Optional): [...              ]
-```
+1. **User opens credential to edit** → Status banner immediately shows current state
+2. **User sees error** → Banner shows specific error and recommendation
+3. **User updates credentials** → Clicks "Test" → Banner will update after page refresh
+4. **User saves** → Status will update on next sync cycle
 
-This allows admins to configure webhook credentials while seeing/updating the Entity ID in one place.
+---
+
+## Benefits
+
+- **Immediate feedback** without switching tabs
+- **Actionable guidance** for fixing issues
+- **At-a-glance status** using familiar icons
+- **Consistent with existing UI patterns** (uses same Alert styling)
