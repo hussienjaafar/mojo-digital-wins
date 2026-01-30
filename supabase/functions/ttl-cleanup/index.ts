@@ -172,6 +172,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // 9. Delete cron job_run_details older than 7 days
+    const { data: cronCleanupResult, error: e9 } = await supabase.rpc('cleanup_cron_job_run_details', { 
+      retention_days: 7 
+    });
+    
+    results.push({ 
+      table: 'cron.job_run_details', 
+      deleted: cronCleanupResult || 0,
+      error: e9?.message 
+    });
+
     const totalDeleted = results.reduce((sum, r) => sum + r.deleted, 0);
     const duration = Date.now() - startTime;
     const errors = results.filter(r => r.error);
