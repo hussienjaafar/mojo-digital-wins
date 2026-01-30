@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { IntegrationPlatform, ActBlueCredentialSection } from '@/types/integrations';
 import { MetaCredentialAuth } from './MetaCredentialAuth';
+import { CredentialStatusBanner, CredentialStatus } from './CredentialStatusBanner';
 
 // SECURITY: Form state for new credentials (never persisted to state after save)
 export type CredentialFormData = {
@@ -47,6 +48,7 @@ interface CredentialFormProps {
   disabled?: boolean;
   isEditing?: boolean; // True when editing existing credentials
   existingCredentialMask?: Record<string, string>; // Hints for existing credentials
+  credentialStatus?: CredentialStatus; // Status info for existing credentials
 }
 
 // Secure input component with show/hide toggle
@@ -118,6 +120,7 @@ export function CredentialForm({
   disabled = false,
   isEditing = false,
   existingCredentialMask = {},
+  credentialStatus,
 }: CredentialFormProps) {
   const [actblueSection, setActblueSection] = useState<ActBlueCredentialSection>('csv');
 
@@ -184,6 +187,9 @@ export function CredentialForm({
       </TabsList>
 
       <TabsContent value="meta" className="space-y-4 pt-4">
+        {isEditing && credentialStatus && (
+          <CredentialStatusBanner status={credentialStatus} className="mb-4" />
+        )}
         {organizationId && !disabled ? (
           <MetaCredentialAuth
             organizationId={organizationId}
@@ -244,6 +250,9 @@ export function CredentialForm({
       </TabsContent>
 
       <TabsContent value="switchboard" className="space-y-4 pt-4">
+        {isEditing && credentialStatus && (
+          <CredentialStatusBanner status={credentialStatus} className="mb-4" />
+        )}
         <SecureInput
           id="switchboard_api_key"
           label="API Key"
@@ -265,6 +274,9 @@ export function CredentialForm({
       </TabsContent>
 
       <TabsContent value="actblue" className="space-y-4 pt-4">
+        {isEditing && credentialStatus && (
+          <CredentialStatusBanner status={credentialStatus} className="mb-4" />
+        )}
         {/* Nested tabs for CSV API vs Webhook */}
         <Tabs value={actblueSection} onValueChange={(v) => handleActblueSectionChange(v as ActBlueCredentialSection)}>
           <TabsList className="grid w-full grid-cols-2 mb-4">
@@ -392,6 +404,9 @@ export function CredentialForm({
       </TabsContent>
 
       <TabsContent value="google_ads" className="space-y-4 pt-4">
+        {isEditing && credentialStatus && (
+          <CredentialStatusBanner status={credentialStatus} className="mb-4" />
+        )}
         <SecureInput
           id="google_developer_token"
           label="Developer Token"
