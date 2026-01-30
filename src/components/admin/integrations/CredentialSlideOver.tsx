@@ -113,7 +113,19 @@ export function CredentialSlideOver({
     try {
       const { data, error } = await supabase
         .from('client_api_credentials')
-        .select('id, organization_id, platform, is_active')
+        .select(`
+          id, 
+          organization_id, 
+          platform, 
+          is_active,
+          credential_mask,
+          last_tested_at,
+          last_test_status,
+          last_test_error,
+          last_sync_at,
+          last_sync_status,
+          last_sync_error
+        `)
         .eq('id', id)
         .single();
 
@@ -425,6 +437,16 @@ export function CredentialSlideOver({
                       onPlatformChange={setPlatform}
                       organizationId={selectedOrg}
                       disabled={false}
+                      isEditing={true}
+                      existingCredentialMask={(existingCredential?.credential_mask as Record<string, string>) || {}}
+                      credentialStatus={{
+                        lastTestedAt: existingCredential?.last_tested_at,
+                        lastTestStatus: existingCredential?.last_test_status,
+                        lastTestError: existingCredential?.last_test_error,
+                        lastSyncAt: existingCredential?.last_sync_at,
+                        lastSyncStatus: existingCredential?.last_sync_status,
+                        lastSyncError: existingCredential?.last_sync_error,
+                      }}
                     />
                   </div>
                 </TabsContent>
