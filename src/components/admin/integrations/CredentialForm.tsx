@@ -329,6 +329,24 @@ export function CredentialForm({
               </Alert>
             )}
             
+            {/* Entity ID field - also shown in webhook tab for convenience */}
+            <div className="space-y-2">
+              <Label htmlFor="actblue_entity_id_webhook">Entity ID</Label>
+              <Input
+                id="actblue_entity_id_webhook"
+                value={formData.actblue?.entity_id || ''}
+                onChange={(e) => updateActblue('entity_id', e.target.value)}
+                placeholder={existingCredentialMask.entity_id || "Your ActBlue entity ID"}
+                disabled={disabled}
+              />
+              {existingCredentialMask.entity_id && (
+                <p className="text-xs text-muted-foreground">Current: {existingCredentialMask.entity_id}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Used to identify your organization in ActBlue webhooks
+              </p>
+            </div>
+
             {/* Webhook endpoint URL for configuration in ActBlue */}
             <Alert className="bg-accent/50 border-accent">
               <AlertDescription className="text-sm">
