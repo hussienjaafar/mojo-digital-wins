@@ -85,11 +85,15 @@ export function validateTopicExtraction(result: TopicExtractionResult): Validati
     }
   }
 
-  // Calculate coherence (simplified: presence of expected fields with content)
+  // Calculate coherence (presence of expected fields with content)
+  // Expanded to check 6 key fields instead of just 3 for better coverage
   const expectedFields: (keyof TopicExtractionResult)[] = [
-    'issue_primary',
-    'political_stances',
-    'donor_pain_points'
+    'issue_primary',       // Core: what the ad is about
+    'issue_tags',          // Tags for categorization
+    'political_stances',   // Political positions taken
+    'donor_pain_points',   // Psychology: what motivates donors
+    'values_appealed',     // Psychology: values triggered
+    'policy_positions'     // Specific policies advocated
   ];
 
   const presentFields = expectedFields.filter(fieldName => {
@@ -102,8 +106,8 @@ export function validateTopicExtraction(result: TopicExtractionResult): Validati
 
   // Validation passes if:
   // 1. No critical issues found
-  // 2. Coherence is at least 0.3 (at least 1 of 3 fields populated)
-  const isValid = issues.length === 0 && coherenceScore >= 0.3;
+  // 2. Coherence is at least 0.33 (at least 2 of 6 fields populated)
+  const isValid = issues.length === 0 && coherenceScore >= 0.33;
 
   return {
     isValid,
@@ -118,19 +122,32 @@ export function validateTopicExtraction(result: TopicExtractionResult): Validati
  *
  * @param confidenceRating - LLM's self-rating (1-5 scale)
  * @param defaultValue - Default if rating is missing (default: 3)
- * @returns Confidence score normalized to 0-1 range
+ * @returns Confidence score normalized to 0.2-1.0 range
  */
 export function calculateDynamicConfidence(
   confidenceRating: number | undefined,
   defaultValue: number = 3
 ): number {
-  const rating = confidenceRating || defaultValue;
+  // Use default if undefined, null, or 0 (falsy)
+  const rawRating = confidenceRating || defaultValue;
+
+  // Clamp to valid [1, 5] range to handle out-of-range LLM responses
+  const rating = Math.min(5, Math.max(1, rawRating));
+
+  // Log if input was out of range (for monitoring)
+  if (confidenceRating !== undefined && (confidenceRating < 1 || confidenceRating > 5)) {
+    console.warn(`[topic-validation] Out-of-range confidence_rating: ${confidenceRating}, clamped to ${rating}`);
+  }
+
   // Normalize 1-5 scale to 0.2-1.0 range
   return rating / 5;
 }
 
 /**
  * Combine confidence and coherence for final analysis confidence
+ *
+ * Uses weighted average instead of multiplication to prevent
+ * one weak signal from killing the entire score.
  *
  * @param llmConfidence - LLM self-reported confidence (0-1)
  * @param coherenceScore - Validation coherence score (0-1)
@@ -140,7 +157,9 @@ export function combineConfidenceScores(
   llmConfidence: number,
   coherenceScore: number
 ): number {
-  // Multiply to penalize low coherence
-  // E.g., LLM confidence 0.8 * coherence 0.5 = 0.4 final
-  return llmConfidence * coherenceScore;
+  // Weighted combination: LLM rating (60%) + coherence validation (40%)
+  // This prevents aggressive penalty when one component is weak
+  // E.g., LLM 0.8 + coherence 0.5 = 0.6*0.8 + 0.4*0.5 = 0.48 + 0.2 = 0.68
+  // vs multiplicative: 0.8 * 0.5 = 0.4 (too harsh)
+  return 0.6 * llmConfidence + 0.4 * coherenceScore;
 }
