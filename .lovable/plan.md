@@ -1,173 +1,148 @@
 
+# SMS Data Optimization & AI Learning Integrity Plan
 
-# Database Cleanup Plan
-**Goal**: Reclaim ~1-1.5 GB of disk space (excluding SMS events as requested)
+## Current State Summary
 
----
-
-## Current Storage Analysis
-
-| Table | Size | Issue |
-|-------|------|-------|
-| `bluesky_posts` | 855 MB | 50,088 posts ALL over 14 days old |
-| `cron.job_run_details` | 179 MB | 129,207 logs over 14 days old |
-| `entity_mentions` | 270 MB | 118,607 mentions over 30 days old |
-| `job_executions` | 33 MB | 60,301 stuck "running" records |
-
-**Total recoverable**: ~1-1.5 GB
+| Metric | Value | Status |
+|--------|-------|--------|
+| **SMS Campaigns** | 83 total, 81 with message text | ✅ Data exists |
+| **Campaigns Analyzed** | 0 of 81 | ❌ Critical gap |
+| **Deep Motivation Fields** | 0% populated | ❌ AI learning blocked |
+| **sms_creative_insights table** | 0 rows | ❌ Empty |
+| **Creative Learnings (SMS)** | None | ❌ No patterns learned |
+| **Performance Data** | 54 campaigns with conversions | ✅ Available |
 
 ---
 
-## Root Cause Analysis
+## Problem Identified
 
-1. **TTL Cleanup Job is Broken**: The scheduled job `TTL Cleanup` has been failing since December 6, 2025 with error: *"Unknown job type: ttl-cleanup"*
-   - The job has `job_type: ttl-cleanup` but the scheduler only handles `cleanup_cache` 
-   - Circuit breaker is open after 5 consecutive failures
+The AI learning system is not receiving donor psychology signals because:
 
-2. **Bluesky Cleanup Misconfigured**: The pg_cron job calls `cleanup-bluesky-posts` with `retention_days: 30` instead of 7-14 days
+1. **analyze-sms-campaigns** (populates `sms_campaigns.donor_pain_points`, etc.) has **never run** - no scheduled job exists
+2. **analyze-sms-creatives** runs on schedule but reads from `sms_creative_insights` which is **empty**
+3. **calculate-creative-learnings** cannot compute ROAS correlations for pain points/values without input data
 
-3. **60,000+ Stuck Job Executions**: Records marked as "running" since November 30, 2025 - never cleaned up
-
----
-
-## Implementation Plan
-
-### Phase 1: Fix the Scheduler (Code Changes)
-
-**File**: `supabase/functions/run-scheduled-jobs/index.ts`
-
-Add a new case handler for `ttl-cleanup` job type:
-
-```text
-case 'ttl-cleanup':
-case 'ttl_cleanup':
-  console.log('[SCHEDULER] Running TTL cleanup');
-  const ttlResponse = await supabase.functions.invoke('ttl-cleanup', { 
-    body: {},
-    headers: authHeaders
-  });
-  if (ttlResponse.error) throw new Error(ttlResponse.error.message);
-  result = ttlResponse.data;
-  itemsProcessed = result?.total_deleted || 0;
-  break;
-```
+**Bottom line**: The system can tell you *what* campaigns raised money, but not *why* (what psychological triggers worked).
 
 ---
 
-### Phase 2: Database Cleanup (One-Time SQL)
+## Recommended Strategy
 
-**A. Purge cron.job_run_details (>7 days)**
-```sql
-DELETE FROM cron.job_run_details 
-WHERE start_time < NOW() - INTERVAL '7 days';
--- Expected: ~145,000 rows, ~170 MB recovered
-```
+### Safe SMS Storage Optimizations
 
-**B. Clean stuck job_executions**
-```sql
-UPDATE job_executions 
-SET status = 'timeout', 
-    completed_at = started_at + INTERVAL '1 hour',
-    error_message = 'Marked as timeout by cleanup job'
-WHERE status = 'running' 
-  AND started_at < NOW() - INTERVAL '1 hour';
--- Expected: ~60,000 rows fixed
-```
+These changes will **not impact AI learning** since they affect raw event data, not the aggregate campaign data:
 
-**C. Re-enable TTL Cleanup job**
-```sql
-UPDATE scheduled_jobs 
-SET is_active = true, 
-    is_circuit_open = false, 
-    consecutive_failures = 0,
-    job_type = 'ttl_cleanup'  -- Use underscore format
-WHERE job_name = 'TTL Cleanup';
-```
+| Optimization | Space Saved | Impact on AI |
+|--------------|-------------|--------------|
+| Purge `delivered` events > 30 days | ~2-3 GB | ✅ None - not used by AI |
+| Purge `unknown` events > 7 days | ~500 MB | ✅ None - not used by AI |
+| Convert `phone_hash` to BYTEA | ~1 GB | ✅ None - internal format |
+| Archive events > 90 days | Ongoing | ⚠️ Low - donor journeys truncated in UI |
 
-**D. Fix pg_cron bluesky retention**
-```sql
-SELECT cron.alter_job(
-  32,  -- cleanup-bluesky-posts job
-  schedule := '0 */6 * * *',
-  command := $$
-    SELECT net.http_post(
-      url:='https://nuclmzoasgydubdshtab.supabase.co/functions/v1/cleanup-bluesky-posts',
-      headers:='{"Content-Type": "application/json", "x-cron-secret": "YOUR_CRON_SECRET"}'::jsonb,
-      body:='{"retention_days": 7, "batch_size": 500, "max_batches": 20, "aggressive": true}'::jsonb
-    ) AS request_id;
-  $$
-);
-```
+### Restore AI Learning (Critical Path)
+
+1. **Run analyze-sms-campaigns** on all 81 unanalyzed campaigns to populate motivation fields
+2. **Add scheduled job** for analyze-sms-campaigns (batch of 10, every 4 hours)
+3. **Populate sms_creative_insights** from sms_campaigns so calculate-creative-learnings can process SMS data
+4. **Verify creative learnings** job processes SMS channel data
 
 ---
 
-### Phase 3: Add Automatic Cron Cleanup
+## Phase 1: Immediate AI Backfill
 
-**File**: `supabase/functions/ttl-cleanup/index.ts`
+Run the existing `analyze-sms-campaigns` function on all 81 unanalyzed campaigns.
 
-Add a new cleanup step to purge old cron logs:
-
-```text
-// 9. Delete cron job_run_details older than 7 days
-const { count: oldCronLogs, error: e9 } = await supabase
-  .rpc('cleanup_cron_job_run_details', { retention_days: 7 });
-
-results.push({ 
-  table: 'cron.job_run_details', 
-  deleted: oldCronLogs || 0,
-  error: e9?.message 
-});
-```
-
-**New Database Function** (migration):
-```sql
-CREATE OR REPLACE FUNCTION cleanup_cron_job_run_details(retention_days INT DEFAULT 7)
-RETURNS INT
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = cron, public
-AS $$
-DECLARE
-  deleted_count INT;
-BEGIN
-  DELETE FROM cron.job_run_details 
-  WHERE start_time < NOW() - (retention_days || ' days')::INTERVAL;
-  GET DIAGNOSTICS deleted_count = ROW_COUNT;
-  RETURN deleted_count;
-END;
-$$;
-```
+**Expected Outcome**: All campaigns will have:
+- topic, tone, urgency_level
+- donor_pain_points (e.g., "deportation of community members")
+- values_appealed (e.g., "family protection", "immigrant rights")
+- emotional_triggers (e.g., "fear", "solidarity")
 
 ---
 
-### Phase 4: Trigger Immediate Cleanup
+## Phase 2: Automated Analysis Schedule
 
-After deploying the fixes, manually trigger cleanup:
+Create a scheduled job entry for `analyze-sms-campaigns`:
 
-1. Deploy updated edge functions
-2. Run TTL cleanup manually via admin API
-3. Run bluesky cleanup with aggressive mode
-4. Verify disk space recovery
-
----
-
-## Expected Results
-
-| Table | Before | After | Saved |
-|-------|--------|-------|-------|
-| `bluesky_posts` | 855 MB | ~50 MB | ~800 MB |
-| `cron.job_run_details` | 179 MB | ~10 MB | ~170 MB |
-| `entity_mentions` | 270 MB | ~50 MB | ~220 MB |
-| `job_executions` (bloat) | 33 MB | ~5 MB | ~28 MB |
-
-**Total estimated savings**: ~1.2 GB
+| Field | Value |
+|-------|-------|
+| job_name | Analyze SMS Campaigns |
+| job_type | edge_function |
+| endpoint | analyze-sms-campaigns |
+| schedule | 0 */4 * * * (every 4 hours) |
+| payload | {"batch_size": 10} |
 
 ---
 
-## Technical Notes
+## Phase 3: Storage Optimization (Safe)
 
-- The `bluesky_posts` table has 800+ MB of index bloat that will be reclaimed after deletions
-- A `REINDEX` may be needed after mass deletions to fully reclaim index space
-- The stuck job_executions indicate the scheduler has memory/timeout issues that should be monitored
-- Consider enabling a weekly maintenance window for `VACUUM ANALYZE` on high-churn tables
+### A. Immediate Cleanup - Low-Value Events
 
+Create edge function or SQL to purge:
+- `event_type = 'delivered'` older than 30 days
+- `event_type = 'unknown'` older than 7 days
+- `event_type = 'sent'` older than 60 days (keep metadata in sms_campaigns)
+
+### B. Schema Optimization (Future)
+
+Convert `phone_hash` from 64-char hex TEXT to 32-byte BYTEA:
+- Requires migration script
+- ~1 GB savings
+- Must update all functions using phone_hash (5 edge functions)
+
+---
+
+## Phase 4: Bridge SMS Data to Learning Pipeline
+
+The `sms_creative_insights` table exists but is unpopulated. Two options:
+
+**Option A**: Create sync function to copy analyzed campaigns to sms_creative_insights
+- Preserves existing architecture
+- More tables to maintain
+
+**Option B**: Modify `calculate-creative-learnings` to read directly from `sms_campaigns`
+- Simpler data flow
+- Single source of truth
+
+---
+
+## Expected Outcomes
+
+After implementation:
+
+| Capability | Before | After |
+|------------|--------|-------|
+| AI knows what topics perform best | ❌ | ✅ |
+| AI knows which pain points drive donations | ❌ | ✅ |
+| AI knows which emotional triggers work | ❌ | ✅ |
+| Donor segmentation by motivation | ❌ | ✅ |
+| SMS storage size | ~6.3 GB | ~3.5 GB |
+
+---
+
+## Technical Implementation Order
+
+1. **Backfill analysis** - Run analyze-sms-campaigns for all 81 campaigns (AI prerequisite)
+2. **Add scheduled job** - Automate future analysis
+3. **Verify data flow** - Confirm creative learnings can access SMS motivation data
+4. **Storage cleanup** - Purge low-value raw events (after AI data is secured)
+5. **Schema optimization** - BYTEA migration (optional, future phase)
+
+---
+
+## Risk Assessment
+
+| Action | Risk | Mitigation |
+|--------|------|------------|
+| Purging delivered/unknown events | Low - not used by AI | Verify with queries first |
+| Purging old sent events | Medium - donor journey UI | Keep 90 days minimum |
+| BYTEA migration | Medium - code changes | Test in staging first |
+| Backfill analysis | Low | Already uses rate limiting |
+
+---
+
+## Summary
+
+The storage optimizations are **safe** for AI learning because the AI systems read from **aggregate tables** (`sms_campaigns`, `creative_performance_learnings`), not raw `sms_events`.
+
+However, a **critical gap** was discovered: the AI has never actually analyzed any SMS campaigns for donor psychology. This must be fixed **before** any storage cleanup to ensure the learning data is captured.
