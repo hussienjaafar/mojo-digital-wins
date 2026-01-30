@@ -49,11 +49,14 @@ function formatTimeAgo(date: string | null | undefined): string | null {
 }
 
 export function CredentialStatusBanner({ status, className }: CredentialStatusBannerProps) {
+  // Check for errors in both status and error fields
   const hasTestError = status.lastTestStatus?.toLowerCase().includes('error') || 
-                       status.lastTestStatus?.toLowerCase().includes('failed');
+                       status.lastTestStatus?.toLowerCase().includes('failed') ||
+                       !!status.lastTestError;
   const hasSyncError = status.lastSyncStatus?.toLowerCase().includes('error') || 
-                       status.lastSyncStatus?.toLowerCase().includes('failed');
-  const neverTested = !status.lastTestedAt && !status.lastSyncAt;
+                       status.lastSyncStatus?.toLowerCase().includes('failed') ||
+                       !!status.lastSyncError;
+  const neverTested = !status.lastTestedAt && !status.lastSyncAt && !status.lastSyncStatus && !status.lastTestStatus;
   const hasIssues = hasTestError || hasSyncError;
   
   // Determine the most recent activity
@@ -62,6 +65,12 @@ export function CredentialStatusBanner({ status, className }: CredentialStatusBa
   
   // Success state: no errors and at least one successful operation
   const isSuccess = !hasIssues && (status.lastTestStatus || status.lastSyncStatus);
+  
+  // Extract error message from status or error field
+  const testErrorMessage = status.lastTestError || 
+    (status.lastTestStatus?.toLowerCase().includes('error') ? status.lastTestStatus : null);
+  const syncErrorMessage = status.lastSyncError || 
+    (status.lastSyncStatus?.toLowerCase().includes('error') ? status.lastSyncStatus : null);
   
   if (neverTested) {
     return (
@@ -76,14 +85,14 @@ export function CredentialStatusBanner({ status, className }: CredentialStatusBa
   }
   
   if (hasTestError) {
-    const recommendation = getRecommendation(status.lastTestError);
+    const recommendation = getRecommendation(testErrorMessage);
     return (
       <Alert className={cn("bg-destructive/10 border-destructive/30", className)}>
         <XCircle className="h-4 w-4 text-destructive" />
         <AlertTitle className="text-destructive">Credential test failed</AlertTitle>
         <AlertDescription className="space-y-1">
-          {status.lastTestError && (
-            <p className="text-sm text-destructive/90">{status.lastTestError}</p>
+          {testErrorMessage && (
+            <p className="text-sm text-destructive/90">{testErrorMessage}</p>
           )}
           {recommendation && (
             <p className="text-sm text-muted-foreground">{recommendation}</p>
@@ -97,14 +106,14 @@ export function CredentialStatusBanner({ status, className }: CredentialStatusBa
   }
   
   if (hasSyncError) {
-    const recommendation = getRecommendation(status.lastSyncError);
+    const recommendation = getRecommendation(syncErrorMessage);
     return (
       <Alert className={cn("bg-[hsl(var(--portal-warning))]/10 border-[hsl(var(--portal-warning))]/30", className)}>
         <AlertTriangle className="h-4 w-4 text-[hsl(var(--portal-warning))]" />
         <AlertTitle className="text-[hsl(var(--portal-warning))]">Sync issue detected</AlertTitle>
         <AlertDescription className="space-y-1">
-          {status.lastSyncError && (
-            <p className="text-sm">{status.lastSyncError}</p>
+          {syncErrorMessage && (
+            <p className="text-sm">{syncErrorMessage}</p>
           )}
           {recommendation && (
             <p className="text-sm text-muted-foreground">{recommendation}</p>
