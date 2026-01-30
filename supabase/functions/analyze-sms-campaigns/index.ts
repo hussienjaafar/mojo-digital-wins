@@ -149,11 +149,18 @@ Respond ONLY with valid JSON, no markdown:
 }`;
 
         // Call Lovable AI gateway
+        const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+        if (!lovableApiKey) {
+          console.error('LOVABLE_API_KEY not configured');
+          results.push({ id: campaign.id, success: false, error: 'LOVABLE_API_KEY not configured' });
+          continue;
+        }
+        
         const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Authorization': `Bearer ${lovableApiKey}`,
           },
           body: JSON.stringify({
             model: 'google/gemini-2.5-flash',
