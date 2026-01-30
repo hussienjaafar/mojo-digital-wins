@@ -800,6 +800,19 @@ serve(async (req) => {
             console.log(`[SCHEDULER] correlate completed: ${itemsProcessed} analyzed, ${itemsCreated} correlations`);
             break;
 
+          case 'ttl-cleanup':
+          case 'ttl_cleanup':
+            console.log('[SCHEDULER] Running TTL cleanup');
+            const ttlCleanupResponse = await supabase.functions.invoke('ttl-cleanup', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (ttlCleanupResponse.error) throw new Error(ttlCleanupResponse.error.message);
+            result = ttlCleanupResponse.data;
+            itemsProcessed = result?.total_deleted || 0;
+            console.log(`[SCHEDULER] ttl-cleanup completed: ${itemsProcessed} records deleted`);
+            break;
+
           default:
             console.log(`[SCHEDULER] Unknown job type: ${job.job_type}`);
             result = { skipped: true, reason: 'Unknown job type' };

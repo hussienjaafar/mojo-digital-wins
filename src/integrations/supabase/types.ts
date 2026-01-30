@@ -14857,6 +14857,10 @@ export type Database = {
           stale_rss: number
         }[]
       }
+      cleanup_cron_job_run_details: {
+        Args: { retention_days?: number }
+        Returns: number
+      }
       cleanup_expired_invite_codes: { Args: never; Returns: undefined }
       cleanup_expired_sessions: { Args: never; Returns: number }
       cleanup_old_cache: { Args: never; Returns: number }
