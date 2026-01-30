@@ -1,203 +1,130 @@
 
-# Credential Status Feedback Enhancement
+
+# Abdul for Senate Webhook Recovery Plan
 
 ## Summary
-Add a status banner to the credential update form that shows users whether existing credentials are working properly or have issues, without requiring them to switch to the Diagnostics tab.
+The webhook credentials for Abdul for Senate have been updated correctly, but there are 1,107 failed webhook events from Jan 28-30 that need to be reprocessed to recover the missed donation data.
 
 ---
 
 ## Current State
 
-| Component | Issue |
-|-----------|-------|
-| **CredentialSlideOver** | `loadCredential()` only fetches `id, organization_id, platform, is_active` - missing status fields |
-| **CredentialForm** | No visual feedback about credential health when editing |
-| **Diagnostics tab** | Shows full health info but requires tab switch |
-| **existingCredentialMask** | Prop exists but is passed as empty object `{}` |
+| Item | Status |
+|------|--------|
+| Credentials in database | Correctly configured (MOJAFS / molitico2026) |
+| Entity ID | 168679 (matches) |
+| Last webhook received | 21:57:36 UTC (before credential update) |
+| New webhooks since update | 0 (waiting for new donations) |
+| Failed webhooks to recover | 1,107 events |
 
 ---
 
-## Proposed Solution
+## Problem Timeline
 
-Add a **Credential Status Alert** component that displays:
-1. Whether credentials are configured (from `credential_mask`)
-2. Last test result (success/error)
-3. Last sync result (success/error)
-4. Time since last test/sync
-5. Specific error messages when applicable
+```text
+Jan 28-30: Webhooks arriving but failing auth (wrong credentials stored)
+     |
+22:03:33 UTC: You updated credentials to correct values
+     |
+Now: Waiting for new ActBlue webhook to verify fix
+```
 
 ---
 
-## UI Design
+## Solution: Reprocess Failed Webhooks
 
-### When credentials are working:
-```text
-+-------------------------------------------------------+
-|  [CheckCircle] Credentials verified                   |
-|  Last tested: 2 days ago | Last sync: 5 minutes ago   |
-+-------------------------------------------------------+
-```
-
-### When there are issues:
-```text
-+-------------------------------------------------------+
-|  [AlertTriangle] Credential issues detected           |
-|  Last sync failed: ActBlue API error 401              |
-|  Recommendation: Update your API credentials          |
-+-------------------------------------------------------+
-```
-
-### When never tested:
-```text
-+-------------------------------------------------------+
-|  [Clock] Credentials not yet verified                 |
-|  Use the "Test" button to verify your credentials     |
-+-------------------------------------------------------+
-```
+Create an edge function or SQL procedure to:
+1. Find all failed webhook events for Abdul's org
+2. Re-validate using the updated credentials
+3. Process the payload data into actblue_transactions
+4. Mark events as reprocessed
 
 ---
 
 ## Implementation
 
-### File 1: `src/components/admin/integrations/CredentialSlideOver.tsx`
+### Option A: Edge Function for Bulk Reprocessing
 
-**Update `loadCredential()` to fetch status fields:**
-```typescript
-const { data, error } = await supabase
-  .from('client_api_credentials')
-  .select(`
-    id, 
-    organization_id, 
-    platform, 
-    is_active,
-    credential_mask,
-    last_tested_at,
-    last_test_status,
-    last_test_error,
-    last_sync_at,
-    last_sync_status,
-    last_sync_error
-  `)
-  .eq('id', id)
-  .single();
+Create `supabase/functions/reprocess-failed-webhooks/index.ts`:
+
+**Functionality:**
+- Accept organization_id as parameter
+- Query webhook_logs where status = 'failed' and error = 'Authentication failed'
+- For each event, extract the payload and insert into actblue_transactions
+- Skip authentication validation (since we're reprocessing stored data)
+- Update webhook_logs to mark as 'reprocessed'
+
+**Key code flow:**
+```text
+1. Fetch failed webhook_logs for org
+2. For each log entry:
+   a. Parse stored payload
+   b. Extract donation data (donor, amount, refcodes, etc.)
+   c. Insert into actblue_transactions (skip duplicates)
+   d. Update webhook_log status to 'reprocessed'
+3. Return summary (processed count, skipped count, errors)
 ```
 
-**Pass credential status data to CredentialForm:**
-```typescript
-<CredentialForm
-  platform={platform}
-  formData={formData}
-  onFormDataChange={setFormData}
-  onPlatformChange={setPlatform}
-  organizationId={selectedOrg}
-  disabled={false}
-  isEditing={true}
-  existingCredentialMask={existingCredential?.credential_mask || {}}
-  credentialStatus={{
-    lastTestedAt: existingCredential?.last_tested_at,
-    lastTestStatus: existingCredential?.last_test_status,
-    lastTestError: existingCredential?.last_test_error,
-    lastSyncAt: existingCredential?.last_sync_at,
-    lastSyncStatus: existingCredential?.last_sync_status,
-    lastSyncError: existingCredential?.last_sync_error,
-  }}
-/>
-```
+### Option B: Direct SQL Reprocessing
+
+Use stored procedure to:
+1. Join webhook_logs with the expected transaction schema
+2. Insert missing transactions directly
+3. More efficient for large volumes
 
 ---
 
-### File 2: `src/components/admin/integrations/CredentialForm.tsx`
+## Files to Create/Modify
 
-**Add new prop types:**
-```typescript
-interface CredentialStatus {
-  lastTestedAt?: string | null;
-  lastTestStatus?: string | null;
-  lastTestError?: string | null;
-  lastSyncAt?: string | null;
-  lastSyncStatus?: string | null;
-  lastSyncError?: string | null;
-}
-
-interface CredentialFormProps {
-  // ... existing props
-  credentialStatus?: CredentialStatus;
-}
-```
-
-**Create new CredentialStatusBanner component:**
-```typescript
-function CredentialStatusBanner({ status }: { status?: CredentialStatus }) {
-  if (!status) return null;
-  
-  const hasTestError = status.lastTestStatus?.includes('error');
-  const hasSyncError = status.lastSyncStatus?.includes('error');
-  const neverTested = !status.lastTestedAt;
-  const hasIssues = hasTestError || hasSyncError;
-  
-  // Render appropriate alert based on status
-}
-```
-
-**Add the banner at the top of each platform's TabsContent when editing:**
-```typescript
-{isEditing && credentialStatus && (
-  <CredentialStatusBanner status={credentialStatus} />
-)}
-```
-
----
-
-## Visual Component Design
-
-The `CredentialStatusBanner` will be a styled Alert component with:
-
-| Status | Icon | Background | Message |
-|--------|------|------------|---------|
-| **All Good** | CheckCircle (green) | Green/10 | "Credentials verified and working" |
-| **Sync Error** | AlertTriangle (yellow) | Yellow/10 | Shows sync error + recommendation |
-| **Test Error** | XCircle (red) | Red/10 | Shows test error + recommendation |
-| **Not Tested** | Clock (muted) | Gray/10 | "Click Test to verify credentials" |
-
----
-
-## Files to Modify
-
-| File | Changes |
+| File | Purpose |
 |------|---------|
-| `src/components/admin/integrations/CredentialSlideOver.tsx` | Expand `loadCredential()` query; pass status to CredentialForm |
-| `src/components/admin/integrations/CredentialForm.tsx` | Add `credentialStatus` prop; add `CredentialStatusBanner` component |
+| `supabase/functions/reprocess-failed-webhooks/index.ts` | Edge function to reprocess failed events |
+| Admin UI button (optional) | Trigger reprocessing from Integration Center |
 
 ---
 
-## Technical Notes
+## Technical Details
 
-### ActBlue-Specific Feedback
-For ActBlue, the banner should differentiate between CSV API and Webhook status:
-- CSV API uses `last_sync_status` from sync-actblue-csv
-- Webhook uses webhook_events table (already handled by IntegrationHealthPanel)
+### Edge Function Structure
 
-The banner will parse the error message to provide actionable guidance:
-- "401" errors → "Invalid credentials. Please verify your username and password."
-- "Entity ID" errors → "Entity ID mismatch. Check your ActBlue entity ID."
+```typescript
+// 1. Validate admin access
+// 2. Query failed webhooks for organization
+const { data: failedWebhooks } = await supabase
+  .from('webhook_logs')
+  .select('id, payload, received_at')
+  .eq('organization_id', organization_id)
+  .eq('processing_status', 'failed')
+  .eq('error_message', 'Authentication failed')
+  .order('received_at', { ascending: true });
 
-### State Management
-The status data is fetched once when editing and stored in `existingCredential` state. No additional queries needed since we already have the ID.
+// 3. Process each webhook payload (reuse existing logic from actblue-webhook)
+// 4. Insert transactions, handle deduplication
+// 5. Update webhook_logs status
+```
+
+### Deduplication Strategy
+
+Use `transaction_id` (lineitemId from ActBlue) as unique key:
+```sql
+ON CONFLICT (organization_id, transaction_id) DO NOTHING
+```
 
 ---
 
-## Expected Behavior
+## Verification Steps
 
-1. **User opens credential to edit** → Status banner immediately shows current state
-2. **User sees error** → Banner shows specific error and recommendation
-3. **User updates credentials** → Clicks "Test" → Banner will update after page refresh
-4. **User saves** → Status will update on next sync cycle
+After implementation:
+1. Run reprocessing for Abdul's org (8ba98ab9-e079-4e93-90dc-269cd384e99b)
+2. Verify transaction count increased by ~1,107
+3. Check donation totals in dashboard match ActBlue reports
+4. Monitor next real webhook to confirm authentication works
 
 ---
 
-## Benefits
+## Expected Outcome
 
-- **Immediate feedback** without switching tabs
-- **Actionable guidance** for fixing issues
-- **At-a-glance status** using familiar icons
-- **Consistent with existing UI patterns** (uses same Alert styling)
+- Recover 1,107 missed donations from Jan 28-30
+- Dashboard shows complete donation history
+- Future webhooks authenticate successfully with new credentials
+
