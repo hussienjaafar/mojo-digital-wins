@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback, useMemo } from "react";
-import Map, {
+import MapGL, {
   Source,
   Layer,
   NavigationControl,
@@ -495,7 +495,7 @@ export function ImpactMap({
 
   return (
     <div className="w-full h-full relative">
-      <Map
+      <MapGL
         {...viewState}
         onMove={handleMove}
         mapStyle={MAP_STYLE}
@@ -531,7 +531,7 @@ export function ImpactMap({
           <Layer {...districtsFillLayer} />
           <Layer {...districtsBorderLayer} />
         </Source>
-      </Map>
+      </MapGL>
     </div>
   );
 }

@@ -61,8 +61,9 @@ const GC_TIME = 30 * 60 * 1000; // 30 minutes
 // ============================================================================
 
 async function fetchVoterImpactStates(): Promise<VoterImpactState[]> {
+  // Using .from() with explicit type annotation since tables may not be in generated types yet
   const { data, error } = await supabase
-    .from("voter_impact_states")
+    .from("voter_impact_states" as any)
     .select("*")
     .order("state_name", { ascending: true });
 
@@ -71,12 +72,13 @@ async function fetchVoterImpactStates(): Promise<VoterImpactState[]> {
     throw error;
   }
 
-  return (data || []) as VoterImpactState[];
+  return (data || []) as unknown as VoterImpactState[];
 }
 
 async function fetchVoterImpactDistricts(): Promise<VoterImpactDistrict[]> {
+  // Using .from() with explicit type annotation since tables may not be in generated types yet
   const { data, error } = await supabase
-    .from("voter_impact_districts")
+    .from("voter_impact_districts" as any)
     .select("*")
     .order("cd_code", { ascending: true });
 
@@ -85,12 +87,13 @@ async function fetchVoterImpactDistricts(): Promise<VoterImpactDistrict[]> {
     throw error;
   }
 
-  return (data || []) as VoterImpactDistrict[];
+  return (data || []) as unknown as VoterImpactDistrict[];
 }
 
 async function fetchDistrictsByState(stateCode: string): Promise<VoterImpactDistrict[]> {
+  // Using .from() with explicit type annotation since tables may not be in generated types yet
   const { data, error } = await supabase
-    .from("voter_impact_districts")
+    .from("voter_impact_districts" as any)
     .select("*")
     .eq("state_code", stateCode)
     .order("cd_code", { ascending: true });
@@ -100,12 +103,13 @@ async function fetchDistrictsByState(stateCode: string): Promise<VoterImpactDist
     throw error;
   }
 
-  return (data || []) as VoterImpactDistrict[];
+  return (data || []) as unknown as VoterImpactDistrict[];
 }
 
 async function fetchVoterImpactDistrict(cdCode: string): Promise<VoterImpactDistrict | null> {
+  // Using .from() with explicit type annotation since tables may not be in generated types yet
   const { data, error } = await supabase
-    .from("voter_impact_districts")
+    .from("voter_impact_districts" as any)
     .select("*")
     .eq("cd_code", cdCode)
     .single();
@@ -119,7 +123,7 @@ async function fetchVoterImpactDistrict(cdCode: string): Promise<VoterImpactDist
     throw error;
   }
 
-  return data as VoterImpactDistrict;
+  return data as unknown as VoterImpactDistrict;
 }
 
 // ============================================================================
