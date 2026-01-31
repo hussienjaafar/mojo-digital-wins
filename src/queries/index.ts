@@ -219,3 +219,13 @@ export {
   type AttributionChannel,
   type ChannelDetectionInput,
 } from "@/utils/channelDetection";
+
+// Voter Impact Map queries
+export {
+  useVoterImpactStates,
+  useVoterImpactDistricts,
+  useDistrictsByState,
+  useVoterImpactDistrict,
+  type VoterImpactState,
+  type VoterImpactDistrict,
+} from "./useVoterImpactQueries";
