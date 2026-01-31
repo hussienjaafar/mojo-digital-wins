@@ -1,130 +1,116 @@
 
+# Fix Voter Impact Data Import
 
-# Abdul for Senate Webhook Recovery Plan
+## Problem Summary
+The data import is failing due to two issues:
+1. **State Column Mismatch**: The Excel file contains state **abbreviations** (CA, TX, NY) but the code expects full state names to convert
+2. **Foreign Key Cascade**: Since states fail to import, districts fail with FK constraint errors
 
-## Summary
-The webhook credentials for Abdul for Senate have been updated correctly, but there are 1,107 failed webhook events from Jan 28-30 that need to be reprocessed to recover the missed donation data.
+## Root Cause Analysis
 
----
-
-## Current State
-
-| Item | Status |
-|------|--------|
-| Credentials in database | Correctly configured (MOJAFS / molitico2026) |
-| Entity ID | 168679 (matches) |
-| Last webhook received | 21:57:36 UTC (before credential update) |
-| New webhooks since update | 0 (waiting for new donations) |
-| Failed webhooks to recover | 1,107 events |
-
----
-
-## Problem Timeline
-
-```text
-Jan 28-30: Webhooks arriving but failing auth (wrong credentials stored)
-     |
-22:03:33 UTC: You updated credentials to correct values
-     |
-Now: Waiting for new ActBlue webhook to verify fix
+### States File Issue
+The National_Analysis.xlsx file structure:
+```
+State | Muslim Voters | ...
+CA    | 551,639       | ...
+NY    | 435,214       | ...
 ```
 
----
-
-## Solution: Reprocess Failed Webhooks
-
-Create an edge function or SQL procedure to:
-1. Find all failed webhook events for Abdul's org
-2. Re-validate using the updated credentials
-3. Process the payload data into actblue_transactions
-4. Mark events as reprocessed
-
----
-
-## Implementation
-
-### Option A: Edge Function for Bulk Reprocessing
-
-Create `supabase/functions/reprocess-failed-webhooks/index.ts`:
-
-**Functionality:**
-- Accept organization_id as parameter
-- Query webhook_logs where status = 'failed' and error = 'Authentication failed'
-- For each event, extract the payload and insert into actblue_transactions
-- Skip authentication validation (since we're reprocessing stored data)
-- Update webhook_logs to mark as 'reprocessed'
-
-**Key code flow:**
-```text
-1. Fetch failed webhook_logs for org
-2. For each log entry:
-   a. Parse stored payload
-   b. Extract donation data (donor, amount, refcodes, etc.)
-   c. Insert into actblue_transactions (skip duplicates)
-   d. Update webhook_log status to 'reprocessed'
-3. Return summary (processed count, skipped count, errors)
+Current code in `VoterImpactDataImport.tsx`:
+```typescript
+const stateCode = getStateAbbreviation(stateName);
+if (!stateCode || stateCode === stateName) {
+  console.warn(`Unknown state: ${stateName}`);  // <- "Unknown state: WA"
+  continue;
+}
 ```
 
-### Option B: Direct SQL Reprocessing
+The `getStateAbbreviation()` function expects "California" and returns "CA", but the file already has "CA" so it returns "CA" unchanged, causing the `stateCode === stateName` check to skip every row.
 
-Use stored procedure to:
-1. Join webhook_logs with the expected transaction schema
-2. Insert missing transactions directly
-3. More efficient for large volumes
+### Districts File Issue
+Districts require states to exist first (foreign key), but since all states were skipped, all district inserts fail.
 
----
+## Solution
 
-## Files to Create/Modify
-
-| File | Purpose |
-|------|---------|
-| `supabase/functions/reprocess-failed-webhooks/index.ts` | Edge function to reprocess failed events |
-| Admin UI button (optional) | Trigger reprocessing from Integration Center |
-
----
-
-## Technical Details
-
-### Edge Function Structure
+### Step 1: Fix State Import Logic
+Update `parseStatesFile()` to handle **both** abbreviations and full names:
 
 ```typescript
-// 1. Validate admin access
-// 2. Query failed webhooks for organization
-const { data: failedWebhooks } = await supabase
-  .from('webhook_logs')
-  .select('id, payload, received_at')
-  .eq('organization_id', organization_id)
-  .eq('processing_status', 'failed')
-  .eq('error_message', 'Authentication failed')
-  .order('received_at', { ascending: true });
+// Check if it's already a valid abbreviation
+let stateCode = stateName;
+let fullStateName = stateName;
 
-// 3. Process each webhook payload (reuse existing logic from actblue-webhook)
-// 4. Insert transactions, handle deduplication
-// 5. Update webhook_logs status
+if (stateName.length === 2 && isValidStateAbbreviation(stateName)) {
+  // It's already an abbreviation, get the full name
+  stateCode = stateName.toUpperCase();
+  fullStateName = getStateName(stateCode);
+} else {
+  // It's a full name, get the abbreviation
+  stateCode = getStateAbbreviation(stateName);
+  if (stateCode === stateName) {
+    console.warn(`Unknown state: ${stateName}`);
+    continue;
+  }
+}
 ```
 
-### Deduplication Strategy
+### Step 2: Update Districts Parser Similarly
+The districts file has a "State Code" column with abbreviations, which should work correctly, but we should validate it exists in `STATE_ABBREVIATIONS`.
 
-Use `transaction_id` (lineitemId from ActBlue) as unique key:
-```sql
-ON CONFLICT (organization_id, transaction_id) DO NOTHING
+### Step 3: Handle Edge Cases
+- Skip "NATIONAL" summary row (already handled)
+- Handle empty/null values gracefully (already handled)
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/components/admin/VoterImpactDataImport.tsx` | Fix state parsing logic to handle abbreviations |
+| `src/lib/us-states.ts` | Ensure `isValidStateAbbreviation()` is exported (already is) |
+
+## Technical Implementation
+
+### Update parseStatesFile function
+```typescript
+const parseStatesFile = useCallback(async (file: File): Promise<StateRow[]> => {
+  // ... existing file reading code ...
+
+  for (const row of rows) {
+    const rawState = String(row["State"] || "").trim();
+    
+    // Skip "NATIONAL" summary row
+    if (!rawState || rawState.toUpperCase() === "NATIONAL") continue;
+
+    let stateCode: string;
+    let stateName: string;
+
+    // Check if the value is already a 2-letter abbreviation
+    if (rawState.length === 2 && isValidStateAbbreviation(rawState)) {
+      stateCode = rawState.toUpperCase();
+      stateName = getStateName(stateCode);
+    } else {
+      // Assume it's a full state name
+      const abbr = getStateAbbreviation(rawState);
+      if (abbr === rawState) {
+        console.warn(`Unknown state: ${rawState}`);
+        continue;
+      }
+      stateCode = abbr;
+      stateName = rawState;
+    }
+
+    stateRows.push({
+      state_code: stateCode,
+      state_name: stateName,
+      // ... rest of fields ...
+    });
+  }
+}, []);
 ```
-
----
-
-## Verification Steps
-
-After implementation:
-1. Run reprocessing for Abdul's org (8ba98ab9-e079-4e93-90dc-269cd384e99b)
-2. Verify transaction count increased by ~1,107
-3. Check donation totals in dashboard match ActBlue reports
-4. Monitor next real webhook to confirm authentication works
-
----
 
 ## Expected Outcome
-
-- Recover 1,107 missed donations from Jan 28-30
-- Dashboard shows complete donation history
-- Future webhooks authenticate successfully with new credentials
-
+After this fix:
+- States import will correctly handle "CA" → store as state_code="CA", state_name="California"
+- All 50+ states will import successfully
+- Districts import will succeed (states exist for FK constraint)
+- The voter impact map will display with real data
