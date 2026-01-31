@@ -137,6 +137,15 @@ const Admin = () => {
     localStorage.setItem('admin-active-tab', activeTab);
   }, [activeTab]);
 
+  // Handle navigation to standalone pages - must be in useEffect, not during render
+  useEffect(() => {
+    if (activeTab === "voter-impact-map") {
+      navigate("/admin/voter-impact-map");
+    } else if (activeTab === "contacts") {
+      navigate("/admin/contacts");
+    }
+  }, [activeTab, navigate]);
+
   // Get current section title for breadcrumb
   const getCurrentSectionTitle = () => {
     for (const group of navigationGroups) {
@@ -360,9 +369,8 @@ const Admin = () => {
       case "users":
         return <UserManagement />;
       case "contacts":
-        // Navigate to standalone V3 page
-        navigate("/admin/contacts");
-        return null;
+        // Navigation handled in useEffect
+        return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
       case "newsletter":
         return (
           <div className="space-y-4">
@@ -409,9 +417,8 @@ const Admin = () => {
       case "coverage-governance":
         return <CoverageGovernancePanel />;
       case "voter-impact-map":
-        // Navigate to standalone VoterImpactMap page
-        navigate("/admin/voter-impact-map");
-        return null;
+        // Navigation handled in useEffect
+        return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
       case "voter-data-import":
         return <VoterImpactDataImport />;
       default:
