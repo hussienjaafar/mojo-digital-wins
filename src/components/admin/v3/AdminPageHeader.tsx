@@ -1,4 +1,4 @@
-import React from "react";
+import * as React from "react";
 import { type LucideIcon, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { V3Button } from "@/components/v3/V3Button";

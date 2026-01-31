@@ -1,4 +1,4 @@
-import React from "react";
+import * as React from "react";
 import { cn } from "@/lib/utils";
 import { LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
 import { PortalCircularProgress } from "./PortalCircularProgress";

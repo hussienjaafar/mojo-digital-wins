@@ -5,7 +5,7 @@
  * and preset options for exploring Muslim voter impact data.
  */
 
-import React, { useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Search, Filter, Zap, X, TrendingUp, Users, Target, Crown } from "lucide-react";
 
 import { Input } from "@/components/ui/input";

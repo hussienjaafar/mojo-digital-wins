@@ -1,4 +1,3 @@
-import React from 'react';
 import { DashboardWidget } from "../DashboardWidget";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import StatCounter from "@/components/StatCounter";

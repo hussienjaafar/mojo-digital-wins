@@ -1,4 +1,4 @@
-import React from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ReportCustomization from "@/components/client/ReportCustomization";
 
