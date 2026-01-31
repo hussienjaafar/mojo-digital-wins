@@ -5,7 +5,7 @@
  * Shows states and congressional districts with color-coded impact scores.
  */
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Map, {
   Source,
   Layer,
@@ -116,7 +116,7 @@ export function ImpactMap({
   states,
   districts,
   filters,
-  metric,
+  metric: _metric,
   selectedRegion,
   onRegionSelect,
   onRegionHover,
