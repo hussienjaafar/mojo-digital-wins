@@ -126,6 +126,16 @@ export const actblueKeys = {
     [...actblueKeys.all, 'filtered-rollup', orgId, startDate, endDate, campaignId, creativeId] as const,
 };
 
+export const voterImpactKeys = {
+  all: ['voter-impact'] as const,
+  states: () => [...voterImpactKeys.all, 'states'] as const,
+  districts: () => [...voterImpactKeys.all, 'districts'] as const,
+  districtsByState: (stateCode: string) =>
+    [...voterImpactKeys.districts(), stateCode] as const,
+  district: (cdCode: string) =>
+    [...voterImpactKeys.all, 'district', cdCode] as const,
+};
+
 // Unified queryKeys object for backwards compatibility
 export const queryKeys = {
   dashboard: dashboardKeys,
@@ -141,4 +151,5 @@ export const queryKeys = {
   kpis: kpiKeys,
   adPerformance: adPerformanceKeys,
   actblue: actblueKeys,
+  voterImpact: voterImpactKeys,
 };
