@@ -1,120 +1,162 @@
 
-# Fix: Admin Dashboard Blank Page - Missing React Imports
+
+# Fix: Complete Application Crash - Missing React Imports
 
 ## Root Cause Analysis
 
-The entire admin dashboard (and by extension the whole app when viewing `/admin`) is crashing because multiple components reference the `React` namespace without importing it. When JavaScript tries to access `React.ComponentType` or `React.ReactNode` without React being in scope, it throws a `ReferenceError: React is not defined`, which crashes the entire component tree before anything can render.
+The entire application is crashing before any UI renders because multiple components reference the `React` namespace (like `React.ReactNode`, `React.FormEvent`, `React.RefObject`) without importing React. With Vite's automatic JSX runtime, you don't need to import React for JSX syntax, but **explicit `React.` namespace references still require the import**.
 
-## Why No Console Logs?
+The crash happens during JavaScript module evaluation (before React even mounts), which is why:
+- No console logs appear
+- No network requests fire  
+- The page is completely blank
 
-The crash happens during module loading/parsing, before React even mounts to the DOM. This is why:
-- No console logs are visible (the app never gets to execute any runtime code)
-- No network requests appear (Supabase queries never fire)
-- The page is completely blank (React never renders anything)
+## Critical Files (Crash Path)
 
-## Affected Files (Priority Order)
+These files are loaded at app initialization or on the marketing homepage, causing the cascade failure:
 
-| File | Issue | Impact |
-|------|-------|--------|
-| `src/components/AdminSidebar.tsx` | Uses `React.ComponentType` (lines 64, 77) | **CRITICAL** - Breaks entire admin layout |
-| `src/components/dashboard/widgets/MetricsWidget.tsx` | Uses `React.ReactNode` (line 11) | Breaks admin dashboard widgets |
-| `src/components/charts/USChoroplethMap.tsx` | Uses `React.ReactNode`, `React.MouseEvent` (lines 84, 193, etc.) | Breaks choropleth maps |
-| `src/components/admin/VoterImpactDataImport.tsx` | Uses `React.ChangeEvent` (lines 474, 488) | Breaks voter data import |
-| `src/components/client/OrgBulkInvite.tsx` | Uses `React.ChangeEvent` (line 103) | Breaks bulk invite feature |
-| `src/components/admin/forms/LogoUploadField.tsx` | Uses `React.DragEvent`, `React.ChangeEvent` (lines 107, 112) | Breaks logo uploads |
+| File | Issue | Why Critical |
+|------|-------|--------------|
+| `src/components/ThemeProvider.tsx` | Uses `React.ReactNode` (line 6) | First component loaded in App.tsx |
+| `src/components/ParticleButton.tsx` | Uses `React.ReactNode`, `React.MouseEvent`, `React.RefObject` | Used on Index page hero |
+| `src/hooks/useIntersectionObserver.tsx` | Uses `React.RefObject`, `React.ReactNode` | Used by Index page |
+| `src/components/Footer.tsx` | Uses `React.FormEvent` (line 15) | Loaded on every marketing page |
+| `src/pages/Contact.tsx` | Uses `React.FormEvent` (line 67) | Contact page |
+| `src/pages/ForgotPassword.tsx` | Uses `React.FormEvent` | Auth flow |
+| `src/pages/ResetPassword.tsx` | Uses `React.FormEvent` | Auth flow |
+| `src/pages/AcceptInvitation.tsx` | Uses `React.FormEvent` | Invitation flow |
+| `src/pages/Profile.tsx` | Uses `React.FormEvent` | Profile page |
+
+## Additional Files Requiring Fix
+
+These files also need the React import but are loaded later in the app flow:
+
+**Admin V3 Components:**
+- `src/components/admin/v3/AdminCard.tsx`
+- `src/components/admin/v3/AdminPageHeader.tsx`
+- `src/components/admin/v3/AdminStatsGrid.tsx`
+- `src/components/admin/v3/DrilldownSection.tsx`
+- `src/components/admin/v3/SecondaryExplorer.tsx`
+
+**Admin Forms & Panels:**
+- `src/components/admin/OpsPanel.tsx`
+- `src/components/admin/bulk/BulkOperations.tsx`
+- `src/components/admin/InviteUserDialog.tsx`
+- `src/components/admin/ClientOrganizationManager.tsx`
+- `src/components/admin/organization/OrganizationDetailsForm.tsx`
+- `src/components/admin/organization/OrganizationProfileForm.tsx`
+- `src/components/admin/organization/OrganizationSettingsForm.tsx`
+- `src/components/admin/APICredentialsManager.tsx`
+- `src/components/admin/AnomalyAlertsWidget.tsx`
+- `src/components/admin/SidebarSearch.tsx`
+
+**Client Portal Components:**
+- `src/components/client/HeroKpiCard.tsx`
+- `src/components/client/OpportunityCard.tsx`
+- `src/components/client/CreativeCard.tsx`
+- `src/components/client/FeedbackButtons.tsx`
+- `src/components/client/CreativeOptimizationScorecard.tsx`
+- `src/components/client/SingleDayMetricGrid.tsx`
+- `src/components/client/WinningFormulasGrid.tsx`
+- `src/components/client/AIInsightsBanner.tsx`
+- `src/components/client/DashboardTopSection.tsx`
+- `src/components/client/TopCreativesSection.tsx`
+- `src/components/client/RecentActivityFeed.tsx`
+
+**V3 Design System:**
+- `src/components/v3/V3ChartWrapper.tsx`
+- `src/components/v3/V3HighlightableRow.tsx`
+- `src/components/v3/V3InsightBadge.tsx`
+- `src/components/v3/V3PageContainer.tsx`
+- `src/components/v3/V3EmptyState.tsx`
+- `src/components/v3/V3ErrorState.tsx`
+- `src/components/v3/V3DataFreshnessIndicator.tsx`
+- `src/components/v3/V3DateRangePicker.tsx`
+
+**UI Components:**
+- `src/components/ui/table-mobile.tsx`
+- `src/components/ui/DateInputGroup.tsx`
+- `src/components/ui/StatusChip.tsx`
+
+**Portal & News:**
+- `src/components/portal/PortalMetric.tsx`
+- `src/components/portal/PortalCircularProgress.tsx`
+- `src/components/news/TagInput.tsx`
+- `src/components/news/BookmarkButton.tsx`
 
 ## Solution
 
-Add `import React from 'react';` to each affected file. For files that already import from React (like `useState`, `useCallback`), update the import to include the default export.
+For each affected file, add `import React from 'react';` at the top, or update existing imports to include the default React export.
 
-### 1. AdminSidebar.tsx (CRITICAL - fixes main dashboard)
+### Example Fixes
 
-**Current (line 1):**
+**ThemeProvider.tsx:**
 ```typescript
-import { useEffect, useState, useRef, useCallback } from "react";
+// Before
+import { createContext, useContext, useEffect, useState } from "react";
+
+// After
+import React, { createContext, useContext, useEffect, useState } from "react";
 ```
 
-**Fixed:**
+**ParticleButton.tsx:**
 ```typescript
-import React, { useEffect, useState, useRef, useCallback } from "react";
+// Before
+import { useState, useRef, useEffect } from "react";
+
+// After
+import React, { useState, useRef, useEffect } from "react";
 ```
 
-### 2. MetricsWidget.tsx
-
-**Add at line 1:**
+**Footer.tsx:**
 ```typescript
-import React from 'react';
+// Before
+import { useState } from "react";
+// ... other imports
+const handleNewsletterSubmit = async (e: React.FormEvent) => {
+
+// After
+import React, { useState } from "react";
+// ... rest unchanged
 ```
 
-### 3. USChoroplethMap.tsx
+## Implementation Priority
 
-**Current (line 1):**
-```typescript
-import { useMemo, useState, useCallback } from "react";
-```
+1. **Phase 1 - Unblock Marketing Site (Critical):**
+   - ThemeProvider.tsx
+   - ParticleButton.tsx
+   - useIntersectionObserver.tsx
+   - Footer.tsx
 
-**Fixed:**
-```typescript
-import React, { useMemo, useState, useCallback } from "react";
-```
+2. **Phase 2 - Auth & User Pages:**
+   - Contact.tsx
+   - ForgotPassword.tsx
+   - ResetPassword.tsx
+   - AcceptInvitation.tsx
+   - Profile.tsx
 
-### 4. VoterImpactDataImport.tsx
+3. **Phase 3 - Admin Dashboard:**
+   - All files in `src/components/admin/`
 
-**Current (line 8):**
-```typescript
-import { useState, useCallback } from "react";
-```
+4. **Phase 4 - Client Portal:**
+   - All files in `src/components/client/`
 
-**Fixed:**
-```typescript
-import React, { useState, useCallback } from "react";
-```
+5. **Phase 5 - Design System:**
+   - All files in `src/components/v3/`
+   - All files in `src/components/ui/`
+   - All files in `src/components/portal/`
+   - All files in `src/components/news/`
 
-### 5. OrgBulkInvite.tsx
+## Expected Outcome
 
-Needs React import added (will check exact current import statement during implementation).
+After these fixes:
+1. The marketing homepage will load immediately
+2. All navigation will work
+3. The admin dashboard will render properly
+4. The client portal will function correctly
+5. All forms and interactive components will work
 
-### 6. LogoUploadField.tsx
+## Technical Note
 
-Needs React import added (will check exact current import statement during implementation).
+This is a common issue when migrating to or using Vite's automatic JSX transform. While JSX like `<div>` works without importing React, any explicit `React.` namespace reference requires the import. A future improvement would be to use TypeScript's built-in types directly (e.g., `FormEvent` from React's type exports) instead of the `React.` prefix, but adding the import is the faster fix.
 
-## Technical Details
-
-### Why This Happens
-
-Vite uses the automatic JSX runtime (`@vitejs/plugin-react-swc`), which means:
-- JSX like `<div>` is automatically transformed without needing `import React`
-- However, explicit references to the `React` namespace (like `React.FC`, `React.ReactNode`, `React.ChangeEvent`) still require the import
-- TypeScript compiles these to `React.ComponentType` at runtime, which fails if React isn't in scope
-
-### Vite Config Status
-
-The recent `vite.config.ts` changes for MapLibre bundling are correct and are NOT causing this issue:
-```typescript
-optimizeDeps: {
-  include: ['maplibre-gl', 'react-map-gl'],
-},
-build: {
-  commonjsOptions: {
-    include: [/maplibre-gl/, /node_modules/],
-  },
-},
-```
-
-### After Fix
-
-Once the React imports are added:
-1. The admin dashboard will render immediately
-2. All sidebar navigation will work
-3. Dashboard widgets and charts will display
-4. The Voter Impact Map will load correctly
-5. All file upload/import features will function
-
-## Files to Modify
-
-1. `src/components/AdminSidebar.tsx` - Line 1
-2. `src/components/dashboard/widgets/MetricsWidget.tsx` - Line 1
-3. `src/components/charts/USChoroplethMap.tsx` - Line 1
-4. `src/components/admin/VoterImpactDataImport.tsx` - Line 8
-5. `src/components/client/OrgBulkInvite.tsx` - Check and fix import
-6. `src/components/admin/forms/LogoUploadField.tsx` - Check and fix import
