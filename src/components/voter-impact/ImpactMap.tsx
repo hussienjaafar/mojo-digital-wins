@@ -5,7 +5,7 @@
  * Shows states and congressional districts with color-coded impact scores.
  */
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import MapGL, {
   Source,
   Layer,
@@ -15,6 +15,7 @@ import MapGL, {
 } from "react-map-gl/maplibre";
 import type { FillLayerSpecification, LineLayerSpecification, ExpressionSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import type { FeatureCollection, Feature, Geometry } from "geojson";
 
 import type {
   VoterImpactState,
@@ -60,10 +61,29 @@ const INITIAL_VIEW_STATE: ViewState = {
 
 const MAP_STYLE = "https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json";
 
-const GEOJSON_STATES = "/geojson/us-states.json";
-const GEOJSON_DISTRICTS = "/geojson/congressional-districts-118.json";
+const GEOJSON_STATES_URL = "/geojson/us-states.json";
+const GEOJSON_DISTRICTS_URL = "/geojson/congressional-districts-118.json";
 
 const DISTRICT_VISIBILITY_ZOOM = 5.5;
+
+// Type for GeoJSON properties
+interface StateProperties {
+  name: string;
+  density?: number;
+  impactScore?: number;
+  stateCode?: string;
+}
+
+interface DistrictProperties {
+  GEO_ID: string;
+  STATE: string;
+  CD: string;
+  NAME: string;
+  LSAD: string;
+  CENSUSAREA: number;
+  impactScore?: number;
+  cdCode?: string;
+}
 
 const COLORS = {
   border: "#1e2a45",
@@ -124,6 +144,45 @@ export function ImpactMap({
   const [viewState, setViewState] = useState<ViewState>(INITIAL_VIEW_STATE);
   const [hoveredRegion, setHoveredRegion] = useState<string | null>(null);
   const [hoveredType, setHoveredType] = useState<"state" | "district">("state");
+  const [statesGeoJSON, setStatesGeoJSON] = useState<FeatureCollection<Geometry, StateProperties> | null>(null);
+  const [districtsGeoJSON, setDistrictsGeoJSON] = useState<FeatureCollection<Geometry, DistrictProperties> | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Load GeoJSON files on mount
+  useEffect(() => {
+    async function loadGeoJSON() {
+      try {
+        setIsLoading(true);
+        setLoadError(null);
+
+        const [statesResponse, districtsResponse] = await Promise.all([
+          fetch(GEOJSON_STATES_URL),
+          fetch(GEOJSON_DISTRICTS_URL),
+        ]);
+
+        if (!statesResponse.ok) {
+          throw new Error(`Failed to load states GeoJSON: ${statesResponse.status}`);
+        }
+        if (!districtsResponse.ok) {
+          throw new Error(`Failed to load districts GeoJSON: ${districtsResponse.status}`);
+        }
+
+        const statesData = await statesResponse.json();
+        const districtsData = await districtsResponse.json();
+
+        setStatesGeoJSON(statesData);
+        setDistrictsGeoJSON(districtsData);
+      } catch (error) {
+        console.error("Error loading GeoJSON:", error);
+        setLoadError(error instanceof Error ? error.message : "Failed to load map data");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadGeoJSON();
+  }, []);
 
   // Determine if districts should be visible based on zoom level
   const showDistricts = viewState.zoom >= DISTRICT_VISIBILITY_ZOOM;
@@ -493,6 +552,30 @@ export function ImpactMap({
     };
   }, [selectedRegion, hoveredRegion, hoveredType, showDistricts]);
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-[#0a0f1a]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4" />
+          <p className="text-gray-400">Loading map data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (loadError || !statesGeoJSON || !districtsGeoJSON) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-[#0a0f1a]">
+        <div className="text-center text-red-400">
+          <p className="text-lg mb-2">Failed to load map</p>
+          <p className="text-sm text-gray-500">{loadError || "GeoJSON data not available"}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full relative">
       <MapGL
@@ -521,13 +604,13 @@ export function ImpactMap({
         <NavigationControl position="top-right" />
 
         {/* States layer */}
-        <Source id="states" type="geojson" data={GEOJSON_STATES}>
+        <Source id="states" type="geojson" data={statesGeoJSON}>
           <Layer {...statesFillLayer} />
           <Layer {...statesBorderLayer} />
         </Source>
 
         {/* Districts layer */}
-        <Source id="districts" type="geojson" data={GEOJSON_DISTRICTS}>
+        <Source id="districts" type="geojson" data={districtsGeoJSON}>
           <Layer {...districtsFillLayer} />
           <Layer {...districtsBorderLayer} />
         </Source>
