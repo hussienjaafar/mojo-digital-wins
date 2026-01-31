@@ -196,13 +196,26 @@ export function ImpactMap({
   // Build state impact scores map
   const stateImpactScores = useMemo(() => {
     const scores = new Map<string, number>();
+    console.log("[ImpactMap] States received:", states.length, "Districts received:", districts.length);
+    if (states.length > 0) {
+      console.log("[ImpactMap] Sample state:", states[0]);
+    }
+    if (districts.length > 0) {
+      console.log("[ImpactMap] Sample district:", districts[0]);
+      console.log("[ImpactMap] Districts with can_impact=true:", districts.filter(d => d.can_impact).length);
+    }
     states.forEach((state) => {
       const stateDistricts = districts.filter(
         (d) => d.state_code === state.state_code
       );
       const score = calculateStateImpactScore(state, stateDistricts);
       scores.set(state.state_code, score);
+      if (score > 0) {
+        console.log(`[ImpactMap] ${state.state_code}: ${stateDistricts.length} districts, score=${score.toFixed(3)}`);
+      }
     });
+    const nonZeroScores = [...scores.entries()].filter(([,v]) => v > 0);
+    console.log("[ImpactMap] States with score > 0:", nonZeroScores.length);
     return scores;
   }, [states, districts]);
 
