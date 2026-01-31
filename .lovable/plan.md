@@ -1,116 +1,151 @@
 
-# Fix Voter Impact Data Import
+
+# Fix District Import Errors
 
 ## Problem Summary
-The data import is failing due to two issues:
-1. **State Column Mismatch**: The Excel file contains state **abbreviations** (CA, TX, NY) but the code expects full state names to convert
-2. **Foreign Key Cascade**: Since states fail to import, districts fail with FK constraint errors
+The district import is failing with two distinct errors:
+
+1. **Foreign Key Constraint Violations** - Districts from MN, NJ, and CO cannot be imported because those states are **not present in the National_Analysis.xlsx file** and therefore don't exist in `voter_impact_states`
+2. **Value Too Long Error** - Party names like "DEMOCRATIC-FARMER-LABOR" (23 characters) exceed the `VARCHAR(20)` limit on `winner_party` and `runner_up_party` columns
 
 ## Root Cause Analysis
 
-### States File Issue
-The National_Analysis.xlsx file structure:
-```
-State | Muslim Voters | ...
-CA    | 551,639       | ...
-NY    | 435,214       | ...
-```
+### Issue 1: Missing States in Source Data
+The `National_Analysis.xlsx` file only contains 48 states. It is **missing**:
+- **MN** (Minnesota)
+- **NJ** (New Jersey)  
+- **CO** (Colorado)
 
-Current code in `VoterImpactDataImport.tsx`:
-```typescript
-const stateCode = getStateAbbreviation(stateName);
-if (!stateCode || stateCode === stateName) {
-  console.warn(`Unknown state: ${stateName}`);  // <- "Unknown state: WA"
-  continue;
-}
+When the district import attempts to insert districts for these states (e.g., MN-001, NJ-001, CO-001), it fails because the `state_code` foreign key constraint requires the state to exist first.
+
+### Issue 2: Database Column Too Short
+The database schema has:
+```text
+winner_party:     VARCHAR(20)
+runner_up_party:  VARCHAR(20)
 ```
 
-The `getStateAbbreviation()` function expects "California" and returns "CA", but the file already has "CA" so it returns "CA" unchanged, causing the `stateCode === stateName` check to skip every row.
-
-### Districts File Issue
-Districts require states to exist first (foreign key), but since all states were skipped, all district inserts fail.
+But the Excel data contains longer party names:
+- "DEMOCRATIC-FARMER-LABOR" = 23 characters (Minnesota's DFL party)
+- Potentially "NO PARTY PREFERENCE" = 19 characters (fits, but close)
 
 ## Solution
 
-### Step 1: Fix State Import Logic
-Update `parseStatesFile()` to handle **both** abbreviations and full names:
+### Step 1: Expand Party Column Lengths (Database Migration)
+Increase the VARCHAR limits for party columns to accommodate all party names:
+
+```sql
+ALTER TABLE voter_impact_districts 
+  ALTER COLUMN winner_party TYPE VARCHAR(50),
+  ALTER COLUMN runner_up_party TYPE VARCHAR(50);
+```
+
+### Step 2: Auto-Create Missing States During District Import
+Update the district import logic to:
+1. Collect all unique state codes from the districts file
+2. Check which states are missing from `voter_impact_states`
+3. Insert placeholder state records for missing states before importing districts
 
 ```typescript
-// Check if it's already a valid abbreviation
-let stateCode = stateName;
-let fullStateName = stateName;
+// Before importing districts, ensure all referenced states exist
+const uniqueStateCodes = [...new Set(districtRows.map(d => d.state_code))];
 
-if (stateName.length === 2 && isValidStateAbbreviation(stateName)) {
-  // It's already an abbreviation, get the full name
-  stateCode = stateName.toUpperCase();
-  fullStateName = getStateName(stateCode);
-} else {
-  // It's a full name, get the abbreviation
-  stateCode = getStateAbbreviation(stateName);
-  if (stateCode === stateName) {
-    console.warn(`Unknown state: ${stateName}`);
-    continue;
+for (const stateCode of uniqueStateCodes) {
+  // Check if state exists
+  const { data: existing } = await supabase
+    .from("voter_impact_states")
+    .select("state_code")
+    .eq("state_code", stateCode)
+    .single();
+
+  if (!existing) {
+    // Insert placeholder state with zero values
+    await supabase.from("voter_impact_states").insert({
+      state_code: stateCode,
+      state_name: getStateName(stateCode),
+      muslim_voters: 0,
+      households: 0,
+      // ... other fields default to 0
+    });
   }
 }
 ```
 
-### Step 2: Update Districts Parser Similarly
-The districts file has a "State Code" column with abbreviations, which should work correctly, but we should validate it exists in `STATE_ABBREVIATIONS`.
+### Step 3: Truncate Long Party Names (Safety Fallback)
+Add truncation in `parseString()` for party fields to prevent future issues:
 
-### Step 3: Handle Edge Cases
-- Skip "NATIONAL" summary row (already handled)
-- Handle empty/null values gracefully (already handled)
+```typescript
+function parsePartyName(value: unknown, maxLength: number = 50): string | null {
+  const str = parseString(value);
+  if (str && str.length > maxLength) {
+    return str.substring(0, maxLength);
+  }
+  return str;
+}
+```
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/admin/VoterImpactDataImport.tsx` | Fix state parsing logic to handle abbreviations |
-| `src/lib/us-states.ts` | Ensure `isValidStateAbbreviation()` is exported (already is) |
+| Database Migration | Expand `winner_party` and `runner_up_party` to VARCHAR(50) |
+| `src/components/admin/VoterImpactDataImport.tsx` | Add missing state auto-creation before district import |
 
-## Technical Implementation
+## Technical Implementation Details
 
-### Update parseStatesFile function
+### Database Migration SQL
+```sql
+-- Expand party columns to accommodate longer party names like "DEMOCRATIC-FARMER-LABOR"
+ALTER TABLE voter_impact_districts 
+  ALTER COLUMN winner_party TYPE VARCHAR(50);
+
+ALTER TABLE voter_impact_districts 
+  ALTER COLUMN runner_up_party TYPE VARCHAR(50);
+```
+
+### Import Logic Update
+In the `importDistricts` function, before the batch insert loop:
+
 ```typescript
-const parseStatesFile = useCallback(async (file: File): Promise<StateRow[]> => {
-  // ... existing file reading code ...
+// Step 1: Collect unique state codes from district data
+const uniqueStateCodes = [...new Set(rows.map(r => r.state_code))];
 
-  for (const row of rows) {
-    const rawState = String(row["State"] || "").trim();
-    
-    // Skip "NATIONAL" summary row
-    if (!rawState || rawState.toUpperCase() === "NATIONAL") continue;
+// Step 2: Check which states are missing
+const { data: existingStates } = await supabase
+  .from("voter_impact_states" as never)
+  .select("state_code");
 
-    let stateCode: string;
-    let stateName: string;
+const existingCodes = new Set(existingStates?.map(s => s.state_code) || []);
+const missingCodes = uniqueStateCodes.filter(code => !existingCodes.has(code));
 
-    // Check if the value is already a 2-letter abbreviation
-    if (rawState.length === 2 && isValidStateAbbreviation(rawState)) {
-      stateCode = rawState.toUpperCase();
-      stateName = getStateName(stateCode);
-    } else {
-      // Assume it's a full state name
-      const abbr = getStateAbbreviation(rawState);
-      if (abbr === rawState) {
-        console.warn(`Unknown state: ${rawState}`);
-        continue;
-      }
-      stateCode = abbr;
-      stateName = rawState;
-    }
-
-    stateRows.push({
-      state_code: stateCode,
-      state_name: stateName,
-      // ... rest of fields ...
-    });
-  }
-}, []);
+// Step 3: Insert placeholder records for missing states
+if (missingCodes.length > 0) {
+  const placeholderStates = missingCodes.map(code => ({
+    state_code: code,
+    state_name: getStateName(code),
+    muslim_voters: 0,
+    households: 0,
+    cell_phones: 0,
+    registered: 0,
+    registered_pct: 0,
+    vote_2024: 0,
+    vote_2024_pct: 0,
+    vote_2022: 0,
+    vote_2022_pct: 0,
+    political_donors: 0,
+    political_activists: 0,
+  }));
+  
+  await supabase
+    .from("voter_impact_states" as never)
+    .upsert(placeholderStates as never[], { onConflict: "state_code" });
+}
 ```
 
 ## Expected Outcome
-After this fix:
-- States import will correctly handle "CA" → store as state_code="CA", state_name="California"
-- All 50+ states will import successfully
-- Districts import will succeed (states exist for FK constraint)
-- The voter impact map will display with real data
+After these fixes:
+- All 435 congressional districts can be imported successfully
+- Missing states (MN, NJ, CO) will be auto-created with placeholder data
+- Long party names like "DEMOCRATIC-FARMER-LABOR" will be stored correctly
+- The voter impact map will display complete data for all states and districts
+
