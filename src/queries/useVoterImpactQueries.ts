@@ -61,8 +61,6 @@ const GC_TIME = 30 * 60 * 1000; // 30 minutes
 // ============================================================================
 
 async function fetchVoterImpactStates(): Promise<VoterImpactState[]> {
-  console.log("[DEBUG] Fetching voter impact states...");
-  // Using .from() with explicit type annotation since tables may not be in generated types yet
   const { data, error } = await supabase
     .from("voter_impact_states" as any)
     .select("*")
@@ -73,13 +71,10 @@ async function fetchVoterImpactStates(): Promise<VoterImpactState[]> {
     throw error;
   }
 
-  console.log("[DEBUG] Fetched states:", data?.length || 0, "rows", data?.slice(0, 3));
   return (data || []) as unknown as VoterImpactState[];
 }
 
 async function fetchVoterImpactDistricts(): Promise<VoterImpactDistrict[]> {
-  console.log("[DEBUG] Fetching voter impact districts...");
-  // Using .from() with explicit type annotation since tables may not be in generated types yet
   const { data, error } = await supabase
     .from("voter_impact_districts" as any)
     .select("*")
@@ -90,7 +85,6 @@ async function fetchVoterImpactDistricts(): Promise<VoterImpactDistrict[]> {
     throw error;
   }
 
-  console.log("[DEBUG] Fetched districts:", data?.length || 0, "rows", data?.slice(0, 3));
   return (data || []) as unknown as VoterImpactDistrict[];
 }
 
