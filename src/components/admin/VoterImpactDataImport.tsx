@@ -356,9 +356,57 @@ export function VoterImpactDataImport() {
       setDistrictsImport((prev) => ({
         ...prev,
         status: "importing",
+        progress: 5,
+        message: "Checking for missing states...",
+        rowsTotal: rows.length,
+      }));
+
+      // Step 1: Collect unique state codes from district data
+      const uniqueStateCodes = [...new Set(rows.map(r => r.state_code))];
+
+      // Step 2: Check which states are missing from voter_impact_states
+      const { data: existingStates } = await supabase
+        .from("voter_impact_states" as never)
+        .select("state_code");
+
+      const existingCodes = new Set((existingStates as { state_code: string }[] || []).map(s => s.state_code));
+      const missingCodes = uniqueStateCodes.filter(code => !existingCodes.has(code));
+
+      // Step 3: Insert placeholder records for missing states
+      if (missingCodes.length > 0) {
+        console.log(`Auto-creating placeholder states for: ${missingCodes.join(", ")}`);
+        
+        const placeholderStates = missingCodes.map(code => ({
+          state_code: code,
+          state_name: getStateName(code),
+          muslim_voters: 0,
+          households: 0,
+          cell_phones: 0,
+          registered: 0,
+          registered_pct: 0,
+          vote_2024: 0,
+          vote_2024_pct: 0,
+          vote_2022: 0,
+          vote_2022_pct: 0,
+          political_donors: 0,
+          political_activists: 0,
+        }));
+        
+        const { error: stateError } = await supabase
+          .from("voter_impact_states" as never)
+          .upsert(placeholderStates as never[], { onConflict: "state_code" });
+        
+        if (stateError) {
+          console.error("Error creating placeholder states:", stateError);
+        } else {
+          console.log(`Created ${missingCodes.length} placeholder state records`);
+        }
+      }
+
+      setDistrictsImport((prev) => ({
+        ...prev,
         progress: 10,
         message: `Importing ${rows.length} districts...`,
-        rowsTotal: rows.length,
       }));
 
       // Batch insert in groups of 50
