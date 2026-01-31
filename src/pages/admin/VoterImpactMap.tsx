@@ -169,7 +169,7 @@ export default function VoterImpactMap() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate('/admin')}
+            onClick={() => navigate('/admin?tab=analytics')}
             className="text-[#64748b] hover:text-[#e2e8f0] hover:bg-[#1e2a45]"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
