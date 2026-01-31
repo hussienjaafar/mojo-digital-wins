@@ -46,6 +46,10 @@ export default function VoterImpactMap() {
   const { data: states = [], isLoading: statesLoading } = useVoterImpactStates();
   const { data: districts = [], isLoading: districtsLoading } = useVoterImpactDistricts();
 
+  // Debug logging
+  console.log('[VoterImpactMap] States loaded:', states.length, states.slice(0, 3));
+  console.log('[VoterImpactMap] Districts loaded:', districts.length, districts.slice(0, 3));
+
   // Calculate max voters for slider
   const maxVoters = useMemo(() => {
     if (districts.length === 0) return 100000;

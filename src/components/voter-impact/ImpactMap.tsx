@@ -219,17 +219,22 @@ export function ImpactMap({
 
   // Build color expressions for states layer
   const stateColorExpression = useMemo((): ExpressionSpecification => {
+    // Debug logging
+    console.log('[ImpactMap] Building color expression for', states.length, 'states');
+    console.log('[ImpactMap] Sample state:', states[0]);
+    console.log('[ImpactMap] State impact scores:', Array.from(stateImpactScores.entries()).slice(0, 3));
+    
     const colorStops: (string | ExpressionSpecification)[] = ["case"];
 
     states.forEach((state) => {
       const score = stateImpactScores.get(state.state_code) || 0;
       const color = getImpactColor(score);
-      // Match by FIPS code (feature id)
+      // Match by FIPS code (feature id) - use to-string for robust comparison
       const fips = Object.entries(FIPS_TO_ABBR).find(
         ([, abbr]) => abbr === state.state_code
       )?.[0];
       if (fips) {
-        colorStops.push(["==", ["id"], fips], color);
+        colorStops.push(["==", ["to-string", ["id"]], fips], color);
       }
     });
 
