@@ -10,6 +10,14 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  optimizeDeps: {
+    include: ['maplibre-gl', 'react-map-gl'],
+  },
+  build: {
+    commonjsOptions: {
+      include: [/maplibre-gl/, /node_modules/],
+    },
+  },
   plugins: [
     react(),
     mode === "development" && componentTagger(),
