@@ -12660,6 +12660,152 @@ export type Database = {
           },
         ]
       }
+      voter_impact_districts: {
+        Row: {
+          can_impact: boolean
+          cd_code: string
+          cost_estimate: number | null
+          created_at: string
+          didnt_vote_2024: number
+          district_num: number
+          id: string
+          margin_pct: number | null
+          margin_votes: number | null
+          muslim_registered: number
+          muslim_unregistered: number
+          muslim_voters: number
+          runner_up: string | null
+          runner_up_party: string | null
+          runner_up_votes: number | null
+          state_code: string
+          total_votes: number | null
+          turnout_pct: number
+          updated_at: string
+          voted_2024: number
+          votes_needed: number | null
+          winner: string | null
+          winner_party: string | null
+          winner_votes: number | null
+        }
+        Insert: {
+          can_impact?: boolean
+          cd_code: string
+          cost_estimate?: number | null
+          created_at?: string
+          didnt_vote_2024?: number
+          district_num: number
+          id?: string
+          margin_pct?: number | null
+          margin_votes?: number | null
+          muslim_registered?: number
+          muslim_unregistered?: number
+          muslim_voters?: number
+          runner_up?: string | null
+          runner_up_party?: string | null
+          runner_up_votes?: number | null
+          state_code: string
+          total_votes?: number | null
+          turnout_pct?: number
+          updated_at?: string
+          voted_2024?: number
+          votes_needed?: number | null
+          winner?: string | null
+          winner_party?: string | null
+          winner_votes?: number | null
+        }
+        Update: {
+          can_impact?: boolean
+          cd_code?: string
+          cost_estimate?: number | null
+          created_at?: string
+          didnt_vote_2024?: number
+          district_num?: number
+          id?: string
+          margin_pct?: number | null
+          margin_votes?: number | null
+          muslim_registered?: number
+          muslim_unregistered?: number
+          muslim_voters?: number
+          runner_up?: string | null
+          runner_up_party?: string | null
+          runner_up_votes?: number | null
+          state_code?: string
+          total_votes?: number | null
+          turnout_pct?: number
+          updated_at?: string
+          voted_2024?: number
+          votes_needed?: number | null
+          winner?: string | null
+          winner_party?: string | null
+          winner_votes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voter_impact_districts_state_code_fkey"
+            columns: ["state_code"]
+            isOneToOne: false
+            referencedRelation: "voter_impact_states"
+            referencedColumns: ["state_code"]
+          },
+        ]
+      }
+      voter_impact_states: {
+        Row: {
+          cell_phones: number
+          created_at: string
+          households: number
+          id: string
+          muslim_voters: number
+          political_activists: number
+          political_donors: number
+          registered: number
+          registered_pct: number
+          state_code: string
+          state_name: string
+          updated_at: string
+          vote_2022: number
+          vote_2022_pct: number
+          vote_2024: number
+          vote_2024_pct: number
+        }
+        Insert: {
+          cell_phones?: number
+          created_at?: string
+          households?: number
+          id?: string
+          muslim_voters?: number
+          political_activists?: number
+          political_donors?: number
+          registered?: number
+          registered_pct?: number
+          state_code: string
+          state_name: string
+          updated_at?: string
+          vote_2022?: number
+          vote_2022_pct?: number
+          vote_2024?: number
+          vote_2024_pct?: number
+        }
+        Update: {
+          cell_phones?: number
+          created_at?: string
+          households?: number
+          id?: string
+          muslim_voters?: number
+          political_activists?: number
+          political_donors?: number
+          registered?: number
+          registered_pct?: number
+          state_code?: string
+          state_name?: string
+          updated_at?: string
+          vote_2022?: number
+          vote_2022_pct?: number
+          vote_2024?: number
+          vote_2024_pct?: number
+        }
+        Relationships: []
+      }
       watchlist_usage_log: {
         Row: {
           action: string

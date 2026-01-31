@@ -96,6 +96,7 @@ export const navigationGroups: NavigationGroup[] = [
       { title: "Critical Alerts", icon: AlertTriangle, value: "critical-alerts" },
       { title: "Bills", icon: ScrollText, value: "bills" },
       { title: "Voter Impact Map", icon: Map, value: "voter-impact-map" },
+      { title: "Voter Data Import", icon: Download, value: "voter-data-import", requiredRole: 'admin' },
     ],
   },
   {
