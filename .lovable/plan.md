@@ -1,46 +1,61 @@
 
-# Voter Impact Map - Status Verification
+# Fix: Voter Impact Map Blank Page
 
-## Current Database State (Verified)
+## Root Cause Analysis
 
-| Table | Schema | Records | RLS Enabled |
-|-------|--------|---------|-------------|
-| voter_impact_states | public | 51 | Yes |
-| voter_impact_districts | public | 436 | Yes |
+The blank page is caused by **missing React imports** in three voter-impact components. These components reference `React.FC` or `React.ReactNode` without importing React, which throws a runtime `ReferenceError: React is not defined` and crashes the entire page before any UI renders.
 
-## RLS Policies Confirmed
+### Affected Files
 
-### Read Access (Public)
-- "Anyone can view voter impact states" - SELECT for all roles
-- "Anyone can view voter impact districts" - SELECT for all roles
+| File | Issue | Line |
+|------|-------|------|
+| `src/components/voter-impact/MapLegend.tsx` | Uses `React.FC` without import | Line 8 |
+| `src/components/voter-impact/MapControls.tsx` | Uses `React.ReactNode` without import | Line 54 |
+| `src/components/voter-impact/RegionSidebar.tsx` | Uses `React.ReactNode` without import | Line 140 |
 
-### Write Access (Admin Only)
-- INSERT policies require `has_role(auth.uid(), 'admin')` check
-- UPDATE policies require `has_role(auth.uid(), 'admin')` check
-- DELETE policies require `has_role(auth.uid(), 'admin')` check
+### Why This Happens
 
-## Foreign Key Status
+The project uses Vite with the automatic JSX runtime, which means you don't need to import React just to use JSX. However, if you explicitly reference the `React` namespace (like `React.FC` or `React.ReactNode`), you must import it.
 
-The migration file shows the foreign key constraint IS present:
-```sql
-state_code VARCHAR(2) NOT NULL REFERENCES public.voter_impact_states(state_code)
+## Solution
+
+Add the missing React import to each affected file:
+
+### 1. MapLegend.tsx
+Add at line 1:
+```typescript
+import React from 'react';
 ```
 
-Since you confirmed you want to **keep the foreign key**, the current setup is correct. The importer already handles this by creating placeholder states before inserting districts.
+### 2. MapControls.tsx
+Change line 8 from:
+```typescript
+import { useCallback, useMemo } from "react";
+```
+To:
+```typescript
+import React, { useCallback, useMemo } from "react";
+```
 
-## No Action Required
+### 3. RegionSidebar.tsx
+Add at line 1:
+```typescript
+import React from 'react';
+```
 
-The tables exist and contain data. The 404 errors you reported earlier have been resolved - likely through the migration that was deployed. The map should now display data correctly.
+## Technical Details
 
-## Next Steps (Verification)
+### Current State
+- Network requests show 200 OK for database tables (data is loading correctly)
+- The error occurs at component initialization before any rendering
+- Browser console may show "React is not defined" but logs aren't captured because the crash happens early
 
-1. Refresh the preview page at `/admin/voter-impact-map`
-2. The map should load with 51 states and 436 congressional districts
-3. If still seeing issues, check browser DevTools Network tab for any new 404s
+### Vite Config Assessment
+The recent `vite.config.ts` changes for MapLibre bundling are correctly configured and are not causing this issue. The `optimizeDeps.include` and `build.commonjsOptions` settings are appropriate for MapLibre 5.x.
 
-## If Issues Persist
-
-If you still see 404 errors after refreshing:
-1. Clear browser cache and hard refresh (Ctrl+Shift+R)
-2. Check that you're on the correct preview URL
-3. Look for any console errors related to the Supabase client connection
+### After Fix
+Once the React imports are added:
+1. The page will render the header, controls, and sidebar
+2. The map will load with GeoJSON data
+3. States will be colored according to impact scores (previously fixed with `["to-string", ["id"]]` expression)
+4. Console logs will show diagnostic output confirming data flow
