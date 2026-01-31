@@ -5,7 +5,7 @@
  * Handles both National_Analysis.xlsx (states) and CD_GOTV_ANALYSIS.xlsx (districts).
  */
 
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
