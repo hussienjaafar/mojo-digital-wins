@@ -54,6 +54,7 @@ import { AuditActivityCenter } from "@/components/admin/audit/AuditActivityCente
 import { BulkOperations } from "@/components/admin/bulk/BulkOperations";
 import { EnvironmentBanner } from "@/components/admin/EnvironmentBanner";
 import { RedirectLinkAnalytics } from "@/components/analytics/RedirectLinkAnalytics";
+import { VoterImpactDataImport } from "@/components/admin/VoterImpactDataImport";
 
 type ContactSubmission = {
   id: string;
@@ -411,6 +412,8 @@ const Admin = () => {
         // Navigate to standalone VoterImpactMap page
         navigate("/admin/voter-impact-map");
         return null;
+      case "voter-data-import":
+        return <VoterImpactDataImport />;
       default:
         return <AnalyticsDashboard />;
     }
