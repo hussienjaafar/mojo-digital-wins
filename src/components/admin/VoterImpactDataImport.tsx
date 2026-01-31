@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { STATE_ABBREVIATIONS, getStateAbbreviation } from "@/lib/us-states";
+import { STATE_ABBREVIATIONS, getStateAbbreviation, getStateName, isValidStateAbbreviation } from "@/lib/us-states";
 import { voterImpactKeys } from "@/queries/queryKeys";
 
 // ============================================================================
@@ -140,16 +140,28 @@ export function VoterImpactDataImport() {
     const stateRows: StateRow[] = [];
     
     for (const row of rows) {
-      const stateName = String(row["State"] || "").trim();
+      const rawState = String(row["State"] || "").trim();
       
       // Skip "NATIONAL" summary row
-      if (!stateName || stateName.toUpperCase() === "NATIONAL") continue;
+      if (!rawState || rawState.toUpperCase() === "NATIONAL") continue;
 
-      // Get state code from name
-      const stateCode = getStateAbbreviation(stateName);
-      if (!stateCode || stateCode === stateName) {
-        console.warn(`Unknown state: ${stateName}`);
-        continue;
+      let stateCode: string;
+      let stateName: string;
+
+      // Check if the value is already a 2-letter abbreviation
+      if (rawState.length === 2 && isValidStateAbbreviation(rawState)) {
+        // It's already an abbreviation, get the full name
+        stateCode = rawState.toUpperCase();
+        stateName = getStateName(stateCode);
+      } else {
+        // Assume it's a full state name
+        const abbr = getStateAbbreviation(rawState);
+        if (abbr === rawState) {
+          console.warn(`Unknown state: ${rawState}`);
+          continue;
+        }
+        stateCode = abbr;
+        stateName = rawState;
       }
 
       stateRows.push({
