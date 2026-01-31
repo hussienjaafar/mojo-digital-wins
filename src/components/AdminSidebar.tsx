@@ -32,6 +32,7 @@ import {
   TrendingUp,
   HeartPulse,
   Layers,
+  Map,
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import {
@@ -94,6 +95,7 @@ export const navigationGroups: NavigationGroup[] = [
       { title: "Analytics", icon: BarChart3, value: "content-analytics" },
       { title: "Critical Alerts", icon: AlertTriangle, value: "critical-alerts" },
       { title: "Bills", icon: ScrollText, value: "bills" },
+      { title: "Voter Impact Map", icon: Map, value: "voter-impact-map" },
     ],
   },
   {

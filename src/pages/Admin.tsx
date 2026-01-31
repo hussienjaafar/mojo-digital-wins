@@ -407,6 +407,10 @@ const Admin = () => {
         return <RedirectLinkAnalytics title="Redirect Link Click Analytics" />;
       case "coverage-governance":
         return <CoverageGovernancePanel />;
+      case "voter-impact-map":
+        // Navigate to standalone VoterImpactMap page
+        navigate("/admin/voter-impact-map");
+        return null;
       default:
         return <AnalyticsDashboard />;
     }
