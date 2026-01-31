@@ -5,7 +5,7 @@
  * Records feedback events for the learning algorithm.
  */
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { ThumbsUp, ThumbsDown, VolumeX, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {

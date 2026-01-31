@@ -1,4 +1,4 @@
-import * as React from "react";
+import React from "react";
 import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { V3Card, V3CardHeader, V3CardTitle, V3CardDescription, V3CardContent, V3CardFooter, V3CardAccent } from "@/components/v3/V3Card";
