@@ -52,6 +52,7 @@ const UserDetail = lazy(() => import("./pages/admin/UserDetail"));
 const DashboardHealth = lazy(() => import("./pages/admin/DashboardHealth"));
 const OrganizationDetail = lazy(() => import("./pages/admin/OrganizationDetail"));
 const ContactSubmissions = lazy(() => import("./pages/admin/ContactSubmissions"));
+const VoterImpactMap = lazy(() => import("./pages/admin/VoterImpactMap"));
 const Profile = lazy(() => import("./pages/Profile"));
 
 // Client portal pages (lazy loaded)
@@ -195,6 +196,7 @@ const AppContent = () => {
             <Route path="/admin/contacts" element={<ContactSubmissions />} />
             <Route path="/admin/client-view/:organizationId" element={<AdminClientView />} />
             <Route path="/admin/health" element={<DashboardHealth />} />
+            <Route path="/admin/voter-impact-map" element={<VoterImpactMap />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/client-login" element={<ClientLogin />} />
             <Route path="/client/dashboard" element={<ClientDashboard />} />
