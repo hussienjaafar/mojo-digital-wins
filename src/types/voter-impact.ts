@@ -95,10 +95,8 @@ const CLOSE_RACE_THRESHOLD = 0.05;
  * - Weighted: margin 40%, population 30%, turnout gap 30%
  */
 export function calculateImpactScore(district: VoterImpactDistrict): number {
-  // If district cannot impact the outcome, return 0
-  if (!district.can_impact) {
-    return 0;
-  }
+  // Calculate base score regardless of can_impact flag
+  // The can_impact flag will boost the score, not eliminate it
 
   // Margin score: closer margins = higher score
   // margin_pct is stored as decimal (e.g., 0.05 for 5%)
@@ -117,10 +115,15 @@ export function calculateImpactScore(district: VoterImpactDistrict): number {
   const turnoutScore = 1 - (district.turnout_pct ?? 1);
 
   // Calculate weighted score
-  const score =
+  let score =
     marginScore * WEIGHT_MARGIN +
     populationScore * WEIGHT_POPULATION +
     turnoutScore * WEIGHT_TURNOUT;
+
+  // If can_impact is true, boost the score by 20% for strategic importance
+  if (district.can_impact) {
+    score = Math.min(1, score * 1.2);
+  }
 
   // Clamp to 0-1 range
   return Math.max(0, Math.min(1, score));
