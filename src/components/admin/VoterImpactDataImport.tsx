@@ -482,7 +482,22 @@ export function VoterImpactDataImport() {
           .upsert(batch as never[], { onConflict: "state_code" });
 
         if (error) {
-          errors.push(`Batch ${Math.floor(i / batchSize) + 1}: ${error.message}`);
+          console.error("[importStates] Upsert error:", {
+            batch: Math.floor(i / batchSize) + 1,
+            error,
+            sampleRow: batch[0],
+          });
+
+          const details = [
+            (error as any)?.code,
+            (error as any)?.message,
+            (error as any)?.details,
+            (error as any)?.hint,
+          ]
+            .filter(Boolean)
+            .join(" | ");
+
+          errors.push(`Batch ${Math.floor(i / batchSize) + 1}: ${details || error.message}`);
         } else {
           processed += batch.length;
         }
@@ -593,7 +608,10 @@ export function VoterImpactDataImport() {
           .upsert(placeholderStates as never[], { onConflict: "state_code" });
         
         if (stateError) {
-          console.error("Error creating placeholder states:", stateError);
+          console.error("[importDistricts] Error creating placeholder states:", {
+            stateError,
+            placeholderSample: placeholderStates[0],
+          });
         } else {
           console.log(`Created ${missingCodes.length} placeholder state records`);
         }
@@ -618,7 +636,22 @@ export function VoterImpactDataImport() {
           .upsert(batch as never[], { onConflict: "cd_code" });
 
         if (error) {
-          errors.push(`Batch ${Math.floor(i / batchSize) + 1}: ${error.message}`);
+          console.error("[importDistricts] Upsert error:", {
+            batch: Math.floor(i / batchSize) + 1,
+            error,
+            sampleRow: batch[0],
+          });
+
+          const details = [
+            (error as any)?.code,
+            (error as any)?.message,
+            (error as any)?.details,
+            (error as any)?.hint,
+          ]
+            .filter(Boolean)
+            .join(" | ");
+
+          errors.push(`Batch ${Math.floor(i / batchSize) + 1}: ${details || error.message}`);
         } else {
           processed += batch.length;
         }
