@@ -95,8 +95,10 @@ const CLOSE_RACE_THRESHOLD = 0.05;
  * - Weighted: margin 40%, population 30%, turnout gap 30%
  */
 export function calculateImpactScore(district: VoterImpactDistrict): number {
-  // Calculate base score regardless of can_impact flag
-  // The can_impact flag will boost the score, not eliminate it
+  // MUST have Muslim voters to have any impact
+  if (!district.muslim_voters || district.muslim_voters === 0) {
+    return 0;
+  }
 
   // Margin score: closer margins = higher score
   // margin_pct is stored as decimal (e.g., 0.05 for 5%)
@@ -136,19 +138,42 @@ export function calculateImpactScore(district: VoterImpactDistrict): number {
  * Returns 0 if no districts are provided.
  */
 export function calculateStateImpactScore(
-  _state: VoterImpactState,
+  state: VoterImpactState,
   districts: VoterImpactDistrict[]
 ): number {
-  if (districts.length === 0) {
+  // If state has no Muslim voters, no impact
+  if (state.muslim_voters === 0) {
     return 0;
   }
 
-  const totalScore = districts.reduce(
+  // For at-large states with no district data, calculate from state data
+  const hasDistrictData = districts.some((d) => d.muslim_voters > 0);
+
+  if (!hasDistrictData) {
+    // Use state-level metrics directly
+    // Higher registration + lower turnout = more opportunity
+    const turnout2024 = state.vote_2024_pct || 0;
+    const turnoutGap = 1 - turnout2024; // Lower turnout = higher opportunity
+
+    // Population factor (normalize to 100k)
+    const populationScore = Math.min(1, state.muslim_voters / 100000);
+
+    return Math.min(1, populationScore * (0.5 + turnoutGap * 0.5));
+  }
+
+  // For states with district data, average the district scores
+  // but only count districts with actual voter data
+  const validDistricts = districts.filter((d) => d.muslim_voters > 0);
+  if (validDistricts.length === 0) {
+    return 0;
+  }
+
+  const totalScore = validDistricts.reduce(
     (sum, district) => sum + calculateImpactScore(district),
     0
   );
 
-  return totalScore / districts.length;
+  return totalScore / validDistricts.length;
 }
 
 /**
