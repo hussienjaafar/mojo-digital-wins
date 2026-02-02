@@ -158,12 +158,14 @@ export function calculateStateImpactScore(
   );
 
   if (districtsWithData.length === 0) {
-    // Fallback for states without district-level data
-    // Use turnout gap as proxy for mobilization potential
+    // Fallback for at-large states without district-level data
+    // Use turnout gap and population as proxy for mobilization potential
     const turnout2024 = state.vote_2024_pct || 0;
-    const turnoutGap = 1 - turnout2024;
+    const turnoutGap = Math.max(0, 1 - turnout2024);
+    // Scale: 50k voters = 0.5 base score, 100k+ = 1.0
     const populationScore = Math.min(1, state.muslim_voters / 100000);
-    return Math.min(1, populationScore * (0.3 + turnoutGap * 0.4));
+    // Combine population with turnout gap for reasonable fallback score
+    return Math.min(1, populationScore * (0.4 + turnoutGap * 0.5));
   }
 
   // Count flippable districts (where mobilizable Muslims >= margin)
@@ -187,9 +189,10 @@ export function calculateStateImpactScore(
 
   const avgDistrictImpact = totalWeight > 0 ? weightedSum / totalWeight : 0;
 
-  // Final score: combination of flippable ratio and weighted district impact
-  // Flippable districts matter more for strategic importance
-  return Math.min(1, flippableRatio * 0.4 + avgDistrictImpact * 0.6);
+  // Final score: prioritize weighted district impact over flippable ratio
+  // This ensures states with high-influence (but not quite flippable) districts 
+  // still show meaningful scores
+  return Math.min(1, flippableRatio * 0.2 + avgDistrictImpact * 0.8);
 }
 
 /**

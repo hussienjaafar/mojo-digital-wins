@@ -6,10 +6,10 @@
  */
 
 const legendItems = [
-  { color: "#22c55e", label: "High", description: "Can flip election" },
-  { color: "#eab308", label: "Medium", description: "25-50% of margin" },
-  { color: "#ef4444", label: "Low", description: "< 25% of margin" },
-  { color: "#374151", label: "None", description: "No data" },
+  { color: "#22c55e", label: "High", description: "Strong influence (≥15%)" },
+  { color: "#eab308", label: "Medium", description: "Moderate influence (7-15%)" },
+  { color: "#ef4444", label: "Low", description: "Some influence (2-7%)" },
+  { color: "#374151", label: "None", description: "Minimal data" },
 ];
 
 export const MapLegend: React.FC = () => {
