@@ -85,95 +85,111 @@ const CLOSE_RACE_THRESHOLD = 0.05;
 // ============================================================================
 
 /**
- * Calculate impact score for a district (0-1 scale)
+ * Calculate district impact score based on "flippability"
  *
- * Score is based on:
- * - 0 if can_impact is false
- * - Higher score for close margins (multiply margin_pct by 10, subtract from 1)
- * - Higher score for larger muslim population (normalize to 50k)
- * - Higher score for low turnout (1 - turnout_pct)
- * - Weighted: margin 40%, population 30%, turnout gap 30%
+ * Core concept: surplus_ratio = mobilizable_muslims / election_margin
+ * - ratio >= 1: Muslims could flip this district
+ * - ratio < 1: Muslims can influence but not flip
+ *
+ * Score interpretation:
+ * - 0.5-1.0: HIGH - Muslims significantly exceed margin, highly flippable
+ * - 0.25-0.5: MEDIUM - Muslims can flip with strong mobilization
+ * - 0.05-0.25: LOW - Some influence but unlikely to flip
+ * - 0.0-0.05: MINIMAL - Safe district, margin too large
  */
 export function calculateImpactScore(district: VoterImpactDistrict): number {
-  // MUST have Muslim voters to have any impact
+  // No Muslim voters = no impact
   if (!district.muslim_voters || district.muslim_voters === 0) {
     return 0;
   }
 
-  // Margin score: closer margins = higher score
-  // margin_pct is stored as decimal (e.g., 0.05 for 5%)
-  const marginPct = district.margin_pct ?? 1;
-  const marginScore = Math.max(0, 1 - marginPct * MARGIN_MULTIPLIER);
-
-  // Population score: larger Muslim population = higher score
-  // Normalize to 50k (populations >= 50k get score of 1)
-  const populationScore = Math.min(
-    1,
-    district.muslim_voters / POPULATION_NORMALIZATION
-  );
-
-  // Turnout gap score: lower turnout = higher opportunity
-  // turnout_pct is stored as decimal (e.g., 0.6 for 60%)
-  const turnoutScore = 1 - (district.turnout_pct ?? 1);
-
-  // Calculate weighted score
-  let score =
-    marginScore * WEIGHT_MARGIN +
-    populationScore * WEIGHT_POPULATION +
-    turnoutScore * WEIGHT_TURNOUT;
-
-  // If can_impact is true, boost the score by 20% for strategic importance
-  if (district.can_impact) {
-    score = Math.min(1, score * 1.2);
+  // No margin data = can't calculate flippability
+  if (!district.margin_votes || district.margin_votes <= 0) {
+    return 0;
   }
 
-  // Clamp to 0-1 range
-  return Math.max(0, Math.min(1, score));
+  // Mobilizable pool = Muslims who didn't vote in 2024
+  // This includes both registered non-voters AND unregistered Muslims
+  const mobilizable = district.didnt_vote_2024 || 0;
+
+  if (mobilizable === 0) {
+    return 0;
+  }
+
+  // Surplus ratio: How many times over can Muslims cover the margin?
+  const surplusRatio = mobilizable / district.margin_votes;
+
+  if (surplusRatio >= 1) {
+    // CAN FLIP: Mobilizable Muslims exceed the election margin
+    // Score ranges from 0.5 to 1.0 based on surplus
+    // More surplus = easier to achieve = higher score
+    // Cap the surplus benefit (diminishing returns after 10x margin)
+    const surplus = Math.min(surplusRatio - 1, 9); // Cap at 10x
+    return Math.min(1, 0.5 + surplus * 0.055);
+  } else {
+    // CAN'T FLIP: Not enough Muslims to overcome margin
+    // But still has proportional influence
+    // Score ranges from 0 to 0.5
+    return surplusRatio * 0.5;
+  }
 }
 
 /**
- * Calculate aggregate impact score for a state
+ * Calculate state-level impact score
  *
- * Returns the average of impact scores for all districts in the state.
- * Returns 0 if no districts are provided.
+ * Based on:
+ * 1. Number of flippable districts (where Muslims exceed margin)
+ * 2. Weighted average of district impacts
+ *
+ * For at-large states with no district data, uses state-level turnout gap
  */
 export function calculateStateImpactScore(
   state: VoterImpactState,
   districts: VoterImpactDistrict[]
 ): number {
-  // If state has no Muslim voters, no impact
-  if (state.muslim_voters === 0) {
+  // No Muslim voters = no impact
+  if (!state.muslim_voters || state.muslim_voters === 0) {
     return 0;
   }
 
-  // For at-large states with no district data, calculate from state data
-  const hasDistrictData = districts.some((d) => d.muslim_voters > 0);
-
-  if (!hasDistrictData) {
-    // Use state-level metrics directly
-    // Higher registration + lower turnout = more opportunity
-    const turnout2024 = state.vote_2024_pct || 0;
-    const turnoutGap = 1 - turnout2024; // Lower turnout = higher opportunity
-
-    // Population factor (normalize to 100k)
-    const populationScore = Math.min(1, state.muslim_voters / 100000);
-
-    return Math.min(1, populationScore * (0.5 + turnoutGap * 0.5));
-  }
-
-  // For states with district data, average the district scores
-  // but only count districts with actual voter data
-  const validDistricts = districts.filter((d) => d.muslim_voters > 0);
-  if (validDistricts.length === 0) {
-    return 0;
-  }
-
-  const totalScore = validDistricts.reduce(
-    (sum, district) => sum + calculateImpactScore(district),
-    0
+  // For at-large states with no district data, use state-level metrics
+  const districtsWithData = districts.filter(
+    (d) => d.muslim_voters > 0 && d.margin_votes && d.margin_votes > 0
   );
 
-  return totalScore / validDistricts.length;
+  if (districtsWithData.length === 0) {
+    // Fallback for states without district-level data
+    // Use turnout gap as proxy for mobilization potential
+    const turnout2024 = state.vote_2024_pct || 0;
+    const turnoutGap = 1 - turnout2024;
+    const populationScore = Math.min(1, state.muslim_voters / 100000);
+    return Math.min(1, populationScore * (0.3 + turnoutGap * 0.4));
+  }
+
+  // Count flippable districts (where mobilizable Muslims >= margin)
+  const flippableDistricts = districtsWithData.filter((d) => {
+    const mobilizable = d.didnt_vote_2024 || 0;
+    return mobilizable >= (d.margin_votes || Infinity);
+  });
+
+  const flippableRatio = flippableDistricts.length / districtsWithData.length;
+
+  // Calculate weighted average of district impacts (weighted by Muslim population)
+  let totalWeight = 0;
+  let weightedSum = 0;
+
+  for (const district of districtsWithData) {
+    const districtImpact = calculateImpactScore(district);
+    const weight = district.muslim_voters;
+    weightedSum += districtImpact * weight;
+    totalWeight += weight;
+  }
+
+  const avgDistrictImpact = totalWeight > 0 ? weightedSum / totalWeight : 0;
+
+  // Final score: combination of flippable ratio and weighted district impact
+  // Flippable districts matter more for strategic importance
+  return Math.min(1, flippableRatio * 0.4 + avgDistrictImpact * 0.6);
 }
 
 /**
