@@ -134,8 +134,8 @@ const mockDistrictGeoJSON = {
   features: [
     {
       type: 'Feature' as const,
-      id: 'MI-11',
-      properties: { state: 'MI', district: '11', cd_code: 'MI-11' },
+      id: 'MI-011',
+      properties: { state: 'MI', district: '11', cd_code: 'MI-011' },
       geometry: {
         type: 'Polygon' as const,
         coordinates: [[[-83, 42], [-83, 43], [-84, 43], [-84, 42], [-83, 42]]],
@@ -143,8 +143,8 @@ const mockDistrictGeoJSON = {
     },
     {
       type: 'Feature' as const,
-      id: 'PA-07',
-      properties: { state: 'PA', district: '07', cd_code: 'PA-07' },
+      id: 'PA-007',
+      properties: { state: 'PA', district: '07', cd_code: 'PA-007' },
       geometry: {
         type: 'Polygon' as const,
         coordinates: [[[-75, 40], [-75, 41], [-76, 41], [-76, 40], [-75, 40]]],
@@ -152,8 +152,8 @@ const mockDistrictGeoJSON = {
     },
     {
       type: 'Feature' as const,
-      id: 'CA-45',
-      properties: { state: 'CA', district: '45', cd_code: 'CA-45' },
+      id: 'CA-045',
+      properties: { state: 'CA', district: '45', cd_code: 'CA-045' },
       geometry: {
         type: 'Polygon' as const,
         coordinates: [[[-118, 33], [-118, 34], [-117, 34], [-117, 33], [-118, 33]]],
@@ -243,8 +243,8 @@ export const mockVoterImpactStates: VoterImpactState[] = [
 export const mockVoterImpactDistricts: VoterImpactDistrict[] = [
   // High impact district - close race, can impact
   {
-    id: 'dist-mi-11',
-    cd_code: 'MI-11',
+    id: 'dist-mi-011',
+    cd_code: 'MI-011',
     state_code: 'MI',
     district_num: 11,
     winner: 'John Smith',
@@ -268,8 +268,8 @@ export const mockVoterImpactDistricts: VoterImpactDistrict[] = [
   },
   // Medium impact district - moderate margin
   {
-    id: 'dist-pa-07',
-    cd_code: 'PA-07',
+    id: 'dist-pa-007',
+    cd_code: 'PA-007',
     state_code: 'PA',
     district_num: 7,
     winner: 'Bob Wilson',
@@ -293,8 +293,8 @@ export const mockVoterImpactDistricts: VoterImpactDistrict[] = [
   },
   // Safe district - cannot impact
   {
-    id: 'dist-ca-45',
-    cd_code: 'CA-45',
+    id: 'dist-ca-045',
+    cd_code: 'CA-045',
     state_code: 'CA',
     district_num: 45,
     winner: 'Sarah Lee',
@@ -318,8 +318,8 @@ export const mockVoterImpactDistricts: VoterImpactDistrict[] = [
   },
   // Very close race with low turnout
   {
-    id: 'dist-mi-08',
-    cd_code: 'MI-08',
+    id: 'dist-mi-008',
+    cd_code: 'MI-008',
     state_code: 'MI',
     district_num: 8,
     winner: 'Chris Green',
@@ -343,8 +343,8 @@ export const mockVoterImpactDistricts: VoterImpactDistrict[] = [
   },
   // District with very small Muslim population
   {
-    id: 'dist-pa-12',
-    cd_code: 'PA-12',
+    id: 'dist-pa-012',
+    cd_code: 'PA-012',
     state_code: 'PA',
     district_num: 12,
     winner: 'Mike Red',
@@ -400,13 +400,30 @@ export function resetMocks() {
 
 /**
  * Create a custom district for testing specific scenarios
+ *
+ * Automatically computes derived values when relevant fields are overridden:
+ * - margin_votes from margin_pct * total_votes (if margin_pct is provided)
+ * - didnt_vote_2024 from muslim_registered * (1 - turnout_pct) (if turnout or population is provided)
+ * - voted_2024 from muslim_registered * turnout_pct
  */
 export function createMockDistrict(
   overrides: Partial<VoterImpactDistrict>
 ): VoterImpactDistrict {
+  // Base values
+  const total_votes = overrides.total_votes ?? 190000;
+  const margin_pct = overrides.margin_pct ?? 0.05;
+  const muslim_voters = overrides.muslim_voters ?? 20000;
+  const turnout_pct = overrides.turnout_pct ?? 0.70;
+
+  // Compute derived values if not explicitly provided
+  const margin_votes = overrides.margin_votes ?? Math.round(margin_pct * total_votes);
+  const muslim_registered = overrides.muslim_registered ?? Math.round(muslim_voters * 0.9);
+  const voted_2024 = overrides.voted_2024 ?? Math.round(muslim_registered * turnout_pct);
+  const didnt_vote_2024 = overrides.didnt_vote_2024 ?? (muslim_registered - voted_2024);
+
   return {
     id: 'dist-test',
-    cd_code: 'TEST-01',
+    cd_code: 'TEST-001',
     state_code: 'TS',
     district_num: 1,
     winner: 'Test Winner',
@@ -415,15 +432,15 @@ export function createMockDistrict(
     runner_up: 'Test Runner Up',
     runner_up_party: 'R',
     runner_up_votes: 90000,
-    margin_votes: 10000,
-    margin_pct: 0.05,
-    total_votes: 190000,
-    muslim_voters: 20000,
-    muslim_registered: 18000,
-    muslim_unregistered: 2000,
-    voted_2024: 12600,
-    didnt_vote_2024: 5400,
-    turnout_pct: 0.70,
+    margin_votes,
+    margin_pct,
+    total_votes,
+    muslim_voters,
+    muslim_registered,
+    muslim_unregistered: muslim_voters - muslim_registered,
+    voted_2024,
+    didnt_vote_2024,
+    turnout_pct,
     can_impact: true,
     votes_needed: 5001,
     cost_estimate: 100000,

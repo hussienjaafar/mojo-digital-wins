@@ -333,7 +333,7 @@ describe('useVoterImpactDistrict', () => {
 
   it('fetches a single district by cd_code', async () => {
     const { result } = renderHookWithClient(() =>
-      useVoterImpactDistrict('MI-11')
+      useVoterImpactDistrict('MI-011')
     );
 
     await waitFor(() => {
@@ -341,12 +341,12 @@ describe('useVoterImpactDistrict', () => {
     });
 
     expect(result.current.data).toBeDefined();
-    expect(result.current.data?.cd_code).toBe('MI-11');
+    expect(result.current.data?.cd_code).toBe('MI-011');
   });
 
   it('returns null for non-existent district', async () => {
     const { result } = renderHookWithClient(() =>
-      useVoterImpactDistrict('XX-99')
+      useVoterImpactDistrict('XX-099')
     );
 
     await waitFor(() => {
@@ -358,7 +358,7 @@ describe('useVoterImpactDistrict', () => {
 
   it('returns complete district data', async () => {
     const { result } = renderHookWithClient(() =>
-      useVoterImpactDistrict('PA-07')
+      useVoterImpactDistrict('PA-007')
     );
 
     await waitFor(() => {
@@ -367,7 +367,7 @@ describe('useVoterImpactDistrict', () => {
 
     const district = result.current.data;
     expect(district).toBeDefined();
-    expect(district?.cd_code).toBe('PA-07');
+    expect(district?.cd_code).toBe('PA-007');
     expect(district?.state_code).toBe('PA');
     expect(typeof district?.muslim_voters).toBe('number');
     expect(typeof district?.can_impact).toBe('boolean');
@@ -439,7 +439,7 @@ describe('Query Hook Integration', () => {
       useVoterImpactDistricts()
     );
     const { result: singleDistrictResult } = renderHookWithClient(() =>
-      useVoterImpactDistrict('MI-11')
+      useVoterImpactDistrict('MI-011')
     );
 
     await waitFor(() => {
@@ -448,7 +448,7 @@ describe('Query Hook Integration', () => {
     });
 
     const fromAll = allDistrictsResult.current.data?.find(
-      (d) => d.cd_code === 'MI-11'
+      (d) => d.cd_code === 'MI-011'
     );
     const single = singleDistrictResult.current.data;
 

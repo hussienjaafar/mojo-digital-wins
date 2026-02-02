@@ -43,7 +43,7 @@ describe('calculateImpactScore', () => {
 
     it('returns 0 for safe district from fixtures', () => {
       const safeDistrict = mockVoterImpactDistricts.find(
-        (d) => d.cd_code === 'CA-45'
+        (d) => d.cd_code === 'CA-045'
       );
       expect(safeDistrict).toBeDefined();
       expect(calculateImpactScore(safeDistrict!)).toBe(0);
@@ -145,8 +145,11 @@ describe('calculateImpactScore', () => {
         turnout_pct: 0.65,
       });
 
-      // Scores should be equal since population is capped at 50k
-      expect(calculateImpactScore(at50k)).toBe(calculateImpactScore(above50k));
+      // Larger population has more non-voters to mobilize, so score should be higher
+      // (new algorithm bases score on mobilizable pool vs margin)
+      expect(calculateImpactScore(above50k)).toBeGreaterThan(
+        calculateImpactScore(at50k)
+      );
     });
   });
 
@@ -211,15 +214,15 @@ describe('calculateImpactScore', () => {
   });
 
   describe('fixture data validation', () => {
-    it('MI-11 has high impact score (close race, high population)', () => {
-      const mi11 = mockVoterImpactDistricts.find((d) => d.cd_code === 'MI-11');
+    it('MI-011 has high impact score (close race, high population)', () => {
+      const mi11 = mockVoterImpactDistricts.find((d) => d.cd_code === 'MI-011');
       expect(mi11).toBeDefined();
       const score = calculateImpactScore(mi11!);
       expect(score).toBeGreaterThan(0.5);
     });
 
-    it('MI-08 has highest impact (very close, low turnout)', () => {
-      const mi08 = mockVoterImpactDistricts.find((d) => d.cd_code === 'MI-08');
+    it('MI-008 has highest impact (very close, low turnout)', () => {
+      const mi08 = mockVoterImpactDistricts.find((d) => d.cd_code === 'MI-008');
       expect(mi08).toBeDefined();
       const score = calculateImpactScore(mi08!);
       // Very close race (0.5%) + low turnout (45%) should give high score
@@ -233,23 +236,45 @@ describe('calculateImpactScore', () => {
 // ============================================================================
 
 describe('calculateStateImpactScore', () => {
-  it('returns 0 for empty districts array', () => {
-    const state = createMockState({});
-    expect(calculateStateImpactScore(state, [])).toBe(0);
+  it('returns fallback score for states with no district data', () => {
+    // For at-large states with no district data, uses state-level turnout gap
+    const state = createMockState({ muslim_voters: 100000, vote_2024_pct: 0.70 });
+    const score = calculateStateImpactScore(state, []);
+    // Should return a positive fallback score based on population and turnout gap
+    expect(score).toBeGreaterThan(0);
+    expect(score).toBeLessThanOrEqual(1);
   });
 
-  it('returns average of district impact scores', () => {
+  it('returns weighted average of district impact scores', () => {
     const state = mockVoterImpactStates[0]; // Michigan
     const miDistricts = mockVoterImpactDistricts.filter(
       (d) => d.state_code === 'MI'
     );
 
     const stateScore = calculateStateImpactScore(state, miDistricts);
-    const manualAvg =
-      miDistricts.reduce((sum, d) => sum + calculateImpactScore(d), 0) /
-      miDistricts.length;
 
-    expect(stateScore).toBe(manualAvg);
+    // Calculate expected weighted average (weighted by muslim_voters)
+    // Also accounts for flippable ratio (20% weight) vs avg impact (80% weight)
+    const districtsWithData = miDistricts.filter(
+      (d) => d.muslim_voters > 0 && d.margin_votes && d.margin_votes > 0
+    );
+
+    let totalWeight = 0;
+    let weightedSum = 0;
+    for (const d of districtsWithData) {
+      const districtImpact = calculateImpactScore(d);
+      weightedSum += districtImpact * d.muslim_voters;
+      totalWeight += d.muslim_voters;
+    }
+    const avgImpact = totalWeight > 0 ? weightedSum / totalWeight : 0;
+
+    const flippable = districtsWithData.filter(
+      (d) => (d.didnt_vote_2024 || 0) >= (d.margin_votes || Infinity)
+    );
+    const flippableRatio = flippable.length / districtsWithData.length;
+
+    const expectedScore = Math.min(1, flippableRatio * 0.2 + avgImpact * 0.8);
+    expect(stateScore).toBeCloseTo(expectedScore, 5);
   });
 
   it('returns 0 when all districts have can_impact=false', () => {
@@ -262,7 +287,7 @@ describe('calculateStateImpactScore', () => {
     expect(calculateStateImpactScore(state, districts)).toBe(0);
   });
 
-  it('correctly averages mixed impactable districts', () => {
+  it('correctly calculates weighted state score with mixed districts', () => {
     const state = createMockState({});
     const districts = [
       createMockDistrict({
@@ -272,16 +297,24 @@ describe('calculateStateImpactScore', () => {
         turnout_pct: 0.60,
       }),
       createMockDistrict({
-        can_impact: false, // Should contribute 0
-        cd_code: 'TS-02',
+        can_impact: false, // Should contribute 0 to impact score
+        cd_code: 'TS-002',
+        muslim_voters: 20000,
       }),
     ];
 
     const stateScore = calculateStateImpactScore(state, districts);
     const firstDistrictScore = calculateImpactScore(districts[0]);
+    const secondDistrictScore = calculateImpactScore(districts[1]); // 0 because can_impact=false
 
-    // Average of (firstDistrictScore + 0) / 2
-    expect(stateScore).toBe(firstDistrictScore / 2);
+    // Weighted average = (score1 * 40000 + 0 * 20000) / (40000 + 20000) = score1 * 40000/60000
+    const weightedAvg = (firstDistrictScore * 40000 + secondDistrictScore * 20000) / 60000;
+
+    // First district is flippable, second is not -> flippable ratio = 0.5
+    // Final score = flippableRatio * 0.2 + weightedAvg * 0.8
+    const expectedScore = 0.5 * 0.2 + weightedAvg * 0.8;
+
+    expect(stateScore).toBeCloseTo(expectedScore, 5);
   });
 });
 
@@ -430,8 +463,8 @@ describe('applyFilters', () => {
       const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, minVoters: 5000 };
       const result = applyFilters(mockVoterImpactDistricts, filters);
 
-      // PA-12 has only 2500 voters, should be excluded
-      const pa12 = result.find((d) => d.cd_code === 'PA-12');
+      // PA-012 has only 2500 voters, should be excluded
+      const pa12 = result.find((d) => d.cd_code === 'PA-012');
       expect(pa12).toBeUndefined();
     });
   });
@@ -446,12 +479,12 @@ describe('applyFilters', () => {
     it('filters by district code (cd_code)', () => {
       const filters: MapFilters = {
         ...DEFAULT_MAP_FILTERS,
-        searchQuery: 'MI-11',
+        searchQuery: 'MI-011',
       };
       const result = applyFilters(mockVoterImpactDistricts, filters);
 
       expect(result.length).toBe(1);
-      expect(result[0].cd_code).toBe('MI-11');
+      expect(result[0].cd_code).toBe('MI-011');
     });
 
     it('filters by state code (partial match)', () => {
@@ -467,12 +500,12 @@ describe('applyFilters', () => {
     it('is case insensitive', () => {
       const filters: MapFilters = {
         ...DEFAULT_MAP_FILTERS,
-        searchQuery: 'pa-07',
+        searchQuery: 'pa-007',
       };
       const result = applyFilters(mockVoterImpactDistricts, filters);
 
       expect(result.length).toBe(1);
-      expect(result[0].cd_code).toBe('PA-07');
+      expect(result[0].cd_code).toBe('PA-007');
     });
 
     it('trims whitespace from query', () => {

@@ -98,6 +98,12 @@ const CLOSE_RACE_THRESHOLD = 0.05;
  * - 0.0-0.05: MINIMAL - Safe district, margin too large
  */
 export function calculateImpactScore(district: VoterImpactDistrict): number {
+  // Respect database's authoritative can_impact determination
+  // If the DB says the district can't be flipped, return 0
+  if (district.can_impact === false) {
+    return 0;
+  }
+
   // No Muslim voters = no impact
   if (!district.muslim_voters || district.muslim_voters === 0) {
     return 0;

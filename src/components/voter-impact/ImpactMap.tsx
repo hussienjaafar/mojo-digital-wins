@@ -113,13 +113,14 @@ const FIPS_TO_ABBR: Record<string, string> = {
 
 /**
  * Build district code from GeoJSON properties
- * Format: "XX-YY" where XX is state abbreviation and YY is district number
+ * Format: "XX-YYY" where XX is state abbreviation and YYY is 3-digit padded district number
+ * Must match database cd_code format (e.g., "CA-019" not "CA-19")
  */
 function buildDistrictCode(stateCode: string, districtNum: string): string {
   const stateAbbr = FIPS_TO_ABBR[stateCode];
   if (!stateAbbr) return "";
   const districtNumber = parseInt(districtNum, 10);
-  return `${stateAbbr}-${String(districtNumber).padStart(2, "0")}`;
+  return `${stateAbbr}-${String(districtNumber).padStart(3, "0")}`;
 }
 
 /**
