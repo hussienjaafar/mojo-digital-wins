@@ -149,6 +149,16 @@ export function ImpactMap({
   const [districtsGeoJSON, setDistrictsGeoJSON] = useState<FeatureCollection<Geometry, DistrictProperties> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  
+  // Hover tooltip state
+  const [hoverInfo, setHoverInfo] = useState<{
+    x: number;
+    y: number;
+    name: string;
+    score: number;
+    voters: number;
+    type: 'state' | 'district';
+  } | null>(null);
 
   // Load GeoJSON files on mount
   useEffect(() => {
@@ -272,29 +282,48 @@ export function ImpactMap({
     };
   }, [districtsGeoJSON, districts, districtImpactScores]);
 
-  // Simple property-based color expression for states
-  const stateColorExpression = useMemo((): ExpressionSpecification => {
-    console.log('[ImpactMap] Using simple property-based color expression');
-    // Use step expression for color bands based on impactScore property
-    return [
-      "case",
-      [">=", ["coalesce", ["get", "impactScore"], 0], 0.66], "#22c55e", // High - green
-      [">=", ["coalesce", ["get", "impactScore"], 0], 0.33], "#eab308", // Medium - yellow  
-      [">=", ["coalesce", ["get", "impactScore"], 0], 0.01], "#ef4444", // Low - red
-      "#374151" // None - gray
-    ];
-  }, []);
+  // Calculate percentile-based thresholds for better color distribution
+  const colorThresholds = useMemo(() => {
+    const stateScores = Array.from(stateImpactScores.values()).filter(s => s > 0).sort((a, b) => a - b);
+    const districtScores = Array.from(districtImpactScores.values()).filter(s => s > 0).sort((a, b) => a - b);
+    
+    // Use percentiles for states
+    const stateP33 = stateScores.length > 0 ? stateScores[Math.floor(stateScores.length * 0.33)] || 0.1 : 0.1;
+    const stateP66 = stateScores.length > 0 ? stateScores[Math.floor(stateScores.length * 0.66)] || 0.2 : 0.2;
+    
+    // Use percentiles for districts
+    const districtP33 = districtScores.length > 0 ? districtScores[Math.floor(districtScores.length * 0.33)] || 0.1 : 0.1;
+    const districtP66 = districtScores.length > 0 ? districtScores[Math.floor(districtScores.length * 0.66)] || 0.2 : 0.2;
+    
+    console.log('[ImpactMap] Color thresholds - States:', { p33: stateP33, p66: stateP66, min: stateScores[0], max: stateScores[stateScores.length - 1] });
+    console.log('[ImpactMap] Color thresholds - Districts:', { p33: districtP33, p66: districtP66, min: districtScores[0], max: districtScores[districtScores.length - 1] });
+    
+    return { stateP33, stateP66, districtP33, districtP66 };
+  }, [stateImpactScores, districtImpactScores]);
 
-  // Simple property-based color expression for districts
-  const districtColorExpression = useMemo((): ExpressionSpecification => {
+  // Percentile-based color expression for states
+  const stateColorExpression = useMemo((): ExpressionSpecification => {
+    const { stateP33, stateP66 } = colorThresholds;
     return [
       "case",
-      [">=", ["coalesce", ["get", "impactScore"], 0], 0.66], "#22c55e", // High - green
-      [">=", ["coalesce", ["get", "impactScore"], 0], 0.33], "#eab308", // Medium - yellow
-      [">=", ["coalesce", ["get", "impactScore"], 0], 0.01], "#ef4444", // Low - red
+      [">=", ["coalesce", ["get", "impactScore"], 0], stateP66], "#22c55e", // High - green (top 33%)
+      [">=", ["coalesce", ["get", "impactScore"], 0], stateP33], "#eab308", // Medium - yellow (middle 33%)
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.001], "#ef4444", // Low - red (bottom 33%)
       "#374151" // None - gray
     ];
-  }, []);
+  }, [colorThresholds]);
+
+  // Percentile-based color expression for districts
+  const districtColorExpression = useMemo((): ExpressionSpecification => {
+    const { districtP33, districtP66 } = colorThresholds;
+    return [
+      "case",
+      [">=", ["coalesce", ["get", "impactScore"], 0], districtP66], "#22c55e", // High - green (top 33%)
+      [">=", ["coalesce", ["get", "impactScore"], 0], districtP33], "#eab308", // Medium - yellow (middle 33%)
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.001], "#ef4444", // Low - red (bottom 33%)
+      "#374151" // None - gray
+    ];
+  }, [colorThresholds]);
 
   // Build opacity expression for districts using enriched properties
   const districtOpacityExpression = useMemo((): ExpressionSpecification => {
@@ -320,18 +349,22 @@ export function ImpactMap({
     setViewState(evt.viewState);
   }, []);
 
-  // Handle state click
+  // Handle state click - with robust feature detection for MultiPolygon states
   const handleStateClick = useCallback(
     (event: MapLayerMouseEvent) => {
       if (showDistricts) return; // Districts handle clicks when zoomed in
 
-      const feature = event.features?.[0];
+      // Query all features at click point for the states layer
+      const features = event.features?.filter(f => f.layer?.id === 'states-fill');
+      const feature = features?.[0];
+      
       if (!feature) {
         onRegionSelect(null, "state");
         return;
       }
 
-      const fips = String(feature.id);
+      // Handle both numeric and string IDs, pad to 2 digits
+      const fips = String(feature.id).padStart(2, '0');
       const stateAbbr = getStateFromFips(fips);
 
       if (stateAbbr) {
@@ -370,34 +403,47 @@ export function ImpactMap({
     [onRegionSelect]
   );
 
-  // Handle state hover
+  // Handle state hover - with tooltip info
   const handleStateHover = useCallback(
     (event: MapLayerMouseEvent) => {
       const feature = event.features?.[0];
       if (!feature) {
         setHoveredRegion(null);
+        setHoverInfo(null);
         onRegionHover(null, "state");
         return;
       }
 
-      const fips = String(feature.id);
+      const fips = String(feature.id).padStart(2, '0');
       const stateAbbr = getStateFromFips(fips);
+      const stateName = feature.properties?.name || stateAbbr || 'Unknown';
+      const impactScore = feature.properties?.impactScore || 0;
+      const stateData = states.find(s => s.state_code === stateAbbr);
 
       if (stateAbbr) {
         setHoveredRegion(stateAbbr);
         setHoveredType("state");
+        setHoverInfo({
+          x: event.point.x,
+          y: event.point.y,
+          name: stateName,
+          score: impactScore,
+          voters: stateData?.muslim_voters || 0,
+          type: 'state',
+        });
         onRegionHover(stateAbbr, "state");
       }
     },
-    [onRegionHover]
+    [onRegionHover, states]
   );
 
-  // Handle district hover
+  // Handle district hover - with tooltip info
   const handleDistrictHover = useCallback(
     (event: MapLayerMouseEvent) => {
       const feature = event.features?.[0];
       if (!feature) {
         setHoveredRegion(null);
+        setHoverInfo(null);
         onRegionHover(null, "district");
         return;
       }
@@ -407,19 +453,32 @@ export function ImpactMap({
 
       if (stateCode && districtNum) {
         const cdCode = buildDistrictCode(stateCode, districtNum);
+        const impactScore = feature.properties?.impactScore || 0;
+        const districtData = districts.find(d => d.cd_code === cdCode);
+        const stateAbbr = FIPS_TO_ABBR[stateCode] || stateCode;
+        
         if (cdCode) {
           setHoveredRegion(cdCode);
           setHoveredType("district");
+          setHoverInfo({
+            x: event.point.x,
+            y: event.point.y,
+            name: `${stateAbbr} District ${parseInt(districtNum, 10) || 'At-Large'}`,
+            score: impactScore,
+            voters: districtData?.muslim_voters || 0,
+            type: 'district',
+          });
           onRegionHover(cdCode, "district");
         }
       }
     },
-    [onRegionHover]
+    [onRegionHover, districts]
   );
 
   // Handle mouse leave
   const handleMouseLeave = useCallback(() => {
     setHoveredRegion(null);
+    setHoverInfo(null);
     onRegionHover(null, "state");
   }, [onRegionHover]);
 
@@ -623,17 +682,36 @@ export function ImpactMap({
         <NavigationControl position="top-right" />
 
         {/* States layer - using enriched GeoJSON with impact scores in properties */}
-        <Source id="states" type="geojson" data={enrichedStatesGeoJSON}>
+        <Source id="states" type="geojson" data={enrichedStatesGeoJSON} generateId>
           <Layer {...statesFillLayer} />
           <Layer {...statesBorderLayer} />
         </Source>
 
         {/* Districts layer - using enriched GeoJSON with impact scores in properties */}
-        <Source id="districts" type="geojson" data={enrichedDistrictsGeoJSON}>
+        <Source id="districts" type="geojson" data={enrichedDistrictsGeoJSON} generateId>
           <Layer {...districtsFillLayer} />
           <Layer {...districtsBorderLayer} />
         </Source>
       </MapGL>
+
+      {/* Hover Tooltip */}
+      {hoverInfo && (
+        <div
+          className="absolute z-10 bg-[#1a1f2e] border border-[#2d3748] rounded-lg px-3 py-2 pointer-events-none shadow-lg"
+          style={{ 
+            left: Math.min(hoverInfo.x + 10, window.innerWidth - 200), 
+            top: hoverInfo.y + 10 
+          }}
+        >
+          <div className="font-semibold text-white text-sm">{hoverInfo.name}</div>
+          <div className="text-xs text-gray-400 mt-1">
+            Muslim Voters: {hoverInfo.voters.toLocaleString()}
+          </div>
+          <div className="text-xs text-gray-400">
+            Impact Score: {(hoverInfo.score * 100).toFixed(1)}%
+          </div>
+        </div>
+      )}
     </div>
   );
 }
