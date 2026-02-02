@@ -160,11 +160,15 @@ function logColumnDiagnostics(
   console.groupEnd();
 }
 
+/**
+ * Parse a number from Excel cell, rounding to integer.
+ * Use this for count/integer columns.
+ */
 function parseNumber(value: unknown): number {
   if (value === null || value === undefined || value === "-" || value === "") return 0;
-  if (typeof value === "number") return value;
+  if (typeof value === "number") return Math.round(value);
   const cleaned = String(value).replace(/[$,\s]/g, "");
-  return parseFloat(cleaned) || 0;
+  return Math.round(parseFloat(cleaned) || 0);
 }
 
 function parsePercent(value: unknown): number {
