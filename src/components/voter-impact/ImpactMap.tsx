@@ -282,30 +282,30 @@ export function ImpactMap({
     };
   }, [districtsGeoJSON, districts, districtImpactScores]);
 
-  // Fixed thresholds based on flippability score meaning
-  // >= 0.5: HIGH (green) - Flippable districts, strong mobilization potential
-  // >= 0.25: MEDIUM (yellow) - Some flippable potential
-  // >= 0.05: LOW (red) - Limited but measurable influence
-  // < 0.05: NONE (gray) - Minimal impact
+  // Adjusted thresholds based on actual data distribution
+  // >= 0.15: HIGH (green) - Top tier influence (flippable or very close)
+  // >= 0.07: MEDIUM (yellow) - Significant influence potential
+  // >= 0.02: LOW (red) - Some measurable influence
+  // < 0.02: NONE (gray) - Minimal impact
 
-  // Color expression for states using fixed flippability thresholds
+  // Color expression for states using adjusted thresholds
   const stateColorExpression = useMemo((): ExpressionSpecification => {
     return [
       "case",
-      [">=", ["coalesce", ["get", "impactScore"], 0], 0.5], "#22c55e", // High - green
-      [">=", ["coalesce", ["get", "impactScore"], 0], 0.25], "#eab308", // Medium - yellow
-      [">=", ["coalesce", ["get", "impactScore"], 0], 0.05], "#ef4444", // Low - red
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.15], "#22c55e", // High - green
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.07], "#eab308", // Medium - yellow
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.02], "#ef4444", // Low - red
       "#374151" // None - gray
     ];
   }, []);
 
-  // Color expression for districts using fixed flippability thresholds
+  // Color expression for districts using adjusted thresholds
   const districtColorExpression = useMemo((): ExpressionSpecification => {
     return [
       "case",
-      [">=", ["coalesce", ["get", "impactScore"], 0], 0.5], "#22c55e", // High - green
-      [">=", ["coalesce", ["get", "impactScore"], 0], 0.25], "#eab308", // Medium - yellow
-      [">=", ["coalesce", ["get", "impactScore"], 0], 0.05], "#ef4444", // Low - red
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.15], "#22c55e", // High - green
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.07], "#eab308", // Medium - yellow
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.02], "#ef4444", // Low - red
       "#374151" // None - gray
     ];
   }, []);

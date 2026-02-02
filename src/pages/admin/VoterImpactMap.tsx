@@ -48,8 +48,33 @@ export default function VoterImpactMap() {
   const [comparisonItems, setComparisonItems] = useState<ComparisonItem[]>([]);
 
   // Data fetching
-  const { data: states = [], isLoading: statesLoading } = useVoterImpactStates();
+  const { data: rawStates = [], isLoading: statesLoading } = useVoterImpactStates();
   const { data: districts = [], isLoading: districtsLoading } = useVoterImpactDistricts();
+
+  // Reconcile state-level data from district sums when state data is missing/wrong
+  const states = useMemo(() => {
+    return rawStates.map((state) => {
+      const stateDistricts = districts.filter((d) => d.state_code === state.state_code);
+      const districtSum = stateDistricts.reduce((sum, d) => sum + (d.muslim_voters || 0), 0);
+
+      // If state has 0 but districts have data, use district sum
+      if (state.muslim_voters === 0 && districtSum > 0) {
+        console.log(`[reconcileStateData] Patching ${state.state_code}: 0 -> ${districtSum}`);
+        return { ...state, muslim_voters: districtSum };
+      }
+
+      // If state value is clearly wrong (>90% different from district sum)
+      if (districtSum > 0 && state.muslim_voters > 0) {
+        const diff = Math.abs(state.muslim_voters - districtSum) / Math.max(state.muslim_voters, districtSum);
+        if (diff > 0.9) {
+          console.log(`[reconcileStateData] Correcting ${state.state_code}: ${state.muslim_voters} -> ${districtSum} (diff: ${(diff * 100).toFixed(1)}%)`);
+          return { ...state, muslim_voters: districtSum };
+        }
+      }
+
+      return state;
+    });
+  }, [rawStates, districts]);
 
   // Calculate max voters for slider
   const maxVoters = useMemo(() => {
