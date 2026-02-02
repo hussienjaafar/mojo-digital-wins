@@ -137,10 +137,28 @@ export function VoterImpactDataImport() {
     const sheet = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(sheet) as Record<string, unknown>[];
 
+    // DEBUG: Log the actual column names from the Excel file
+    if (rows.length > 0) {
+      const headers = Object.keys(rows[0]);
+      console.log("[parseStatesFile] Found columns:", headers);
+      console.log("[parseStatesFile] First row data:", JSON.stringify(rows[0], null, 2));
+    }
+
     const stateRows: StateRow[] = [];
     
+    // Helper to find column value with flexible name matching
+    const getCol = (row: Record<string, unknown>, ...names: string[]): unknown => {
+      for (const name of names) {
+        if (row[name] !== undefined) return row[name];
+        // Try case-insensitive match
+        const key = Object.keys(row).find(k => k.toLowerCase() === name.toLowerCase());
+        if (key) return row[key];
+      }
+      return undefined;
+    };
+    
     for (const row of rows) {
-      const rawState = String(row["State"] || "").trim();
+      const rawState = String(getCol(row, "State", "STATE") || "").trim();
       
       // Skip "NATIONAL" summary row
       if (!rawState || rawState.toUpperCase() === "NATIONAL") continue;
@@ -164,23 +182,32 @@ export function VoterImpactDataImport() {
         stateName = rawState;
       }
 
+      // Use flexible column matching with multiple possible names
+      const muslimVoters = parseNumber(getCol(row, "Muslim Voters", "MUSLIM VOTERS", "Muslim_Voters", "MuslimVoters"));
+      
+      // DEBUG: Log if we found muslim voters for this state
+      if (stateCode === "CO" || stateCode === "MN" || stateCode === "NJ") {
+        console.log(`[parseStatesFile] ${stateCode} - muslim_voters: ${muslimVoters}, raw value:`, getCol(row, "Muslim Voters", "MUSLIM VOTERS"));
+      }
+
       stateRows.push({
         state_code: stateCode,
         state_name: stateName,
-        muslim_voters: parseNumber(row["Muslim Voters"]),
-        households: parseNumber(row["Households"]),
-        cell_phones: parseNumber(row["Cell Phones"]),
-        registered: parseNumber(row["Registered"]),
-        registered_pct: parsePercent(row["Registered %"]),
-        vote_2024: parseNumber(row["Vote 2024"]),
-        vote_2024_pct: parsePercent(row["Vote 2024 %"]),
-        vote_2022: parseNumber(row["Vote 2022"]),
-        vote_2022_pct: parsePercent(row["Vote 2022 %"]),
-        political_donors: parseNumber(row["Political Donors"]),
-        political_activists: parseNumber(row["Political Activists"]),
+        muslim_voters: muslimVoters,
+        households: parseNumber(getCol(row, "Households", "HOUSEHOLDS")),
+        cell_phones: parseNumber(getCol(row, "Cell Phones", "CELL PHONES", "Cell_Phones")),
+        registered: parseNumber(getCol(row, "Registered", "REGISTERED")),
+        registered_pct: parsePercent(getCol(row, "Registered %", "REGISTERED %", "Registered%")),
+        vote_2024: parseNumber(getCol(row, "Vote 2024", "VOTE 2024", "Vote_2024")),
+        vote_2024_pct: parsePercent(getCol(row, "Vote 2024 %", "VOTE 2024 %", "Vote_2024%")),
+        vote_2022: parseNumber(getCol(row, "Vote 2022", "VOTE 2022", "Vote_2022")),
+        vote_2022_pct: parsePercent(getCol(row, "Vote 2022 %", "VOTE 2022 %", "Vote_2022%")),
+        political_donors: parseNumber(getCol(row, "Political Donors", "POLITICAL DONORS")),
+        political_activists: parseNumber(getCol(row, "Political Activists", "POLITICAL ACTIVISTS")),
       });
     }
 
+    console.log(`[parseStatesFile] Parsed ${stateRows.length} state rows`);
     return stateRows;
   }, []);
 
@@ -192,25 +219,52 @@ export function VoterImpactDataImport() {
     const sheet = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(sheet) as Record<string, unknown>[];
 
+    // DEBUG: Log the actual column names from the Excel file
+    if (rows.length > 0) {
+      const headers = Object.keys(rows[0]);
+      console.log("[parseDistrictsFile] Found columns:", headers);
+      console.log("[parseDistrictsFile] First row data:", JSON.stringify(rows[0], null, 2));
+    }
+
+    // Helper to find column value with flexible name matching
+    const getCol = (row: Record<string, unknown>, ...names: string[]): unknown => {
+      for (const name of names) {
+        if (row[name] !== undefined) return row[name];
+        // Try case-insensitive match
+        const key = Object.keys(row).find(k => k.toLowerCase() === name.toLowerCase());
+        if (key) return row[key];
+      }
+      return undefined;
+    };
+
     const districtRows: DistrictRow[] = [];
     
-    for (const row of rows) {
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      
       // Get state code - try multiple column names
-      let stateCode = String(row["State Code"] || row["State_Code"] || "").trim();
+      let stateCode = String(getCol(row, "State Code", "State_Code", "STATE CODE", "STATE_CODE") || "").trim();
       
       // If state code is empty but we have state name, convert it
-      if (!stateCode && row["State"]) {
-        const stateName = String(row["State"]).trim();
-        const abbr = getStateAbbreviation(stateName);
-        if (abbr && abbr !== stateName) {
-          stateCode = abbr;
+      if (!stateCode) {
+        const stateName = String(getCol(row, "State", "STATE") || "").trim();
+        if (stateName) {
+          const abbr = getStateAbbreviation(stateName);
+          if (abbr && abbr !== stateName) {
+            stateCode = abbr;
+          }
         }
       }
 
-      // Get CD code
-      const cdCode = String(row["CD_CODE"] || row["CD CODE"] || "").trim();
+      // Get CD code - try multiple variations
+      const cdCode = String(getCol(row, "CD_CODE", "CD CODE", "CD_Code", "CDCODE") || "").trim();
       
-      if (!stateCode || !cdCode) continue;
+      if (!stateCode || !cdCode) {
+        if (i === 0) {
+          console.warn("[parseDistrictsFile] Row 0: Missing state code or CD code:", { stateCode, cdCode, row });
+        }
+        continue;
+      }
 
       // Validate state code exists in our mapping
       if (!(stateCode in STATE_ABBREVIATIONS)) {
@@ -218,30 +272,50 @@ export function VoterImpactDataImport() {
         continue;
       }
 
+      // Flexible column matching for Muslim voter data
+      const muslimVoters = parseNumber(getCol(row, "MUSLIM", "Muslim", "muslim_voters", "Muslim Voters", "MUSLIMVOTERS"));
+      const muslimRegistered = parseNumber(getCol(row, "MUS-REG", "MUS_REG", "Muslim Registered", "MUSLIM_REGISTERED"));
+      const muslimUnregistered = parseNumber(getCol(row, "MUS-UNREG", "MUS_UNREG", "Muslim Unregistered", "MUSLIM_UNREGISTERED"));
+      const voted2024 = parseNumber(getCol(row, "MUS_VOTED24", "MUS-VOTED24", "Muslim Voted 2024", "VOTED_2024"));
+      const didntVote2024 = parseNumber(getCol(row, "MUS_DIDN'TVOTE24", "MUS_DIDNTVOTE24", "MUS_DIDNT_VOTE24", "Didn't Vote 2024", "DIDNT_VOTE_2024"));
+
+      // DEBUG: Log first few rows and any with unexpected 0 values
+      if (i < 3 || (muslimVoters === 0 && i < 20)) {
+        console.log(`[parseDistrictsFile] Row ${i} (${cdCode}): muslim_voters=${muslimVoters}, raw MUSLIM value:`, getCol(row, "MUSLIM", "Muslim"));
+      }
+
       districtRows.push({
         cd_code: cdCode,
         state_code: stateCode,
-        district_num: parseNumber(row["District"]),
-        winner: parseString(row["WINNER"]),
-        winner_party: parseString(row["Party"]),
-        winner_votes: parseNumber(row["Votes"]) || null,
-        runner_up: parseString(row["Runner-Up"]),
-        runner_up_party: parseString(row["Runner-Up Party"]),
-        runner_up_votes: parseNumber(row["Runner-Up Votes"]) || null,
-        margin_votes: parseNumber(row["Margin (Votes)"]) || null,
-        margin_pct: parsePercent(row["Margin (%)"]) || null,
-        total_votes: parseNumber(row["Total Votes"]) || null,
-        muslim_voters: parseNumber(row["MUSLIM"]),
-        muslim_registered: parseNumber(row["MUS-REG"]),
-        muslim_unregistered: parseNumber(row["MUS-UNREG"]),
-        voted_2024: parseNumber(row["MUS_VOTED24"]),
-        didnt_vote_2024: parseNumber(row["MUS_DIDN'TVOTE24"]),
-        turnout_pct: parsePercent(row["NEWREG_TURNOUT"]),
-        can_impact: parseBoolean(row["CAN IMPACT"]),
-        votes_needed: parseNumber(row["ADD MUSLIM VOTES NEEDED"]) || null,
-        cost_estimate: parseNumber(row["COST (~ $70 PER VOTE)"]) || null,
+        district_num: parseNumber(getCol(row, "District", "DISTRICT", "District_Num")),
+        winner: parseString(getCol(row, "WINNER", "Winner")),
+        winner_party: parseString(getCol(row, "Party", "PARTY", "Winner Party")),
+        winner_votes: parseNumber(getCol(row, "Votes", "VOTES", "Winner Votes")) || null,
+        runner_up: parseString(getCol(row, "Runner-Up", "RUNNER-UP", "Runner Up")),
+        runner_up_party: parseString(getCol(row, "Runner-Up Party", "RUNNER-UP PARTY")),
+        runner_up_votes: parseNumber(getCol(row, "Runner-Up Votes", "RUNNER-UP VOTES")) || null,
+        margin_votes: parseNumber(getCol(row, "Margin (Votes)", "MARGIN (VOTES)", "Margin_Votes")) || null,
+        margin_pct: parsePercent(getCol(row, "Margin (%)", "MARGIN (%)", "Margin_Pct")) || null,
+        total_votes: parseNumber(getCol(row, "Total Votes", "TOTAL VOTES", "Total_Votes")) || null,
+        muslim_voters: muslimVoters,
+        muslim_registered: muslimRegistered,
+        muslim_unregistered: muslimUnregistered,
+        voted_2024: voted2024,
+        didnt_vote_2024: didntVote2024,
+        turnout_pct: parsePercent(getCol(row, "NEWREG_TURNOUT", "Turnout", "TURNOUT", "Turnout_Pct")),
+        can_impact: parseBoolean(getCol(row, "CAN IMPACT", "CAN_IMPACT", "Can Impact")),
+        votes_needed: parseNumber(getCol(row, "ADD MUSLIM VOTES NEEDED", "Votes Needed", "VOTES_NEEDED")) || null,
+        cost_estimate: parseNumber(getCol(row, "COST (~ $70 PER VOTE)", "Cost Estimate", "COST_ESTIMATE")) || null,
       });
     }
+
+    console.log(`[parseDistrictsFile] Parsed ${districtRows.length} district rows`);
+    
+    // Summary of parsed data
+    const withVoters = districtRows.filter(r => r.muslim_voters > 0).length;
+    const withMargin = districtRows.filter(r => r.margin_votes && r.margin_votes > 0).length;
+    console.log(`[parseDistrictsFile] Districts with muslim_voters > 0: ${withVoters}/${districtRows.length}`);
+    console.log(`[parseDistrictsFile] Districts with margin_votes > 0: ${withMargin}/${districtRows.length}`);
 
     return districtRows;
   }, []);
