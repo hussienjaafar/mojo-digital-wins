@@ -282,48 +282,33 @@ export function ImpactMap({
     };
   }, [districtsGeoJSON, districts, districtImpactScores]);
 
-  // Calculate percentile-based thresholds for better color distribution
-  const colorThresholds = useMemo(() => {
-    const stateScores = Array.from(stateImpactScores.values()).filter(s => s > 0).sort((a, b) => a - b);
-    const districtScores = Array.from(districtImpactScores.values()).filter(s => s > 0).sort((a, b) => a - b);
-    
-    // Use percentiles for states
-    const stateP33 = stateScores.length > 0 ? stateScores[Math.floor(stateScores.length * 0.33)] || 0.1 : 0.1;
-    const stateP66 = stateScores.length > 0 ? stateScores[Math.floor(stateScores.length * 0.66)] || 0.2 : 0.2;
-    
-    // Use percentiles for districts
-    const districtP33 = districtScores.length > 0 ? districtScores[Math.floor(districtScores.length * 0.33)] || 0.1 : 0.1;
-    const districtP66 = districtScores.length > 0 ? districtScores[Math.floor(districtScores.length * 0.66)] || 0.2 : 0.2;
-    
-    console.log('[ImpactMap] Color thresholds - States:', { p33: stateP33, p66: stateP66, min: stateScores[0], max: stateScores[stateScores.length - 1] });
-    console.log('[ImpactMap] Color thresholds - Districts:', { p33: districtP33, p66: districtP66, min: districtScores[0], max: districtScores[districtScores.length - 1] });
-    
-    return { stateP33, stateP66, districtP33, districtP66 };
-  }, [stateImpactScores, districtImpactScores]);
+  // Fixed thresholds based on flippability score meaning
+  // >= 0.5: HIGH (green) - Flippable districts, strong mobilization potential
+  // >= 0.25: MEDIUM (yellow) - Some flippable potential
+  // >= 0.05: LOW (red) - Limited but measurable influence
+  // < 0.05: NONE (gray) - Minimal impact
 
-  // Percentile-based color expression for states
+  // Color expression for states using fixed flippability thresholds
   const stateColorExpression = useMemo((): ExpressionSpecification => {
-    const { stateP33, stateP66 } = colorThresholds;
     return [
       "case",
-      [">=", ["coalesce", ["get", "impactScore"], 0], stateP66], "#22c55e", // High - green (top 33%)
-      [">=", ["coalesce", ["get", "impactScore"], 0], stateP33], "#eab308", // Medium - yellow (middle 33%)
-      [">=", ["coalesce", ["get", "impactScore"], 0], 0.001], "#ef4444", // Low - red (bottom 33%)
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.5], "#22c55e", // High - green
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.25], "#eab308", // Medium - yellow
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.05], "#ef4444", // Low - red
       "#374151" // None - gray
     ];
-  }, [colorThresholds]);
+  }, []);
 
-  // Percentile-based color expression for districts
+  // Color expression for districts using fixed flippability thresholds
   const districtColorExpression = useMemo((): ExpressionSpecification => {
-    const { districtP33, districtP66 } = colorThresholds;
     return [
       "case",
-      [">=", ["coalesce", ["get", "impactScore"], 0], districtP66], "#22c55e", // High - green (top 33%)
-      [">=", ["coalesce", ["get", "impactScore"], 0], districtP33], "#eab308", // Medium - yellow (middle 33%)
-      [">=", ["coalesce", ["get", "impactScore"], 0], 0.001], "#ef4444", // Low - red (bottom 33%)
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.5], "#22c55e", // High - green
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.25], "#eab308", // Medium - yellow
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.05], "#ef4444", // Low - red
       "#374151" // None - gray
     ];
-  }, [colorThresholds]);
+  }, []);
 
   // Build opacity expression for districts using enriched properties
   const districtOpacityExpression = useMemo((): ExpressionSpecification => {
