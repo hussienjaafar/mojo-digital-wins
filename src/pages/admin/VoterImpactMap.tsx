@@ -5,7 +5,7 @@
  * across US states and congressional districts.
  */
 
-import React, { useState, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
@@ -51,10 +51,6 @@ export default function VoterImpactMap() {
   const { data: states = [], isLoading: statesLoading } = useVoterImpactStates();
   const { data: districts = [], isLoading: districtsLoading } = useVoterImpactDistricts();
 
-  // Debug logging
-  console.log('[VoterImpactMap] States loaded:', states.length, states.slice(0, 3));
-  console.log('[VoterImpactMap] Districts loaded:', districts.length, districts.slice(0, 3));
-
   // Calculate max voters for slider
   const maxVoters = useMemo(() => {
     if (districts.length === 0) return 100000;
@@ -79,6 +75,28 @@ export default function VoterImpactMap() {
 
     return null;
   }, [selectedRegionId, selectedRegionType, states, districts]);
+
+  // Debug logging - verify key states have correct data
+  useEffect(() => {
+    if (states.length > 0) {
+      console.log('[VoterImpactMap] States data sample:');
+      states.slice(0, 5).forEach(s => {
+        console.log(`  ${s.state_code}: ${s.state_name} - ${s.muslim_voters} voters`);
+      });
+      
+      // Check specific states mentioned in bug report
+      const ny = states.find(s => s.state_code === 'NY');
+      const mi = states.find(s => s.state_code === 'MI');
+      const la = states.find(s => s.state_code === 'LA');
+      console.log('[VoterImpactMap] Key states - NY:', ny?.muslim_voters, 'MI:', mi?.muslim_voters, 'LA:', la?.muslim_voters);
+    }
+  }, [states]);
+  
+  // Log selection changes to debug sidebar data
+  useEffect(() => {
+    console.log('[VoterImpactMap] Selection changed:', { selectedRegionId, selectedRegionType });
+    console.log('[VoterImpactMap] Selected region data:', selectedRegion);
+  }, [selectedRegionId, selectedRegionType, selectedRegion]);
 
   // Handlers
   const handleRegionSelect = useCallback(

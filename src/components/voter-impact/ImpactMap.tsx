@@ -348,9 +348,15 @@ export function ImpactMap({
         return;
       }
 
+      // DEBUG: Log the raw feature data
+      console.log('[handleStateClick] Raw feature.id:', feature.id, 'type:', typeof feature.id);
+      console.log('[handleStateClick] Feature properties:', feature.properties);
+
       // Handle both numeric and string IDs, pad to 2 digits
       const fips = String(feature.id).padStart(2, '0');
       const stateAbbr = getStateFromFips(fips);
+
+      console.log('[handleStateClick] FIPS:', fips, '-> State:', stateAbbr);
 
       if (stateAbbr) {
         onRegionSelect(stateAbbr, "state");
@@ -403,7 +409,18 @@ export function ImpactMap({
       const stateAbbr = getStateFromFips(fips);
       const stateName = feature.properties?.name || stateAbbr || 'Unknown';
       const impactScore = feature.properties?.impactScore || 0;
+      
+      // DEBUG: Log the lookup
+      console.log('[handleStateHover] FIPS:', fips, '-> State:', stateAbbr, 'Name:', stateName);
+      console.log('[handleStateHover] States array length:', states.length);
+      
       const stateData = states.find(s => s.state_code === stateAbbr);
+      
+      console.log('[handleStateHover] Found stateData:', stateData ? {
+        state_code: stateData.state_code,
+        state_name: stateData.state_name,
+        muslim_voters: stateData.muslim_voters
+      } : 'NOT FOUND');
 
       if (stateAbbr) {
         setHoveredRegion(stateAbbr);
