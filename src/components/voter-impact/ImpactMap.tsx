@@ -684,13 +684,14 @@ export function ImpactMap({
         <NavigationControl position="top-right" />
 
         {/* States layer - using enriched GeoJSON with impact scores in properties */}
-        <Source id="states" type="geojson" data={enrichedStatesGeoJSON} generateId>
+        {/* Note: Do NOT use generateId - it overwrites original FIPS codes with array indices */}
+        <Source id="states" type="geojson" data={enrichedStatesGeoJSON}>
           <Layer {...statesFillLayer} />
           <Layer {...statesBorderLayer} />
         </Source>
 
         {/* Districts layer - using enriched GeoJSON with impact scores in properties */}
-        <Source id="districts" type="geojson" data={enrichedDistrictsGeoJSON} generateId>
+        <Source id="districts" type="geojson" data={enrichedDistrictsGeoJSON}>
           <Layer {...districtsFillLayer} />
           <Layer {...districtsBorderLayer} />
         </Source>
