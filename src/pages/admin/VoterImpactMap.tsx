@@ -5,7 +5,7 @@
  * across US states and congressional districts.
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
@@ -21,8 +21,13 @@ import type {
 } from '@/queries/useVoterImpactQueries';
 import type { MapFilters, MetricType, ComparisonItem } from '@/types/voter-impact';
 import { DEFAULT_MAP_FILTERS } from '@/types/voter-impact';
-import { ImpactMap } from '@/components/voter-impact/ImpactMap';
+import { V3ErrorBoundary } from '@/components/v3/V3ErrorBoundary';
 import { MapControls } from '@/components/voter-impact/MapControls';
+
+// Lazy load ImpactMap to isolate maplibre-gl bundling
+const ImpactMap = lazy(() => 
+  import('@/components/voter-impact/ImpactMap').then(mod => ({ default: mod.ImpactMap }))
+);
 import { RegionSidebar } from '@/components/voter-impact/RegionSidebar';
 import { MapLegend } from '@/components/voter-impact/MapLegend';
 import { MetricToggle } from '@/components/voter-impact/MetricToggle';
@@ -202,18 +207,24 @@ export default function VoterImpactMap() {
               <p className="text-[#e2e8f0]">Loading map data...</p>
             </div>
           ) : (
-            <>
-              <ImpactMap
-                states={states}
-                districts={districts}
-                filters={filters}
-                metric={metric}
-                selectedRegion={selectedRegionId}
-                onRegionSelect={handleRegionSelect}
-                onRegionHover={handleRegionHover}
-              />
+            <V3ErrorBoundary sectionName="Voter Impact Map">
+              <Suspense fallback={
+                <div className="absolute inset-0 flex items-center justify-center bg-[#0a0f1a]">
+                  <p className="text-[#e2e8f0]">Loading map component...</p>
+                </div>
+              }>
+                <ImpactMap
+                  states={states}
+                  districts={districts}
+                  filters={filters}
+                  metric={metric}
+                  selectedRegion={selectedRegionId}
+                  onRegionSelect={handleRegionSelect}
+                  onRegionHover={handleRegionHover}
+                />
+              </Suspense>
               <MapLegend />
-            </>
+            </V3ErrorBoundary>
           )}
         </div>
 
