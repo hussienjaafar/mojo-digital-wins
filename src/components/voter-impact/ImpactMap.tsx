@@ -194,7 +194,7 @@ export function ImpactMap({
     return new Set(filtered.map((d) => d.cd_code));
   }, [districts, filters]);
 
-  // Build state impact scores map
+  // Build state impact scores map (FIPS -> score)
   const stateImpactScores = useMemo(() => {
     const scores = new Map<string, number>();
     states.forEach((state) => {
@@ -202,6 +202,13 @@ export function ImpactMap({
         (d) => d.state_code === state.state_code
       );
       const score = calculateStateImpactScore(state, stateDistricts);
+      // Store by FIPS code for easy matching
+      const fips = Object.entries(FIPS_TO_ABBR).find(
+        ([, abbr]) => abbr === state.state_code
+      )?.[0];
+      if (fips) {
+        scores.set(fips, score);
+      }
       scores.set(state.state_code, score);
     });
     return scores;
@@ -217,90 +224,96 @@ export function ImpactMap({
     return scores;
   }, [districts]);
 
-  // Build color expressions for states layer
+  // Create enriched GeoJSON with impact scores merged into properties (states)
+  const enrichedStatesGeoJSON = useMemo(() => {
+    if (!statesGeoJSON || states.length === 0) return statesGeoJSON;
+
+    console.log('[ImpactMap] Enriching states GeoJSON with', states.length, 'states');
+    console.log('[ImpactMap] Sample state impact scores:', Array.from(stateImpactScores.entries()).slice(0, 5));
+
+    return {
+      ...statesGeoJSON,
+      features: statesGeoJSON.features.map((feature) => {
+        const fips = String(feature.id).padStart(2, '0');
+        const score = stateImpactScores.get(fips) ?? 0;
+        return {
+          ...feature,
+          properties: {
+            ...feature.properties,
+            impactScore: score,
+          },
+        };
+      }),
+    };
+  }, [statesGeoJSON, states, stateImpactScores]);
+
+  // Create enriched GeoJSON with impact scores merged into properties (districts)
+  const enrichedDistrictsGeoJSON = useMemo(() => {
+    if (!districtsGeoJSON || districts.length === 0) return districtsGeoJSON;
+
+    console.log('[ImpactMap] Enriching districts GeoJSON with', districts.length, 'districts');
+
+    return {
+      ...districtsGeoJSON,
+      features: districtsGeoJSON.features.map((feature) => {
+        const stateCode = feature.properties?.STATE;
+        const districtNum = feature.properties?.CD;
+        const cdCode = stateCode && districtNum ? buildDistrictCode(stateCode, districtNum) : null;
+        const score = cdCode ? (districtImpactScores.get(cdCode) ?? 0) : 0;
+        return {
+          ...feature,
+          properties: {
+            ...feature.properties,
+            impactScore: score,
+            cdCode: cdCode,
+          },
+        };
+      }),
+    };
+  }, [districtsGeoJSON, districts, districtImpactScores]);
+
+  // Simple property-based color expression for states
   const stateColorExpression = useMemo((): ExpressionSpecification => {
-    // Debug logging
-    console.log('[ImpactMap] Building color expression for', states.length, 'states');
-    console.log('[ImpactMap] Sample state:', states[0]);
-    console.log('[ImpactMap] State impact scores:', Array.from(stateImpactScores.entries()).slice(0, 3));
-    
-    const colorStops: (string | ExpressionSpecification)[] = ["case"];
+    console.log('[ImpactMap] Using simple property-based color expression');
+    // Use step expression for color bands based on impactScore property
+    return [
+      "case",
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.66], "#22c55e", // High - green
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.33], "#eab308", // Medium - yellow  
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.01], "#ef4444", // Low - red
+      "#374151" // None - gray
+    ];
+  }, []);
 
-    states.forEach((state) => {
-      const score = stateImpactScores.get(state.state_code) || 0;
-      const color = getImpactColor(score);
-      // Match by FIPS code (feature id) - use to-string for robust comparison
-      const fips = Object.entries(FIPS_TO_ABBR).find(
-        ([, abbr]) => abbr === state.state_code
-      )?.[0];
-      if (fips) {
-        colorStops.push(["==", ["to-string", ["id"]], fips], color);
-      }
-    });
-
-    // Default color for states without data
-    colorStops.push("#374151");
-
-    return colorStops as ExpressionSpecification;
-  }, [states, stateImpactScores]);
-
-  // Build color expressions for districts layer
+  // Simple property-based color expression for districts
   const districtColorExpression = useMemo((): ExpressionSpecification => {
-    const colorStops: (string | ExpressionSpecification)[] = ["case"];
+    return [
+      "case",
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.66], "#22c55e", // High - green
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.33], "#eab308", // Medium - yellow
+      [">=", ["coalesce", ["get", "impactScore"], 0], 0.01], "#ef4444", // Low - red
+      "#374151" // None - gray
+    ];
+  }, []);
 
-    districts.forEach((district) => {
-      const score = districtImpactScores.get(district.cd_code) || 0;
-      const color = getImpactColor(score);
-      // Match by STATE and CD properties
-      const [stateAbbr, districtNum] = district.cd_code.split("-");
-      const fips = Object.entries(FIPS_TO_ABBR).find(
-        ([, abbr]) => abbr === stateAbbr
-      )?.[0];
-      if (fips) {
-        colorStops.push(
-          [
-            "all",
-            ["==", ["get", "STATE"], fips],
-            ["==", ["get", "CD"], districtNum],
-          ],
-          color
-        );
-      }
-    });
-
-    // Default color for districts without data
-    colorStops.push("#374151");
-
-    return colorStops as ExpressionSpecification;
-  }, [districts, districtImpactScores]);
-
-  // Build opacity expression for districts (filtered out = 20% opacity)
+  // Build opacity expression for districts using enriched properties
   const districtOpacityExpression = useMemo((): ExpressionSpecification => {
-    const opacityStops: (string | number | ExpressionSpecification)[] = ["case"];
-
-    districts.forEach((district) => {
-      const isFiltered = filteredDistrictIds.has(district.cd_code);
-      const [stateAbbr, districtNum] = district.cd_code.split("-");
-      const fips = Object.entries(FIPS_TO_ABBR).find(
-        ([, abbr]) => abbr === stateAbbr
-      )?.[0];
-      if (fips) {
-        opacityStops.push(
-          [
-            "all",
-            ["==", ["get", "STATE"], fips],
-            ["==", ["get", "CD"], districtNum],
-          ],
-          isFiltered ? 0.7 : 0.2
-        );
-      }
-    });
-
-    // Default opacity
-    opacityStops.push(0.7);
-
-    return opacityStops as ExpressionSpecification;
-  }, [districts, filteredDistrictIds]);
+    // Create a list of filtered district cdCodes for the expression
+    // Since we now have cdCode in properties, we can use a simpler approach
+    const filteredCodes = Array.from(filteredDistrictIds);
+    
+    if (filteredCodes.length === 0) {
+      // All visible if no filter - use literal expression
+      return ["literal", 0.7] as unknown as ExpressionSpecification;
+    }
+    
+    // Use "in" expression to check if cdCode is in the filtered set
+    return [
+      "case",
+      ["in", ["get", "cdCode"], ["literal", filteredCodes]], 0.7,
+      0.2
+    ] as ExpressionSpecification;
+  }, [filteredDistrictIds]);
 
   // Handle view state change
   const handleMove = useCallback((evt: ViewStateChangeEvent) => {
@@ -609,14 +622,14 @@ export function ImpactMap({
       >
         <NavigationControl position="top-right" />
 
-        {/* States layer */}
-        <Source id="states" type="geojson" data={statesGeoJSON}>
+        {/* States layer - using enriched GeoJSON with impact scores in properties */}
+        <Source id="states" type="geojson" data={enrichedStatesGeoJSON}>
           <Layer {...statesFillLayer} />
           <Layer {...statesBorderLayer} />
         </Source>
 
-        {/* Districts layer */}
-        <Source id="districts" type="geojson" data={districtsGeoJSON}>
+        {/* Districts layer - using enriched GeoJSON with impact scores in properties */}
+        <Source id="districts" type="geojson" data={enrichedDistrictsGeoJSON}>
           <Layer {...districtsFillLayer} />
           <Layer {...districtsBorderLayer} />
         </Source>
