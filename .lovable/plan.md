@@ -1,141 +1,139 @@
 
-# Fix Voter Impact Data Import - Column Name Mismatch
+# Plan: Fix Build Errors & Improve Invitation Flow Logging
 
-## Problem Analysis
+## 1. Password Reset Status
 
-After examining the uploaded Excel files and comparing them with the import script, I've identified the root cause:
+**Password reset email has been sent** to `clembalanoff@gmail.com`. The user should check their inbox (and spam folder) for an email from "Account Security" with the subject "Reset Your Password". This will allow them to set their own secure password.
 
-### Current Database State
-- **436 districts** exist but **ALL have 0 muslim_voters** and **null margin_votes**
-- **48/51 states** have correct data, but **CO, MN, NJ show 0** (these are missing from the uploaded National_Analysis file)
-- The district structure (cd_code, state_code) imported correctly, but numeric columns failed
+## 2. Build Errors to Fix
 
-### Root Cause
-The `xlsx` library parses Excel column headers differently than how they appear. When there are special characters or formatting, the actual JavaScript object keys may differ. The current `getCol` helper function may not be matching correctly.
+### Error 1: ImpactMap.tsx - TypeScript Expression Type Error (Line 337)
 
-### Key Evidence
-Looking at the CD_GOTV_ANALYSIS Excel file:
-- TX-001 should have MUSLIM = 1941, but database shows 0
-- TX-007 should have MUSLIM = 38819, but database shows 0
-- All 436 districts have muslim_voters = 0
+**Problem**: The nested MapLibre expression using interpolate inside case conditions is not properly typed for the `ExpressionSpecification` type.
 
-## Solution Overview
+**Solution**: Add explicit type casting to fix the complex nested expression structure.
 
-### 1. Add Robust Column Name Logging
-First, add debug logging that outputs the **exact** JavaScript object keys that xlsx produces, not the display names. This will reveal any hidden characters, encoding issues, or formatting differences.
+**File**: `src/components/voter-impact/ImpactMap.tsx`
+**Lines**: 337-372
 
-### 2. Implement Fuzzy Column Matching
-Replace the simple `getCol` helper with a more sophisticated matcher that:
-- Normalizes column names (remove spaces, underscores, special chars)
-- Logs which column name variant was matched
-- Reports unmatched expected columns
+**Change**:
+- The existing `as ExpressionSpecification` cast at line 372 is not enough for the nested structure
+- Need to simplify the expression or cast it through `unknown` first
+- Replace the problematic expression with a simplified version that uses `as unknown as ExpressionSpecification`
 
-### 3. Handle the Missing States
-The National_Analysis file uploaded is missing CO, MN, NJ entirely. These states need data from a complete source file.
+### Error 2: RegionSidebar.tsx - Invalid `as` prop (Line 161)
 
-### 4. Fix Column Name Matching for Districts
-Based on Excel analysis, these columns need flexible matching:
+**Problem**: The CardTitle component doesn't support an `as` prop - it always renders an h3.
 
-| Excel Column | Needs to Match |
-|--------------|----------------|
-| `MUSLIM` | muslim_voters |
-| `MUS-REG` | muslim_registered |
-| `MUS-UNREG` | muslim_unregistered |
-| `MUS_VOTED24` | voted_2024 |
-| `MUS_DIDN'TVOTE24` | didnt_vote_2024 |
-| `Margin (Votes)` | margin_votes |
-| `Margin (%)` | margin_pct |
+**Solution**: Remove the invalid `as="h3"` prop since CardTitle already renders as h3 by default.
 
----
+**File**: `src/components/voter-impact/RegionSidebar.tsx`
+**Line**: 161
 
-## Technical Implementation
+**Current**:
+```tsx
+<CardTitle as="h3" className="text-sm font-medium text-[#94a3b8]">{title}</CardTitle>
+```
 
-### Changes to `src/components/admin/VoterImpactDataImport.tsx`
+**Fixed**:
+```tsx
+<CardTitle className="text-sm font-medium text-[#94a3b8]">{title}</CardTitle>
+```
 
-#### 1. Improve the `getCol` Helper with Normalization
+## 3. Logging Improvements for Invitation Flow
 
-Replace the current `getCol` function with a version that:
-- Creates a normalized lookup map of all column names
-- Strips special characters, spaces, and underscores for comparison
-- Logs the exact match found for debugging
+The invitation flow already has extensive structured logging in the Edge Function (`accept-invitation-signup/index.ts`). To help diagnose future issues, I recommend adding client-side diagnostic logging to the AcceptInvitation page.
+
+**File**: `src/pages/AcceptInvitation.tsx`
+
+### Add Client-Side Diagnostic Logging
+
+Add a structured logging utility at the top of the file and use it throughout the invitation flow:
 
 ```typescript
-// Create a normalized key for matching
-const normalizeKey = (key: string): string => {
-  return key.toLowerCase().replace(/[\s_\-()%']/g, '');
-};
-
-// Build a lookup map for the row's columns once
-const buildColumnLookup = (row: Record<string, unknown>): Map<string, string> => {
-  const lookup = new Map<string, string>();
-  for (const key of Object.keys(row)) {
-    lookup.set(normalizeKey(key), key);
-  }
-  return lookup;
-};
+// Diagnostic logging for invitation debugging
+function logInvitationEvent(event: string, data?: Record<string, unknown>) {
+  console.log(JSON.stringify({
+    component: "AcceptInvitation",
+    timestamp: new Date().toISOString(),
+    event,
+    url: window.location.href,
+    token: new URLSearchParams(window.location.search).get("token")?.substring(0, 8) + "...",
+    ...data,
+  }));
+}
 ```
 
-#### 2. Add Explicit Column Mapping with Fallbacks
+### Log Key Events
 
-For each column, try multiple variations and log which one matched:
+Add logging calls to these key points:
 
+1. **Page Load** - Log when the page loads with the token
+2. **Invitation Loaded** - Log invitation details (status, type, email pattern)
+3. **Signup Form Submit** - Log when the form is submitted
+4. **Edge Function Response** - Log the response status and any error codes
+5. **Session Established** - Log when the session is created
+6. **Redirect** - Log when the user is redirected to the dashboard
+
+### Example Additions
+
+**loadInvitation function** (around line 176):
 ```typescript
-const COLUMN_MAPPINGS = {
-  muslim_voters: ['MUSLIM', 'Muslim', 'Muslim Voters', 'muslim_voters'],
-  muslim_registered: ['MUS-REG', 'MUS_REG', 'MusReg'],
-  muslim_unregistered: ['MUS-UNREG', 'MUS_UNREG', 'MusUnreg'],
-  voted_2024: ['MUS_VOTED24', 'MUS-VOTED24', 'MusVoted24'],
-  didnt_vote_2024: ["MUS_DIDN'TVOTE24", 'MUS_DIDNTVOTE24', 'MusDidntVote24'],
-  margin_votes: ['Margin (Votes)', 'MarginVotes', 'Margin_Votes'],
-  margin_pct: ['Margin (%)', 'MarginPct', 'Margin_Pct'],
-};
+const loadInvitation = async () => {
+  logInvitationEvent("loading_invitation");
+  try {
+    const { data, error } = await supabase.rpc("get_invitation_by_token", {
+      p_token: token!,
+    });
+
+    if (error) {
+      logInvitationEvent("invitation_rpc_error", { error: error.message });
+      throw error;
+    }
+    
+    if (!data || data.length === 0) {
+      logInvitationEvent("invitation_not_found");
+      setError("Invitation not found or has expired");
+      return;
+    }
+
+    const inv = data[0] as InvitationDetails;
+    logInvitationEvent("invitation_loaded", { 
+      status: inv.status, 
+      type: inv.invitation_type,
+      hasOrg: !!inv.organization_id 
+    });
+    // ... rest of function
 ```
 
-#### 3. Add Diagnostic Output After Parsing
+**handleSignup function** (around line 240):
+```typescript
+logInvitationEvent("signup_started", { email: invitation!.email });
 
-After parsing, display a summary showing:
-- Actual column names found in Excel
-- Which columns were successfully matched
-- Sample values from first row to verify parsing
+const response = await fetch(/* ... */);
+const result = await response.json();
 
-#### 4. Log All Columns When Import Fails
-
-If parsing produces all-zero values for muslim_voters, halt and display the column mapping mismatch as an error to the user.
-
-### Expected File Changes
-
-| File | Changes |
-|------|---------|
-| `src/components/admin/VoterImpactDataImport.tsx` | Enhanced column matching with normalization, better logging, diagnostic output |
-
----
-
-## Post-Implementation Verification
-
-After the fix, re-import should show:
-1. TX-001: muslim_voters = 1941
-2. TX-007: muslim_voters = 38819  
-3. CA districts sum ≈ 551,639 total
-4. All 436 districts with proper muslim_voters values
-5. Margin data populated for competitive districts
-
-### Database Verification Query
-```sql
-SELECT 
-  COUNT(*) as total,
-  SUM(CASE WHEN muslim_voters > 0 THEN 1 ELSE 0 END) as with_voters,
-  SUM(muslim_voters) as total_voters
-FROM voter_impact_districts;
+logInvitationEvent("signup_response", { 
+  status: response.status, 
+  ok: response.ok,
+  code: result.code,
+  hasAccessToken: !!result.access_token,
+  requestId: result.requestId  // Correlates with edge function logs
+});
 ```
 
-Expected result: ~380+ districts with voters, total voters ~3.4M
+## Summary of Changes
 
----
+| File | Change | Purpose |
+|------|--------|---------|
+| `src/components/voter-impact/ImpactMap.tsx` | Fix type casting for district color expression | Resolve TypeScript build error |
+| `src/components/voter-impact/RegionSidebar.tsx` | Remove invalid `as` prop from CardTitle | Resolve TypeScript build error |
+| `src/pages/AcceptInvitation.tsx` | Add structured diagnostic logging | Debug future invitation issues |
 
-## Note on Missing States (CO, MN, NJ)
+## Verification
 
-The uploaded National_Analysis file does not contain Colorado, Minnesota, or New Jersey. This is a **data file issue**, not a code issue. The user should:
-1. Verify they have the complete National_Analysis file with all states
-2. Re-upload once the complete file is obtained
-
-Alternatively, if this is the authoritative source, these states genuinely have no tracked Muslim voter data.
+After implementation:
+1. Build should complete without TypeScript errors
+2. Voter Impact Map should display correctly with colored districts
+3. Console logs will show detailed invitation flow diagnostics
+4. Edge function logs already show server-side events (as seen in previous debugging)
