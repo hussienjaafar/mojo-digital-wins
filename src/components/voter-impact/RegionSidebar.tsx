@@ -16,7 +16,7 @@ import type {
   VoterImpactState,
   VoterImpactDistrict,
 } from "@/queries/useVoterImpactQueries";
-import { calculateImpactScore } from "@/types/voter-impact";
+import { calculateImpactScore, IMPACT_THRESHOLDS } from "@/types/voter-impact";
 
 // ============================================================================
 // Types
@@ -75,10 +75,10 @@ function getImpactLevel(
     return "NO IMPACT";
   }
   const score = calculateImpactScore(district);
-  if (score >= 0.66) {
+  if (score >= IMPACT_THRESHOLDS.HIGH) {
     return "HIGH";
   }
-  if (score >= 0.33) {
+  if (score >= IMPACT_THRESHOLDS.MEDIUM) {
     return "MEDIUM";
   }
   return "LOW";

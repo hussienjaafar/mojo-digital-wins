@@ -15,6 +15,7 @@ import {
   getImpactColor,
   applyFilters,
   DEFAULT_MAP_FILTERS,
+  IMPACT_THRESHOLDS,
   type MapFilters,
 } from '@/types/voter-impact';
 import {
@@ -433,12 +434,12 @@ describe('applyFilters', () => {
       });
     });
 
-    it('filters to high impact districts (score >= 0.66)', () => {
+    it('filters to high impact districts (score >= IMPACT_THRESHOLDS.HIGH)', () => {
       const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, impact: 'high' };
       const result = applyFilters(mockVoterImpactDistricts, filters);
 
       result.forEach((d) => {
-        expect(calculateImpactScore(d)).toBeGreaterThanOrEqual(0.66);
+        expect(calculateImpactScore(d)).toBeGreaterThanOrEqual(IMPACT_THRESHOLDS.HIGH);
       });
     });
   });
