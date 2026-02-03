@@ -62,20 +62,20 @@ export interface MapViewState {
 // Constants
 // ============================================================================
 
-/** Population normalization constant for impact score calculation */
-const POPULATION_NORMALIZATION = 50000;
-
-/** Margin multiplier for impact score calculation */
-const MARGIN_MULTIPLIER = 10;
-
-/** Weight for margin in impact score calculation */
-const WEIGHT_MARGIN = 0.4;
-
-/** Weight for population in impact score calculation */
-const WEIGHT_POPULATION = 0.3;
-
-/** Weight for turnout gap in impact score calculation */
-const WEIGHT_TURNOUT = 0.3;
+/**
+ * Unified impact score thresholds for consistent categorization across all components.
+ * These thresholds are based on the algorithm's output range (0-1 scale where most districts score below 0.5).
+ *
+ * - HIGH (>=0.15): Top tier influence - district is highly flippable
+ * - MEDIUM (>=0.07): Significant influence potential
+ * - LOW (>=0.02): Some measurable influence
+ * - Below LOW: Minimal/no impact
+ */
+export const IMPACT_THRESHOLDS = {
+  HIGH: 0.15,
+  MEDIUM: 0.07,
+  LOW: 0.02,
+} as const;
 
 /** Threshold for close race margin percentage */
 const CLOSE_RACE_THRESHOLD = 0.05;
@@ -261,8 +261,8 @@ export function applyFilters(
     } else if (filters.impact === "no-impact") {
       result = result.filter((d) => !d.can_impact);
     } else if (filters.impact === "high") {
-      // High impact: score >= 0.66
-      result = result.filter((d) => calculateImpactScore(d) >= 0.66);
+      // High impact: score >= HIGH threshold
+      result = result.filter((d) => calculateImpactScore(d) >= IMPACT_THRESHOLDS.HIGH);
     }
   }
 
