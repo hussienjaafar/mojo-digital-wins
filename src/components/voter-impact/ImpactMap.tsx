@@ -95,7 +95,7 @@ interface DistrictProperties {
 }
 
 const COLORS = {
-  border: "#334155",          // Improved contrast (was #0f172a)
+  border: "#94a3b8",          // Light slate for clear district boundaries
   hoverBorder: "#93c5fd",     // Brighter blue for hover
   selectedBorder: "#3b82f6",  // Strong blue for selection
   glowHover: "#60a5fa",       // Glow color for hover
@@ -281,9 +281,12 @@ export function ImpactMap({
     };
   }, [statesGeoJSON, states, stateImpactScores]);
 
-  // Create enriched GeoJSON with impact scores merged into properties (districts)
+  // Create enriched GeoJSON with impact scores and voter counts merged into properties (districts)
   const enrichedDistrictsGeoJSON = useMemo(() => {
     if (!districtsGeoJSON || districts.length === 0) return districtsGeoJSON;
+
+    // Calculate max Muslim voters for normalization
+    const maxMuslimVoters = Math.max(...districts.map(d => d.muslim_voters || 0), 1);
 
     return {
       ...districtsGeoJSON,
@@ -292,12 +295,19 @@ export function ImpactMap({
         const districtNum = feature.properties?.CD;
         const cdCode = stateCode && districtNum ? buildDistrictCode(stateCode, districtNum) : null;
         const score = cdCode ? (districtImpactScores.get(cdCode) ?? 0) : 0;
+        const districtData = cdCode ? districts.find(d => d.cd_code === cdCode) : null;
+        const muslimVoters = districtData?.muslim_voters || 0;
+        // Normalized value 0-1 for color interpolation
+        const voterRatio = muslimVoters / maxMuslimVoters;
+
         return {
           ...feature,
           properties: {
             ...feature.properties,
             impactScore: score,
             cdCode: cdCode,
+            muslimVoters: muslimVoters,
+            voterRatio: voterRatio,
           },
         };
       }),
@@ -316,16 +326,50 @@ export function ImpactMap({
     ];
   }, []);
 
-  // Color expression for districts using unified IMPACT_THRESHOLDS and IMPACT_COLORS constants
-  // Uses colorblind-safe palette: Blue (high), Orange (medium), Purple (low), Gray (none)
+  // Color expression for districts with gradient variation based on Muslim voter population
+  // Each impact tier has a color range: districts with more voters are lighter/brighter
+  // This creates visual texture to distinguish adjacent districts
   const districtColorExpression = useMemo((): ExpressionSpecification => {
+    // Get voter ratio for interpolation (0-1 scale)
+    const voterRatio = ["coalesce", ["get", "voterRatio"], 0];
+    const impactScore = ["coalesce", ["get", "impactScore"], 0];
+
     return [
       "case",
-      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.HIGH], IMPACT_COLORS.HIGH,
-      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.MEDIUM], IMPACT_COLORS.MEDIUM,
-      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.LOW], IMPACT_COLORS.LOW,
-      IMPACT_COLORS.NONE
-    ];
+      // HIGH impact: Blue gradient (#1e40af dark to #60a5fa light)
+      [">=", impactScore, IMPACT_THRESHOLDS.HIGH],
+      [
+        "interpolate", ["linear"], voterRatio,
+        0, "#1e40af",  // Dark blue for fewer voters
+        0.5, "#2563eb", // Medium blue
+        1, "#60a5fa"   // Light blue for more voters
+      ],
+      // MEDIUM impact: Orange gradient (#b45309 dark to #fbbf24 light)
+      [">=", impactScore, IMPACT_THRESHOLDS.MEDIUM],
+      [
+        "interpolate", ["linear"], voterRatio,
+        0, "#b45309",  // Dark orange
+        0.5, "#f97316", // Medium orange
+        1, "#fbbf24"   // Light amber
+      ],
+      // LOW impact: Purple gradient (#581c87 dark to #c084fc light)
+      [">=", impactScore, IMPACT_THRESHOLDS.LOW],
+      [
+        "interpolate", ["linear"], voterRatio,
+        0, "#581c87",  // Dark purple
+        0.5, "#9333ea", // Medium purple
+        1, "#c084fc"   // Light purple
+      ],
+      // NO IMPACT: Gray gradient (#1e293b dark to #64748b light)
+      // This creates visual differentiation even among "no impact" districts
+      [
+        "interpolate", ["linear"], voterRatio,
+        0, "#1e293b",  // Dark slate (fewer voters)
+        0.3, "#334155", // Medium-dark slate
+        0.6, "#475569", // Medium slate
+        1, "#64748b"   // Light slate (more voters)
+      ]
+    ] as ExpressionSpecification;
   }, []);
 
   // Build opacity expression for districts using enriched properties
@@ -728,12 +772,12 @@ export function ImpactMap({
           selectedStateFips && selectedDistrictNum
             ? ["all", ["==", ["get", "STATE"], selectedStateFips], ["==", ["get", "CD"], selectedDistrictNum]]
             : false,
-          5,  // Increased from 3
+          5,
           hoveredStateFips && hoveredDistrictNum
             ? ["all", ["==", ["get", "STATE"], hoveredStateFips], ["==", ["get", "CD"], hoveredDistrictNum]]
             : false,
-          4,  // Increased from 2.5
-          1.5,  // Increased from 1
+          4,
+          2,  // Thicker default for clear district boundaries
         ] as ExpressionSpecification,
       },
     };
