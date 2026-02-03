@@ -16,6 +16,7 @@ import {
   applyFilters,
   DEFAULT_MAP_FILTERS,
   IMPACT_THRESHOLDS,
+  IMPACT_COLORS,
   type MapFilters,
 } from '@/types/voter-impact';
 import {
@@ -324,34 +325,46 @@ describe('calculateStateImpactScore', () => {
 // ============================================================================
 
 describe('getImpactColor', () => {
-  it('returns gray (#374151) for score <= 0', () => {
-    expect(getImpactColor(0)).toBe('#374151');
-    expect(getImpactColor(-0.5)).toBe('#374151');
+  // Tests use colorblind-safe palette: Blue (high), Orange (medium), Purple (low), Gray (none)
+  // Based on IMPACT_THRESHOLDS: HIGH=0.15, MEDIUM=0.07, LOW=0.02
+
+  it('returns gray (IMPACT_COLORS.NONE) for score < LOW threshold', () => {
+    expect(getImpactColor(0)).toBe(IMPACT_COLORS.NONE);
+    expect(getImpactColor(-0.5)).toBe(IMPACT_COLORS.NONE);
+    expect(getImpactColor(0.01)).toBe(IMPACT_COLORS.NONE);
   });
 
-  it('returns red (#ef4444) for score < 0.33', () => {
-    expect(getImpactColor(0.1)).toBe('#ef4444');
-    expect(getImpactColor(0.32)).toBe('#ef4444');
+  it('returns purple (IMPACT_COLORS.LOW) for score >= LOW and < MEDIUM', () => {
+    expect(getImpactColor(0.02)).toBe(IMPACT_COLORS.LOW);
+    expect(getImpactColor(0.05)).toBe(IMPACT_COLORS.LOW);
+    expect(getImpactColor(0.069)).toBe(IMPACT_COLORS.LOW);
   });
 
-  it('returns yellow (#eab308) for score >= 0.33 and < 0.66', () => {
-    expect(getImpactColor(0.33)).toBe('#eab308');
-    expect(getImpactColor(0.5)).toBe('#eab308');
-    expect(getImpactColor(0.65)).toBe('#eab308');
+  it('returns orange (IMPACT_COLORS.MEDIUM) for score >= MEDIUM and < HIGH', () => {
+    expect(getImpactColor(0.07)).toBe(IMPACT_COLORS.MEDIUM);
+    expect(getImpactColor(0.1)).toBe(IMPACT_COLORS.MEDIUM);
+    expect(getImpactColor(0.149)).toBe(IMPACT_COLORS.MEDIUM);
   });
 
-  it('returns green (#22c55e) for score >= 0.66', () => {
-    expect(getImpactColor(0.66)).toBe('#22c55e');
-    expect(getImpactColor(0.8)).toBe('#22c55e');
-    expect(getImpactColor(1.0)).toBe('#22c55e');
+  it('returns blue (IMPACT_COLORS.HIGH) for score >= HIGH', () => {
+    expect(getImpactColor(0.15)).toBe(IMPACT_COLORS.HIGH);
+    expect(getImpactColor(0.5)).toBe(IMPACT_COLORS.HIGH);
+    expect(getImpactColor(1.0)).toBe(IMPACT_COLORS.HIGH);
   });
 
-  it('handles edge cases at boundaries', () => {
-    // Right at boundaries
-    expect(getImpactColor(0.329999)).toBe('#ef4444');
-    expect(getImpactColor(0.33)).toBe('#eab308');
-    expect(getImpactColor(0.659999)).toBe('#eab308');
-    expect(getImpactColor(0.66)).toBe('#22c55e');
+  it('handles edge cases at IMPACT_THRESHOLDS boundaries', () => {
+    // Just below LOW threshold
+    expect(getImpactColor(IMPACT_THRESHOLDS.LOW - 0.001)).toBe(IMPACT_COLORS.NONE);
+    // At LOW threshold
+    expect(getImpactColor(IMPACT_THRESHOLDS.LOW)).toBe(IMPACT_COLORS.LOW);
+    // Just below MEDIUM threshold
+    expect(getImpactColor(IMPACT_THRESHOLDS.MEDIUM - 0.001)).toBe(IMPACT_COLORS.LOW);
+    // At MEDIUM threshold
+    expect(getImpactColor(IMPACT_THRESHOLDS.MEDIUM)).toBe(IMPACT_COLORS.MEDIUM);
+    // Just below HIGH threshold
+    expect(getImpactColor(IMPACT_THRESHOLDS.HIGH - 0.001)).toBe(IMPACT_COLORS.MEDIUM);
+    // At HIGH threshold
+    expect(getImpactColor(IMPACT_THRESHOLDS.HIGH)).toBe(IMPACT_COLORS.HIGH);
   });
 });
 

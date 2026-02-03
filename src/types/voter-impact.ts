@@ -77,6 +77,17 @@ export const IMPACT_THRESHOLDS = {
   LOW: 0.02,
 } as const;
 
+/**
+ * Colorblind-safe impact color palette
+ * Blue-Orange-Purple avoids red-green confusion
+ */
+export const IMPACT_COLORS = {
+  HIGH: "#2563eb",    // Blue - clearly distinguishable
+  MEDIUM: "#f97316",  // Orange - warm tone
+  LOW: "#9333ea",     // Purple - cool tone
+  NONE: "#6b7280",    // Gray - neutral
+} as const;
+
 /** Threshold for close race margin percentage */
 const CLOSE_RACE_THRESHOLD = 0.05;
 
@@ -203,24 +214,25 @@ export function calculateStateImpactScore(
 
 /**
  * Get color for impact score visualization
+ * Uses colorblind-safe palette: Blue (high), Orange (medium), Purple (low), Gray (none)
  *
- * Color scale:
- * - score <= 0: gray (#374151) - no impact
- * - score < 0.33: red (#ef4444) - low impact
- * - score < 0.66: yellow (#eab308) - medium impact
- * - score >= 0.66: green (#22c55e) - high impact
+ * Color scale based on IMPACT_THRESHOLDS:
+ * - score >= HIGH (0.15): Blue - high impact
+ * - score >= MEDIUM (0.07): Orange - medium impact
+ * - score >= LOW (0.02): Purple - low impact
+ * - score < LOW: Gray - no impact
  */
 export function getImpactColor(score: number): string {
-  if (score <= 0) {
-    return "#374151"; // gray-700
+  if (score >= IMPACT_THRESHOLDS.HIGH) {
+    return IMPACT_COLORS.HIGH;
   }
-  if (score < 0.33) {
-    return "#ef4444"; // red-500
+  if (score >= IMPACT_THRESHOLDS.MEDIUM) {
+    return IMPACT_COLORS.MEDIUM;
   }
-  if (score < 0.66) {
-    return "#eab308"; // yellow-500
+  if (score >= IMPACT_THRESHOLDS.LOW) {
+    return IMPACT_COLORS.LOW;
   }
-  return "#22c55e"; // green-500
+  return IMPACT_COLORS.NONE;
 }
 
 /**
