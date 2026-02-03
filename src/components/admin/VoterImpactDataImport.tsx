@@ -377,9 +377,18 @@ export function VoterImpactDataImport() {
         }
       }
 
-      // Get CD code
-      const cdCode = String(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.cd_code) || "").trim();
-      
+      // Get CD code and normalize to 3-digit format (e.g., "MI-14" → "MI-014")
+      let cdCode = String(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.cd_code) || "").trim();
+
+      // Normalize cd_code to 3-digit district number format
+      if (cdCode && cdCode.includes("-")) {
+        const [state, district] = cdCode.split("-");
+        const districtNum = parseInt(district, 10);
+        if (!isNaN(districtNum)) {
+          cdCode = `${state}-${String(districtNum).padStart(3, "0")}`;
+        }
+      }
+
       if (!stateCode || !cdCode) {
         if (i === 0) {
           console.warn("[parseDistrictsFile] Row 0: Missing state code or CD code:", { stateCode, cdCode });
