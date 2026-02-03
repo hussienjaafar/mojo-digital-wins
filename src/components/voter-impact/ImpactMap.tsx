@@ -369,7 +369,7 @@ export function ImpactMap({
         0.6, "#475569", // Medium slate
         1, "#64748b"   // Light slate (more voters)
       ]
-    ] as ExpressionSpecification;
+    ] as unknown as ExpressionSpecification;
   }, []);
 
   // Build opacity expression for districts using enriched properties
