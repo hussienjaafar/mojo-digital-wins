@@ -285,6 +285,11 @@ export function ImpactMap({
   const enrichedDistrictsGeoJSON = useMemo(() => {
     if (!districtsGeoJSON || districts.length === 0) return districtsGeoJSON;
 
+    // DEBUG: Log sample cd_codes from database
+    if (districts.length > 0) {
+      console.log(`[DEBUG] Database cd_code samples: ${districts.slice(0, 5).map(d => d.cd_code).join(', ')}`);
+    }
+
     // Calculate max Muslim voters for normalization
     const maxMuslimVoters = Math.max(...districts.map(d => d.muslim_voters || 0), 1);
 
@@ -536,6 +541,12 @@ export function ImpactMap({
         const impactScore = feature.properties?.impactScore || 0;
         const districtData = districts.find(d => d.cd_code === cdCode);
         const stateAbbr = FIPS_TO_ABBR[stateCode] || stateCode;
+
+        // DEBUG: Log format mismatch info
+        if (!districtData && districts.length > 0) {
+          const sampleCodes = districts.slice(0, 5).map(d => d.cd_code);
+          console.log(`[DEBUG] No match for cdCode: "${cdCode}". Sample db codes: ${sampleCodes.join(', ')}. Total districts: ${districts.length}`);
+        }
         
         if (cdCode) {
           setHoveredRegion(cdCode);
