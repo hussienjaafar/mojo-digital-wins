@@ -5,17 +5,20 @@
  * Shows states and congressional districts with color-coded impact scores.
  */
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import MapGL, {
   Source,
   Layer,
   NavigationControl,
   type MapLayerMouseEvent,
   type ViewStateChangeEvent,
+  type MapRef,
 } from "react-map-gl/maplibre";
 import type { FillLayerSpecification, LineLayerSpecification, ExpressionSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { FeatureCollection, Feature, Geometry } from "geojson";
+import bbox from "@turf/bbox";
+import { ArrowLeft } from "lucide-react";
 
 import type {
   VoterImpactState,
@@ -92,9 +95,11 @@ interface DistrictProperties {
 }
 
 const COLORS = {
-  border: "#0f172a",
-  hoverBorder: "#60a5fa",
-  selectedBorder: "#3b82f6",
+  border: "#334155",          // Improved contrast (was #0f172a)
+  hoverBorder: "#93c5fd",     // Brighter blue for hover
+  selectedBorder: "#3b82f6",  // Strong blue for selection
+  glowHover: "#60a5fa",       // Glow color for hover
+  glowSelected: "#3b82f6",    // Glow color for selection
 };
 
 // State FIPS code to abbreviation mapping
@@ -158,6 +163,16 @@ export function ImpactMap({
   const [districtsGeoJSON, setDistrictsGeoJSON] = useState<FeatureCollection<Geometry, DistrictProperties> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Map ref for programmatic control (fitBounds, etc.)
+  const mapRef = useRef<MapRef>(null);
+
+  // Selected state info for context header
+  const [selectedStateInfo, setSelectedStateInfo] = useState<{
+    name: string;
+    code: string;
+    districtCount: number;
+  } | null>(null);
 
   // Screen reader announcement state
   const [screenReaderAnnouncement, setScreenReaderAnnouncement] = useState<string>("");
@@ -337,7 +352,7 @@ export function ImpactMap({
     setViewState(evt.viewState);
   }, []);
 
-  // Handle state click - with robust feature detection for MultiPolygon states
+  // Handle state click - with fit-to-bounds zoom for large states
   const handleStateClick = useCallback(
     (event: MapLayerMouseEvent) => {
       if (showDistricts) return; // Districts handle clicks when zoomed in
@@ -345,9 +360,10 @@ export function ImpactMap({
       // Query all features at click point for the states layer
       const features = event.features?.filter(f => f.layer?.id === 'states-fill');
       const feature = features?.[0];
-      
+
       if (!feature) {
         onRegionSelect(null, "state");
+        setSelectedStateInfo(null);
         return;
       }
 
@@ -358,18 +374,43 @@ export function ImpactMap({
 
       if (stateAbbr) {
         onRegionSelect(stateAbbr, "state");
+
+        // Count districts in this state
+        const stateDistrictCount = districts.filter(d => d.state_code === stateAbbr).length;
+        setSelectedStateInfo({
+          name: stateName,
+          code: stateAbbr,
+          districtCount: stateDistrictCount,
+        });
+
         // Announce selection to screen readers
-        setScreenReaderAnnouncement(`Selected ${stateName}. Zooming to view congressional districts.`);
-        // Zoom to state level
-        setViewState((prev) => ({
-          ...prev,
-          longitude: event.lngLat.lng,
-          latitude: event.lngLat.lat,
-          zoom: 6,
-        }));
+        setScreenReaderAnnouncement(`Selected ${stateName}. Zooming to view ${stateDistrictCount} congressional districts.`);
+
+        // Fit-to-bounds: Calculate bounding box from feature geometry and zoom to fit
+        if (feature.geometry && mapRef.current) {
+          try {
+            const featureBbox = bbox(feature as Feature);
+            mapRef.current.fitBounds(
+              [[featureBbox[0], featureBbox[1]], [featureBbox[2], featureBbox[3]]],
+              {
+                padding: 50,
+                maxZoom: 7.5,
+                duration: 1000, // Smooth 1s animation
+              }
+            );
+          } catch {
+            // Fallback to manual zoom if bbox calculation fails
+            setViewState((prev) => ({
+              ...prev,
+              longitude: event.lngLat.lng,
+              latitude: event.lngLat.lat,
+              zoom: 6,
+            }));
+          }
+        }
       }
     },
-    [showDistricts, onRegionSelect]
+    [showDistricts, onRegionSelect, districts]
   );
 
   // Handle district click
@@ -491,43 +532,68 @@ export function ImpactMap({
     [stateColorExpression, showDistricts]
   );
 
+  // States border glow layer (rendered below main border for halo effect)
+  const statesBorderGlowLayer: LineLayerSpecification = useMemo(() => {
+    const selectedFips = selectedRegion ? Object.entries(FIPS_TO_ABBR).find(([, abbr]) => abbr === selectedRegion)?.[0] || "" : "";
+    const hoveredFips = hoveredRegion && hoveredType === "state"
+      ? Object.entries(FIPS_TO_ABBR).find(([, abbr]) => abbr === hoveredRegion)?.[0] || ""
+      : "";
+
+    return {
+      id: "states-border-glow",
+      type: "line",
+      source: "states",
+      paint: {
+        "line-color": [
+          "case",
+          ["==", ["id"], selectedFips], COLORS.glowSelected,
+          ["==", ["id"], hoveredFips], COLORS.glowHover,
+          "transparent",
+        ] as ExpressionSpecification,
+        "line-width": [
+          "case",
+          ["==", ["id"], selectedFips], 12,
+          ["==", ["id"], hoveredFips], 10,
+          0,
+        ] as ExpressionSpecification,
+        "line-opacity": [
+          "case",
+          ["==", ["id"], selectedFips], 0.5,
+          ["==", ["id"], hoveredFips], 0.4,
+          0,
+        ] as ExpressionSpecification,
+        "line-blur": 4,
+      },
+    };
+  }, [selectedRegion, hoveredRegion, hoveredType]);
+
   // States border layer
-  const statesBorderLayer: LineLayerSpecification = useMemo(
-    () => ({
+  const statesBorderLayer: LineLayerSpecification = useMemo(() => {
+    const selectedFips = selectedRegion ? Object.entries(FIPS_TO_ABBR).find(([, abbr]) => abbr === selectedRegion)?.[0] || "" : "";
+    const hoveredFips = hoveredRegion && hoveredType === "state"
+      ? Object.entries(FIPS_TO_ABBR).find(([, abbr]) => abbr === hoveredRegion)?.[0] || ""
+      : "";
+
+    return {
       id: "states-border",
       type: "line",
       source: "states",
       paint: {
         "line-color": [
           "case",
-          ["==", ["id"], selectedRegion ? Object.entries(FIPS_TO_ABBR).find(([, abbr]) => abbr === selectedRegion)?.[0] || "" : ""],
-          COLORS.selectedBorder,
-          hoveredRegion && hoveredType === "state"
-            ? [
-                "case",
-                ["==", ["id"], Object.entries(FIPS_TO_ABBR).find(([, abbr]) => abbr === hoveredRegion)?.[0] || ""],
-                COLORS.hoverBorder,
-                COLORS.border,
-              ]
-            : COLORS.border,
+          ["==", ["id"], selectedFips], COLORS.selectedBorder,
+          ["==", ["id"], hoveredFips], COLORS.hoverBorder,
+          COLORS.border,
         ] as ExpressionSpecification,
         "line-width": [
           "case",
-          ["==", ["id"], selectedRegion ? Object.entries(FIPS_TO_ABBR).find(([, abbr]) => abbr === selectedRegion)?.[0] || "" : ""],
-          3,
-          hoveredRegion && hoveredType === "state"
-            ? [
-                "case",
-                ["==", ["id"], Object.entries(FIPS_TO_ABBR).find(([, abbr]) => abbr === hoveredRegion)?.[0] || ""],
-                2,
-                1,
-              ]
-            : 1,
+          ["==", ["id"], selectedFips], 5,  // Increased from 3
+          ["==", ["id"], hoveredFips], 4,   // Increased from 2
+          1.5,  // Increased from 1
         ] as ExpressionSpecification,
       },
-    }),
-    [selectedRegion, hoveredRegion, hoveredType]
-  );
+    };
+  }, [selectedRegion, hoveredRegion, hoveredType]);
 
   // Districts fill layer
   const districtsFillLayer: FillLayerSpecification = useMemo(
@@ -545,6 +611,76 @@ export function ImpactMap({
     }),
     [districtColorExpression, districtOpacityExpression, showDistricts]
   );
+
+  // Districts border glow layer (rendered below main border for halo effect)
+  const districtsBorderGlowLayer: LineLayerSpecification = useMemo(() => {
+    // Parse selected district for matching
+    const selectedParts = selectedRegion?.includes("-")
+      ? selectedRegion.split("-")
+      : null;
+    const selectedStateFips = selectedParts
+      ? Object.entries(FIPS_TO_ABBR).find(([, abbr]) => abbr === selectedParts[0])?.[0]
+      : null;
+    const selectedDistrictNum = selectedParts?.[1];
+
+    // Parse hovered district for matching
+    const hoveredParts =
+      hoveredRegion?.includes("-") && hoveredType === "district"
+        ? hoveredRegion.split("-")
+        : null;
+    const hoveredStateFips = hoveredParts
+      ? Object.entries(FIPS_TO_ABBR).find(([, abbr]) => abbr === hoveredParts[0])?.[0]
+      : null;
+    const hoveredDistrictNum = hoveredParts?.[1];
+
+    return {
+      id: "districts-border-glow",
+      type: "line",
+      source: "districts",
+      layout: {
+        visibility: showDistricts ? "visible" : "none",
+      },
+      paint: {
+        "line-color": [
+          "case",
+          selectedStateFips && selectedDistrictNum
+            ? ["all", ["==", ["get", "STATE"], selectedStateFips], ["==", ["get", "CD"], selectedDistrictNum]]
+            : false,
+          COLORS.glowSelected,
+          hoveredStateFips && hoveredDistrictNum
+            ? ["all", ["==", ["get", "STATE"], hoveredStateFips], ["==", ["get", "CD"], hoveredDistrictNum]]
+            : false,
+          COLORS.glowHover,
+          "transparent",
+        ] as ExpressionSpecification,
+        "line-width": [
+          "case",
+          selectedStateFips && selectedDistrictNum
+            ? ["all", ["==", ["get", "STATE"], selectedStateFips], ["==", ["get", "CD"], selectedDistrictNum]]
+            : false,
+          12,
+          hoveredStateFips && hoveredDistrictNum
+            ? ["all", ["==", ["get", "STATE"], hoveredStateFips], ["==", ["get", "CD"], hoveredDistrictNum]]
+            : false,
+          10,
+          0,
+        ] as ExpressionSpecification,
+        "line-opacity": [
+          "case",
+          selectedStateFips && selectedDistrictNum
+            ? ["all", ["==", ["get", "STATE"], selectedStateFips], ["==", ["get", "CD"], selectedDistrictNum]]
+            : false,
+          0.5,
+          hoveredStateFips && hoveredDistrictNum
+            ? ["all", ["==", ["get", "STATE"], hoveredStateFips], ["==", ["get", "CD"], hoveredDistrictNum]]
+            : false,
+          0.4,
+          0,
+        ] as ExpressionSpecification,
+        "line-blur": 4,
+      },
+    };
+  }, [selectedRegion, hoveredRegion, hoveredType, showDistricts]);
 
   // Districts border layer
   const districtsBorderLayer: LineLayerSpecification = useMemo(() => {
@@ -577,49 +713,27 @@ export function ImpactMap({
       paint: {
         "line-color": [
           "case",
-          // Selected district
           selectedStateFips && selectedDistrictNum
-            ? [
-                "all",
-                ["==", ["get", "STATE"], selectedStateFips],
-                ["==", ["get", "CD"], selectedDistrictNum],
-              ]
+            ? ["all", ["==", ["get", "STATE"], selectedStateFips], ["==", ["get", "CD"], selectedDistrictNum]]
             : false,
           COLORS.selectedBorder,
-          // Hovered district
           hoveredStateFips && hoveredDistrictNum
-            ? [
-                "all",
-                ["==", ["get", "STATE"], hoveredStateFips],
-                ["==", ["get", "CD"], hoveredDistrictNum],
-              ]
+            ? ["all", ["==", ["get", "STATE"], hoveredStateFips], ["==", ["get", "CD"], hoveredDistrictNum]]
             : false,
           COLORS.hoverBorder,
-          // Default
           COLORS.border,
         ] as ExpressionSpecification,
         "line-width": [
           "case",
-          // Selected district
           selectedStateFips && selectedDistrictNum
-            ? [
-                "all",
-                ["==", ["get", "STATE"], selectedStateFips],
-                ["==", ["get", "CD"], selectedDistrictNum],
-              ]
+            ? ["all", ["==", ["get", "STATE"], selectedStateFips], ["==", ["get", "CD"], selectedDistrictNum]]
             : false,
-          3,
-          // Hovered district
+          5,  // Increased from 3
           hoveredStateFips && hoveredDistrictNum
-            ? [
-                "all",
-                ["==", ["get", "STATE"], hoveredStateFips],
-                ["==", ["get", "CD"], hoveredDistrictNum],
-              ]
+            ? ["all", ["==", ["get", "STATE"], hoveredStateFips], ["==", ["get", "CD"], hoveredDistrictNum]]
             : false,
-          2.5,
-          // Default
-          1,
+          4,  // Increased from 2.5
+          1.5,  // Increased from 1
         ] as ExpressionSpecification,
       },
     };
@@ -666,6 +780,7 @@ export function ImpactMap({
       </div>
 
       <MapGL
+        ref={mapRef}
         {...viewState}
         onMove={handleMove}
         mapStyle={MAP_STYLE}
@@ -694,15 +809,46 @@ export function ImpactMap({
         {/* Note: Do NOT use generateId - it overwrites original FIPS codes with array indices */}
         <Source id="states" type="geojson" data={enrichedStatesGeoJSON}>
           <Layer {...statesFillLayer} />
+          <Layer {...statesBorderGlowLayer} />
           <Layer {...statesBorderLayer} />
         </Source>
 
         {/* Districts layer - using enriched GeoJSON with impact scores in properties */}
         <Source id="districts" type="geojson" data={enrichedDistrictsGeoJSON}>
           <Layer {...districtsFillLayer} />
+          <Layer {...districtsBorderGlowLayer} />
           <Layer {...districtsBorderLayer} />
         </Source>
       </MapGL>
+
+      {/* State Context Header - shows when zoomed into a state's districts */}
+      {showDistricts && selectedStateInfo && (
+        <div className="absolute top-4 left-4 z-10 bg-[#1a1f2e]/95 backdrop-blur-sm border border-[#2d3748] rounded-lg px-4 py-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                // Reset to US view
+                setViewState(INITIAL_VIEW_STATE);
+                onRegionSelect(null, "state");
+                setSelectedStateInfo(null);
+                setScreenReaderAnnouncement("Returned to United States overview.");
+              }}
+              className="flex items-center gap-1.5 text-[#94a3b8] hover:text-white transition-colors"
+              aria-label="Return to US map view"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-sm">Back</span>
+            </button>
+            <div className="h-5 w-px bg-[#374151]" />
+            <div>
+              <span className="text-white font-medium">{selectedStateInfo.name}</span>
+              <span className="text-[#94a3b8] text-sm ml-2">
+                ({selectedStateInfo.districtCount} {selectedStateInfo.districtCount === 1 ? 'district' : 'districts'})
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hover Tooltip */}
       {hoverInfo && (
