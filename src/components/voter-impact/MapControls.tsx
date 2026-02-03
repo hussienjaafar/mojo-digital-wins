@@ -179,22 +179,24 @@ export function MapControls({
 
   return (
     <div
-      className="flex items-center gap-3 p-3 bg-[#141b2d] border-b border-[#1e2a45]"
+      className="flex items-center gap-2 px-4 py-2 bg-[#0a0f1a]/95 backdrop-blur-md border-b border-[#1e2a45]"
       role="toolbar"
       aria-label="Map filter controls"
     >
       {/* Search Input */}
-      <div className="relative flex-shrink-0 w-48">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#94a3b8]" aria-hidden="true" />
+      <div className="relative flex-shrink-0 w-52">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#64748b]" aria-hidden="true" />
         <Input
           type="text"
           placeholder="Search districts..."
           value={filters.searchQuery}
           onChange={handleSearchChange}
-          className="pl-9 h-9 bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#94a3b8] focus:border-blue-500"
+          className="pl-9 h-9 bg-[#141b2d] border-[#1e2a45] rounded-lg text-[#e2e8f0] placeholder:text-[#64748b] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
           aria-label="Search districts by name or code"
         />
       </div>
+
+      <div className="h-6 w-px bg-[#1e2a45] mx-1" />
 
       {/* Party Filter Dropdown */}
       <DropdownMenu>
@@ -202,25 +204,33 @@ export function MapControls({
           <Button
             variant="outline"
             size="sm"
-            className="h-9 bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45] hover:text-[#e2e8f0]"
+            className={`h-9 rounded-lg transition-all ${
+              filters.party !== 'all'
+                ? 'bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20'
+                : 'bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45]'
+            }`}
             aria-label={`Filter by party, currently ${getPartyLabel(filters.party)}`}
           >
             <Filter className="h-4 w-4 mr-2" aria-hidden="true" />
             {getPartyLabel(filters.party)}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="bg-[#141b2d] border-[#1e2a45]">
-          <DropdownMenuLabel className="text-[#94a3b8]">Filter by Party</DropdownMenuLabel>
+        <DropdownMenuContent className="bg-[#0a0f1a]/95 backdrop-blur-md border-[#1e2a45] rounded-xl p-1">
+          <DropdownMenuLabel className="text-[#64748b] text-xs uppercase tracking-wider px-3">Filter by Party</DropdownMenuLabel>
           <DropdownMenuSeparator className="bg-[#1e2a45]" />
           {PARTY_OPTIONS.map((option) => (
             <DropdownMenuItem
               key={option.value}
               onClick={() => handlePartyChange(option.value)}
-              className="text-[#e2e8f0] focus:bg-[#1e2a45] focus:text-[#e2e8f0] cursor-pointer"
+              className={`rounded-lg cursor-pointer mx-1 ${
+                filters.party === option.value
+                  ? 'bg-[#1e2a45] text-[#e2e8f0]'
+                  : 'text-[#94a3b8] hover:bg-[#1e2a45]/50 hover:text-[#e2e8f0]'
+              }`}
             >
               {option.label}
               {filters.party === option.value && (
-                <span className="ml-auto text-blue-400">&#10003;</span>
+                <span className="ml-auto w-2 h-2 rounded-full bg-blue-500" />
               )}
             </DropdownMenuItem>
           ))}
@@ -233,35 +243,45 @@ export function MapControls({
           <Button
             variant="outline"
             size="sm"
-            className="h-9 bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45] hover:text-[#e2e8f0]"
+            className={`h-9 rounded-lg transition-all ${
+              filters.impact !== 'all'
+                ? 'bg-[#22c55e]/10 border-[#22c55e]/30 text-[#22c55e] hover:bg-[#22c55e]/20'
+                : 'bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45]'
+            }`}
             aria-label={`Filter by impact level, currently ${getImpactLabel(filters.impact)}`}
           >
             <Zap className="h-4 w-4 mr-2" aria-hidden="true" />
             {getImpactLabel(filters.impact)}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="bg-[#141b2d] border-[#1e2a45]">
-          <DropdownMenuLabel className="text-[#94a3b8]">Filter by Impact</DropdownMenuLabel>
+        <DropdownMenuContent className="bg-[#0a0f1a]/95 backdrop-blur-md border-[#1e2a45] rounded-xl p-1">
+          <DropdownMenuLabel className="text-[#64748b] text-xs uppercase tracking-wider px-3">Filter by Impact</DropdownMenuLabel>
           <DropdownMenuSeparator className="bg-[#1e2a45]" />
           {IMPACT_OPTIONS.map((option) => (
             <DropdownMenuItem
               key={option.value}
               onClick={() => handleImpactChange(option.value)}
-              className="text-[#e2e8f0] focus:bg-[#1e2a45] focus:text-[#e2e8f0] cursor-pointer"
+              className={`rounded-lg cursor-pointer mx-1 ${
+                filters.impact === option.value
+                  ? 'bg-[#1e2a45] text-[#e2e8f0]'
+                  : 'text-[#94a3b8] hover:bg-[#1e2a45]/50 hover:text-[#e2e8f0]'
+              }`}
             >
               {option.label}
               {filters.impact === option.value && (
-                <span className="ml-auto text-blue-400">&#10003;</span>
+                <span className="ml-auto w-2 h-2 rounded-full bg-[#22c55e]" />
               )}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
 
+      <div className="h-6 w-px bg-[#1e2a45] mx-1" />
+
       {/* Voter Threshold Slider */}
-      <div className="flex items-center gap-3 flex-shrink-0" role="group" aria-labelledby="min-voters-label">
-        <span id="min-voters-label" className="text-sm text-[#94a3b8] whitespace-nowrap">Minimum Muslim Population:</span>
-        <div className="w-32">
+      <div className="flex items-center gap-3 flex-shrink-0 bg-[#141b2d] rounded-lg px-3 py-1.5 border border-[#1e2a45]" role="group" aria-labelledby="min-voters-label">
+        <span id="min-voters-label" className="text-xs text-[#64748b] whitespace-nowrap uppercase tracking-wider">Min. Population:</span>
+        <div className="w-28">
           <Slider
             value={[filters.minVoters]}
             min={0}
@@ -276,7 +296,7 @@ export function MapControls({
             aria-valuetext={`${formatVoterCount(filters.minVoters)} voters`}
           />
         </div>
-        <span className="text-sm text-[#e2e8f0] w-12 text-right" aria-hidden="true">
+        <span className="text-sm font-medium text-[#e2e8f0] w-10 text-right tabular-nums" aria-hidden="true">
           {formatVoterCount(filters.minVoters)}
         </span>
       </div>
@@ -287,37 +307,51 @@ export function MapControls({
           <Button
             variant="outline"
             size="sm"
-            className={`h-9 bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45] hover:text-[#e2e8f0] ${
-              filters.preset !== "none" ? "border-blue-500" : ""
+            className={`h-9 rounded-lg transition-all ${
+              filters.preset !== "none"
+                ? "bg-[#a855f7]/10 border-[#a855f7]/30 text-[#a855f7] hover:bg-[#a855f7]/20"
+                : "bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45]"
             }`}
             aria-label={filters.preset !== "none" ? `Quick filter presets, 1 active` : "Quick filter presets"}
           >
             <Zap className="h-4 w-4 mr-2" aria-hidden="true" />
             Presets
             {filters.preset !== "none" && (
-              <span className="ml-2 px-1.5 py-0.5 text-xs bg-blue-500 text-white rounded" aria-hidden="true">
+              <span className="ml-2 px-1.5 py-0.5 text-xs bg-[#a855f7] text-white rounded-full font-medium" aria-hidden="true">
                 1
               </span>
             )}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-72 bg-[#141b2d] border-[#1e2a45]">
-          <DropdownMenuLabel className="text-[#94a3b8]">Quick Filters</DropdownMenuLabel>
+        <DropdownMenuContent className="w-80 bg-[#0a0f1a]/95 backdrop-blur-md border-[#1e2a45] rounded-xl p-1">
+          <DropdownMenuLabel className="text-[#64748b] text-xs uppercase tracking-wider px-3">Quick Filters</DropdownMenuLabel>
           <DropdownMenuSeparator className="bg-[#1e2a45]" />
           {PRESET_OPTIONS.map((option) => (
             <DropdownMenuItem
               key={option.value}
               onClick={() => handlePresetChange(option.value)}
-              className="flex flex-col items-start gap-1 py-2 text-[#e2e8f0] focus:bg-[#1e2a45] focus:text-[#e2e8f0] cursor-pointer"
+              className={`flex flex-col items-start gap-1.5 py-3 px-3 rounded-lg cursor-pointer mx-1 my-0.5 transition-all ${
+                filters.preset === option.value
+                  ? "bg-[#a855f7]/10 border border-[#a855f7]/30"
+                  : "hover:bg-[#1e2a45]/50"
+              }`}
             >
-              <div className="flex items-center gap-2 w-full">
-                {option.icon}
-                <span className="font-medium">{option.label}</span>
+              <div className="flex items-center gap-2.5 w-full">
+                <div className={`p-1.5 rounded-md ${
+                  filters.preset === option.value
+                    ? "bg-[#a855f7]/20 text-[#a855f7]"
+                    : "bg-[#1e2a45] text-[#64748b]"
+                }`}>
+                  {option.icon}
+                </div>
+                <span className={`font-medium ${
+                  filters.preset === option.value ? "text-[#e2e8f0]" : "text-[#94a3b8]"
+                }`}>{option.label}</span>
                 {filters.preset === option.value && (
-                  <span className="ml-auto text-blue-400">&#10003;</span>
+                  <span className="ml-auto w-2 h-2 rounded-full bg-[#a855f7]" />
                 )}
               </div>
-              <span className="text-xs text-[#94a3b8] ml-6">{option.description}</span>
+              <span className="text-xs text-[#64748b] ml-8">{option.description}</span>
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -332,7 +366,7 @@ export function MapControls({
           variant="ghost"
           size="sm"
           onClick={handleClearFilters}
-          className="h-9 text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1e2a45]"
+          className="h-9 rounded-lg text-red-400/80 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
         >
           <X className="h-4 w-4 mr-2" />
           Clear Filters

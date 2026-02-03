@@ -260,7 +260,13 @@ export default function VoterImpactMap() {
   if (isAdminLoading) {
     return (
       <div className="h-screen bg-[#0a0f1a] flex items-center justify-center">
-        <p className="text-[#e2e8f0]">Loading...</p>
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center">
+            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+          <p className="text-[#e2e8f0] font-medium">Loading...</p>
+          <p className="text-[#64748b] text-sm mt-1">Checking permissions</p>
+        </div>
       </div>
     );
   }
@@ -268,16 +274,22 @@ export default function VoterImpactMap() {
   // Access denied
   if (!isAdmin) {
     return (
-      <div className="h-screen bg-[#0a0f1a] flex flex-col items-center justify-center gap-4">
-        <h1 className="text-2xl font-bold text-[#e2e8f0]">Access Denied</h1>
-        <p className="text-[#64748b]">You do not have permission to view this page.</p>
-        <Button
-          variant="outline"
-          onClick={() => navigate('/')}
-          className="bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45] hover:text-[#e2e8f0]"
-        >
-          Go Home
-        </Button>
+      <div className="h-screen bg-[#0a0f1a] flex flex-col items-center justify-center p-4">
+        <div className="bg-[#141b2d] border border-[#1e2a45] rounded-2xl p-8 max-w-md text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center">
+            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-[#e2e8f0] mb-2">Access Denied</h1>
+          <p className="text-[#64748b] mb-6">You don't have permission to view the Muslim Voter Impact Map. Please contact an administrator.</p>
+          <Button
+            onClick={() => navigate('/')}
+            className="bg-[#1e2a45] hover:bg-[#2d3b55] text-[#e2e8f0] border-0"
+          >
+            Return Home
+          </Button>
+        </div>
       </div>
     );
   }
@@ -323,13 +335,25 @@ export default function VoterImpactMap() {
         <div className="flex-1 relative">
           {isDataLoading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-[#0a0f1a]">
-              <p className="text-[#e2e8f0]">Loading map data...</p>
+              <div className="text-center">
+                <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+                <p className="text-[#e2e8f0] font-medium">Loading map data...</p>
+                <p className="text-[#64748b] text-sm mt-1">Fetching voter impact statistics</p>
+              </div>
             </div>
           ) : (
             <V3ErrorBoundary sectionName="Voter Impact Map">
               <Suspense fallback={
                 <div className="absolute inset-0 flex items-center justify-center bg-[#0a0f1a]">
-                  <p className="text-[#e2e8f0]">Loading map component...</p>
+                  <div className="text-center">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center">
+                      <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                    <p className="text-[#e2e8f0] font-medium">Loading map...</p>
+                    <p className="text-[#64748b] text-sm mt-1">Initializing visualization</p>
+                  </div>
                 </div>
               }>
                 <ImpactMap
