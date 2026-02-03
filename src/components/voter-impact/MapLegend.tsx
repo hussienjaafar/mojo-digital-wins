@@ -5,17 +5,19 @@
  * Shows flippability levels based on mobilizable Muslim voters vs election margin.
  */
 
+import { IMPACT_COLORS } from "@/types/voter-impact";
+
 const legendItems = [
-  { color: "#22c55e", label: "High", description: "Can flip district" },
-  { color: "#eab308", label: "Medium", description: "Strong influence" },
-  { color: "#ef4444", label: "Low", description: "Some influence" },
-  { color: "#374151", label: "None", description: "Cannot impact" },
+  { color: IMPACT_COLORS.HIGH, label: "High", description: "Can flip district" },
+  { color: IMPACT_COLORS.MEDIUM, label: "Medium", description: "Strong influence" },
+  { color: IMPACT_COLORS.LOW, label: "Low", description: "Some influence" },
+  { color: IMPACT_COLORS.NONE, label: "None", description: "Cannot impact" },
 ];
 
 export const MapLegend: React.FC = () => {
   return (
     <div className="absolute bottom-4 left-4 bg-[#141b2d]/90 backdrop-blur-sm rounded-lg border border-[#1e2a45] p-3">
-      <div className="text-xs text-[#64748b] uppercase tracking-wide mb-2">
+      <div className="text-xs text-[#94a3b8] uppercase tracking-wide mb-2">
         Flippability Score
       </div>
       <div className="flex flex-col gap-1.5">
@@ -28,7 +30,7 @@ export const MapLegend: React.FC = () => {
             <span className="text-xs text-white font-medium w-14">
               {item.label}
             </span>
-            <span className="text-xs text-[#64748b]">{item.description}</span>
+            <span className="text-xs text-[#94a3b8]">{item.description}</span>
           </div>
         ))}
       </div>

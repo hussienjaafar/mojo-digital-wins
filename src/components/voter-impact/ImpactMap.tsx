@@ -241,9 +241,6 @@ export function ImpactMap({
   const enrichedStatesGeoJSON = useMemo(() => {
     if (!statesGeoJSON || states.length === 0) return statesGeoJSON;
 
-    console.log('[ImpactMap] Enriching states GeoJSON with', states.length, 'states');
-    console.log('[ImpactMap] Sample state impact scores:', Array.from(stateImpactScores.entries()).slice(0, 5));
-
     return {
       ...statesGeoJSON,
       features: statesGeoJSON.features.map((feature) => {
@@ -264,8 +261,6 @@ export function ImpactMap({
   const enrichedDistrictsGeoJSON = useMemo(() => {
     if (!districtsGeoJSON || districts.length === 0) return districtsGeoJSON;
 
-    console.log('[ImpactMap] Enriching districts GeoJSON with', districts.length, 'districts');
-
     return {
       ...districtsGeoJSON,
       features: districtsGeoJSON.features.map((feature) => {
@@ -285,18 +280,15 @@ export function ImpactMap({
     };
   }, [districtsGeoJSON, districts, districtImpactScores]);
 
-  // Color expression for states using unified IMPACT_THRESHOLDS constants
-  // >= HIGH: green - Top tier influence (flippable or very close)
-  // >= MEDIUM: yellow - Significant influence potential
-  // >= LOW: red - Some measurable influence
-  // < LOW: gray - Minimal impact
+  // Color expression for states using unified IMPACT_THRESHOLDS and IMPACT_COLORS constants
+  // Uses colorblind-safe palette: Blue (high), Orange (medium), Purple (low), Gray (none)
   const stateColorExpression = useMemo((): ExpressionSpecification => {
     return [
       "case",
-      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.HIGH], "#22c55e", // High - green
-      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.MEDIUM], "#eab308", // Medium - yellow
-      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.LOW], "#ef4444", // Low - red
-      "#374151" // None - gray
+      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.HIGH], IMPACT_COLORS.HIGH,
+      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.MEDIUM], IMPACT_COLORS.MEDIUM,
+      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.LOW], IMPACT_COLORS.LOW,
+      IMPACT_COLORS.NONE
     ];
   }, []);
 
@@ -708,10 +700,10 @@ export function ImpactMap({
           }}
         >
           <div className="font-semibold text-white text-sm">{hoverInfo.name}</div>
-          <div className="text-xs text-gray-400 mt-1">
+          <div className="text-xs text-gray-300 mt-1">
             Muslim Voters: {hoverInfo.voters.toLocaleString()}
           </div>
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-300">
             Impact Score: {(hoverInfo.score * 100).toFixed(1)}%
           </div>
         </div>

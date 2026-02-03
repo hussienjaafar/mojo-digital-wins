@@ -144,7 +144,7 @@ function InfoCard({ title, children }: InfoCardProps) {
   return (
     <Card className="bg-[#0a0f1a] border-[#1e2a45]">
       <CardHeader className="p-3 pb-2">
-        <CardTitle className="text-sm font-medium text-[#64748b]">{title}</CardTitle>
+        <CardTitle className="text-sm font-medium text-[#94a3b8]">{title}</CardTitle>
       </CardHeader>
       <CardContent className="p-3 pt-0">
         {children}
@@ -267,7 +267,7 @@ function StateDetails({ state }: StateDetailsProps) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-[#e2e8f0]">{state.state_name}</h2>
-          <span className="text-sm text-[#64748b]">{state.state_code}</span>
+          <span className="text-sm text-[#94a3b8]">{state.state_code}</span>
         </div>
       </div>
 
@@ -308,7 +308,7 @@ function StateDetails({ state }: StateDetailsProps) {
           <Progress
             value={state.vote_2022_pct * 100}
             className="h-2 bg-[#1e2a45]"
-            indicatorClassName="bg-[#64748b]"
+            indicatorClassName="bg-[#94a3b8]"
           />
         </div>
       </InfoCard>
@@ -348,7 +348,7 @@ function ComparisonItem({ type, data, onRemove }: ComparisonItemProps) {
         variant="ghost"
         size="sm"
         onClick={onRemove}
-        className="h-6 w-6 p-0 text-[#64748b] hover:text-[#ef4444] hover:bg-transparent"
+        className="h-6 w-6 p-0 text-[#94a3b8] hover:text-[#ef4444] hover:bg-transparent"
       >
         <X className="h-4 w-4" />
       </Button>
@@ -403,7 +403,7 @@ export function RegionSidebar({
           </>
         ) : (
           <div className="flex flex-col items-center justify-center h-64 text-center">
-            <p className="text-[#64748b] text-sm">
+            <p className="text-[#94a3b8] text-sm">
               Select a region on the map to view details
             </p>
           </div>
@@ -421,7 +421,7 @@ export function RegionSidebar({
               variant="ghost"
               size="sm"
               onClick={onClearComparison}
-              className="h-7 px-2 text-[#64748b] hover:text-[#ef4444] hover:bg-transparent"
+              className="h-7 px-2 text-[#94a3b8] hover:text-[#ef4444] hover:bg-transparent"
             >
               <Trash2 className="h-3 w-3 mr-1" />
               Clear All

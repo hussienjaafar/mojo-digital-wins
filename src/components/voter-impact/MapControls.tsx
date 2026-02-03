@@ -181,13 +181,13 @@ export function MapControls({
     <div className="flex items-center gap-3 p-3 bg-[#141b2d] border-b border-[#1e2a45]">
       {/* Search Input */}
       <div className="relative flex-shrink-0 w-48">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#64748b]" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#94a3b8]" />
         <Input
           type="text"
           placeholder="Search districts..."
           value={filters.searchQuery}
           onChange={handleSearchChange}
-          className="pl-9 h-9 bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#64748b] focus:border-blue-500"
+          className="pl-9 h-9 bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#94a3b8] focus:border-blue-500"
         />
       </div>
 
@@ -204,7 +204,7 @@ export function MapControls({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="bg-[#141b2d] border-[#1e2a45]">
-          <DropdownMenuLabel className="text-[#64748b]">Filter by Party</DropdownMenuLabel>
+          <DropdownMenuLabel className="text-[#94a3b8]">Filter by Party</DropdownMenuLabel>
           <DropdownMenuSeparator className="bg-[#1e2a45]" />
           {PARTY_OPTIONS.map((option) => (
             <DropdownMenuItem
@@ -234,7 +234,7 @@ export function MapControls({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="bg-[#141b2d] border-[#1e2a45]">
-          <DropdownMenuLabel className="text-[#64748b]">Filter by Impact</DropdownMenuLabel>
+          <DropdownMenuLabel className="text-[#94a3b8]">Filter by Impact</DropdownMenuLabel>
           <DropdownMenuSeparator className="bg-[#1e2a45]" />
           {IMPACT_OPTIONS.map((option) => (
             <DropdownMenuItem
@@ -253,7 +253,7 @@ export function MapControls({
 
       {/* Voter Threshold Slider */}
       <div className="flex items-center gap-3 flex-shrink-0">
-        <span className="text-sm text-[#64748b] whitespace-nowrap">Min Voters:</span>
+        <span className="text-sm text-[#94a3b8] whitespace-nowrap">Min Voters:</span>
         <div className="w-32">
           <Slider
             value={[filters.minVoters]}
@@ -289,7 +289,7 @@ export function MapControls({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-72 bg-[#141b2d] border-[#1e2a45]">
-          <DropdownMenuLabel className="text-[#64748b]">Quick Filters</DropdownMenuLabel>
+          <DropdownMenuLabel className="text-[#94a3b8]">Quick Filters</DropdownMenuLabel>
           <DropdownMenuSeparator className="bg-[#1e2a45]" />
           {PRESET_OPTIONS.map((option) => (
             <DropdownMenuItem
@@ -304,7 +304,7 @@ export function MapControls({
                   <span className="ml-auto text-blue-400">&#10003;</span>
                 )}
               </div>
-              <span className="text-xs text-[#64748b] ml-6">{option.description}</span>
+              <span className="text-xs text-[#94a3b8] ml-6">{option.description}</span>
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -319,7 +319,7 @@ export function MapControls({
           variant="ghost"
           size="sm"
           onClick={handleClearFilters}
-          className="h-9 text-[#64748b] hover:text-[#e2e8f0] hover:bg-[#1e2a45]"
+          className="h-9 text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1e2a45]"
         >
           <X className="h-4 w-4 mr-2" />
           Clear Filters
