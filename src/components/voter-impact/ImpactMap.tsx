@@ -28,6 +28,7 @@ import {
   getImpactColor,
   applyFilters,
   IMPACT_THRESHOLDS,
+  IMPACT_COLORS,
 } from "@/types/voter-impact";
 
 // ============================================================================
@@ -88,7 +89,7 @@ interface DistrictProperties {
 }
 
 const COLORS = {
-  border: "#1e2a45",
+  border: "#0f172a",
   hoverBorder: "#60a5fa",
   selectedBorder: "#3b82f6",
 };
@@ -624,9 +625,9 @@ export function ImpactMap({
                 ["==", ["get", "CD"], hoveredDistrictNum],
               ]
             : false,
-          2,
+          2.5,
           // Default
-          0.5,
+          1,
         ] as ExpressionSpecification,
       },
     };
