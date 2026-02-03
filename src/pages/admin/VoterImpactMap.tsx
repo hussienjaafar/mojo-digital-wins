@@ -5,8 +5,8 @@
  * across US states and congressional districts.
  */
 
-import React, { useState, useMemo, useCallback, lazy, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useCallback, lazy, Suspense, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ import type {
   VoterImpactState,
   VoterImpactDistrict,
 } from '@/queries/useVoterImpactQueries';
-import type { MapFilters, MetricType, ComparisonItem } from '@/types/voter-impact';
+import type { MapFilters, MetricType, ComparisonItem, PartyFilter, ImpactFilter, PresetFilter } from '@/types/voter-impact';
 import { DEFAULT_MAP_FILTERS, applyFilters } from '@/types/voter-impact';
 import { V3ErrorBoundary } from '@/components/v3/V3ErrorBoundary';
 import { MapControls } from '@/components/voter-impact/MapControls';
@@ -36,16 +36,91 @@ import { MetricToggle } from '@/components/voter-impact/MetricToggle';
 // Component
 // ============================================================================
 
+// Valid filter values for URL param validation
+const VALID_PARTY_VALUES: PartyFilter[] = ['all', 'democrat', 'republican', 'close'];
+const VALID_IMPACT_VALUES: ImpactFilter[] = ['all', 'high', 'can-impact', 'no-impact'];
+const VALID_PRESET_VALUES: PresetFilter[] = ['none', 'swing', 'high-roi', 'low-turnout', 'top-population'];
+const VALID_REGION_TYPES = ['state', 'district'] as const;
+
 export default function VoterImpactMap() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
 
+  // Initialize state from URL params (runs once on mount)
+  const initialFilters = useMemo<MapFilters>(() => {
+    const partyParam = searchParams.get('party');
+    const impactParam = searchParams.get('impact');
+    const minVotersParam = searchParams.get('minVoters');
+    const presetParam = searchParams.get('preset');
+    const searchQueryParam = searchParams.get('q');
+
+    return {
+      party: partyParam && VALID_PARTY_VALUES.includes(partyParam as PartyFilter)
+        ? (partyParam as PartyFilter)
+        : DEFAULT_MAP_FILTERS.party,
+      impact: impactParam && VALID_IMPACT_VALUES.includes(impactParam as ImpactFilter)
+        ? (impactParam as ImpactFilter)
+        : DEFAULT_MAP_FILTERS.impact,
+      minVoters: minVotersParam ? Math.max(0, parseInt(minVotersParam, 10) || 0) : DEFAULT_MAP_FILTERS.minVoters,
+      preset: presetParam && VALID_PRESET_VALUES.includes(presetParam as PresetFilter)
+        ? (presetParam as PresetFilter)
+        : DEFAULT_MAP_FILTERS.preset,
+      searchQuery: searchQueryParam || DEFAULT_MAP_FILTERS.searchQuery,
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  const initialRegionId = useMemo<string | null>(() => {
+    return searchParams.get('region') || null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  const initialRegionType = useMemo<'state' | 'district'>(() => {
+    const typeParam = searchParams.get('type');
+    return typeParam && VALID_REGION_TYPES.includes(typeParam as 'state' | 'district')
+      ? (typeParam as 'state' | 'district')
+      : 'state';
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
   // State management
-  const [filters, setFilters] = useState<MapFilters>(DEFAULT_MAP_FILTERS);
+  const [filters, setFilters] = useState<MapFilters>(initialFilters);
   const [metric, setMetric] = useState<MetricType>('impact');
-  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
-  const [selectedRegionType, setSelectedRegionType] = useState<'state' | 'district'>('state');
+  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(initialRegionId);
+  const [selectedRegionType, setSelectedRegionType] = useState<'state' | 'district'>(initialRegionType);
   const [comparisonItems, setComparisonItems] = useState<ComparisonItem[]>([]);
+
+  // Sync state changes to URL params
+  useEffect(() => {
+    const params = new URLSearchParams();
+
+    // Only add non-default filter values to keep URL clean
+    if (filters.party !== 'all') {
+      params.set('party', filters.party);
+    }
+    if (filters.impact !== 'all') {
+      params.set('impact', filters.impact);
+    }
+    if (filters.minVoters > 0) {
+      params.set('minVoters', filters.minVoters.toString());
+    }
+    if (filters.preset !== 'none') {
+      params.set('preset', filters.preset);
+    }
+    if (filters.searchQuery) {
+      params.set('q', filters.searchQuery);
+    }
+
+    // Add selected region to URL
+    if (selectedRegionId) {
+      params.set('region', selectedRegionId);
+      params.set('type', selectedRegionType);
+    }
+
+    // Use replace: true to avoid polluting browser history
+    setSearchParams(params, { replace: true });
+  }, [filters, selectedRegionId, selectedRegionType, setSearchParams]);
 
   // Data fetching
   const { data: rawStates = [], isLoading: statesLoading } = useVoterImpactStates();
