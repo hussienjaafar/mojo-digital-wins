@@ -234,14 +234,21 @@ function DistrictDetails({ district, onDeselect }: DistrictDetailsProps) {
 
       {/* Election Results - Redesigned */}
       <div className="bg-[#0a0f1a] rounded-lg p-4 border border-[#1e2a45]">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-2">
           <span className="text-xs text-[#64748b] uppercase tracking-wider">2024 Race</span>
           {district.margin_pct !== null && (
             <span className="text-xs px-2 py-0.5 rounded bg-[#1e2a45] text-[#94a3b8]">
-              {formatPercent(district.margin_pct)} margin
+              {formatPercent(district.margin_pct)}
             </span>
           )}
         </div>
+        {/* Vote Margin - Key metric for analysis */}
+        {district.margin_votes !== null && (
+          <div className="text-center py-2 mb-3 bg-[#141b2d] rounded border border-[#1e2a45]">
+            <div className="text-2xl font-bold text-[#f59e0b]">{formatNumber(district.margin_votes)}</div>
+            <div className="text-xs text-[#64748b]">vote margin</div>
+          </div>
+        )}
 
         {/* Winner */}
         <div className={`flex items-center gap-3 p-2 rounded mb-2 ${winnerParty === 'D' ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
