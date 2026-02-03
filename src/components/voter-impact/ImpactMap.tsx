@@ -158,7 +158,10 @@ export function ImpactMap({
   const [districtsGeoJSON, setDistrictsGeoJSON] = useState<FeatureCollection<Geometry, DistrictProperties> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  
+
+  // Screen reader announcement state
+  const [screenReaderAnnouncement, setScreenReaderAnnouncement] = useState<string>("");
+
   // Hover tooltip state
   const [hoverInfo, setHoverInfo] = useState<{
     x: number;
@@ -351,9 +354,12 @@ export function ImpactMap({
       // Handle both numeric and string IDs, pad to 2 digits
       const fips = String(feature.id).padStart(2, '0');
       const stateAbbr = getStateFromFips(fips);
+      const stateName = feature.properties?.name || stateAbbr || 'Unknown';
 
       if (stateAbbr) {
         onRegionSelect(stateAbbr, "state");
+        // Announce selection to screen readers
+        setScreenReaderAnnouncement(`Selected ${stateName}. Zooming to view congressional districts.`);
         // Zoom to state level
         setViewState((prev) => ({
           ...prev,
@@ -380,8 +386,11 @@ export function ImpactMap({
 
       if (stateCode && districtNum) {
         const cdCode = buildDistrictCode(stateCode, districtNum);
+        const stateAbbr = FIPS_TO_ABBR[stateCode] || stateCode;
         if (cdCode) {
           onRegionSelect(cdCode, "district");
+          // Announce selection to screen readers
+          setScreenReaderAnnouncement(`Selected ${stateAbbr} Congressional District ${parseInt(districtNum, 10) || 'At-Large'}.`);
         }
       }
     },
@@ -641,7 +650,21 @@ export function ImpactMap({
   }
 
   return (
-    <div className="w-full h-full relative">
+    <div
+      className="w-full h-full relative"
+      role="application"
+      aria-label="Muslim Voter Impact Map of United States"
+      aria-description="Interactive choropleth map showing Muslim voter impact data across states and congressional districts. Click on a state to zoom in and view district-level data. Colors indicate flippability score from high impact (blue) to no impact (gray)."
+    >
+      {/* Screen reader announcements */}
+      <div
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {screenReaderAnnouncement}
+      </div>
+
       <MapGL
         {...viewState}
         onMove={handleMove}

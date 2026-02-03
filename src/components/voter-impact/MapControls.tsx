@@ -178,16 +178,21 @@ export function MapControls({
   }, [onFiltersChange]);
 
   return (
-    <div className="flex items-center gap-3 p-3 bg-[#141b2d] border-b border-[#1e2a45]">
+    <div
+      className="flex items-center gap-3 p-3 bg-[#141b2d] border-b border-[#1e2a45]"
+      role="toolbar"
+      aria-label="Map filter controls"
+    >
       {/* Search Input */}
       <div className="relative flex-shrink-0 w-48">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#94a3b8]" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#94a3b8]" aria-hidden="true" />
         <Input
           type="text"
           placeholder="Search districts..."
           value={filters.searchQuery}
           onChange={handleSearchChange}
           className="pl-9 h-9 bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#94a3b8] focus:border-blue-500"
+          aria-label="Search districts by name or code"
         />
       </div>
 
@@ -198,8 +203,9 @@ export function MapControls({
             variant="outline"
             size="sm"
             className="h-9 bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45] hover:text-[#e2e8f0]"
+            aria-label={`Filter by party, currently ${getPartyLabel(filters.party)}`}
           >
-            <Filter className="h-4 w-4 mr-2" />
+            <Filter className="h-4 w-4 mr-2" aria-hidden="true" />
             {getPartyLabel(filters.party)}
           </Button>
         </DropdownMenuTrigger>
@@ -228,8 +234,9 @@ export function MapControls({
             variant="outline"
             size="sm"
             className="h-9 bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45] hover:text-[#e2e8f0]"
+            aria-label={`Filter by impact level, currently ${getImpactLabel(filters.impact)}`}
           >
-            <Zap className="h-4 w-4 mr-2" />
+            <Zap className="h-4 w-4 mr-2" aria-hidden="true" />
             {getImpactLabel(filters.impact)}
           </Button>
         </DropdownMenuTrigger>
@@ -252,8 +259,8 @@ export function MapControls({
       </DropdownMenu>
 
       {/* Voter Threshold Slider */}
-      <div className="flex items-center gap-3 flex-shrink-0">
-        <span className="text-sm text-[#94a3b8] whitespace-nowrap">Minimum Muslim Population:</span>
+      <div className="flex items-center gap-3 flex-shrink-0" role="group" aria-labelledby="min-voters-label">
+        <span id="min-voters-label" className="text-sm text-[#94a3b8] whitespace-nowrap">Minimum Muslim Population:</span>
         <div className="w-32">
           <Slider
             value={[filters.minVoters]}
@@ -262,9 +269,14 @@ export function MapControls({
             step={1000}
             onValueChange={handleMinVotersChange}
             className="[&_[data-slot=track]]:bg-[#1e2a45] [&_[data-slot=range]]:bg-blue-500 [&_[data-slot=thumb]]:bg-[#e2e8f0] [&_[data-slot=thumb]]:border-blue-500"
+            aria-label="Minimum Muslim population threshold"
+            aria-valuemin={0}
+            aria-valuemax={maxVoters}
+            aria-valuenow={filters.minVoters}
+            aria-valuetext={`${formatVoterCount(filters.minVoters)} voters`}
           />
         </div>
-        <span className="text-sm text-[#e2e8f0] w-12 text-right">
+        <span className="text-sm text-[#e2e8f0] w-12 text-right" aria-hidden="true">
           {formatVoterCount(filters.minVoters)}
         </span>
       </div>
@@ -278,11 +290,12 @@ export function MapControls({
             className={`h-9 bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45] hover:text-[#e2e8f0] ${
               filters.preset !== "none" ? "border-blue-500" : ""
             }`}
+            aria-label={filters.preset !== "none" ? `Quick filter presets, 1 active` : "Quick filter presets"}
           >
-            <Zap className="h-4 w-4 mr-2" />
+            <Zap className="h-4 w-4 mr-2" aria-hidden="true" />
             Presets
             {filters.preset !== "none" && (
-              <span className="ml-2 px-1.5 py-0.5 text-xs bg-blue-500 text-white rounded">
+              <span className="ml-2 px-1.5 py-0.5 text-xs bg-blue-500 text-white rounded" aria-hidden="true">
                 1
               </span>
             )}

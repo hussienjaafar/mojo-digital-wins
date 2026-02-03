@@ -143,9 +143,9 @@ interface InfoCardProps {
 
 function InfoCard({ title, children }: InfoCardProps) {
   return (
-    <Card className="bg-[#0a0f1a] border-[#1e2a45]">
+    <Card className="bg-[#0a0f1a] border-[#1e2a45]" role="group" aria-label={title}>
       <CardHeader className="p-3 pb-2">
-        <CardTitle className="text-sm font-medium text-[#94a3b8]">{title}</CardTitle>
+        <CardTitle as="h3" className="text-sm font-medium text-[#94a3b8]">{title}</CardTitle>
       </CardHeader>
       <CardContent className="p-3 pt-0">
         {children}
@@ -164,11 +164,11 @@ function DistrictDetails({ district, onDeselect }: DistrictDetailsProps) {
   const turnoutPct = district.turnout_pct * 100;
 
   return (
-    <div className="space-y-3">
+    <article className="space-y-3" aria-labelledby="district-heading">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <header className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h2 className="text-xl font-bold text-[#e2e8f0]">{district.cd_code}</h2>
+          <h2 id="district-heading" className="text-xl font-bold text-[#e2e8f0]">{district.cd_code}</h2>
           <Button
             variant="ghost"
             size="sm"
@@ -180,7 +180,7 @@ function DistrictDetails({ district, onDeselect }: DistrictDetailsProps) {
           </Button>
         </div>
         <ImpactBadge level={impactLevel} />
-      </div>
+      </header>
 
       {/* Muslim Voters Card */}
       <InfoCard title="Muslim Voters">
@@ -265,7 +265,7 @@ function DistrictDetails({ district, onDeselect }: DistrictDetailsProps) {
           </div>
         </InfoCard>
       )}
-    </div>
+    </article>
   );
 }
 
@@ -276,12 +276,12 @@ interface StateDetailsProps {
 
 function StateDetails({ state, onDeselect }: StateDetailsProps) {
   return (
-    <div className="space-y-3">
+    <article className="space-y-3" aria-labelledby="state-heading">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <header className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div>
-            <h2 className="text-xl font-bold text-[#e2e8f0]">{state.state_name}</h2>
+            <h2 id="state-heading" className="text-xl font-bold text-[#e2e8f0]">{state.state_name}</h2>
             <span className="text-sm text-[#94a3b8]">{state.state_code}</span>
           </div>
           <Button
@@ -294,7 +294,7 @@ function StateDetails({ state, onDeselect }: StateDetailsProps) {
             <X className="h-4 w-4" />
           </Button>
         </div>
-      </div>
+      </header>
 
       {/* Muslim Voters Card */}
       <InfoCard title="Muslim Voters">
@@ -351,7 +351,7 @@ function StateDetails({ state, onDeselect }: StateDetailsProps) {
           </div>
         </div>
       </InfoCard>
-    </div>
+    </article>
   );
 }
 
@@ -402,8 +402,25 @@ export function RegionSidebar({
         getRegionId(selectedRegion.type, selectedRegion.data)
     );
 
+  // Generate region name for screen reader announcement
+  const selectedRegionName = selectedRegion
+    ? selectedRegion.type === "district" && isDistrict(selectedRegion.data)
+      ? selectedRegion.data.cd_code
+      : (selectedRegion.data as VoterImpactState).state_name
+    : null;
+
   return (
-    <div className="w-80 bg-[#141b2d] border-l border-[#1e2a45] flex flex-col h-full overflow-hidden">
+    <div
+      className="w-80 bg-[#141b2d] border-l border-[#1e2a45] flex flex-col h-full overflow-hidden"
+      role="region"
+      aria-label="Region Details"
+    >
+      {/* Screen reader announcement for region selection changes */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {selectedRegionName
+          ? `Now viewing details for ${selectedRegionName}`
+          : "No region selected. Click on the map to select a region."}
+      </div>
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-4">
         {selectedRegion ? (

@@ -43,7 +43,8 @@ describe('RegionSidebar', () => {
           selectedRegion={{ type: 'state', data: state }}
         />
       );
-      expect(screen.getByText(/Michigan/i)).toBeInTheDocument();
+      // Use getByRole to target the heading specifically
+      expect(screen.getByRole('heading', { name: /Michigan/i })).toBeInTheDocument();
       expect(screen.getByText(/MI/)).toBeInTheDocument();
     });
 
@@ -69,7 +70,8 @@ describe('RegionSidebar', () => {
           selectedRegion={{ type: 'district', data: district }}
         />
       );
-      expect(screen.getByText(/MI-011/)).toBeInTheDocument();
+      // Use getByRole to target the heading specifically
+      expect(screen.getByRole('heading', { name: /MI-011/ })).toBeInTheDocument();
     });
 
     it('renders winner information', () => {
