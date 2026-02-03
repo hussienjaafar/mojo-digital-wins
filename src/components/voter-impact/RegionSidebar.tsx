@@ -158,7 +158,7 @@ function InfoCard({ title, children }: InfoCardProps) {
   return (
     <Card className="bg-[#0a0f1a] border-[#1e2a45]" role="group" aria-label={title}>
       <CardHeader className="p-3 pb-2">
-        <CardTitle as="h3" className="text-sm font-medium text-[#94a3b8]">{title}</CardTitle>
+        <CardTitle className="text-sm font-medium text-[#94a3b8]">{title}</CardTitle>
       </CardHeader>
       <CardContent className="p-3 pt-0">
         {children}

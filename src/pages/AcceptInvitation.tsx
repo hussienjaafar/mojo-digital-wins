@@ -26,6 +26,22 @@ import { PasswordStrengthMeter } from "@/components/auth/PasswordStrengthMeter";
 import { isPasswordValid, validatePassword } from "@/lib/password-validation";
 
 /**
+ * Diagnostic logging for invitation debugging
+ * Outputs structured JSON logs that correlate with edge function logs
+ */
+function logInvitationEvent(event: string, data?: Record<string, unknown>) {
+  const token = new URLSearchParams(window.location.search).get("token");
+  console.log(JSON.stringify({
+    component: "AcceptInvitation",
+    timestamp: new Date().toISOString(),
+    event,
+    url: window.location.href,
+    token: token ? token.substring(0, 8) + "..." : null,
+    ...data,
+  }));
+}
+
+/**
  * Track login attempt (success or failure)
  */
 async function trackLoginAttempt(
@@ -123,11 +139,13 @@ export default function AcceptInvitation() {
 
   useEffect(() => {
     if (!token) {
+      logInvitationEvent("no_token_provided");
       setError("No invitation token provided");
       setLoading(false);
       return;
     }
 
+    logInvitationEvent("page_loaded");
     loadInvitation();
     checkAuthStatus();
   }, [token]);
@@ -174,31 +192,45 @@ export default function AcceptInvitation() {
   };
 
   const loadInvitation = async () => {
+    logInvitationEvent("loading_invitation");
     try {
       const { data, error } = await supabase.rpc("get_invitation_by_token", {
         p_token: token!,
       });
 
-      if (error) throw error;
+      if (error) {
+        logInvitationEvent("invitation_rpc_error", { error: error.message });
+        throw error;
+      }
 
       if (!data || data.length === 0) {
+        logInvitationEvent("invitation_not_found");
         setError("Invitation not found or has expired");
         return;
       }
 
       const inv = data[0] as InvitationDetails;
+      logInvitationEvent("invitation_loaded", {
+        status: inv.status,
+        type: inv.invitation_type,
+        hasOrg: !!inv.organization_id,
+        email: inv.email.substring(0, 3) + "***"
+      });
       
       if (inv.status === "accepted") {
+        logInvitationEvent("invitation_already_accepted");
         setError("This invitation has already been accepted");
         return;
       }
 
       if (inv.status === "revoked") {
+        logInvitationEvent("invitation_revoked");
         setError("This invitation has been revoked");
         return;
       }
 
       if (new Date(inv.expires_at) < new Date()) {
+        logInvitationEvent("invitation_expired");
         setError("This invitation has expired");
         return;
       }
@@ -207,6 +239,7 @@ export default function AcceptInvitation() {
       setLoginEmail(inv.email);
     } catch (err: any) {
       console.error("Error loading invitation:", err);
+      logInvitationEvent("invitation_load_error", { error: err.message });
       setError("Failed to load invitation details");
     } finally {
       setLoading(false);
@@ -236,6 +269,7 @@ export default function AcceptInvitation() {
     }
 
     setSigningUp(true);
+    logInvitationEvent("signup_started", { email: invitation!.email.substring(0, 3) + "***" });
 
     try {
       const response = await fetch(
@@ -258,9 +292,18 @@ export default function AcceptInvitation() {
 
       const result = await response.json();
 
+      logInvitationEvent("signup_response", {
+        status: response.status,
+        ok: response.ok,
+        code: result.code,
+        hasAccessToken: !!result.access_token,
+        requestId: result.requestId
+      });
+
       if (!response.ok) {
         // Handle specific error codes
         if (result.code === "USER_EXISTS") {
+          logInvitationEvent("user_exists_redirect_to_login");
           setSignupError("An account with this email already exists. Please log in instead.");
           setViewMode('login');
           return;
@@ -278,8 +321,11 @@ export default function AcceptInvitation() {
         // Confirm session was persisted before proceeding
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
+          logInvitationEvent("session_not_established");
           throw new Error('Session not established after signup');
         }
+        
+        logInvitationEvent("session_established", { userId: session.user.id });
         
         // Set org context so user lands on correct organization dashboard
         if (invitation?.organization_id) {
@@ -288,14 +334,17 @@ export default function AcceptInvitation() {
         
         setViewMode('accepted');
         setConfirmPassword("");
+        logInvitationEvent("signup_complete_redirecting");
         toast.success("Welcome aboard! Your account has been created.");
       } else {
         // Account created but no session returned - redirect to login
+        logInvitationEvent("no_session_returned_redirect_to_login");
         toast.success("Account created! Please log in with your new password.");
         navigate("/client-login");
       }
     } catch (err: any) {
       console.error("Signup error:", err);
+      logInvitationEvent("signup_error", { error: err.message });
       setSignupError(err.message || "Failed to create account");
     } finally {
       setSigningUp(false);
