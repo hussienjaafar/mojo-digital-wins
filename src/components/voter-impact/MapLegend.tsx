@@ -11,7 +11,7 @@ const legendItems = [
   { color: IMPACT_COLORS.HIGH, label: "High", description: "Can flip district" },
   { color: IMPACT_COLORS.MEDIUM, label: "Medium", description: "Strong influence" },
   { color: IMPACT_COLORS.LOW, label: "Low", description: "Some influence" },
-  { color: IMPACT_COLORS.NONE, label: "None", description: "Cannot impact" },
+  { color: IMPACT_COLORS.NONE, label: "None", description: "Minimal impact" },
 ];
 
 export const MapLegend: React.FC = () => {

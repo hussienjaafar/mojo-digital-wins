@@ -253,7 +253,7 @@ export function MapControls({
 
       {/* Voter Threshold Slider */}
       <div className="flex items-center gap-3 flex-shrink-0">
-        <span className="text-sm text-[#94a3b8] whitespace-nowrap">Min Voters:</span>
+        <span className="text-sm text-[#94a3b8] whitespace-nowrap">Minimum Muslim Population:</span>
         <div className="w-32">
           <Slider
             value={[filters.minVoters]}
