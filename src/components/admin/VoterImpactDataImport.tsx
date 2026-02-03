@@ -190,6 +190,37 @@ function parseString(value: unknown): string | null {
   return String(value).trim();
 }
 
+/**
+ * Extract party from a candidate name that might include party in parentheses
+ * e.g., "RASHIDA TLAIB (D)" -> "D", "John Smith (R)" -> "R"
+ */
+function extractPartyFromName(name: string | null): string | null {
+  if (!name) return null;
+  // Match patterns like (D), (R), (DEM), (REP), (Democrat), (Republican)
+  const match = name.match(/\(([DR]|DEM|REP|Democrat|Republican)\)/i);
+  if (match) {
+    const party = match[1].toUpperCase();
+    if (party === "D" || party === "DEM" || party === "DEMOCRAT") return "D";
+    if (party === "R" || party === "REP" || party === "REPUBLICAN") return "R";
+  }
+  return null;
+}
+
+/**
+ * Normalize party value to "D" or "R"
+ */
+function normalizePartyValue(party: string | null): string | null {
+  if (!party) return null;
+  const normalized = party.toUpperCase().trim();
+  if (normalized === "D" || normalized === "DEM" || normalized === "DEMOCRAT" || normalized === "DEMOCRATIC") {
+    return "D";
+  }
+  if (normalized === "R" || normalized === "REP" || normalized === "REPUBLICAN" || normalized === "GOP") {
+    return "R";
+  }
+  return null;
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -287,12 +318,12 @@ export function VoterImpactDataImport() {
     state_code: ["State Code", "State_Code", "STATE CODE", "STATE_CODE", "STATE", "State"],
     cd_code: ["CD_CODE", "CD CODE", "CD_Code", "CDCODE", "CD"],
     district: ["District", "DISTRICT", "District_Num", "DIST"],
-    winner: ["WINNER", "Winner", "winner"],
-    party: ["Party", "PARTY", "Winner Party"],
-    votes: ["Votes", "VOTES", "Winner Votes"],
-    runner_up: ["Runner-Up", "RUNNER-UP", "Runner Up", "RUNNERUP"],
-    runner_up_party: ["Runner-Up Party", "RUNNER-UP PARTY", "RunnerUpParty"],
-    runner_up_votes: ["Runner-Up Votes", "RUNNER-UP VOTES", "RunnerUpVotes"],
+    winner: ["WINNER", "Winner", "winner", "Winner Name", "WINNER NAME"],
+    party: ["Party", "PARTY", "Winner Party", "WINNER PARTY", "Winner_Party", "WinnerParty", "WIN PARTY", "WIN_PARTY"],
+    votes: ["Votes", "VOTES", "Winner Votes", "WINNER VOTES", "Winner_Votes"],
+    runner_up: ["Runner-Up", "RUNNER-UP", "Runner Up", "RUNNERUP", "Runner-Up Name", "RUNNER-UP NAME", "Loser", "LOSER"],
+    runner_up_party: ["Runner-Up Party", "RUNNER-UP PARTY", "RunnerUpParty", "Runner Up Party", "RUNNER UP PARTY", "Loser Party", "LOSER PARTY", "LOSE PARTY"],
+    runner_up_votes: ["Runner-Up Votes", "RUNNER-UP VOTES", "RunnerUpVotes", "Runner Up Votes", "RUNNER UP VOTES", "Loser Votes"],
     margin_votes: ["Margin (Votes)", "MARGIN (VOTES)", "Margin_Votes", "MarginVotes", "MARGIN"],
     margin_pct: ["Margin (%)", "MARGIN (%)", "Margin_Pct", "MarginPct", "MARGINPCT"],
     total_votes: ["Total Votes", "TOTAL VOTES", "Total_Votes", "TotalVotes"],
@@ -464,15 +495,35 @@ export function VoterImpactDataImport() {
         console.log(`[parseDistrictsFile] Row ${i} (${cdCode}): muslim_voters=${muslimVoters}, registered=${muslimRegistered}`);
       }
 
+      // Parse candidate names and party affiliations
+      const winnerName = parseString(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.winner));
+      const runnerUpName = parseString(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.runner_up));
+
+      // Try explicit party columns first, then extract from candidate names
+      let winnerParty = normalizePartyValue(parseString(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.party)));
+      if (!winnerParty && winnerName) {
+        winnerParty = extractPartyFromName(winnerName);
+      }
+
+      let runnerUpParty = normalizePartyValue(parseString(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.runner_up_party)));
+      if (!runnerUpParty && runnerUpName) {
+        runnerUpParty = extractPartyFromName(runnerUpName);
+      }
+
+      // Debug log party extraction for first few rows
+      if (i < 3) {
+        console.log(`[parseDistrictsFile] Row ${i} party debug: winner="${winnerName}" party="${winnerParty}", runner="${runnerUpName}" party="${runnerUpParty}"`);
+      }
+
       districtRows.push({
         cd_code: cdCode,
         state_code: stateCode,
         district_num: parseNumber(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.district)),
-        winner: parseString(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.winner)),
-        winner_party: parseString(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.party)),
+        winner: winnerName,
+        winner_party: winnerParty,
         winner_votes: parseNumber(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.votes)) || null,
-        runner_up: parseString(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.runner_up)),
-        runner_up_party: parseString(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.runner_up_party)),
+        runner_up: runnerUpName,
+        runner_up_party: runnerUpParty,
         runner_up_votes: parseNumber(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.runner_up_votes)) || null,
         margin_votes: parseNumber(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.margin_votes)) || null,
         margin_pct: parsePercent(getColWithLookup(row, rowLookup, ...DISTRICT_COLUMN_MAPPINGS.margin_pct)) || null,
