@@ -298,82 +298,101 @@ interface StateDetailsProps {
 }
 
 function StateDetails({ state, onDeselect }: StateDetailsProps) {
+  const turnout2024 = state.vote_2024_pct * 100;
+  const turnout2022 = state.vote_2022_pct * 100;
+  const turnoutChange = turnout2024 - turnout2022;
+
   return (
-    <article className="space-y-3" aria-labelledby="state-heading">
+    <article className="space-y-4" aria-labelledby="state-heading">
       {/* Header */}
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <header className="flex items-center justify-between pb-2 border-b border-[#1e2a45]">
+        <div className="flex items-center gap-3">
           <div>
-            <h2 id="state-heading" className="text-xl font-bold text-[#e2e8f0]">{state.state_name}</h2>
-            <span className="text-sm text-[#94a3b8]">{state.state_code}</span>
+            <h2 id="state-heading" className="text-2xl font-bold text-[#e2e8f0]">{state.state_name}</h2>
+            <span className="text-xs text-[#64748b] uppercase tracking-wider">{state.state_code}</span>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onDeselect}
-            className="h-6 w-6 p-0 text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1e2a45]"
-            aria-label="Close details"
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onDeselect}
+          className="h-7 w-7 p-0 text-[#64748b] hover:text-[#e2e8f0] hover:bg-[#1e2a45]"
+          aria-label="Close details"
+        >
+          <X className="h-4 w-4" />
+        </Button>
       </header>
 
-      {/* Muslim Voters Card */}
-      <InfoCard title="Muslim Voters">
-        <div className="space-y-2">
-          <div className="flex justify-between text-[#e2e8f0]">
-            <span>Total</span>
-            <span className="font-semibold">{formatNumber(state.muslim_voters)}</span>
+      {/* Key Metric - Muslim Voter Population */}
+      <div className="bg-[#0a0f1a] rounded-lg p-4 border border-[#1e2a45]">
+        <div className="text-center mb-3">
+          <div className="text-3xl font-bold text-[#e2e8f0]">{formatNumber(state.muslim_voters)}</div>
+          <div className="text-xs text-[#64748b] uppercase tracking-wider">Muslim Voters</div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-center">
+          <div className="bg-[#141b2d] rounded p-2">
+            <div className="text-lg font-semibold text-[#22c55e]">{formatNumber(state.registered)}</div>
+            <div className="text-xs text-[#64748b]">Registered</div>
           </div>
-          <div className="flex justify-between text-[#e2e8f0]">
-            <span>Registered</span>
-            <span className="font-semibold text-[#22c55e]">{formatNumber(state.registered)}</span>
-          </div>
-          <div className="flex justify-between text-[#e2e8f0]">
-            <span>Registration Rate</span>
-            <span className="font-semibold">{formatPercent(state.registered_pct)}</span>
+          <div className="bg-[#141b2d] rounded p-2">
+            <div className="text-lg font-semibold text-blue-400">{formatPercent(state.registered_pct)}</div>
+            <div className="text-xs text-[#64748b]">Reg. Rate</div>
           </div>
         </div>
-      </InfoCard>
+      </div>
 
-      {/* Voting History Card */}
-      <InfoCard title="Voting History">
-        <div className="space-y-2">
-          <div className="flex justify-between text-[#e2e8f0]">
-            <span>2024 Turnout</span>
-            <span className="font-semibold">{formatPercent(state.vote_2024_pct)}</span>
+      {/* Turnout Comparison */}
+      <div className="bg-[#0a0f1a] rounded-lg p-4 border border-[#1e2a45]">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs text-[#64748b] uppercase tracking-wider">Voter Turnout</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+            turnoutChange > 0 ? 'bg-[#22c55e]/20 text-[#22c55e]' : 'bg-[#ef4444]/20 text-[#ef4444]'
+          }`}>
+            {turnoutChange > 0 ? '↑' : '↓'} {Math.abs(turnoutChange).toFixed(1)}%
+          </span>
+        </div>
+
+        {/* 2024 */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm text-[#e2e8f0]">2024</span>
+            <span className="text-lg font-bold text-[#e2e8f0]">{formatPercent(state.vote_2024_pct)}</span>
           </div>
           <Progress
-            value={state.vote_2024_pct * 100}
+            value={turnout2024}
             className="h-2 bg-[#1e2a45]"
             indicatorClassName="bg-blue-500"
           />
-          <div className="flex justify-between text-[#e2e8f0]">
-            <span>2022 Turnout</span>
-            <span className="font-semibold">{formatPercent(state.vote_2022_pct)}</span>
+        </div>
+
+        {/* 2022 */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm text-[#94a3b8]">2022</span>
+            <span className="text-sm font-medium text-[#94a3b8]">{formatPercent(state.vote_2022_pct)}</span>
           </div>
           <Progress
-            value={state.vote_2022_pct * 100}
-            className="h-2 bg-[#1e2a45]"
-            indicatorClassName="bg-[#94a3b8]"
+            value={turnout2022}
+            className="h-1.5 bg-[#1e2a45]"
+            indicatorClassName="bg-[#64748b]"
           />
         </div>
-      </InfoCard>
+      </div>
 
-      {/* Political Engagement Card */}
-      <InfoCard title="Political Engagement">
-        <div className="space-y-2">
-          <div className="flex justify-between text-[#e2e8f0]">
-            <span>Political Donors</span>
-            <span className="font-semibold">{formatNumber(state.political_donors)}</span>
+      {/* Political Engagement */}
+      <div className="bg-[#0a0f1a] rounded-lg p-4 border border-[#1e2a45]">
+        <div className="text-xs text-[#64748b] uppercase tracking-wider mb-3">Political Engagement</div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="text-center p-3 bg-[#141b2d] rounded-lg border border-[#1e2a45]">
+            <div className="text-xl font-bold text-[#a855f7]">{formatNumber(state.political_donors)}</div>
+            <div className="text-xs text-[#64748b]">Donors</div>
           </div>
-          <div className="flex justify-between text-[#e2e8f0]">
-            <span>Political Activists</span>
-            <span className="font-semibold">{formatNumber(state.political_activists)}</span>
+          <div className="text-center p-3 bg-[#141b2d] rounded-lg border border-[#1e2a45]">
+            <div className="text-xl font-bold text-[#f59e0b]">{formatNumber(state.political_activists)}</div>
+            <div className="text-xs text-[#64748b]">Activists</div>
           </div>
         </div>
-      </InfoCard>
+      </div>
     </article>
   );
 }
@@ -484,7 +503,7 @@ export function RegionSidebar({
                 variant="outline"
                 size="sm"
                 onClick={onAddToCompare}
-                className="w-full mt-4 bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45] hover:text-[#e2e8f0]"
+                className="w-full mt-4 bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 hover:border-purple-500/50 transition-all"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add to Compare

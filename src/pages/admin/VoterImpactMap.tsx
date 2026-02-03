@@ -288,20 +288,24 @@ export default function VoterImpactMap() {
   return (
     <div className="h-screen bg-[#0a0f1a] flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-[#141b2d] border-b border-[#1e2a45] px-4 py-3 flex items-center justify-between">
+      <header className="bg-[#0a0f1a]/95 backdrop-blur-md border-b border-[#1e2a45] px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate('/admin?tab=analytics')}
-            className="text-[#64748b] hover:text-[#e2e8f0] hover:bg-[#1e2a45]"
+            className="text-[#64748b] hover:text-[#e2e8f0] hover:bg-[#1e2a45] rounded-lg"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Admin
           </Button>
-          <h1 className="text-lg font-semibold text-[#e2e8f0] uppercase tracking-wide">
-            Muslim Voter Impact Map
-          </h1>
+          <div className="h-6 w-px bg-[#1e2a45]" />
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            <h1 className="text-base font-bold text-[#e2e8f0] tracking-tight">
+              Muslim Voter Impact Map
+            </h1>
+          </div>
         </div>
         <MetricToggle value={metric} onChange={setMetric} />
       </header>
