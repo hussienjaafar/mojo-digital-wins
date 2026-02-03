@@ -385,21 +385,45 @@ interface ComparisonItemProps {
 }
 
 function ComparisonItem({ type, data, onRemove }: ComparisonItemProps) {
-  const label = type === "district" && isDistrict(data)
-    ? data.cd_code
-    : (data as VoterImpactState).state_name;
+  const isDistrictType = type === "district" && isDistrict(data);
+  const label = isDistrictType ? data.cd_code : (data as VoterImpactState).state_name;
+  const muslimVoters = data.muslim_voters;
+
+  // Get impact score for districts
+  const impactScore = isDistrictType ? calculateImpactScore(data as VoterImpactDistrict) : null;
+  const marginVotes = isDistrictType ? (data as VoterImpactDistrict).margin_votes : null;
 
   return (
-    <div className="flex items-center justify-between p-2 bg-[#0a0f1a] border border-[#1e2a45] rounded">
-      <span className="text-sm text-[#e2e8f0]">{label}</span>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onRemove}
-        className="h-6 w-6 p-0 text-[#94a3b8] hover:text-[#ef4444] hover:bg-transparent"
-      >
-        <X className="h-4 w-4" />
-      </Button>
+    <div className="bg-[#0a0f1a] border border-[#1e2a45] rounded-lg p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-[#e2e8f0]">{label}</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onRemove}
+          className="h-6 w-6 p-0 text-[#64748b] hover:text-[#ef4444] hover:bg-transparent"
+        >
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="text-center p-2 bg-[#141b2d] rounded">
+          <div className="text-sm font-bold text-[#e2e8f0]">{formatNumber(muslimVoters)}</div>
+          <div className="text-xs text-[#64748b]">Voters</div>
+        </div>
+        {isDistrictType && marginVotes !== null && (
+          <div className="text-center p-2 bg-[#141b2d] rounded">
+            <div className="text-sm font-bold text-[#f59e0b]">{formatNumber(marginVotes)}</div>
+            <div className="text-xs text-[#64748b]">Margin</div>
+          </div>
+        )}
+        {!isDistrictType && (
+          <div className="text-center p-2 bg-[#141b2d] rounded">
+            <div className="text-sm font-bold text-[#22c55e]">{formatPercent((data as VoterImpactState).registered_pct)}</div>
+            <div className="text-xs text-[#64748b]">Registered</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -468,36 +492,71 @@ export function RegionSidebar({
             )}
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center h-64 text-center px-4">
-            <MapPin className="h-12 w-12 text-[#64748b] mb-4" />
-            <h3 className="text-lg font-medium text-[#e2e8f0] mb-2">No Region Selected</h3>
-            <ul className="text-sm text-[#94a3b8] space-y-2">
-              <li>Click on a state for overview data</li>
-              <li>Zoom in to select congressional districts</li>
-              <li>Use the filters above to find targets</li>
-            </ul>
+          <div className="flex flex-col items-center justify-center h-full text-center px-6 py-8">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center mb-5">
+              <MapPin className="h-8 w-8 text-blue-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-[#e2e8f0] mb-2">Select a Region</h3>
+            <p className="text-sm text-[#64748b] mb-6 max-w-[200px]">
+              Click on the map to explore voter impact data
+            </p>
+            <div className="w-full space-y-2">
+              <div className="flex items-center gap-3 p-3 bg-[#0a0f1a] rounded-lg border border-[#1e2a45]">
+                <div className="w-8 h-8 rounded-lg bg-[#1e2a45] flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm">🗺️</span>
+                </div>
+                <div className="text-left">
+                  <div className="text-xs font-medium text-[#e2e8f0]">Click a state</div>
+                  <div className="text-xs text-[#64748b]">View state overview</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-[#0a0f1a] rounded-lg border border-[#1e2a45]">
+                <div className="w-8 h-8 rounded-lg bg-[#1e2a45] flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm">🔍</span>
+                </div>
+                <div className="text-left">
+                  <div className="text-xs font-medium text-[#e2e8f0]">Zoom in</div>
+                  <div className="text-xs text-[#64748b]">See congressional districts</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-[#0a0f1a] rounded-lg border border-[#1e2a45]">
+                <div className="w-8 h-8 rounded-lg bg-[#1e2a45] flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm">⚡</span>
+                </div>
+                <div className="text-left">
+                  <div className="text-xs font-medium text-[#e2e8f0]">Use presets</div>
+                  <div className="text-xs text-[#64748b]">Find high-impact targets</div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
       {/* Comparison Mode Section */}
       {comparisonItems.length > 0 && (
-        <div className="border-t border-[#1e2a45] p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-medium text-[#e2e8f0]">
-              Comparing ({comparisonItems.length}/4)
-            </h3>
+        <div className="border-t border-[#1e2a45] bg-[#0a0f1a]/50">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[#1e2a45]">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+              <h3 className="text-xs font-medium text-[#94a3b8] uppercase tracking-wider">
+                Compare Mode
+              </h3>
+              <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded">
+                {comparisonItems.length}/4
+              </span>
+            </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={onClearComparison}
-              className="h-7 px-2 text-[#94a3b8] hover:text-[#ef4444] hover:bg-transparent"
+              className="h-6 px-2 text-xs text-[#64748b] hover:text-[#ef4444] hover:bg-transparent"
             >
               <Trash2 className="h-3 w-3 mr-1" />
-              Clear All
+              Clear
             </Button>
           </div>
-          <div className="space-y-2">
+          <div className="p-3 space-y-2 max-h-64 overflow-y-auto">
             {comparisonItems.map((item) => {
               const id = getRegionId(item.type, item.data);
               return (

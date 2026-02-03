@@ -867,8 +867,8 @@ export function ImpactMap({
 
       {/* State Context Header - shows when zoomed into a state's districts */}
       {showDistricts && selectedStateInfo && (
-        <div className="absolute top-4 left-4 z-10 bg-[#1a1f2e]/95 backdrop-blur-sm border border-[#2d3748] rounded-lg px-4 py-3 shadow-lg">
-          <div className="flex items-center gap-3">
+        <div className="absolute top-4 left-4 z-10 bg-[#0a0f1a]/95 backdrop-blur-md border border-[#1e2a45] rounded-xl shadow-xl overflow-hidden">
+          <div className="flex items-center">
             <button
               onClick={() => {
                 // Reset to US view
@@ -877,17 +877,19 @@ export function ImpactMap({
                 setSelectedStateInfo(null);
                 setScreenReaderAnnouncement("Returned to United States overview.");
               }}
-              className="flex items-center gap-1.5 text-[#94a3b8] hover:text-white transition-colors"
+              className="flex items-center gap-2 px-4 py-3 text-[#94a3b8] hover:text-white hover:bg-[#1e2a45] transition-all"
               aria-label="Return to US map view"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span className="text-sm">Back</span>
+              <span className="text-sm font-medium">Back</span>
             </button>
-            <div className="h-5 w-px bg-[#374151]" />
-            <div>
-              <span className="text-white font-medium">{selectedStateInfo.name}</span>
-              <span className="text-[#94a3b8] text-sm ml-2">
-                ({selectedStateInfo.districtCount} {selectedStateInfo.districtCount === 1 ? 'district' : 'districts'})
+            <div className="h-8 w-px bg-[#1e2a45]" />
+            <div className="px-4 py-3 flex items-center gap-3">
+              <div>
+                <span className="text-[#e2e8f0] font-semibold text-lg">{selectedStateInfo.name}</span>
+              </div>
+              <span className="px-2.5 py-1 bg-[#1e2a45] rounded-full text-xs text-[#94a3b8] font-medium">
+                {selectedStateInfo.districtCount} {selectedStateInfo.districtCount === 1 ? 'district' : 'districts'}
               </span>
             </div>
           </div>
@@ -897,18 +899,32 @@ export function ImpactMap({
       {/* Hover Tooltip */}
       {hoverInfo && (
         <div
-          className="absolute z-10 bg-[#1a1f2e] border border-[#2d3748] rounded-lg px-3 py-2 pointer-events-none shadow-lg"
+          className="absolute z-10 bg-[#0a0f1a]/95 backdrop-blur-md border border-[#1e2a45] rounded-xl px-4 py-3 pointer-events-none shadow-xl min-w-[180px]"
           style={{
-            left: Math.min(hoverInfo.x + 10, window.innerWidth - 200),
+            left: Math.min(hoverInfo.x + 10, window.innerWidth - 220),
             top: hoverInfo.y + 10
           }}
         >
-          <div className="font-semibold text-white text-sm">{hoverInfo.name}</div>
-          <div className="text-xs text-gray-300 mt-1">
-            Muslim Voters: {hoverInfo.voters.toLocaleString()}
+          <div className="flex items-center justify-between gap-3 mb-2 pb-2 border-b border-[#1e2a45]">
+            <span className="font-bold text-[#e2e8f0] text-sm">{hoverInfo.name}</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              hoverInfo.score >= 0.7 ? 'bg-[#22c55e]/20 text-[#22c55e]' :
+              hoverInfo.score >= 0.4 ? 'bg-[#f97316]/20 text-[#f97316]' :
+              hoverInfo.score >= 0.1 ? 'bg-[#a855f7]/20 text-[#a855f7]' :
+              'bg-[#64748b]/20 text-[#64748b]'
+            }`}>
+              {hoverInfo.score >= 0.7 ? 'High' : hoverInfo.score >= 0.4 ? 'Medium' : hoverInfo.score >= 0.1 ? 'Low' : 'None'}
+            </span>
           </div>
-          <div className="text-xs text-gray-300">
-            Impact Score: {(hoverInfo.score * 100).toFixed(1)}%
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-lg font-bold text-[#e2e8f0]">{hoverInfo.voters.toLocaleString()}</div>
+              <div className="text-xs text-[#64748b]">Muslim Voters</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold text-blue-400">{(hoverInfo.score * 100).toFixed(0)}%</div>
+              <div className="text-xs text-[#64748b]">Impact</div>
+            </div>
           </div>
         </div>
       )}
@@ -916,16 +932,24 @@ export function ImpactMap({
       {/* Empty State Overlay */}
       {filteredDistrictCount === 0 && hasActiveFilters && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-          <div className="bg-[#1a1f2e] border border-[#2d3748] rounded-lg px-6 py-5 shadow-xl text-center pointer-events-auto">
-            <p className="text-[#e2e8f0] text-lg font-medium mb-3">
-              No districts match your filters
+          <div className="bg-[#0a0f1a]/95 backdrop-blur-md border border-[#1e2a45] rounded-xl px-8 py-6 shadow-2xl text-center pointer-events-auto max-w-sm">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[#1e2a45] flex items-center justify-center">
+              <svg className="w-6 h-6 text-[#64748b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <p className="text-[#e2e8f0] text-lg font-semibold mb-1">
+              No districts found
+            </p>
+            <p className="text-[#64748b] text-sm mb-4">
+              Try adjusting your filters to see more results
             </p>
             {onClearFilters && (
               <button
                 onClick={onClearFilters}
-                className="text-blue-400 hover:text-blue-300 underline text-sm font-medium transition-colors"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
               >
-                Clear filters
+                Clear all filters
               </button>
             )}
           </div>
