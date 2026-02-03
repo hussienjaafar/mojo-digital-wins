@@ -122,12 +122,25 @@ interface PartyBadgeProps {
   party: string | null;
 }
 
-function PartyBadge({ party }: PartyBadgeProps) {
+function normalizeParty(party: string | null): "D" | "R" | null {
   if (!party) return null;
+  const normalized = party.toUpperCase().trim();
+  if (normalized === "D" || normalized === "DEM" || normalized === "DEMOCRAT" || normalized === "DEMOCRATIC") {
+    return "D";
+  }
+  if (normalized === "R" || normalized === "REP" || normalized === "REPUBLICAN" || normalized === "GOP") {
+    return "R";
+  }
+  return null;
+}
 
-  const isDemocrat = party === "D";
-  const color = isDemocrat ? "bg-blue-500" : "bg-red-500";
-  const label = isDemocrat ? "D" : "R";
+function PartyBadge({ party }: PartyBadgeProps) {
+  const normalized = normalizeParty(party);
+  if (!normalized) return null;
+
+  const isDemocrat = normalized === "D";
+  const color = isDemocrat ? "bg-blue-600" : "bg-red-600";
+  const label = normalized;
 
   return (
     <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold text-white ${color}`}>
@@ -162,108 +175,111 @@ interface DistrictDetailsProps {
 function DistrictDetails({ district, onDeselect }: DistrictDetailsProps) {
   const impactLevel = getImpactLevel(district);
   const turnoutPct = district.turnout_pct * 100;
+  const winnerParty = normalizeParty(district.winner_party);
+  const runnerParty = normalizeParty(district.runner_up_party);
 
   return (
-    <article className="space-y-3" aria-labelledby="district-heading">
+    <article className="space-y-4" aria-labelledby="district-heading">
       {/* Header */}
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 id="district-heading" className="text-xl font-bold text-[#e2e8f0]">{district.cd_code}</h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onDeselect}
-            className="h-6 w-6 p-0 text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1e2a45]"
-            aria-label="Close details"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+      <header className="flex items-center justify-between pb-2 border-b border-[#1e2a45]">
+        <div className="flex items-center gap-3">
+          <h2 id="district-heading" className="text-2xl font-bold text-[#e2e8f0]">{district.cd_code}</h2>
+          <ImpactBadge level={impactLevel} />
         </div>
-        <ImpactBadge level={impactLevel} />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onDeselect}
+          className="h-7 w-7 p-0 text-[#64748b] hover:text-[#e2e8f0] hover:bg-[#1e2a45]"
+          aria-label="Close details"
+        >
+          <X className="h-4 w-4" />
+        </Button>
       </header>
 
-      {/* Muslim Voters Card */}
-      <InfoCard title="Muslim Voters">
-        <div className="space-y-2">
-          <div className="flex justify-between text-[#e2e8f0]">
-            <span>Total</span>
-            <span className="font-semibold">{formatNumber(district.muslim_voters)}</span>
+      {/* Key Metric - Muslim Voter Population */}
+      <div className="bg-[#0a0f1a] rounded-lg p-4 border border-[#1e2a45]">
+        <div className="text-center mb-3">
+          <div className="text-3xl font-bold text-[#e2e8f0]">{formatNumber(district.muslim_voters)}</div>
+          <div className="text-xs text-[#64748b] uppercase tracking-wider">Muslim Voters</div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-center">
+          <div className="bg-[#141b2d] rounded p-2">
+            <div className="text-lg font-semibold text-[#22c55e]">{formatNumber(district.muslim_registered)}</div>
+            <div className="text-xs text-[#64748b]">Registered</div>
           </div>
-          <div className="flex justify-between text-[#e2e8f0]">
-            <span>Registered</span>
-            <span className="font-semibold text-[#22c55e]">{formatNumber(district.muslim_registered)}</span>
-          </div>
-          <div className="flex justify-between text-[#e2e8f0]">
-            <span>Unregistered</span>
-            <span className="font-semibold text-[#ef4444]">{formatNumber(district.muslim_unregistered)}</span>
+          <div className="bg-[#141b2d] rounded p-2">
+            <div className="text-lg font-semibold text-[#f97316]">{formatNumber(district.muslim_unregistered)}</div>
+            <div className="text-xs text-[#64748b]">Unregistered</div>
           </div>
         </div>
-      </InfoCard>
+      </div>
 
-      {/* 2024 Turnout Card */}
-      <InfoCard title="2024 Turnout">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-[#e2e8f0]">
-            <span>Turnout Rate</span>
-            <span className="font-semibold">{formatPercent(district.turnout_pct)}</span>
-          </div>
-          <Progress
-            value={turnoutPct}
-            className="h-2 bg-[#1e2a45]"
-            indicatorClassName="bg-blue-500"
-          />
-          <div className="flex justify-between text-sm">
-            <span className="text-[#22c55e]">Voted: {formatNumber(district.voted_2024)}</span>
-            <span className="text-[#ef4444]">Didn't Vote: {formatNumber(district.didnt_vote_2024)}</span>
+      {/* 2024 Turnout - Compact */}
+      <div className="bg-[#0a0f1a] rounded-lg p-4 border border-[#1e2a45]">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs text-[#64748b] uppercase tracking-wider">2024 Turnout</span>
+          <span className="text-xl font-bold text-[#e2e8f0]">{formatPercent(district.turnout_pct)}</span>
+        </div>
+        <Progress
+          value={turnoutPct}
+          className="h-2 bg-[#1e2a45]"
+          indicatorClassName="bg-blue-500"
+        />
+        <div className="flex justify-between text-xs mt-2 text-[#94a3b8]">
+          <span><span className="text-[#22c55e] font-medium">{formatNumber(district.voted_2024)}</span> voted</span>
+          <span><span className="text-[#64748b] font-medium">{formatNumber(district.didnt_vote_2024)}</span> didn't vote</span>
+        </div>
+      </div>
+
+      {/* Election Results - Redesigned */}
+      <div className="bg-[#0a0f1a] rounded-lg p-4 border border-[#1e2a45]">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs text-[#64748b] uppercase tracking-wider">2024 Race</span>
+          {district.margin_pct !== null && (
+            <span className="text-xs px-2 py-0.5 rounded bg-[#1e2a45] text-[#94a3b8]">
+              {formatPercent(district.margin_pct)} margin
+            </span>
+          )}
+        </div>
+
+        {/* Winner */}
+        <div className={`flex items-center gap-3 p-2 rounded mb-2 ${winnerParty === 'D' ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+          <PartyBadge party={district.winner_party} />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-[#e2e8f0] truncate">{district.winner || "Unknown"}</div>
+            <div className="text-xs text-[#64748b]">Winner • {district.winner_votes ? formatNumber(district.winner_votes) + ' votes' : ''}</div>
           </div>
         </div>
-      </InfoCard>
 
-      {/* 2024 Election Results Card */}
-      <InfoCard title="2024 Election Results">
-        <div className="space-y-2">
-          <div className="flex justify-between text-[#e2e8f0]">
-            <span>Margin</span>
-            <span className="font-semibold">
-              {district.margin_votes !== null ? formatNumber(district.margin_votes) : "N/A"} votes
-              {district.margin_pct !== null && ` (${formatPercent(district.margin_pct)})`}
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-[#e2e8f0]">
-            <span className="flex items-center gap-2">
-              Winner
-              <PartyBadge party={district.winner_party} />
-            </span>
-            <span className="font-semibold">{district.winner || "N/A"}</span>
-          </div>
-          <div className="flex items-center justify-between text-[#e2e8f0]">
-            <span className="flex items-center gap-2">
-              Runner-up
-              <PartyBadge party={district.runner_up_party} />
-            </span>
-            <span className="font-semibold">{district.runner_up || "N/A"}</span>
+        {/* Runner-up */}
+        <div className={`flex items-center gap-3 p-2 rounded ${runnerParty === 'D' ? 'bg-blue-500/5 border border-blue-500/20' : 'bg-red-500/5 border border-red-500/20'}`}>
+          <PartyBadge party={district.runner_up_party} />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-[#94a3b8] truncate">{district.runner_up || "Unknown"}</div>
+            <div className="text-xs text-[#64748b]">Runner-up • {district.runner_up_votes ? formatNumber(district.runner_up_votes) + ' votes' : ''}</div>
           </div>
         </div>
-      </InfoCard>
+      </div>
 
-      {/* Voter Mobilization Opportunity Card (only if can_impact) */}
-      {district.can_impact && (
-        <InfoCard title="Voter Mobilization Opportunity">
-          <div className="space-y-2">
-            <div className="flex justify-between text-[#e2e8f0]">
-              <span>Additional Votes Needed to Flip</span>
-              <span className="font-semibold text-[#eab308]">
-                {district.votes_needed !== null ? formatNumber(district.votes_needed) : "N/A"}
-              </span>
+      {/* Mobilization Opportunity - Only if impactful */}
+      {district.can_impact && district.votes_needed && (
+        <div className="bg-gradient-to-r from-[#22c55e]/10 to-[#0a0f1a] rounded-lg p-4 border border-[#22c55e]/30">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
+            <span className="text-xs text-[#22c55e] uppercase tracking-wider font-medium">Flip Opportunity</span>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-2xl font-bold text-[#e2e8f0]">{formatNumber(district.votes_needed)}</div>
+              <div className="text-xs text-[#64748b]">Votes to flip</div>
             </div>
-            <div className="flex justify-between text-[#e2e8f0]">
-              <span>Estimated Outreach Cost</span>
-              <span className="font-semibold text-[#22c55e]">
-                {district.cost_estimate !== null ? formatCurrency(district.cost_estimate) : "N/A"}
-              </span>
+            <div>
+              <div className="text-2xl font-bold text-[#22c55e]">{district.cost_estimate ? formatCurrency(district.cost_estimate) : "N/A"}</div>
+              <div className="text-xs text-[#64748b]">Est. cost</div>
             </div>
           </div>
-        </InfoCard>
+        </div>
       )}
     </article>
   );
