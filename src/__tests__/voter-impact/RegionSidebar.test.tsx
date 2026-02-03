@@ -22,13 +22,15 @@ describe('RegionSidebar', () => {
     onAddToCompare: vi.fn(),
     onRemoveFromCompare: vi.fn(),
     onClearComparison: vi.fn(),
+    onDeselect: vi.fn(),
   };
 
   describe('empty state', () => {
     it('renders without selected region', () => {
       render(<RegionSidebar {...defaultProps} />);
-      // Should show some prompt to select a region
-      expect(screen.getByText(/select/i)).toBeInTheDocument();
+      // Should show heading and helpful tips
+      expect(screen.getByText('No Region Selected')).toBeInTheDocument();
+      expect(screen.getByText('Click on a state for overview data')).toBeInTheDocument();
     });
   });
 

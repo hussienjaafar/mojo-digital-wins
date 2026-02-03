@@ -5,7 +5,7 @@
  * Displays district or state information based on selection.
  */
 
-import { X, Plus, Trash2 } from "lucide-react";
+import { X, Plus, Trash2, MapPin } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ export interface RegionSidebarProps {
   onAddToCompare: () => void;
   onRemoveFromCompare: (id: string) => void;
   onClearComparison: () => void;
+  onDeselect: () => void;
 }
 
 // ============================================================================
@@ -155,9 +156,10 @@ function InfoCard({ title, children }: InfoCardProps) {
 
 interface DistrictDetailsProps {
   district: VoterImpactDistrict;
+  onDeselect: () => void;
 }
 
-function DistrictDetails({ district }: DistrictDetailsProps) {
+function DistrictDetails({ district, onDeselect }: DistrictDetailsProps) {
   const impactLevel = getImpactLevel(district);
   const turnoutPct = district.turnout_pct * 100;
 
@@ -165,7 +167,18 @@ function DistrictDetails({ district }: DistrictDetailsProps) {
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-[#e2e8f0]">{district.cd_code}</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-bold text-[#e2e8f0]">{district.cd_code}</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDeselect}
+            className="h-6 w-6 p-0 text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1e2a45]"
+            aria-label="Close details"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
         <ImpactBadge level={impactLevel} />
       </div>
 
@@ -206,8 +219,8 @@ function DistrictDetails({ district }: DistrictDetailsProps) {
         </div>
       </InfoCard>
 
-      {/* Election Margin Card */}
-      <InfoCard title="Election Margin">
+      {/* 2024 Election Results Card */}
+      <InfoCard title="2024 Election Results">
         <div className="space-y-2">
           <div className="flex justify-between text-[#e2e8f0]">
             <span>Margin</span>
@@ -233,18 +246,18 @@ function DistrictDetails({ district }: DistrictDetailsProps) {
         </div>
       </InfoCard>
 
-      {/* Mobilization Card (only if can_impact) */}
+      {/* Voter Mobilization Opportunity Card (only if can_impact) */}
       {district.can_impact && (
-        <InfoCard title="Mobilization Potential">
+        <InfoCard title="Voter Mobilization Opportunity">
           <div className="space-y-2">
             <div className="flex justify-between text-[#e2e8f0]">
-              <span>Votes Needed</span>
+              <span>Additional Votes Needed to Flip</span>
               <span className="font-semibold text-[#eab308]">
                 {district.votes_needed !== null ? formatNumber(district.votes_needed) : "N/A"}
               </span>
             </div>
             <div className="flex justify-between text-[#e2e8f0]">
-              <span>Cost Estimate</span>
+              <span>Estimated Outreach Cost</span>
               <span className="font-semibold text-[#22c55e]">
                 {district.cost_estimate !== null ? formatCurrency(district.cost_estimate) : "N/A"}
               </span>
@@ -258,16 +271,28 @@ function DistrictDetails({ district }: DistrictDetailsProps) {
 
 interface StateDetailsProps {
   state: VoterImpactState;
+  onDeselect: () => void;
 }
 
-function StateDetails({ state }: StateDetailsProps) {
+function StateDetails({ state, onDeselect }: StateDetailsProps) {
   return (
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-[#e2e8f0]">{state.state_name}</h2>
-          <span className="text-sm text-[#94a3b8]">{state.state_code}</span>
+        <div className="flex items-center gap-2">
+          <div>
+            <h2 className="text-xl font-bold text-[#e2e8f0]">{state.state_name}</h2>
+            <span className="text-sm text-[#94a3b8]">{state.state_code}</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDeselect}
+            className="h-6 w-6 p-0 text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1e2a45]"
+            aria-label="Close details"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -366,6 +391,7 @@ export function RegionSidebar({
   onAddToCompare,
   onRemoveFromCompare,
   onClearComparison,
+  onDeselect,
 }: RegionSidebarProps) {
   const canAddToCompare =
     selectedRegion !== null &&
@@ -383,9 +409,9 @@ export function RegionSidebar({
         {selectedRegion ? (
           <>
             {selectedRegion.type === "district" && isDistrict(selectedRegion.data) ? (
-              <DistrictDetails district={selectedRegion.data} />
+              <DistrictDetails district={selectedRegion.data} onDeselect={onDeselect} />
             ) : (
-              <StateDetails state={selectedRegion.data as VoterImpactState} />
+              <StateDetails state={selectedRegion.data as VoterImpactState} onDeselect={onDeselect} />
             )}
 
             {/* Add to Compare Button */}
@@ -402,10 +428,14 @@ export function RegionSidebar({
             )}
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <p className="text-[#94a3b8] text-sm">
-              Select a region on the map to view details
-            </p>
+          <div className="flex flex-col items-center justify-center h-64 text-center px-4">
+            <MapPin className="h-12 w-12 text-[#64748b] mb-4" />
+            <h3 className="text-lg font-medium text-[#e2e8f0] mb-2">No Region Selected</h3>
+            <ul className="text-sm text-[#94a3b8] space-y-2">
+              <li>Click on a state for overview data</li>
+              <li>Zoom in to select congressional districts</li>
+              <li>Use the filters above to find targets</li>
+            </ul>
           </div>
         )}
       </div>
