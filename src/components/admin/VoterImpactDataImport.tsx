@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader2, Trash2 } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader2, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { STATE_ABBREVIATIONS, getStateAbbreviation, getStateName, isValidStateAbbreviation } from "@/lib/us-states";
 import { voterImpactKeys } from "@/queries/queryKeys";
@@ -215,6 +215,56 @@ export function VoterImpactDataImport() {
     rowsTotal: 0,
     errors: [],
   });
+
+  const [clearStatus, setClearStatus] = useState<"idle" | "clearing" | "success" | "error">("idle");
+
+  // Clear all existing voter impact data (for re-import with correct format)
+  const clearAllData = useCallback(async () => {
+    if (!window.confirm(
+      "This will DELETE all existing voter impact data (states and districts). " +
+      "You will need to re-import both files. Continue?"
+    )) {
+      return;
+    }
+
+    setClearStatus("clearing");
+
+    try {
+      // Delete districts first (due to foreign key constraint)
+      const { error: districtsError } = await supabase
+        .from("voter_impact_districts" as never)
+        .delete()
+        .neq("cd_code", "NEVER_MATCHES");
+
+      if (districtsError) {
+        throw new Error(`Failed to clear districts: ${(districtsError as any)?.message}`);
+      }
+
+      // Then delete states
+      const { error: statesError } = await supabase
+        .from("voter_impact_states" as never)
+        .delete()
+        .neq("state_code", "NEVER_MATCHES");
+
+      if (statesError) {
+        throw new Error(`Failed to clear states: ${(statesError as any)?.message}`);
+      }
+
+      // Invalidate queries to refresh UI
+      queryClient.invalidateQueries({ queryKey: voterImpactKeys.all });
+
+      setClearStatus("success");
+      toast.success("All voter impact data cleared. You can now re-import with correct format.");
+
+      // Reset to idle after 3 seconds
+      setTimeout(() => setClearStatus("idle"), 3000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setClearStatus("error");
+      toast.error(`Failed to clear data: ${message}`);
+      setTimeout(() => setClearStatus("idle"), 3000);
+    }
+  }, [queryClient]);
 
   // Column mappings for states file - maps DB field to possible Excel column names
   const STATE_COLUMN_MAPPINGS: Record<string, string[]> = {
@@ -797,6 +847,44 @@ export function VoterImpactDataImport() {
           Import states data <strong>first</strong>, then districts. Districts have a foreign key dependency on states.
         </AlertDescription>
       </Alert>
+
+      {/* Clear Data Card - for re-importing with correct format */}
+      <Card className="border-amber-500/50 bg-amber-500/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="h-5 w-5" />
+            Re-Import Data (Format Fix)
+          </CardTitle>
+          <CardDescription>
+            If districts show 0 voters, the data format may be incorrect. Clear existing data and re-import to fix.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="outline"
+            onClick={clearAllData}
+            disabled={clearStatus === "clearing"}
+            className="border-amber-500/50 hover:bg-amber-500/10 text-amber-700 dark:text-amber-300"
+          >
+            {clearStatus === "clearing" ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Clearing...
+              </>
+            ) : clearStatus === "success" ? (
+              <>
+                <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                Cleared! Now re-import.
+              </>
+            ) : (
+              <>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Clear All Data & Re-Import
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* States Import Card */}
