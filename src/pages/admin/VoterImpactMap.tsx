@@ -20,7 +20,7 @@ import type {
   VoterImpactDistrict,
 } from '@/queries/useVoterImpactQueries';
 import type { MapFilters, MetricType, ComparisonItem } from '@/types/voter-impact';
-import { DEFAULT_MAP_FILTERS } from '@/types/voter-impact';
+import { DEFAULT_MAP_FILTERS, applyFilters } from '@/types/voter-impact';
 import { V3ErrorBoundary } from '@/components/v3/V3ErrorBoundary';
 import { MapControls } from '@/components/voter-impact/MapControls';
 
@@ -79,6 +79,23 @@ export default function VoterImpactMap() {
     if (districts.length === 0) return 100000;
     return Math.max(...districts.map((d) => d.muslim_voters));
   }, [districts]);
+
+  // Calculate filtered districts for empty state detection
+  const filteredDistricts = useMemo(
+    () => applyFilters(districts, filters),
+    [districts, filters]
+  );
+
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return (
+      filters.party !== 'all' ||
+      filters.impact !== 'all' ||
+      filters.minVoters > 0 ||
+      filters.preset !== 'none' ||
+      filters.searchQuery !== ''
+    );
+  }, [filters]);
 
   // Get selected region data
   const selectedRegion = useMemo(() => {
@@ -158,6 +175,10 @@ export default function VoterImpactMap() {
 
   const handleClearComparison = useCallback(() => {
     setComparisonItems([]);
+  }, []);
+
+  const handleDeselect = useCallback(() => {
+    setSelectedRegionId(null);
   }, []);
 
   // Loading state
@@ -240,6 +261,9 @@ export default function VoterImpactMap() {
                   selectedRegion={selectedRegionId}
                   onRegionSelect={handleRegionSelect}
                   onRegionHover={handleRegionHover}
+                  filteredDistrictCount={filteredDistricts.length}
+                  hasActiveFilters={hasActiveFilters}
+                  onClearFilters={() => setFilters(DEFAULT_MAP_FILTERS)}
                 />
               </Suspense>
               <MapLegend />
@@ -257,6 +281,7 @@ export default function VoterImpactMap() {
           onAddToCompare={handleAddToCompare}
           onRemoveFromCompare={handleRemoveFromCompare}
           onClearComparison={handleClearComparison}
+          onDeselect={handleDeselect}
         />
       </div>
     </div>

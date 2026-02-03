@@ -43,6 +43,9 @@ export interface ImpactMapProps {
   selectedRegion: string | null;
   onRegionSelect: (regionId: string | null, type: "state" | "district") => void;
   onRegionHover: (regionId: string | null, type: "state" | "district") => void;
+  filteredDistrictCount?: number;
+  hasActiveFilters?: boolean;
+  onClearFilters?: () => void;
 }
 
 interface ViewState {
@@ -144,6 +147,9 @@ export function ImpactMap({
   selectedRegion,
   onRegionSelect,
   onRegionHover,
+  filteredDistrictCount,
+  hasActiveFilters,
+  onClearFilters,
 }: ImpactMapProps) {
   const [viewState, setViewState] = useState<ViewState>(INITIAL_VIEW_STATE);
   const [hoveredRegion, setHoveredRegion] = useState<string | null>(null);
@@ -679,9 +685,9 @@ export function ImpactMap({
       {hoverInfo && (
         <div
           className="absolute z-10 bg-[#1a1f2e] border border-[#2d3748] rounded-lg px-3 py-2 pointer-events-none shadow-lg"
-          style={{ 
-            left: Math.min(hoverInfo.x + 10, window.innerWidth - 200), 
-            top: hoverInfo.y + 10 
+          style={{
+            left: Math.min(hoverInfo.x + 10, window.innerWidth - 200),
+            top: hoverInfo.y + 10
           }}
         >
           <div className="font-semibold text-white text-sm">{hoverInfo.name}</div>
@@ -690,6 +696,25 @@ export function ImpactMap({
           </div>
           <div className="text-xs text-gray-300">
             Impact Score: {(hoverInfo.score * 100).toFixed(1)}%
+          </div>
+        </div>
+      )}
+
+      {/* Empty State Overlay */}
+      {filteredDistrictCount === 0 && hasActiveFilters && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+          <div className="bg-[#1a1f2e] border border-[#2d3748] rounded-lg px-6 py-5 shadow-xl text-center pointer-events-auto">
+            <p className="text-[#e2e8f0] text-lg font-medium mb-3">
+              No districts match your filters
+            </p>
+            {onClearFilters && (
+              <button
+                onClick={onClearFilters}
+                className="text-blue-400 hover:text-blue-300 underline text-sm font-medium transition-colors"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         </div>
       )}
