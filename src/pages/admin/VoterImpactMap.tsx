@@ -5,7 +5,7 @@
  * across US states and congressional districts.
  */
 
-import React, { useState, useMemo, useCallback, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
@@ -59,7 +59,6 @@ export default function VoterImpactMap() {
 
       // If state has 0 but districts have data, use district sum
       if (state.muslim_voters === 0 && districtSum > 0) {
-        console.log(`[reconcileStateData] Patching ${state.state_code}: 0 -> ${districtSum}`);
         return { ...state, muslim_voters: districtSum };
       }
 
@@ -67,7 +66,6 @@ export default function VoterImpactMap() {
       if (districtSum > 0 && state.muslim_voters > 0) {
         const diff = Math.abs(state.muslim_voters - districtSum) / Math.max(state.muslim_voters, districtSum);
         if (diff > 0.9) {
-          console.log(`[reconcileStateData] Correcting ${state.state_code}: ${state.muslim_voters} -> ${districtSum} (diff: ${(diff * 100).toFixed(1)}%)`);
           return { ...state, muslim_voters: districtSum };
         }
       }
@@ -100,28 +98,6 @@ export default function VoterImpactMap() {
 
     return null;
   }, [selectedRegionId, selectedRegionType, states, districts]);
-
-  // Debug logging - verify key states have correct data
-  useEffect(() => {
-    if (states.length > 0) {
-      console.log('[VoterImpactMap] States data sample:');
-      states.slice(0, 5).forEach(s => {
-        console.log(`  ${s.state_code}: ${s.state_name} - ${s.muslim_voters} voters`);
-      });
-      
-      // Check specific states mentioned in bug report
-      const ny = states.find(s => s.state_code === 'NY');
-      const mi = states.find(s => s.state_code === 'MI');
-      const la = states.find(s => s.state_code === 'LA');
-      console.log('[VoterImpactMap] Key states - NY:', ny?.muslim_voters, 'MI:', mi?.muslim_voters, 'LA:', la?.muslim_voters);
-    }
-  }, [states]);
-  
-  // Log selection changes to debug sidebar data
-  useEffect(() => {
-    console.log('[VoterImpactMap] Selection changed:', { selectedRegionId, selectedRegionType });
-    console.log('[VoterImpactMap] Selected region data:', selectedRegion);
-  }, [selectedRegionId, selectedRegionType, selectedRegion]);
 
   // Handlers
   const handleRegionSelect = useCallback(

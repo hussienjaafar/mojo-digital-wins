@@ -292,14 +292,15 @@ export function ImpactMap({
     ];
   }, []);
 
-  // Color expression for districts using unified IMPACT_THRESHOLDS constants
+  // Color expression for districts using unified IMPACT_THRESHOLDS and IMPACT_COLORS constants
+  // Uses colorblind-safe palette: Blue (high), Orange (medium), Purple (low), Gray (none)
   const districtColorExpression = useMemo((): ExpressionSpecification => {
     return [
       "case",
-      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.HIGH], "#22c55e", // High - green
-      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.MEDIUM], "#eab308", // Medium - yellow
-      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.LOW], "#ef4444", // Low - red
-      "#374151" // None - gray
+      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.HIGH], IMPACT_COLORS.HIGH,
+      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.MEDIUM], IMPACT_COLORS.MEDIUM,
+      [">=", ["coalesce", ["get", "impactScore"], 0], IMPACT_THRESHOLDS.LOW], IMPACT_COLORS.LOW,
+      IMPACT_COLORS.NONE
     ];
   }, []);
 
@@ -341,15 +342,9 @@ export function ImpactMap({
         return;
       }
 
-      // DEBUG: Log the raw feature data
-      console.log('[handleStateClick] Raw feature.id:', feature.id, 'type:', typeof feature.id);
-      console.log('[handleStateClick] Feature properties:', feature.properties);
-
       // Handle both numeric and string IDs, pad to 2 digits
       const fips = String(feature.id).padStart(2, '0');
       const stateAbbr = getStateFromFips(fips);
-
-      console.log('[handleStateClick] FIPS:', fips, '-> State:', stateAbbr);
 
       if (stateAbbr) {
         onRegionSelect(stateAbbr, "state");
@@ -402,18 +397,8 @@ export function ImpactMap({
       const stateAbbr = getStateFromFips(fips);
       const stateName = feature.properties?.name || stateAbbr || 'Unknown';
       const impactScore = feature.properties?.impactScore || 0;
-      
-      // DEBUG: Log the lookup
-      console.log('[handleStateHover] FIPS:', fips, '-> State:', stateAbbr, 'Name:', stateName);
-      console.log('[handleStateHover] States array length:', states.length);
-      
+
       const stateData = states.find(s => s.state_code === stateAbbr);
-      
-      console.log('[handleStateHover] Found stateData:', stateData ? {
-        state_code: stateData.state_code,
-        state_name: stateData.state_name,
-        muslim_voters: stateData.muslim_voters
-      } : 'NOT FOUND');
 
       if (stateAbbr) {
         setHoveredRegion(stateAbbr);
