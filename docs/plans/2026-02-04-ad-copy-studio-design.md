@@ -28,6 +28,195 @@ A tool for system admins to upload video ads, automatically transcribe and analy
 
 ---
 
+## Google Drive Integration
+
+### Import Methods (Priority Order)
+
+**v1.0:** Paste shared link (ships immediately)
+**v1.1:** Google Picker API (enhanced UX, future)
+
+### Paste Link Flow
+
+Users paste Google Drive share links directly:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Upload Your Campaign Videos                    │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  🔗 IMPORT FROM GOOGLE DRIVE                                │   │
+│  │  ┌───────────────────────────────────────────────────────┐  │   │
+│  │  │ Paste Google Drive link(s) here...                    │  │   │
+│  │  │                                                       │  │   │
+│  │  └───────────────────────────────────────────────────────┘  │   │
+│  │  Supports: drive.google.com/file/d/... or /open?id=...      │   │
+│  │  Files must be shared as "Anyone with link"                 │   │
+│  │                                                             │   │
+│  │  ─────────────────── or ───────────────────                 │   │
+│  │                                                             │   │
+│  │  📁 Drag and drop video files here                          │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Link Parsing Logic
+
+```typescript
+// Supported Google Drive URL formats
+const GDRIVE_PATTERNS = [
+  /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/,      // /file/d/{id}/view
+  /drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/,      // /open?id={id}
+  /drive\.google\.com\/uc\?id=([a-zA-Z0-9_-]+)/,        // /uc?id={id}
+  /docs\.google\.com\/.*\/d\/([a-zA-Z0-9_-]+)/,         // docs.google.com format
+];
+
+function extractFileId(url: string): string | null {
+  for (const pattern of GDRIVE_PATTERNS) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+```
+
+### Error Handling & User Feedback
+
+**Error States with Clear Messages:**
+
+| Error Code | Cause | User Message | Action |
+|------------|-------|--------------|--------|
+| `INVALID_URL` | Not a Google Drive link | "This doesn't look like a Google Drive link. Please paste a link starting with drive.google.com" | Show correct format example |
+| `FILE_NOT_SHARED` | Private file, 403 | "This file isn't shared publicly. Please set sharing to 'Anyone with link can view'" | Link to Google's sharing help |
+| `FILE_NOT_FOUND` | Deleted or bad ID, 404 | "File not found. It may have been deleted or the link is incorrect" | Suggest checking the link |
+| `ACCESS_DENIED` | Org restrictions | "Access denied. Your organization may restrict external file access" | Contact admin suggestion |
+| `WRONG_FILE_TYPE` | Not a video | "This file isn't a video. Supported formats: MP4, MOV, WebM" | List supported formats |
+| `FILE_TOO_LARGE` | >500MB | "This video is too large (X MB). Maximum size is 500MB" | Suggest compression |
+| `VIRUS_SCAN_TIMEOUT` | Large file scan page | "Processing large file... This may take a moment" | Show progress, auto-retry |
+| `RATE_LIMITED` | Too many requests | "Google Drive is temporarily limiting requests. Please wait a moment" | Auto-retry with backoff |
+| `NETWORK_ERROR` | Connection failed | "Connection error. Please check your internet and try again" | Retry button |
+
+**Error UI Pattern:**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  🔗 https://drive.google.com/file/d/1abc.../view            │   │
+│  │                                                             │   │
+│  │  ❌ FILE NOT SHARED                                         │   │
+│  │  ┌─────────────────────────────────────────────────────┐   │   │
+│  │  │ This file isn't shared publicly.                    │   │   │
+│  │  │                                                     │   │   │
+│  │  │ To fix: Open the file in Google Drive →             │   │   │
+│  │  │ Click "Share" → Change to "Anyone with link"        │   │   │
+│  │  │                                                     │   │   │
+│  │  │ [📖 View sharing instructions]  [🔄 Try again]      │   │   │
+│  │  └─────────────────────────────────────────────────────┘   │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Success with Validation:**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  🔗 https://drive.google.com/file/d/1abc.../view            │   │
+│  │                                                             │   │
+│  │  ✓ Found: campaign-video-1.mp4                              │   │
+│  │    Size: 45 MB • Duration: 0:28 • Format: MP4               │   │
+│  │    ✓ Meets Meta specs                                       │   │
+│  │                                                   [Remove]  │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  [+ Add another link]                                               │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Large File Handling (>100MB Virus Scan)
+
+Google shows a virus scan warning for files >100MB. Our server-side handler:
+
+```typescript
+async function downloadFromGDrive(fileId: string): Promise<DownloadResult> {
+  const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+
+  let response = await fetch(directUrl, { redirect: 'manual' });
+
+  // Check for virus scan redirect (302 to confirm page)
+  if (response.status === 302) {
+    const redirectUrl = response.headers.get('location');
+
+    // Extract confirm token from redirect
+    const confirmMatch = redirectUrl?.match(/confirm=([a-zA-Z0-9_-]+)/);
+    if (confirmMatch) {
+      const confirmToken = confirmMatch[1];
+      const confirmedUrl = `${directUrl}&confirm=${confirmToken}`;
+      response = await fetch(confirmedUrl);
+    }
+  }
+
+  if (!response.ok) {
+    throw new GDriveError(mapStatusToErrorCode(response.status));
+  }
+
+  return streamToStorage(response.body);
+}
+```
+
+### Edge Function: `import-gdrive-video`
+
+```typescript
+interface ImportGDriveRequest {
+  organization_id: string;
+  gdrive_urls: string[];  // Up to 5 links
+  batch_id?: string;      // For grouping in same campaign
+}
+
+interface ImportGDriveResponse {
+  success: boolean;
+  results: Array<{
+    url: string;
+    status: 'success' | 'error';
+    video_id?: string;          // If success
+    filename?: string;
+    file_size_bytes?: number;
+    error_code?: string;        // If error
+    error_message?: string;
+    suggestion?: string;        // Help text
+  }>;
+}
+```
+
+### v1.1: Google Picker Integration (Future)
+
+When ready to enhance UX:
+
+```typescript
+// React component using @googleworkspace/drive-picker-react
+<GoogleDrivePicker
+  clientId={GOOGLE_CLIENT_ID}
+  developerKey={GOOGLE_API_KEY}
+  scope={['https://www.googleapis.com/auth/drive.readonly']}
+  onChange={(files) => handleSelectedFiles(files)}
+  mimeTypes={['video/mp4', 'video/quicktime', 'video/webm']}
+  multiselect={true}
+  maxFiles={5}
+>
+  <Button variant="outline">
+    <GoogleDriveIcon className="mr-2" />
+    Import from Google Drive
+  </Button>
+</GoogleDrivePicker>
+```
+
+**Required Setup for Picker:**
+- Google Cloud project with Drive API enabled
+- OAuth consent screen configured
+- API key for Picker
+- OAuth client ID for user authorization
+
+---
+
 ## Batch Upload & Organization Picker
 
 ### Global Organization Picker
@@ -836,6 +1025,7 @@ https://molitico.com/r/blue-wave-pac/february-push?refcode=immigration-urgent-02
 |------|------|
 | Migration | `supabase/migrations/YYYYMMDD_ad_copy_studio.sql` |
 | Edge Function | `supabase/functions/generate-ad-copy/index.ts` |
+| Edge Function | `supabase/functions/import-gdrive-video/index.ts` |
 | Page | `src/pages/AdminAdCopyStudio.tsx` |
 | Wizard | `src/components/ad-copy-studio/AdCopyWizard.tsx` |
 | Step 1 | `src/components/ad-copy-studio/steps/VideoUploadStep.tsx` |
@@ -848,6 +1038,8 @@ https://molitico.com/r/blue-wave-pac/february-push?refcode=immigration-urgent-02
 | Component | `src/components/ad-copy-studio/components/CopyVariationCard.tsx` |
 | Component | `src/components/ad-copy-studio/components/TranscriptAnalysisPanel.tsx` |
 | Component | `src/components/ad-copy-studio/components/TrackingUrlPreview.tsx` |
+| Component | `src/components/ad-copy-studio/components/GDriveLinkInput.tsx` |
+| Component | `src/components/ad-copy-studio/components/ImportErrorCard.tsx` |
 | Hook | `src/hooks/useAdCopyGeneration.ts` |
 | Hook | `src/hooks/useVideoUpload.ts` |
 
