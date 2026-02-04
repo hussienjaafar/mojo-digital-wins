@@ -25,6 +25,104 @@ A tool for system admins to upload video ads, automatically transcribe and analy
 
 ---
 
+## UI Design System
+
+The Ad Copy Studio follows the design patterns established in the Voter Impact Map for visual consistency across admin tools.
+
+### Color Palette
+
+| Purpose | Color | Hex |
+|---------|-------|-----|
+| Background (darkest) | Dark navy | `#0a0f1a` |
+| Background (cards) | Navy | `#141b2d` |
+| Borders/dividers | Slate | `#1e2a45` |
+| Text (primary) | Light gray | `#e2e8f0` |
+| Text (secondary) | Gray | `#94a3b8` |
+| Text (muted) | Dark gray | `#64748b` |
+| Accent (primary) | Blue | `#3b82f6` |
+| Accent (success) | Green | `#22c55e` |
+| Accent (warning) | Orange | `#f97316` |
+| Accent (info) | Purple | `#a855f7` |
+| Accent (error) | Red | `#ef4444` |
+
+### Component Patterns
+
+**Glass-morphism containers:**
+```tsx
+className="bg-[#0a0f1a]/95 backdrop-blur-md border border-[#1e2a45] rounded-xl"
+```
+
+**Cards:**
+```tsx
+className="bg-[#0a0f1a] border border-[#1e2a45] rounded-lg p-4"
+```
+
+**Section labels:**
+```tsx
+className="text-xs text-[#64748b] uppercase tracking-wider"
+```
+
+**Active filter/selection states:**
+```tsx
+// Blue accent for primary actions
+className="bg-blue-500/10 border-blue-500/30 text-blue-400"
+
+// Purple accent for secondary features
+className="bg-[#a855f7]/10 border-[#a855f7]/30 text-[#a855f7]"
+
+// Green accent for success/positive
+className="bg-[#22c55e]/10 border-[#22c55e]/30 text-[#22c55e]"
+```
+
+**Buttons:**
+```tsx
+// Primary action
+className="bg-blue-600 hover:bg-blue-500 text-white"
+
+// Secondary/outline
+className="bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45]"
+
+// Destructive
+className="text-red-400/80 hover:text-red-400 hover:bg-red-500/10"
+```
+
+**Progress indicators:**
+```tsx
+className="h-2 bg-[#1e2a45]"
+indicatorClassName="bg-blue-500"
+```
+
+### Layout Patterns
+
+**Wizard layout:**
+- Full-width content area with max-width constraint (`max-w-4xl mx-auto`)
+- Step indicator bar at top with numbered circles
+- Card-based step content
+- Fixed footer with Back/Next buttons
+
+**Sidebar panels (for advanced mode):**
+- Width: `w-80`
+- Background: `bg-[#141b2d]`
+- Border: `border-l border-[#1e2a45]`
+- Scrollable content area
+
+### Accessibility
+
+- All interactive elements have `aria-label`
+- Form sections use `role="group"` with `aria-labelledby`
+- Status changes announced via `aria-live="polite"`
+- Focus management between wizard steps
+- Keyboard navigation support (Tab, Enter, Escape)
+
+### Responsive Behavior
+
+- Wizard collapses to single column on mobile
+- Step indicator becomes horizontal scrollable on small screens
+- Copy cards stack vertically on mobile
+- Touch-friendly tap targets (min 44px)
+
+---
+
 ## Data Model
 
 ### Schema Changes: `meta_ad_videos`
@@ -167,58 +265,242 @@ src/
 
 ### Wizard Flow
 
+#### Step Indicator Design
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  ①──────②──────③──────④──────⑤                                      │
+│  Upload  Review  Configure  Generate  Export                        │
+│    ●       ○        ○          ○        ○                           │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+- Completed steps: filled circle with checkmark
+- Current step: filled circle with number, label highlighted
+- Future steps: outline circle, muted label
+- Progress line connects steps, fills as user advances
+
+---
+
 **Step 1: Upload Video**
-- Drag-and-drop zone (reuse pattern from LogoUploadField)
-- Supported formats: MP4, MOV, WebM
-- Max size: 500MB
-- Show upload progress
-- Auto-trigger transcription on upload complete
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Upload Your Video Ad                         │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                                                             │   │
+│  │              ┌──────────────────────┐                       │   │
+│  │              │      📹 icon         │                       │   │
+│  │              └──────────────────────┘                       │   │
+│  │                                                             │   │
+│  │         Drag and drop your video here                       │   │
+│  │              or click to browse                             │   │
+│  │                                                             │   │
+│  │         Supports MP4, MOV, WebM • Max 500MB                 │   │
+│  │                                                             │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ────────────────────────────────────────────────────────────────   │
+│                                                                     │
+│                                              [Cancel]  [Next →]     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**After upload (processing state):**
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  🎬 campaign-video-v2.mp4                          ✓ Uploaded│   │
+│  │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━          100%     │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  ⏳ Transcribing audio...                                    │   │
+│  │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━░░░░░░░░░░░░          65%     │   │
+│  │                                                             │   │
+│  │  This may take 1-2 minutes depending on video length        │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
 
 **Step 2: Review Transcript & Analysis**
-- Display full transcript (editable for corrections)
-- Show extracted analysis:
-  - Primary issue & issue tags
-  - Tone (primary + tags)
-  - Targets attacked/supported
-  - Donor pain points
-  - Values appealed
-  - Key phrases
-  - Detected CTA
-- "Re-analyze" button if transcript was edited
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Review Transcript & Analysis                     │
+│                                                                     │
+│  ┌──────────────────────────────────┬──────────────────────────┐   │
+│  │ TRANSCRIPT                       │ ANALYSIS                 │   │
+│  │                                  │                          │   │
+│  │ "We're facing a crisis at our    │ PRIMARY ISSUE            │   │
+│  │ border. Families are being       │ ┌────────────────────┐   │   │
+│  │ torn apart, children in cages.   │ │ pro-immigrant       │   │   │
+│  │ We need leaders who will stand   │ │ anti-persecution    │   │   │
+│  │ up for humanity, not hatred.     │ └────────────────────┘   │   │
+│  │                                  │                          │   │
+│  │ That's why I'm running. Will     │ TONE                     │   │
+│  │ you chip in $25 today to help    │ ┌────────────────────┐   │   │
+│  │ us fight back?"                  │ │ 😤 Urgent  😢 Comp- │   │   │
+│  │                                  │ │           assionate │   │   │
+│  │ [Edit transcript]               │ └────────────────────┘   │   │
+│  │                                  │                          │   │
+│  │                                  │ TARGETS ATTACKED         │   │
+│  │                                  │ • Trump administration   │   │
+│  │                                  │ • Border policies        │   │
+│  │                                  │                          │   │
+│  │                                  │ PAIN POINTS              │   │
+│  │                                  │ • Family separation fear │   │
+│  │                                  │ • Moral outrage          │   │
+│  │                                  │                          │   │
+│  │                                  │ KEY PHRASES              │   │
+│  │                                  │ "stand up for humanity"  │   │
+│  │                                  │ "fight back"             │   │
+│  └──────────────────────────────────┴──────────────────────────┘   │
+│                                                                     │
+│  [← Back]                                          [Next →]         │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
 
 **Step 3: Configure Campaign**
-- ActBlue form name (required, with autocomplete from org's forms)
-- Refcode: auto-generated, displayed in editable field
-  - Format: `{issue}-{tone}-{MMDD}-{shortId}`
-  - Example: `immigration-urgent-0204-a3f9`
-- Amount preset (optional)
-- Recurring default toggle
-- Audience segments:
-  - Default empty, user adds their own
-  - Each segment: name + description
-  - Add/edit/remove UI
-  - Minimum 1 segment required
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                       Configure Campaign                            │
+│                                                                     │
+│  ACTBLUE FORM                                                       │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ february-immigration-push                              ▼    │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  REFCODE                                        [🔄 Regenerate]     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ pro-immigrant-urgent-0204-a3f9                              │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│  Auto-generated from video analysis • Edit if needed                │
+│                                                                     │
+│  ┌─────────────────────────────────┬───────────────────────────┐   │
+│  │ AMOUNT PRESET (optional)       │ RECURRING DEFAULT         │   │
+│  │ ┌─────────────────────────┐    │ ┌─────────────────────┐   │   │
+│  │ │ $25                     │    │ │ ☑ Monthly recurring │   │   │
+│  │ └─────────────────────────┘    │ └─────────────────────┘   │   │
+│  └─────────────────────────────────┴───────────────────────────┘   │
+│                                                                     │
+│  ─────────────────────────────────────────────────────────────────  │
+│                                                                     │
+│  TARGET AUDIENCES                                   [+ Add Segment] │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ First-Time Donors                                    [✏️][🗑️]│   │
+│  │ People who haven't donated before and need to be              │   │
+│  │ convinced this campaign matters                               │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ Immigration Advocates                                [✏️][🗑️]│   │
+│  │ Donors who care deeply about immigrant rights and            │   │
+│  │ have donated to similar causes                               │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  [← Back]                                          [Next →]         │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
 
 **Step 4: Generate Copy**
-- Summary of what will be generated
-- "Generate Copy" button
-- Loading state with progress indicator
-- Estimated time based on segment count
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Generate Ad Copy                             │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                                                             │   │
+│  │  📊 GENERATION SUMMARY                                      │   │
+│  │                                                             │   │
+│  │  Audiences:        2 segments                               │   │
+│  │  Variations:       5 per element                            │   │
+│  │  Elements:         Primary Text, Headline, Description      │   │
+│  │                                                             │   │
+│  │  Total outputs:    30 copy variations                       │   │
+│  │                                                             │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│                    ┌──────────────────────────┐                     │
+│                    │   ⚡ Generate Copy        │                     │
+│                    └──────────────────────────┘                     │
+│                                                                     │
+│  [← Back]                                                           │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Generating state:**
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                                                                     │
+│                         ⏳ Generating...                            │
+│                                                                     │
+│     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━░░░░░░░░░░░   65%        │
+│                                                                     │
+│              Generating copy for: Immigration Advocates             │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
 
 **Step 5: Review & Export**
-- Tabbed by audience segment
-- For each segment, show:
-  - 5 Primary Text variations (with char count)
-  - 5 Headline variations (with char count)
-  - 5 Description variations (with char count)
-- Each variation has:
-  - Copy button (individual)
-  - Regenerate button (individual)
-- Tracking URL display with copy button
-- Export options:
-  - "Copy All" (formatted text block)
-  - "Download CSV"
-  - "Start New" (reset wizard)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Review & Export Copy                           │
+│                                                                     │
+│  ┌────────────────────┬────────────────────┐                        │
+│  │ First-Time Donors  │ Immigration Advoc. │  ← Audience tabs       │
+│  └────────────────────┴────────────────────┘                        │
+│                                                                     │
+│  PRIMARY TEXT (125 chars max)                                       │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ 1. Families are being torn apart at the border.      [📋]   │   │
+│  │    Will you chip in $25 to help us fight back?               │   │
+│  │                                            98 chars  [🔄]   │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ 2. Children in cages. We can stop this—but only      [📋]   │   │
+│  │    with your help. Donate $25 now.                           │   │
+│  │                                            89 chars  [🔄]   │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│  ... (3 more variations)                                           │
+│                                                                     │
+│  HEADLINES (40 chars max)                                          │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ 1. Stand Up for Humanity                     28 chars [📋]   │   │
+│  │ 2. Fight Back Against Hatred                 31 chars [📋]   │   │
+│  │ 3. $25 Can Change Everything                 29 chars [📋]   │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  DESCRIPTIONS (30 chars max)                                       │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ 1. Donate now to help families    26 chars [📋]              │   │
+│  │ 2. Your $25 matters today         22 chars [📋]              │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ─────────────────────────────────────────────────────────────────  │
+│                                                                     │
+│  TRACKING URL                                                       │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ https://molitico.com/r/blue-wave/february-push?refcode=...  │📋│   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  [📋 Copy All]  [⬇️ Download CSV]  [🔄 Start New]                   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+Legend: 📋 = Copy to clipboard, 🔄 = Regenerate this variation
 
 ---
 
@@ -419,6 +701,157 @@ https://molitico.com/r/blue-wave-pac/february-push?refcode=immigration-urgent-02
 3. **Copy templates** - Save successful copy as reusable templates
 4. **Bulk generation** - Process multiple videos at once
 5. **Performance feedback loop** - Show which copy variations performed best
+
+---
+
+## Extensibility: Meta Marketing API (v2 Architecture)
+
+The v1 architecture is designed to seamlessly extend to programmatic ad creation via the Meta Marketing API. Key design decisions that enable this:
+
+### Database Schema Ready for v2
+
+The `ad_copy_generations` table includes fields that will map directly to Meta API:
+
+```sql
+-- Add these columns in v2 migration
+ALTER TABLE ad_copy_generations ADD COLUMN meta_campaign_id TEXT;
+ALTER TABLE ad_copy_generations ADD COLUMN meta_adset_id TEXT;
+ALTER TABLE ad_copy_generations ADD COLUMN meta_ad_ids JSONB;  -- Array of created ad IDs
+ALTER TABLE ad_copy_generations ADD COLUMN meta_creative_id TEXT;
+ALTER TABLE ad_copy_generations ADD COLUMN publish_status TEXT CHECK (publish_status IN (
+  'draft',           -- Copy generated, not published
+  'ready',           -- User approved, ready to publish
+  'publishing',      -- API call in progress
+  'published',       -- Successfully created in Meta
+  'failed',          -- API error
+  'paused',          -- User paused the ad
+  'archived'         -- Ad removed from Meta
+));
+ALTER TABLE ad_copy_generations ADD COLUMN publish_error TEXT;
+ALTER TABLE ad_copy_generations ADD COLUMN published_at TIMESTAMPTZ;
+```
+
+### Component Architecture for v2
+
+The wizard step structure allows inserting new steps without breaking existing flow:
+
+```
+v1 Flow:
+Upload → Review → Configure → Generate → Export
+
+v2 Flow (extended):
+Upload → Review → Configure → Generate → [Campaign Setup] → [Publish] → Export
+                                              ↓
+                                    - Select/create campaign
+                                    - Select/create ad set
+                                    - Set budget & schedule
+                                    - Preview ad
+```
+
+**New v2 components (drop-in):**
+```
+src/components/ad-copy-studio/steps/
+├── CampaignSetupStep.tsx      # NEW: Select campaign/adset or create new
+├── AdPreviewStep.tsx          # NEW: Preview as it will appear in Meta
+└── PublishStep.tsx            # NEW: Confirm and publish to Meta
+```
+
+### Edge Function Architecture for v2
+
+**New functions:**
+```
+supabase/functions/
+├── create-meta-campaign/index.ts    # Create campaign via Marketing API
+├── create-meta-adset/index.ts       # Create ad set with targeting
+├── create-meta-ad/index.ts          # Create ad with creative + copy
+├── upload-meta-video/index.ts       # Upload video as creative asset
+└── get-meta-campaigns/index.ts      # List existing campaigns for selection
+```
+
+**Meta Marketing API integration pattern:**
+```typescript
+// Example: create-meta-ad/index.ts
+interface CreateMetaAdRequest {
+  organization_id: string
+  generation_id: string           // Reference to ad_copy_generations
+  campaign_id: string             // Existing or newly created
+  adset_id: string                // Existing or newly created
+  selected_copy: {
+    primary_text_index: number    // Which variation (0-4)
+    headline_index: number
+    description_index: number
+  }
+}
+
+// Uses existing Meta OAuth tokens from integration_credentials
+const credentials = await getMetaCredentials(organizationId)
+const response = await fetch(
+  `https://graph.facebook.com/v19.0/act_${credentials.ad_account_id}/ads`,
+  {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${credentials.access_token}` },
+    body: JSON.stringify({
+      name: `${refcode} - ${segment_name}`,
+      adset_id: adsetId,
+      creative: { creative_id: creativeId },
+      status: 'PAUSED',  // Start paused for review
+    })
+  }
+)
+```
+
+### UI Extension Points
+
+**Step 5 (CopyExportStep) includes v2 hooks:**
+```tsx
+// v1: Just copy buttons
+<Button onClick={copyToClipboard}>Copy All</Button>
+<Button onClick={downloadCSV}>Download CSV</Button>
+
+// v2: Add publish flow (feature-flagged)
+{features.metaPublish && (
+  <Button onClick={() => setStep('campaign-setup')}>
+    Publish to Meta →
+  </Button>
+)}
+```
+
+**Advanced mode toggle (future):**
+```tsx
+// Wizard header
+<div className="flex items-center justify-between">
+  <WizardSteps current={step} />
+  <Toggle
+    label="Advanced Mode"
+    checked={advancedMode}
+    onChange={setAdvancedMode}
+  />
+</div>
+
+// Advanced mode reveals:
+// - Campaign/adset selection inline
+// - A/B test setup
+// - Budget allocation
+// - Schedule controls
+```
+
+### Required Meta API Permissions (v2)
+
+Current OAuth scope: `ads_read`
+
+Additional scopes needed for v2:
+- `ads_management` - Create and manage ads
+- `business_management` - Access business manager assets
+
+Re-OAuth flow will be required when v2 launches. The existing `MetaCredentialAuth.tsx` component supports scope extension.
+
+### Migration Path
+
+1. **v1 ships** with copy-paste workflow
+2. **User feedback** validates the copy generation quality
+3. **v2 development** adds Meta API integration behind feature flag
+4. **Beta rollout** to select organizations
+5. **Full release** with re-OAuth for expanded permissions
 
 ---
 
