@@ -10,18 +10,63 @@ A tool for system admins to upload video ads, automatically transcribe and analy
 
 ## Goals
 
-1. Upload videos before they become Meta ads
-2. Transcribe and analyze using existing Whisper + GPT-4 pipeline
-3. Generate 5 variations of primary text, headline, and description per audience segment
-4. Auto-generate refcodes from video analysis (editable)
-5. One-click copy for Meta Ads Manager
-6. Automatically link uploaded videos to Meta ads when they go live (fingerprinting)
+1. Upload multiple videos (batch) for a unified campaign
+2. Global organization picker — admins can switch clients without leaving the tool
+3. Transcribe and analyze using existing Whisper + GPT-4 pipeline
+4. Generate 5 variations of primary text, headline, and description per audience segment
+5. Auto-generate refcodes from video analysis (editable, auto-suffixed for batch)
+6. One-click copy for Meta Ads Manager
+7. Automatically link uploaded videos to Meta ads when they go live (fingerprinting)
+8. **V2-Ready:** Store video metadata and copy in Meta API-compatible format
 
 ## Non-Goals (v1)
 
 - Direct upload to Meta via Marketing API (future v2)
 - Tone-based or structure-based copy variations (audience-based only for v1)
 - Video editing or trimming
+- Campaign/ad set creation in Meta (v2)
+
+---
+
+## Batch Upload & Organization Picker
+
+### Global Organization Picker
+
+The Ad Copy Studio is a **global admin tool** with an organization selector in the header:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  🎬 Ad Copy Studio          │ Organization: [Blue Wave PAC ▼]      │
+├─────────────────────────────────────────────────────────────────────┤
+```
+
+**Behavior:**
+- Dropdown shows all organizations the admin has access to
+- Changing organization resets the wizard (with confirmation if work in progress)
+- All data (ActBlue forms, existing videos, URLs) scoped to selected org
+- Selected org persisted in localStorage for session continuity
+
+### Batch Video Upload
+
+Users can upload **3-5 videos** for a unified campaign:
+
+**Upload Flow:**
+1. Drag multiple videos or click to select batch
+2. All videos queue for transcription (processed in parallel where possible)
+3. Progress shown per-video with overall batch progress
+
+**Unified Campaign Config:**
+- Same audiences apply to all videos
+- Same ActBlue form and base refcode
+- Each video gets auto-suffixed refcode:
+  - `immigration-urgent-0204-vid1`
+  - `immigration-urgent-0204-vid2`
+  - `immigration-urgent-0204-vid3`
+
+**Export:**
+- Copy grouped by video, then by audience
+- CSV export includes video identifier column
+- "Copy All" formats all videos' copy in one block
 
 ---
 
@@ -136,9 +181,63 @@ ALTER TABLE meta_ad_videos ADD COLUMN matched_meta_ad_id TEXT;
 ALTER TABLE meta_ad_videos ADD COLUMN uploaded_by UUID REFERENCES auth.users(id);
 ALTER TABLE meta_ad_videos ADD COLUMN original_filename TEXT;
 
+-- V2-READY: Video technical metadata for Meta API validation
+ALTER TABLE meta_ad_videos ADD COLUMN video_aspect_ratio TEXT;      -- '9:16', '1:1', '4:5'
+ALTER TABLE meta_ad_videos ADD COLUMN video_resolution TEXT;         -- '1080x1920'
+ALTER TABLE meta_ad_videos ADD COLUMN video_codec TEXT;              -- 'h264'
+ALTER TABLE meta_ad_videos ADD COLUMN video_file_size_bytes BIGINT;
+ALTER TABLE meta_ad_videos ADD COLUMN video_frame_rate NUMERIC(5,2); -- 30.00
+ALTER TABLE meta_ad_videos ADD COLUMN video_bitrate_kbps INTEGER;
+ALTER TABLE meta_ad_videos ADD COLUMN thumbnail_timestamp_sec NUMERIC(5,2); -- custom thumbnail position
+
+-- V2-READY: Meta API compatibility flags
+ALTER TABLE meta_ad_videos ADD COLUMN meets_meta_specs BOOLEAN DEFAULT false;
+ALTER TABLE meta_ad_videos ADD COLUMN meta_spec_issues JSONB;        -- [{field, issue, recommendation}]
+
 CREATE INDEX idx_meta_ad_videos_source ON meta_ad_videos(organization_id, source);
 CREATE INDEX idx_meta_ad_videos_fingerprint ON meta_ad_videos(organization_id, fingerprint_duration_sec)
   WHERE source = 'uploaded' AND matched_meta_ad_id IS NULL;
+```
+
+### V2-Ready: Organization Meta Settings
+
+Store Facebook Page and Instagram associations for future ad creation:
+
+```sql
+-- Add to client_organizations or create new table
+CREATE TABLE IF NOT EXISTS organization_meta_settings (
+  organization_id UUID PRIMARY KEY REFERENCES client_organizations(id) ON DELETE CASCADE,
+
+  -- Page associations (required for ad creation)
+  meta_page_id TEXT,
+  meta_page_name TEXT,
+  meta_instagram_actor_id TEXT,
+  meta_instagram_username TEXT,
+
+  -- Default campaign preferences (for v2 Advantage+ creation)
+  default_objective TEXT DEFAULT 'OUTCOME_SALES',
+  default_optimization_goal TEXT DEFAULT 'OFFSITE_CONVERSIONS',
+  default_billing_event TEXT DEFAULT 'IMPRESSIONS',
+  advantage_plus_creative BOOLEAN DEFAULT true,
+  advantage_audience BOOLEAN DEFAULT true,
+
+  -- Pixel association (for CAPI events)
+  meta_pixel_id TEXT,
+
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- RLS
+ALTER TABLE organization_meta_settings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own org meta settings"
+  ON organization_meta_settings FOR SELECT
+  USING (organization_id = public.get_user_organization_id());
+
+CREATE POLICY "Service role can manage all meta settings"
+  ON organization_meta_settings FOR ALL
+  USING (auth.role() = 'service_role');
 ```
 
 ### New Table: `ad_copy_generations`
@@ -149,6 +248,10 @@ CREATE TABLE ad_copy_generations (
   organization_id UUID NOT NULL REFERENCES client_organizations(id) ON DELETE CASCADE,
   video_ref UUID REFERENCES meta_ad_videos(id) ON DELETE SET NULL,
   transcript_ref UUID REFERENCES meta_ad_transcripts(id) ON DELETE SET NULL,
+
+  -- Batch tracking (for multi-video campaigns)
+  batch_id UUID,                    -- Groups videos in same upload session
+  batch_sequence INTEGER,           -- Order within batch (1, 2, 3...)
 
   -- Campaign config
   actblue_form_name TEXT NOT NULL,
@@ -161,15 +264,47 @@ CREATE TABLE ad_copy_generations (
   audience_segments JSONB NOT NULL DEFAULT '[]',
   -- Format: [{name: string, description: string}, ...]
 
-  -- Generated copy
+  -- Generated copy (V2-READY: Meta API compatible format)
   generated_copy JSONB,
   -- Format: {
   --   "Segment Name": {
   --     primary_texts: string[5],
   --     headlines: string[5],
-  --     descriptions: string[5]
+  --     descriptions: string[5],
+  --     -- V2-READY: Pre-validated Meta specs
+  --     validation: {
+  --       primary_texts_valid: boolean[5],
+  --       headlines_valid: boolean[5],
+  --       descriptions_valid: boolean[5]
+  --     }
   --   }
   -- }
+
+  -- V2-READY: Meta object_story_spec compatible format
+  meta_ready_copy JSONB,
+  -- Format: {
+  --   "Segment Name": {
+  --     variations: [{
+  --       primary_text: string,
+  --       headline: string,
+  --       description: string,
+  --       call_to_action_type: "DONATE_NOW" | "LEARN_MORE" | "SIGN_UP",
+  --       destination_url: string,
+  --       char_counts: { primary: int, headline: int, description: int },
+  --       meets_meta_specs: boolean
+  --     }]
+  --   }
+  -- }
+
+  -- V2-READY: Tracking URL (pre-computed)
+  tracking_url TEXT,
+
+  -- V2-READY: Copy validation summary
+  copy_validation_status TEXT CHECK (copy_validation_status IN (
+    'all_valid',      -- All copy meets Meta specs
+    'some_truncated', -- Some copy exceeds limits
+    'needs_review'    -- Manual review recommended
+  )),
 
   generation_model TEXT,
   generation_prompt_version TEXT,
@@ -280,13 +415,26 @@ src/
 - Future steps: outline circle, muted label
 - Progress line connects steps, fills as user advances
 
+**Page Header with Organization Picker:**
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  🎬 Ad Copy Studio                    Organization: [Blue Wave ▼]   │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ①━━━━━━②━━━━━━③━━━━━━④━━━━━━⑤                                      │
+│  Upload  Review  Configure  Generate  Export                        │
+│    ●       ○        ○          ○        ○                           │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
-**Step 1: Upload Video**
+**Step 1: Upload Videos (Batch)**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        Upload Your Video Ad                         │
+│                      Upload Your Campaign Videos                    │
+│              Upload up to 5 videos for this campaign                │
 │                                                                     │
 │  ┌─────────────────────────────────────────────────────────────┐   │
 │  │                                                             │   │
@@ -294,10 +442,10 @@ src/
 │  │              │      📹 icon         │                       │   │
 │  │              └──────────────────────┘                       │   │
 │  │                                                             │   │
-│  │         Drag and drop your video here                       │   │
+│  │         Drag and drop videos here                           │   │
 │  │              or click to browse                             │   │
 │  │                                                             │   │
-│  │         Supports MP4, MOV, WebM • Max 500MB                 │   │
+│  │    Supports MP4, MOV, WebM • Max 500MB each • Up to 5       │   │
 │  │                                                             │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 │                                                                     │
@@ -307,30 +455,52 @@ src/
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**After upload (processing state):**
+**After batch upload (processing state with V2-ready metadata):**
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
+│                      Processing 3 Videos                            │
+│                                                                     │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  🎬 campaign-video-v2.mp4                          ✓ Uploaded│   │
-│  │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━          100%     │   │
+│  │  🎬 campaign-video-1.mp4                  ✓ Transcribed      │   │
+│  │     0:28 • 1080x1920 (9:16) • H.264          ✓ Meta specs    │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 │                                                                     │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  ⏳ Transcribing audio...                                    │   │
-│  │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━░░░░░░░░░░░░          65%     │   │
-│  │                                                             │   │
-│  │  This may take 1-2 minutes depending on video length        │   │
+│  │  🎬 campaign-video-2.mp4                  ⏳ Transcribing... │   │
+│  │     0:15 • 1080x1920 (9:16) • H.264          ✓ Meta specs    │   │
+│  │     ━━━━━━━━━━━━━━━━━━━━━━━━━━━░░░░░░░░░░░░          65%     │   │
 │  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  🎬 campaign-video-3.mp4                  ⚠️ Spec issue      │   │
+│  │     0:45 • 1920x1080 (16:9) • H.264          ⚠️ Wrong aspect │   │
+│  │     ━━━━━━━━━━━━━━━░░░░░░░░░░░░░░░░░░░░░░░░          40%     │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  Overall Progress: 1/3 complete                                     │
+│                                                                     │
+│  ⚠️ Video 3: 16:9 aspect ratio may perform poorly on mobile.        │
+│     Recommended: 9:16 (Reels/Stories) or 1:1 (Feed)                 │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+**Video Metadata Captured (V2-Ready):**
+- Duration, resolution, aspect ratio
+- Codec validation (H.264 required for Meta)
+- "Meta specs" badge shows compatibility status
+- Warnings for suboptimal specs (still allows proceed)
+
 ---
 
-**Step 2: Review Transcript & Analysis**
+**Step 2: Review Transcripts & Analysis (Batch)**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    Review Transcript & Analysis                     │
+│                    Review Transcripts & Analysis                    │
+│                                                                     │
+│  ┌──────────────┬──────────────┬──────────────┐                     │
+│  │ Video 1 ✓   │ Video 2 ✓   │ Video 3 ✓   │  ← Video tabs        │
+│  └──────────────┴──────────────┴──────────────┘                     │
 │                                                                     │
 │  ┌──────────────────────────────────┬──────────────────────────┐   │
 │  │ TRANSCRIPT                       │ ANALYSIS                 │   │
@@ -360,9 +530,16 @@ src/
 │  │                                  │ "fight back"             │   │
 │  └──────────────────────────────────┴──────────────────────────┘   │
 │                                                                     │
+│  Reviewed: 3/3 videos                                               │
+│                                                                     │
 │  [← Back]                                          [Next →]         │
 └─────────────────────────────────────────────────────────────────────┘
 ```
+
+**Batch Review Features:**
+- Tab for each video, checkmark when reviewed
+- "Next →" enabled when all videos reviewed (or skip option)
+- Analysis is read-only summary; edit transcript if needed per video
 
 ---
 
@@ -694,13 +871,136 @@ https://molitico.com/r/blue-wave-pac/february-push?refcode=immigration-urgent-02
 
 ---
 
+## V2-Ready Additions (Built into V1)
+
+These additions are included in v1 to ensure a smooth upgrade path to programmatic Meta ad creation:
+
+### 1. Video Technical Metadata Capture
+
+When videos are uploaded, we extract and store technical metadata:
+
+```typescript
+interface VideoMetadata {
+  aspect_ratio: '9:16' | '1:1' | '4:5' | '16:9';
+  resolution: string;           // '1080x1920'
+  codec: string;                // 'h264'
+  file_size_bytes: number;
+  frame_rate: number;           // 30.00
+  bitrate_kbps: number;
+  meets_meta_specs: boolean;
+  spec_issues?: SpecIssue[];
+}
+```
+
+**Meta Video Requirements (2026):**
+- Format: H.264 MP4/MOV
+- Aspect: 9:16 (Reels/Stories), 1:1 (Feed), 4:5 (Feed mobile)
+- Duration: 6-30 seconds for Advantage+
+- Resolution: 1080p minimum
+
+**Implementation:** Use browser's `VideoDecoder` API or server-side `ffprobe` to extract metadata on upload.
+
+### 2. Meta-Ready Copy Format
+
+Generated copy is stored in a format that maps directly to Meta's `object_story_spec`:
+
+```typescript
+interface MetaReadyCopy {
+  primary_text: string;           // → video_data.message
+  headline: string;               // → video_data.title
+  description: string;            // → link_data.caption
+  call_to_action_type: string;    // → call_to_action.type
+  destination_url: string;        // → call_to_action.value.link
+  char_counts: {
+    primary: number;
+    headline: number;
+    description: number;
+  };
+  meets_meta_specs: boolean;
+}
+```
+
+**Validation Constants:**
+```typescript
+const META_COPY_LIMITS = {
+  primary_text_visible: 125,      // Visible before "See more"
+  primary_text_max: 2200,         // Hard limit
+  headline_max: 40,
+  headline_recommended: 27,
+  description_max: 30,
+  description_recommended: 25,
+};
+```
+
+### 3. Call-to-Action Type Mapping
+
+Map donation context to Meta CTA types:
+
+| Context | Meta CTA Type |
+|---------|---------------|
+| Direct donation | `DONATE_NOW` |
+| Learn about cause | `LEARN_MORE` |
+| Sign petition | `SIGN_UP` |
+| Share content | `SHARE` |
+| Event registration | `GET_TICKETS` |
+
+Default for political fundraising: `DONATE_NOW`
+
+### 4. Organization Page Associations
+
+Store Facebook Page ID (required for ad creation):
+
+```typescript
+interface OrgMetaSettings {
+  meta_page_id: string;           // Required for object_story_spec
+  meta_page_name: string;
+  meta_instagram_actor_id?: string;
+  meta_instagram_username?: string;
+  meta_pixel_id?: string;         // For CAPI event correlation
+}
+```
+
+**v1 UI:** Settings page where admin can link Facebook Page
+**v2 Use:** Automatically populate `object_story_spec.page_id`
+
+### 5. Advantage+ Campaign Preferences
+
+Store default campaign settings for v2:
+
+```typescript
+interface CampaignPreferences {
+  objective: 'OUTCOME_SALES' | 'OUTCOME_LEADS' | 'OUTCOME_TRAFFIC';
+  optimization_goal: 'OFFSITE_CONVERSIONS' | 'LINK_CLICKS';
+  advantage_plus_creative: boolean;  // Let Meta optimize creative
+  advantage_audience: boolean;       // Let Meta expand targeting
+}
+```
+
+**Why Advantage+:** Meta is deprecating legacy campaign APIs in v25.0 (Q1 2026). All new campaigns must use the Advantage+ structure.
+
+### 6. Batch Tracking Schema
+
+Track videos uploaded together as a batch:
+
+```typescript
+interface BatchTracking {
+  batch_id: string;              // UUID grouping videos
+  batch_sequence: number;        // Order (1, 2, 3...)
+  refcode_suffix: string;        // 'vid1', 'vid2', etc.
+}
+```
+
+**v2 Use:** Create multiple ad variations in single API call
+
+---
+
 ## Future Enhancements (v2+)
 
-1. **Meta Marketing API integration** - Direct ad creation
-2. **A/B test tracking** - Link copy variations to performance data
+1. **Meta Marketing API integration** - Direct ad creation using stored meta_ready_copy
+2. **A/B test tracking** - Link copy variations to performance data via CAPI events
 3. **Copy templates** - Save successful copy as reusable templates
-4. **Bulk generation** - Process multiple videos at once
-5. **Performance feedback loop** - Show which copy variations performed best
+4. **Performance feedback loop** - Show which copy variations performed best (requires CAPI correlation)
+5. **Advantage+ campaign creation** - Full campaign setup with targeting and budget
 
 ---
 
