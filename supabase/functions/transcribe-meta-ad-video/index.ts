@@ -73,11 +73,31 @@ interface AnalysisResult {
 }
 
 /**
- * Download video to memory and return as blob
+ * Extract filename from URL with valid Whisper-compatible extension
  */
-async function downloadVideo(sourceUrl: string): Promise<Blob | null> {
+function getFilenameFromUrl(url: string): string {
+  const validExtensions = ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm'];
   try {
-    console.log(`[TRANSCRIBE] Downloading video from: ${sourceUrl.substring(0, 80)}...`);
+    const urlObj = new URL(url);
+    const pathname = urlObj.pathname;
+    const filename = pathname.split('/').pop() || 'audio.m4a';
+    const ext = filename.split('.').pop()?.toLowerCase();
+    if (ext && validExtensions.includes(ext)) {
+      return filename;
+    }
+    // Default to m4a if extension is unrecognized (common for extracted audio)
+    return 'audio.m4a';
+  } catch {
+    return 'audio.m4a';
+  }
+}
+
+/**
+ * Download media to memory and return as blob with detected filename
+ */
+async function downloadMedia(sourceUrl: string): Promise<{ blob: Blob; filename: string } | null> {
+  try {
+    console.log(`[TRANSCRIBE] Downloading media from: ${sourceUrl.substring(0, 80)}...`);
     const response = await fetch(sourceUrl);
 
     if (!response.ok) {
@@ -86,8 +106,9 @@ async function downloadVideo(sourceUrl: string): Promise<Blob | null> {
     }
 
     const blob = await response.blob();
-    console.log(`[TRANSCRIBE] Downloaded ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
-    return blob;
+    const filename = getFilenameFromUrl(sourceUrl);
+    console.log(`[TRANSCRIBE] Downloaded ${(blob.size / 1024 / 1024).toFixed(2)} MB as ${filename}`);
+    return { blob, filename };
   } catch (err) {
     console.error(`[TRANSCRIBE] Download error:`, err);
     return null;
@@ -95,17 +116,18 @@ async function downloadVideo(sourceUrl: string): Promise<Blob | null> {
 }
 
 /**
- * Transcribe video using OpenAI Whisper API
+ * Transcribe media using OpenAI Whisper API
  */
 async function transcribeWithWhisper(
-  videoBlob: Blob,
+  mediaBlob: Blob,
+  filename: string,
   openaiApiKey: string
 ): Promise<TranscriptionResult | null> {
   try {
-    console.log(`[TRANSCRIBE] Calling Whisper API...`);
+    console.log(`[TRANSCRIBE] Calling Whisper API with file: ${filename}...`);
 
     const formData = new FormData();
-    formData.append('file', videoBlob, 'video.mp4');
+    formData.append('file', mediaBlob, filename);
     formData.append('model', 'whisper-1');
     formData.append('response_format', 'verbose_json');
     formData.append('timestamp_granularities[]', 'segment');
@@ -423,16 +445,16 @@ serve(async (req) => {
         continue;
       }
 
-      // Download video
-      const videoBlob = await downloadVideo(video.video_source_url);
-      if (!videoBlob) {
+      // Download media
+      const mediaResult = await downloadMedia(video.video_source_url);
+      if (!mediaResult) {
         // Update status to URL_EXPIRED or error
         await supabase
           .from('meta_ad_videos')
           .update({
             status: 'URL_EXPIRED',
             error_code: 'DOWNLOAD_FAILED',
-            error_message: 'Failed to download video - URL may have expired',
+            error_message: 'Failed to download media - URL may have expired',
             last_error_at: new Date().toISOString(),
             retry_count: (video.retry_count || 0) + 1,
             updated_at: new Date().toISOString(),
@@ -443,6 +465,8 @@ serve(async (req) => {
         results.push({ video_id: video.video_id, status: 'failed', error: 'Download failed' });
         continue;
       }
+      
+      const { blob: mediaBlob, filename } = mediaResult;
 
       // Check if cancelled after download (expensive operation)
       if (await isCancelled(video.id)) {
@@ -461,8 +485,8 @@ serve(async (req) => {
         })
         .eq('id', video.id);
 
-      // Transcribe with Whisper
-      const transcription = await transcribeWithWhisper(videoBlob, openaiApiKey);
+      // Transcribe with Whisper using correct filename
+      const transcription = await transcribeWithWhisper(mediaBlob, filename, openaiApiKey);
       if (!transcription) {
         await supabase
           .from('meta_ad_videos')
