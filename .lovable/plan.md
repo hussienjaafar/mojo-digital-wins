@@ -1,46 +1,160 @@
 
-# Fix Missing `ad_copy_studio_sessions` Table
+# Fix Audio Extraction Loading State Issue
 
-## Problem
-The Ad Copy Studio page is throwing a 404 error because the `ad_copy_studio_sessions` table doesn't exist in the database:
+## Problem Summary
 
+The audio extraction feature gets stuck in a permanent loading state when users upload large video files. The root cause is known issues with FFmpeg.wasm 0.12.x.
+
+## Root Causes Identified
+
+| Issue | Impact | Evidence |
+|-------|--------|----------|
+| WORKERFS mount fails | Silent failure, falls back to slow path | GitHub issue #757 - "ErrnoError: FS error" |
+| writeFile stalls on large files | Infinite hang during "Preparing file..." | StackOverflow reports of writeFile never completing |
+| No timeout mechanism | Users stuck with spinning loader forever | Code review shows no timeout/abort logic |
+| Single-threaded FFmpeg | 3-5x slower processing | No COOP/COEP headers, no SharedArrayBuffer |
+
+## Solution Strategy
+
+Since WORKERFS mounting is unreliable in FFmpeg.wasm 0.12.x, we need to:
+
+1. **Remove WORKERFS entirely** - Go back to writeFile but with safeguards
+2. **Add timeout protection** - Abort extraction if it takes too long
+3. **Use chunked reading** - Read file in chunks to show progress and reduce memory pressure
+4. **Add a fallback option** - Let users skip extraction and upload the full video (for small files)
+5. **Better error recovery** - Show clear error messages with retry/skip options
+
+## Implementation Plan
+
+### File 1: `src/lib/audio-extractor.ts`
+
+**Changes:**
+
+1. **Remove WORKERFS mount attempt entirely**
+   - Delete the `mountOrWriteFile` function
+   - Use `fetchFile` + `writeFile` directly with progress simulation
+
+2. **Add extraction timeout**
+   - Set a maximum extraction time (e.g., 5 minutes for re-encoding)
+   - Abort FFmpeg execution if timeout exceeded
+
+3. **Add chunked file reading with progress**
+   - Use FileReader to read file in chunks
+   - Report progress during the "Preparing file" stage
+
+4. **Improve error messages**
+   - Distinguish between timeout, memory, and codec errors
+   - Provide actionable suggestions
+
+### File 2: `src/hooks/useVideoUpload.ts`
+
+**Changes:**
+
+1. **Add extraction timeout handling**
+   - Wrap extraction call with timeout promise
+   - On timeout, set clear error message
+
+2. **Add skip extraction option**
+   - For files 25-50MB, allow direct upload as fallback
+   - Update UI state to reflect this option
+
+3. **Improve error recovery**
+   - Allow retry with different settings
+   - Allow skipping extraction for borderline files
+
+### File 3: `src/components/ad-copy-studio/steps/VideoUploadStep.tsx`
+
+**Changes:**
+
+1. **Add timeout warning**
+   - After 30 seconds, show "This is taking longer than expected"
+   - Offer "Cancel" and "Keep waiting" options
+
+2. **Add extraction error actions**
+   - "Retry extraction" button
+   - "Upload original file instead" button (for 25-50MB files)
+
+3. **Improve progress visibility**
+   - Show file reading progress separately from FFmpeg processing
+   - Display estimated time based on file size
+
+## Technical Details
+
+### Timeout Implementation
+
+```typescript
+const EXTRACTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+async function extractAudioWithTimeout(file: File, options: AudioExtractorOptions) {
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('EXTRACTION_TIMEOUT')), EXTRACTION_TIMEOUT_MS);
+  });
+  
+  return Promise.race([
+    extractAudio(file, options),
+    timeoutPromise
+  ]);
+}
 ```
-Could not find the table 'public.ad_copy_studio_sessions' in the schema cache
+
+### Chunked File Reading
+
+```typescript
+async function readFileWithProgress(
+  file: File, 
+  onProgress: (percent: number) => void
+): Promise<Uint8Array> {
+  const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
+  const chunks: Uint8Array[] = [];
+  let offset = 0;
+  
+  while (offset < file.size) {
+    const chunk = file.slice(offset, offset + CHUNK_SIZE);
+    const buffer = await chunk.arrayBuffer();
+    chunks.push(new Uint8Array(buffer));
+    offset += CHUNK_SIZE;
+    onProgress(Math.min(100, (offset / file.size) * 100));
+  }
+  
+  // Combine chunks
+  const combined = new Uint8Array(file.size);
+  let position = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk, position);
+    position += chunk.length;
+  }
+  return combined;
+}
 ```
 
-The table is defined in `supabase/migrations/20260204000000_ad_copy_studio.sql`, but this migration was never applied to the database - the table doesn't appear in the auto-generated `types.ts` file.
+### UI Timeout Warning
 
-## Root Cause
-The migration file has a non-standard filename format (`20260204000000_ad_copy_studio.sql`) that differs from the typical UUID-based naming convention used by other migrations in the project. This likely caused it to be skipped during the migration process.
+After 30 seconds in extraction state, show:
+- "Extraction is taking longer than expected"
+- "For large videos, this can take several minutes"
+- Cancel button to abort and try again
 
-## Solution
-Create a new properly-formatted migration to add the missing `ad_copy_studio_sessions` table along with its related tables (`organization_meta_settings` and `ad_copy_generations`) that are also defined in the same file but missing.
+## Risk Mitigation
 
-### Migration SQL
+| Risk | Mitigation |
+|------|------------|
+| Chunked reading still slow | Show clear progress so users know it's working |
+| Memory issues persist | Add 100MB soft limit with warning |
+| Timeout too aggressive | Allow "Keep waiting" option |
+| Users confused by options | Clear explanatory text in UI |
 
-The migration will create:
+## Expected Outcome
 
-1. **`ad_copy_studio_sessions` table** - Stores wizard state for the 5-step workflow
-   - Columns: `id`, `organization_id`, `user_id`, `current_step`, `batch_id`, `video_ids`, `transcript_ids`, `step_data`, `completed_steps`, `status`, `created_at`, `updated_at`
-   - Unique constraint: Only one `in_progress` session per user per org
-   - RLS policies for user access
+After these changes:
+- Users will see clear progress during file preparation
+- Extraction that hangs will timeout with actionable options
+- Users can choose to upload original file if extraction fails
+- Error messages will explain what went wrong and what to do
 
-2. **`organization_meta_settings` table** (if missing) - Per-org Meta API settings
-   - Columns for Meta page IDs, default campaign settings, Advantage+ options
+## Files to Modify
 
-3. **`ad_copy_generations` table** (if missing) - Generated ad copy storage
-   - Columns for video refs, ActBlue config, generated copy, validation status
-
-### File Changes
-
-| File | Action | Purpose |
-|------|--------|---------|
-| New migration file | Create | Add the missing tables with proper RLS policies |
-
-### Technical Details
-
-The migration will use `CREATE TABLE IF NOT EXISTS` to handle cases where some tables may already exist. All tables will have:
-- Proper foreign key references to `client_organizations` and `auth.users`
-- Row Level Security enabled
-- Appropriate indexes for common query patterns
-- RLS policies allowing users to manage their own data
+| File | Change Type |
+|------|-------------|
+| `src/lib/audio-extractor.ts` | Remove WORKERFS, add timeout, chunked reading |
+| `src/hooks/useVideoUpload.ts` | Add timeout wrapper, skip option |
+| `src/components/ad-copy-studio/steps/VideoUploadStep.tsx` | Add timeout UI, error actions |
