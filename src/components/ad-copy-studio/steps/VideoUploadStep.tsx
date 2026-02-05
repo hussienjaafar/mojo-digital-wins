@@ -30,6 +30,9 @@ import {
   Trash2,
   ArrowRight,
   HardDrive,
+  RotateCcw,
+  XCircle,
+  Clock,
 } from 'lucide-react';
 import type { VideoUpload } from '@/types/ad-copy-studio';
 import { preloadFFmpeg, isFFmpegSupported, formatDiagnosticsReport } from '@/lib/audio-extractor';
@@ -47,6 +50,8 @@ export interface VideoUploadStepProps {
   onRemoveVideo: (id: string) => void;
   onClearError: () => void;
   onComplete: () => void;
+  onCancelVideo?: (id: string) => Promise<void>;
+  onRetryTranscription?: (id: string) => Promise<void>;
 }
 
 // =============================================================================
@@ -56,6 +61,7 @@ export interface VideoUploadStepProps {
 const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/webm'];
 const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024; // 500MB
 const MAX_VIDEOS = 5;
+const STUCK_THRESHOLD_MS = 60 * 1000; // 1 minute
 
 // =============================================================================
 // Helper Functions
@@ -189,6 +195,8 @@ export function VideoUploadStep({
   onRemoveVideo,
   onClearError,
   onComplete,
+  onCancelVideo,
+  onRetryTranscription,
 }: VideoUploadStepProps) {
   // State
   const [gdriveUrl, setGdriveUrl] = useState('');
@@ -469,9 +477,17 @@ export function VideoUploadStep({
 
             {videos.map((video, index) => {
               const statusDisplay = getStatusDisplay(video.status);
-              const isProcessing = ['uploading', 'transcribing', 'analyzing'].includes(
+              const isProcessing = ['uploading', 'transcribing', 'analyzing', 'extracting'].includes(
                 video.status
               );
+              
+              // Check if video is stuck (transcribing for more than 1 minute)
+              const isStuck = video.status === 'transcribing' && 
+                video.extractionStartTime && 
+                (Date.now() - video.extractionStartTime) > STUCK_THRESHOLD_MS;
+              
+              const isError = video.status === 'error';
+              const showCancelRetry = isStuck || isError;
 
               return (
                 <motion.div
@@ -592,6 +608,44 @@ export function VideoUploadStep({
                              </p>
                            )}
                          </div>
+                      )}
+
+                      {/* Stuck warning */}
+                      {isStuck && (
+                        <div className="mt-2 flex items-center gap-2 text-[#f59e0b]">
+                          <Clock className="h-4 w-4" />
+                          <span className="text-xs">Taking longer than expected</span>
+                        </div>
+                      )}
+
+                      {/* Cancel/Retry buttons */}
+                      {showCancelRetry && (onCancelVideo || onRetryTranscription) && (
+                        <div className="mt-3 flex items-center gap-2">
+                          {isStuck && onCancelVideo && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onCancelVideo(video.id)}
+                              className="gap-1.5 border-[#ef4444]/30 bg-transparent text-[#ef4444] hover:bg-[#ef4444]/10"
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                              Cancel
+                            </Button>
+                          )}
+                          {isError && onRetryTranscription && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onRetryTranscription(video.id)}
+                              className="gap-1.5 border-blue-500/30 bg-transparent text-blue-400 hover:bg-blue-500/10"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              Retry
+                            </Button>
+                          )}
+                        </div>
                       )}
                     </div>
 

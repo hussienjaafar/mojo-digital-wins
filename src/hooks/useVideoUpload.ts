@@ -37,6 +37,9 @@ export interface UseVideoUploadReturn {
   importGDriveUrls: (urls: string[]) => Promise<void>;
   removeVideo: (id: string) => void;
   clearError: () => void;
+  updateVideoStatus: (videoDbId: string, status: VideoUpload['status'], errorMessage?: string) => void;
+  cancelVideo: (id: string) => Promise<void>;
+  retryTranscription: (id: string) => Promise<void>;
 }
 
 // =============================================================================
@@ -634,6 +637,145 @@ export function useVideoUpload(
     setError(null);
   }, []);
 
+  /**
+   * Update video status by database ID (video_id)
+   * Used by AdCopyWizard to sync status from polling
+   */
+  const updateVideoStatus = useCallback((videoDbId: string, status: VideoUpload['status'], errorMessage?: string) => {
+    setVideos(prev => prev.map(v => 
+      v.video_id === videoDbId 
+        ? { ...v, status, error_message: errorMessage }
+        : v
+    ));
+  }, []);
+
+  /**
+   * Cancel a video transcription
+   * Marks the database record as CANCELLED and updates local state
+   */
+  const cancelVideo = useCallback(async (id: string) => {
+    const video = videos.find(v => v.id === id);
+    
+    if (!video?.video_id) {
+      // Just remove from local state if no database record
+      removeVideo(id);
+      return;
+    }
+
+    try {
+      // Update database status to CANCELLED
+      await (supabase as any)
+        .from('meta_ad_videos')
+        .update({ 
+          status: 'CANCELLED', 
+          error_message: 'Cancelled by user',
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', video.video_id);
+
+      // Update local state
+      setVideos(prev => prev.map(v => 
+        v.id === id 
+          ? { ...v, status: 'error', error_message: 'Cancelled by user' }
+          : v
+      ));
+
+      toast({
+        title: 'Transcription cancelled',
+        description: 'You can remove the video or retry transcription.',
+      });
+    } catch (err: any) {
+      console.error('[useVideoUpload] Cancel error:', err);
+      toast({
+        title: 'Failed to cancel',
+        description: err?.message || 'Could not cancel transcription',
+        variant: 'destructive',
+      });
+    }
+  }, [videos, removeVideo, toast]);
+
+  /**
+   * Retry transcription for a failed/cancelled video
+   * Resets database status to PENDING and re-triggers the edge function
+   */
+  const retryTranscription = useCallback(async (id: string) => {
+    const video = videos.find(v => v.id === id);
+    
+    if (!video?.video_id) {
+      toast({
+        title: 'Cannot retry',
+        description: 'Video does not have a database record',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      // Update local status first for immediate feedback
+      setVideos(prev => prev.map(v => 
+        v.id === id 
+          ? { 
+              ...v, 
+              status: 'transcribing', 
+              error_message: undefined,
+              extractionStartTime: Date.now(),
+            }
+          : v
+      ));
+
+      // Update database status to PENDING
+      await (supabase as any)
+        .from('meta_ad_videos')
+        .update({ 
+          status: 'PENDING', 
+          error_message: null,
+          retry_count: 0,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', video.video_id);
+
+      // Re-trigger transcription edge function
+      const { error: transcribeError } = await supabase.functions.invoke('transcribe-meta-ad-video', {
+        body: {
+          organization_id: organizationId,
+          video_id: video.video_id,
+          mode: 'single',
+        },
+      });
+
+      if (transcribeError) {
+        console.error('[useVideoUpload] Retry transcription error:', transcribeError);
+        setVideos(prev => prev.map(v => 
+          v.id === id 
+            ? { ...v, status: 'error', error_message: 'Failed to start transcription' }
+            : v
+        ));
+        toast({
+          title: 'Retry failed',
+          description: transcribeError.message || 'Could not start transcription',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Retrying transcription',
+          description: 'Transcription has been restarted.',
+        });
+      }
+    } catch (err: any) {
+      console.error('[useVideoUpload] Retry error:', err);
+      setVideos(prev => prev.map(v => 
+        v.id === id 
+          ? { ...v, status: 'error', error_message: err?.message || 'Retry failed' }
+          : v
+      ));
+      toast({
+        title: 'Retry failed',
+        description: err?.message || 'Could not retry transcription',
+        variant: 'destructive',
+      });
+    }
+  }, [videos, organizationId, toast]);
+
   // =========================================================================
   // Return
   // =========================================================================
@@ -646,5 +788,8 @@ export function useVideoUpload(
     importGDriveUrls,
     removeVideo,
     clearError,
+    updateVideoStatus,
+    cancelVideo,
+    retryTranscription,
   };
 }
