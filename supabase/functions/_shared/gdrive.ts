@@ -1,8 +1,9 @@
 /**
  * Google Drive Utilities for Ad Copy Studio
  *
- * Provides functions for parsing Google Drive URLs, fetching file metadata,
- * and downloading video files for the Ad Copy Studio workflow.
+ * Provides functions for parsing Google Drive URLs and downloading video files
+ * for the Ad Copy Studio workflow. Works with publicly shared links without
+ * requiring a Google API key.
  */
 
 // ============================================================================
@@ -49,7 +50,20 @@ const GDRIVE_PATTERNS = [
 /**
  * Video MIME types supported for ad copy generation
  */
-const VIDEO_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-m4v'];
+const VIDEO_MIME_TYPES = [
+  'video/mp4',
+  'video/quicktime',
+  'video/webm',
+  'video/x-m4v',
+  'video/mpeg',
+  'video/x-msvideo',
+  'application/octet-stream', // Sometimes returned for video files
+];
+
+/**
+ * Video file extensions (used when MIME type is generic)
+ */
+const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.webm', '.m4v', '.mpeg', '.avi'];
 
 /**
  * Maximum file size: 500MB
@@ -141,116 +155,54 @@ export function mapStatusToErrorCode(status: number): GDriveErrorCode {
 }
 
 // ============================================================================
-// File Metadata Functions
+// Helper Functions
 // ============================================================================
 
 /**
- * Fetch file metadata from Google Drive API
- * Validates that the file is a video and within size limits
- *
- * @param fileId - Google Drive file ID
- * @returns File metadata including name, MIME type, and size
- * @throws GDriveError for various failure conditions
- *
- * @example
- * const metadata = await getFileMetadata('1abc123xyz');
- * console.log(metadata.name); // 'campaign_video.mp4'
+ * Extract filename from Content-Disposition header
+ * @param header - Content-Disposition header value
+ * @returns Extracted filename or null
  */
-export async function getFileMetadata(fileId: string): Promise<GDriveFileMetadata> {
-  const apiKey = Deno.env.get('GOOGLE_API_KEY');
-  if (!apiKey) {
-    throw new GDriveError(
-      'NETWORK_ERROR',
-      'Google API key not configured',
-      'Please contact support to configure Google Drive integration'
-    );
-  }
+function extractFilenameFromHeader(header: string | null): string | null {
+  if (!header) return null;
 
-  const metadataUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?key=${apiKey}&fields=name,mimeType,size`;
-
-  let response: Response;
-  try {
-    response = await fetch(metadataUrl);
-  } catch (error) {
-    throw new GDriveError(
-      'NETWORK_ERROR',
-      `Failed to connect to Google Drive: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      'Please check your internet connection and try again'
-    );
-  }
-
-  if (!response.ok) {
-    const errorCode = mapStatusToErrorCode(response.status);
-
-    let suggestion: string;
-    switch (errorCode) {
-      case 'FILE_NOT_FOUND':
-        suggestion = 'Please verify the file exists and the URL is correct';
-        break;
-      case 'ACCESS_DENIED':
-        suggestion = 'Please ensure the file is shared with "Anyone with the link" permission';
-        break;
-      case 'RATE_LIMITED':
-        suggestion = 'Too many requests. Please wait a moment and try again';
-        break;
-      default:
-        suggestion = 'Please try again later';
+  // Try filename*= (RFC 5987) first - handles UTF-8 encoded filenames
+  const utf8Match = header.match(/filename\*=(?:UTF-8''|utf-8'')([^;]+)/i);
+  if (utf8Match) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      // Fall through to other methods
     }
-
-    throw new GDriveError(
-      errorCode,
-      `Failed to fetch file metadata: HTTP ${response.status}`,
-      suggestion
-    );
   }
 
-  let data: { name?: string; mimeType?: string; size?: string };
-  try {
-    data = await response.json();
-  } catch {
-    throw new GDriveError(
-      'NETWORK_ERROR',
-      'Invalid response from Google Drive API',
-      'Please try again later'
-    );
+  // Try filename="..."
+  const quotedMatch = header.match(/filename="([^"]+)"/);
+  if (quotedMatch) {
+    return quotedMatch[1];
   }
 
-  const { name, mimeType, size } = data;
-
-  if (!name || !mimeType || !size) {
-    throw new GDriveError(
-      'FILE_NOT_SHARED',
-      'Could not retrieve file information',
-      'Please ensure the file is shared with "Anyone with the link" permission'
-    );
+  // Try filename=... (unquoted)
+  const unquotedMatch = header.match(/filename=([^;\s]+)/);
+  if (unquotedMatch) {
+    return unquotedMatch[1];
   }
 
-  // Validate MIME type
-  if (!VIDEO_MIME_TYPES.includes(mimeType)) {
-    throw new GDriveError(
-      'WRONG_FILE_TYPE',
-      `Unsupported file type: ${mimeType}`,
-      `Please upload a video file. Supported formats: MP4, QuickTime (MOV), WebM, M4V`
-    );
+  return null;
+}
+
+/**
+ * Check if a file appears to be a video based on MIME type or extension
+ */
+function isVideoFile(mimeType: string | null, filename: string): boolean {
+  // Check MIME type
+  if (mimeType && VIDEO_MIME_TYPES.some(t => mimeType.toLowerCase().includes(t.split('/')[1]))) {
+    return true;
   }
 
-  // Validate file size
-  const fileSizeBytes = parseInt(size, 10);
-  if (fileSizeBytes > MAX_FILE_SIZE) {
-    const sizeMB = Math.round(fileSizeBytes / (1024 * 1024));
-    const maxMB = Math.round(MAX_FILE_SIZE / (1024 * 1024));
-    throw new GDriveError(
-      'FILE_TOO_LARGE',
-      `File size (${sizeMB}MB) exceeds maximum allowed (${maxMB}MB)`,
-      'Please upload a smaller video file or compress the video'
-    );
-  }
-
-  return {
-    name,
-    mimeType,
-    size: fileSizeBytes,
-  };
+  // Check file extension
+  const lowerFilename = filename.toLowerCase();
+  return VIDEO_EXTENSIONS.some(ext => lowerFilename.endsWith(ext));
 }
 
 // ============================================================================
@@ -258,8 +210,9 @@ export async function getFileMetadata(fileId: string): Promise<GDriveFileMetadat
 // ============================================================================
 
 /**
- * Download a file from Google Drive
- * Handles the virus scan confirmation for files >100MB
+ * Download a file from Google Drive using public share link
+ * Works without requiring a Google API key for publicly shared files.
+ * Handles the virus scan confirmation for files >100MB.
  *
  * @param fileId - Google Drive file ID
  * @returns The downloaded file as a Blob with filename
@@ -271,18 +224,18 @@ export async function getFileMetadata(fileId: string): Promise<GDriveFileMetadat
  * // filename is 'campaign_video.mp4'
  */
 export async function downloadFromGDrive(fileId: string): Promise<GDriveDownloadResult> {
-  // First get metadata to verify file and get filename
-  const metadata = await getFileMetadata(fileId);
-
-  // Download URL - use direct download endpoint
+  // Download URL - use direct download endpoint (works for public files without API key)
   const downloadUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
+
+  console.log(`[gdrive] Attempting download for file ID: ${fileId}`);
 
   let response: Response;
   try {
     response = await fetch(downloadUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; AdCopyStudio/1.0)',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
+      redirect: 'follow',
     });
   } catch (error) {
     throw new GDriveError(
@@ -300,8 +253,20 @@ export async function downloadFromGDrive(fileId: string): Promise<GDriveDownload
     // This is the virus scan warning page
     const html = await response.text();
 
+    // Check for access denied
+    if (html.includes('Access Denied') || html.includes('No permission') || html.includes('Sign in')) {
+      throw new GDriveError(
+        'ACCESS_DENIED',
+        'Access denied when downloading file',
+        'Please ensure the file is shared with "Anyone with the link" permission'
+      );
+    }
+
     // Extract the confirmation token from the download warning page
-    const confirmMatch = html.match(/confirm=([a-zA-Z0-9_-]+)/);
+    // Google uses different patterns, try multiple
+    const confirmMatch = html.match(/confirm=([a-zA-Z0-9_-]+)/) ||
+                         html.match(/confirm=([^&"]+)/) ||
+                         html.match(/"confirm":"([^"]+)"/);
     const uuidMatch = html.match(/uuid=([a-zA-Z0-9_-]+)/);
 
     if (confirmMatch) {
@@ -309,14 +274,17 @@ export async function downloadFromGDrive(fileId: string): Promise<GDriveDownload
       const confirmToken = confirmMatch[1];
       const uuid = uuidMatch ? uuidMatch[1] : '';
 
+      console.log(`[gdrive] Large file detected, retrying with confirmation token`);
+
       const confirmedUrl = `https://drive.google.com/uc?id=${fileId}&export=download&confirm=${confirmToken}${uuid ? `&uuid=${uuid}` : ''}`;
 
       let retryResponse: Response;
       try {
         retryResponse = await fetch(confirmedUrl, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; AdCopyStudio/1.0)',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           },
+          redirect: 'follow',
         });
       } catch (error) {
         throw new GDriveError(
@@ -344,24 +312,23 @@ export async function downloadFromGDrive(fileId: string): Promise<GDriveDownload
         );
       }
 
-      const blob = await retryResponse.blob();
-      return { blob, filename: metadata.name };
-    }
+      response = retryResponse;
+    } else {
+      // No confirmation token found - might be a different error
+      if (html.includes('too large') || html.includes('virus scan')) {
+        throw new GDriveError(
+          'VIRUS_SCAN_TIMEOUT',
+          'Could not bypass Google Drive virus scan',
+          'Please download the file manually and upload directly'
+        );
+      }
 
-    // Could not find confirmation token - likely access denied
-    if (html.includes('Access Denied') || html.includes('No permission')) {
       throw new GDriveError(
-        'ACCESS_DENIED',
-        'Access denied when downloading file',
-        'Please ensure the file is shared with "Anyone with the link" permission'
+        'FILE_NOT_FOUND',
+        'File not found or not accessible',
+        'Please verify the file exists and is shared with "Anyone with the link" permission'
       );
     }
-
-    throw new GDriveError(
-      'VIRUS_SCAN_TIMEOUT',
-      'Could not bypass Google Drive virus scan',
-      'Please download the file manually and upload directly'
-    );
   }
 
   if (!response.ok) {
@@ -372,6 +339,43 @@ export async function downloadFromGDrive(fileId: string): Promise<GDriveDownload
     );
   }
 
+  // Extract filename from Content-Disposition header
+  const contentDisposition = response.headers.get('content-disposition');
+  let filename = extractFilenameFromHeader(contentDisposition);
+
+  // Fallback filename if not found in header
+  if (!filename) {
+    filename = `gdrive_${fileId}.mp4`;
+    console.log(`[gdrive] No filename in headers, using fallback: ${filename}`);
+  }
+
+  // Get content type for validation
+  const finalContentType = response.headers.get('content-type') || '';
+
+  // Validate it's a video file
+  if (!isVideoFile(finalContentType, filename)) {
+    throw new GDriveError(
+      'WRONG_FILE_TYPE',
+      `File does not appear to be a video: ${filename} (${finalContentType})`,
+      'Please upload a video file. Supported formats: MP4, MOV, WebM, M4V'
+    );
+  }
+
+  // Download the blob
   const blob = await response.blob();
-  return { blob, filename: metadata.name };
+
+  // Validate file size
+  if (blob.size > MAX_FILE_SIZE) {
+    const sizeMB = Math.round(blob.size / (1024 * 1024));
+    const maxMB = Math.round(MAX_FILE_SIZE / (1024 * 1024));
+    throw new GDriveError(
+      'FILE_TOO_LARGE',
+      `File size (${sizeMB}MB) exceeds maximum allowed (${maxMB}MB)`,
+      'Please upload a smaller video file or compress the video'
+    );
+  }
+
+  console.log(`[gdrive] Successfully downloaded: ${filename} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+
+  return { blob, filename };
 }
