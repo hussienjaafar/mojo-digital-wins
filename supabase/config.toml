@@ -396,3 +396,14 @@ verify_jwt = true  # Requires auth for reanalyzing transcripts
 # --- AUTO-RECOVERY / SELF-HEALING ---
 [functions.recover-stuck-chunks]
 verify_jwt = false  # Runs on cron, validates CRON_SECRET internally
+
+# --- PORTAL PROXY (handles CORS bypass for portal.molitico.com) ---
+[functions.db-proxy]
+verify_jwt = false  # Validates auth header internally
+
+# --- IP/GEOLOCATION HELPERS ---
+[functions.get-client-ip]
+verify_jwt = false  # Public helper to get client IP
+
+[functions.geolocate-ip]
+verify_jwt = false  # Internal IP geolocation lookup
