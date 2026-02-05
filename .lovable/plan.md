@@ -1,175 +1,155 @@
 
-# Client-Side Audio Extraction with FFmpeg.wasm
+# Debugging & Optimizing FFmpeg.wasm Audio Extraction Performance
 
-## Overview
+## Problem Analysis
 
-This plan implements browser-based audio extraction from video files before upload, reducing a 200MB video to a ~10-20MB audio file. This bypasses the 150MB Edge Function memory limit and fits within the Whisper API's 25MB limit.
+Based on code review and research, the slow audio extraction is caused by multiple factors:
 
-## Problem Solved
+### Root Causes Identified
 
-| Current Issue | With FFmpeg.wasm |
-|--------------|------------------|
-| 50MB Edge Function limit for Google Drive imports | Extract audio locally, upload only audio |
-| 200MB+ videos exhaust server memory | Processing happens in user's browser |
-| Large videos exceed Whisper's 25MB limit | Audio-only files are 10-20x smaller |
+| Issue | Impact | Current Code |
+|-------|--------|--------------|
+| **Re-encoding audio** | Very slow - CPU-intensive transcoding | Uses `-acodec libmp3lame` which re-encodes |
+| **Single-threaded mode** | 3-10x slower than multi-threaded | No SharedArrayBuffer (requires COOP/COEP headers) |
+| **Large WASM download** | ~30MB download on first use | Loading from unpkg CDN |
+| **Full file buffering** | Memory pressure for large files | `fetchFile()` loads entire video into memory |
+| **High quality settings** | Slower encoding | `-q:a 2` is VBR ~190kbps |
 
-## Architecture
+### Current FFmpeg Command (Slow)
+```
+ffmpeg -i input.mp4 -vn -acodec libmp3lame -q:a 2 -ar 44100 -ac 1 output.mp3
+```
+This **re-encodes** audio using LAME MP3 encoder, which is CPU-intensive in WebAssembly.
 
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                         USER'S BROWSER                              │
-│  ┌─────────────┐     ┌──────────────┐     ┌───────────────────┐    │
-│  │ Video File  │ ──▶ │ FFmpeg.wasm  │ ──▶ │ Audio File (MP3)  │    │
-│  │ (200MB MP4) │     │ (Client-side)│     │ (~15MB)           │    │
-│  └─────────────┘     └──────────────┘     └───────────────────┘    │
-│                                                    │               │
-│                                                    ▼               │
-│                              ┌───────────────────────────────────┐ │
-│                              │ Upload to Supabase Storage        │ │
-│                              │ (Standard upload, no Edge limits) │ │
-│                              └───────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────┘
-                                         │
-                                         ▼
-                     ┌───────────────────────────────────────────────┐
-                     │              WHISPER API                       │
-                     │  Transcribes audio (already within 25MB limit) │
-                     └───────────────────────────────────────────────┘
+## Optimization Strategy
+
+### 1. Use Copy Codec When Possible (Fastest)
+
+If the source video has AAC audio (most MP4s do), we can **copy it directly** without re-encoding:
+
+```
+ffmpeg -i input.mp4 -vn -acodec copy output.m4a
 ```
 
-## Implementation Steps
+This is **nearly instant** because it just extracts the audio stream without any processing.
 
-### Step 1: Install FFmpeg.wasm Dependencies
+**Trade-off**: Output format matches source (usually AAC/M4A), not MP3. Whisper supports both.
 
-Add the required packages:
-- `@ffmpeg/ffmpeg` - Core FFmpeg functionality
-- `@ffmpeg/util` - Helper utilities for file handling
+### 2. Detect Audio Codec First
 
-### Step 2: Create Audio Extraction Utility
+Before extraction, probe the video to determine if copy is possible:
 
-**New file: `src/lib/audio-extractor.ts`**
-
-This utility will:
-- Load FFmpeg.wasm on first use (~30MB download, cached by browser)
-- Accept video File or Blob input
-- Extract audio track using FFmpeg's `-vn` (no video) flag
-- Output as MP3 (optimal size/quality balance for speech)
-- Report progress during extraction
-- Handle errors gracefully with user-friendly messages
-
-Key FFmpeg command:
 ```
-ffmpeg -i input.mp4 -vn -acodec libmp3lame -q:a 2 output.mp3
+ffmpeg -i input.mp4  (parse output for audio codec info)
 ```
 
-Options breakdown:
-- `-i input.mp4` - Input video file
-- `-vn` - No video (audio only)
-- `-acodec libmp3lame` - Use LAME MP3 encoder
-- `-q:a 2` - High quality audio (VBR ~190kbps, good for speech)
+If audio is AAC → use copy codec (instant)
+If audio is something else → fall back to re-encode
 
-### Step 3: Update Video Upload Hook
+### 3. Optimize Re-encoding Settings (When Needed)
 
-**Modify: `src/hooks/useVideoUpload.ts`**
+If re-encoding is necessary, use faster settings:
 
-Changes:
-1. Add a new processing step after file selection: "Extracting audio..."
-2. For files over 25MB, extract audio before upload
-3. Upload the extracted audio file instead of the full video
-4. Store both the audio file (for transcription) and original video metadata
-5. Update progress tracking to show extraction progress
+| Setting | Current | Optimized | Impact |
+|---------|---------|-----------|--------|
+| Quality | `-q:a 2` (VBR ~190kbps) | `-b:a 64k` (CBR 64kbps) | 3x faster, fine for speech |
+| Sample rate | 44100 Hz | 16000 Hz | 2x faster, ideal for Whisper |
+| Channels | Mono (good) | Mono | Keep as-is |
 
-New flow:
-```text
-File Selected → Validate → Extract Audio (if >25MB) → Upload Audio → Create DB Record
+Optimized command for speech:
+```
+ffmpeg -i input.mp4 -vn -acodec libmp3lame -b:a 64k -ar 16000 -ac 1 output.mp3
 ```
 
-### Step 4: Update Video Upload Step UI
+### 4. Enable Multi-Threading (Requires Server Config)
 
-**Modify: `src/components/ad-copy-studio/steps/VideoUploadStep.tsx`**
+FFmpeg.wasm can use multi-threading with SharedArrayBuffer, but requires specific HTTP headers:
 
-Changes:
-1. Add new status: `'extracting'` with appropriate label ("Extracting audio...")
-2. Show extraction progress (FFmpeg reports progress via events)
-3. Add tooltip explaining that audio is extracted locally for large files
-4. Update the "Processing" states to handle extraction step
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
 
-### Step 5: Update Type Definitions
+This provides **3-5x speedup** but requires Lovable platform support.
 
-**Modify: `src/types/ad-copy-studio.ts`**
+### 5. Add Progress Visibility & Timing
 
-Add new status value:
+Add detailed timing logs to understand where time is spent:
+- WASM loading time
+- File writing time
+- Extraction/encoding time
+- File reading time
+
+## Implementation Plan
+
+### Step 1: Add Codec Detection & Copy Mode
+
+Update `src/lib/audio-extractor.ts`:
+
+1. Add a `probeVideo()` function to detect audio codec
+2. If audio is AAC/MP3 → use `-acodec copy` for instant extraction
+3. Output as `.m4a` (for AAC) or `.mp3` (for MP3 source)
+4. Fall back to re-encode only when necessary
+
+### Step 2: Optimize Re-encoding Settings for Speech
+
+When re-encoding is needed:
+- Lower bitrate: 64kbps (sufficient for speech transcription)
+- Lower sample rate: 16kHz (Whisper's native rate)
+- Use CBR instead of VBR (faster encoding)
+
+### Step 3: Add Performance Timing
+
+Add detailed timing to identify bottlenecks:
 ```typescript
-status: 'pending' | 'uploading' | 'extracting' | 'transcribing' | 'analyzing' | 'ready' | 'error';
+console.time('[FFmpeg] WASM Load');
+console.time('[FFmpeg] Write Input');
+console.time('[FFmpeg] Extract');
+console.time('[FFmpeg] Read Output');
 ```
 
-### Step 6: Improve Google Drive Large File Handling
+### Step 4: Preload FFmpeg WASM
 
-**Modify: `supabase/functions/import-gdrive-video/index.ts`**
+Add option to preload FFmpeg during idle time so it's ready when needed:
+- Trigger preload when user navigates to Ad Copy Studio
+- Cache the loaded instance
 
-For files that exceed the 50MB Edge Function limit:
-1. Return a specific error code: `FILE_TOO_LARGE_FOR_GDRIVE`
-2. Include a user-friendly message explaining that:
-   - The file is too large for automated import
-   - They should download it from Google Drive
-   - Use the direct upload feature (which will extract audio locally)
+### Step 5: Update Storage & Database
 
----
+- Support both `.mp3` and `.m4a` audio files
+- Update content type detection
+
+## Expected Performance Improvements
+
+| Scenario | Current Time | After Optimization |
+|----------|--------------|-------------------|
+| AAC audio in MP4 (copy mode) | 30-60 seconds | 2-5 seconds |
+| Non-AAC audio (optimized re-encode) | 30-60 seconds | 10-20 seconds |
+| WASM preloaded | N/A | Saves 5-15 seconds |
+
+## File Changes Summary
+
+| File | Change |
+|------|--------|
+| `src/lib/audio-extractor.ts` | Add codec detection, copy mode, optimized encoding settings, timing logs |
+| `src/hooks/useVideoUpload.ts` | Handle .m4a output, trigger FFmpeg preload |
+| `src/components/ad-copy-studio/steps/VideoUploadStep.tsx` | Add preload trigger on component mount |
 
 ## Technical Details
 
-### FFmpeg.wasm Loading Strategy
+### Codec Detection Approach
 
-The FFmpeg core is ~30MB and will be loaded from a CDN on first use:
-- Uses SharedArrayBuffer if available (faster, multi-threaded)
-- Falls back to single-threaded mode if needed
-- Cached by browser's service worker after first load
+FFmpeg outputs codec info to stderr when probing. We'll parse this:
+```
+Stream #0:1: Audio: aac (LC), 48000 Hz, stereo
+```
 
-### Memory Considerations
+### Whisper Compatibility
 
-FFmpeg.wasm processes files in a virtual filesystem:
-- For very large files (>500MB), may need to use streaming
-- Will add a warning for files approaching browser memory limits
-- Target extraction time: ~30 seconds for a typical 2-minute campaign video
+OpenAI Whisper supports: mp3, mp4, mpeg, mpga, m4a, wav, webm
+
+Both MP3 and M4A are fully supported, so using copy mode with M4A output is safe.
 
 ### Browser Compatibility
 
-FFmpeg.wasm works in:
-- Chrome 79+ (full support)
-- Firefox 76+ (full support)
-- Safari 14.1+ (single-threaded only)
-- Edge 79+ (full support)
-
-### File Size Expectations
-
-| Video File | Duration | Audio Output (MP3 192kbps) |
-|-----------|----------|---------------------------|
-| 50MB      | ~1 min   | ~1.5MB                    |
-| 100MB     | ~2 min   | ~3MB                      |
-| 200MB     | ~4 min   | ~6MB                      |
-| 500MB     | ~10 min  | ~15MB                     |
-
-All outputs well within Whisper's 25MB limit.
-
----
-
-## Summary of File Changes
-
-| File | Action | Purpose |
-|------|--------|---------|
-| `package.json` | Add dependencies | @ffmpeg/ffmpeg, @ffmpeg/util |
-| `src/lib/audio-extractor.ts` | Create new | FFmpeg.wasm utility for audio extraction |
-| `src/hooks/useVideoUpload.ts` | Modify | Integrate audio extraction before upload |
-| `src/components/ad-copy-studio/steps/VideoUploadStep.tsx` | Modify | Add "extracting" status, progress UI |
-| `src/types/ad-copy-studio.ts` | Modify | Add 'extracting' status type |
-| `supabase/functions/import-gdrive-video/index.ts` | Modify | Better error message for large GDrive files |
-
-## Benefits
-
-- **500MB+ video support**: No more Edge Function memory limits
-- **Faster uploads**: Audio files are 10-20x smaller than videos
-- **Whisper compatibility**: All files fit within 25MB limit
-- **No server costs**: Processing happens in user's browser
-- **Privacy**: Video content never touches your servers (only audio)
-- **Better UX**: Clear progress feedback during extraction
-
+Copy codec mode works in all browsers since it doesn't require heavy CPU processing. The optimization benefits all users regardless of device speed.
