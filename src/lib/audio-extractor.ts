@@ -100,7 +100,7 @@ const FILE_CHUNK_SIZE = 10 * 1024 * 1024;
 // CDN sources for FFmpeg core files (fallback order)
 // Note: cdnjs uses a different path structure than npm CDNs
 const CDN_SOURCES = [
-  'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.6/esm',
+  'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-core/0.12.6/esm',
   'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm',
   'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm',
 ];
