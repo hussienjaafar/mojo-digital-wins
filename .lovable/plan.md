@@ -1,54 +1,95 @@
 
 
-## Fix: Add `audio/mp4` MIME Type to Storage Bucket
+## Fix: Add Missing RLS Policies for `meta_ad_videos` Table
 
 ### Problem
-The FFmpeg audio extraction is now working correctly. The extracted `.m4a` audio file has MIME type `audio/mp4`, but the `meta-ad-audio` storage bucket only allows: `audio/mpeg`, `audio/mp3`, `audio/wav`, `audio/webm`, `audio/ogg`.
 
-This causes the upload to fail with:
-```
-StorageApiError: mime type audio/mp4 is not supported
-```
+The `meta_ad_videos` table is missing INSERT, UPDATE, and DELETE policies for authenticated users. Currently it only has:
+
+| Policy | Command | What it does |
+|--------|---------|--------------|
+| Users can view their org videos | SELECT | Allows viewing videos for active org members |
+| Service role full access | ALL | Allows backend/edge functions to manage videos |
+
+When a user tries to upload a video, the INSERT fails with a 403 error because there's no policy allowing authenticated users to insert records.
 
 ### Solution
-Add `audio/mp4` (and `audio/aac` for compatibility) to the allowed MIME types for the `meta-ad-audio` bucket.
 
-### Database Migration Required
+Add three new RLS policies that allow authenticated users with active organization membership to:
+
+1. **INSERT** - Create new video records for their organization
+2. **UPDATE** - Modify video records for their organization  
+3. **DELETE** - Remove video records for their organization
+
+### Database Migration
 
 ```sql
--- Update the meta-ad-audio bucket to allow audio/mp4 (M4A) and audio/aac formats
-UPDATE storage.buckets 
-SET allowed_mime_types = ARRAY[
-  'audio/mpeg',    -- MP3
-  'audio/mp3',     -- MP3 (alternative)
-  'audio/wav',     -- WAV
-  'audio/webm',    -- WebM
-  'audio/ogg',     -- OGG
-  'audio/mp4',     -- M4A (AAC in MP4 container) - NEW
-  'audio/aac',     -- Raw AAC - NEW
-  'audio/x-m4a'    -- M4A (alternative MIME) - NEW
-]
-WHERE id = 'meta-ad-audio';
+-- Policy 1: Allow users to insert videos for their organizations
+CREATE POLICY "Users can insert videos for their org"
+  ON public.meta_ad_videos
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    organization_id IN (
+      SELECT organization_id 
+      FROM organization_memberships 
+      WHERE user_id = auth.uid() 
+      AND status = 'active'
+    )
+  );
+
+-- Policy 2: Allow users to update videos for their organizations
+CREATE POLICY "Users can update videos for their org"
+  ON public.meta_ad_videos
+  FOR UPDATE
+  TO authenticated
+  USING (
+    organization_id IN (
+      SELECT organization_id 
+      FROM organization_memberships 
+      WHERE user_id = auth.uid() 
+      AND status = 'active'
+    )
+  )
+  WITH CHECK (
+    organization_id IN (
+      SELECT organization_id 
+      FROM organization_memberships 
+      WHERE user_id = auth.uid() 
+      AND status = 'active'
+    )
+  );
+
+-- Policy 3: Allow users to delete videos for their organizations
+CREATE POLICY "Users can delete videos for their org"
+  ON public.meta_ad_videos
+  FOR DELETE
+  TO authenticated
+  USING (
+    organization_id IN (
+      SELECT organization_id 
+      FROM organization_memberships 
+      WHERE user_id = auth.uid() 
+      AND status = 'active'
+    )
+  );
 ```
 
-### Why This Approach
+### How the policies work
 
-| Approach | Pros | Cons |
-|----------|------|------|
-| **Add MIME types (chosen)** | Fast extraction via copy mode, no re-encoding needed | Minor bucket config change |
-| Force re-encode to MP3 | No bucket changes | Slower (10x), larger files, unnecessary quality loss |
-
-The copy mode extraction completed in under 1 second for a 154MB video - forcing re-encode would take 30+ seconds.
+- **INSERT (WITH CHECK)**: Verifies the user has an active membership in the organization they're trying to create a video for
+- **UPDATE (USING + WITH CHECK)**: Verifies the user can only modify videos in their organization and can't move them to another org
+- **DELETE (USING)**: Verifies the user can only delete videos from their own organization
 
 ### Files to Change
-- **Database migration** - Update `meta-ad-audio` bucket allowed MIME types
 
-No code changes needed - the extraction logic is already correct.
+- **Database migration only** - No code changes needed
 
 ### Expected Result After Fix
-1. User uploads video (154MB)
-2. FFmpeg extracts audio in copy mode (~1 second)
-3. Outputs `.m4a` file with `audio/mp4` MIME type
-4. Upload to storage succeeds
-5. Transcription process continues
+
+1. User uploads video file
+2. FFmpeg extracts audio (working)
+3. Audio uploads to storage (working)
+4. Database INSERT succeeds (currently failing - will be fixed)
+5. Video appears in the Ad Copy Studio
 
