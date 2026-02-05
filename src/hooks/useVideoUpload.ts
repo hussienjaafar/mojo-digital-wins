@@ -6,9 +6,11 @@
  * - Google Drive imports via edge function
  * - Upload progress tracking per video
  * - Maximum 5 videos validation
+ * - State hydration from saved sessions
+ * - Cancel/retry with durable backend status
  */
 
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { extractAudio, shouldExtractAudio, isFFmpegSupported, type ExtractionStage } from '@/lib/audio-extractor';
@@ -27,6 +29,8 @@ export interface UseVideoUploadOptions {
   batchId: string;
   userId: string;
   onUploadComplete?: (video: VideoUpload) => void;
+  /** Initial videos to hydrate state from (e.g., from saved session) */
+  initialVideos?: VideoUpload[];
 }
 
 export interface UseVideoUploadReturn {
@@ -101,11 +105,29 @@ function validateVideoFile(file: File): { valid: boolean; error?: string } {
 export function useVideoUpload(
   options: UseVideoUploadOptions
 ): UseVideoUploadReturn {
-  const { organizationId, batchId, userId, onUploadComplete } = options;
+  const { organizationId, batchId, userId, onUploadComplete, initialVideos } = options;
   const { toast } = useToast();
 
   // State
   const [videos, setVideos] = useState<VideoUpload[]>([]);
+  const hasHydratedRef = React.useRef(false);
+
+  // Hydrate from initialVideos on mount (once only)
+  React.useEffect(() => {
+    if (!hasHydratedRef.current && initialVideos && initialVideos.length > 0 && videos.length === 0) {
+      hasHydratedRef.current = true;
+      // Restore videos from session, setting file to null since File objects can't be serialized
+      const hydratedVideos = initialVideos.map(v => ({
+        ...v,
+        file: null,
+        // Set transcriptionStartTime if video is in transcribing state but doesn't have one
+        transcriptionStartTime: v.transcriptionStartTime || 
+          (v.status === 'transcribing' ? (v.backendUpdatedAt ? new Date(v.backendUpdatedAt).getTime() : Date.now()) : undefined),
+      }));
+      setVideos(hydratedVideos);
+      console.log(`[useVideoUpload] Hydrated ${hydratedVideos.length} videos from session`);
+    }
+  }, [initialVideos, videos.length]);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -392,6 +414,7 @@ export function useVideoUpload(
           video_id: insertedVideo.id,
           status: 'transcribing',
           progress: 80,
+          transcriptionStartTime: Date.now(), // Set start time for stuck detection
         };
 
         updateVideo(video.id, updatedVideo);
@@ -652,6 +675,7 @@ export function useVideoUpload(
   /**
    * Cancel a video transcription
    * Marks the database record as CANCELLED and updates local state
+   * The CANCELLED status prevents the edge function from overwriting
    */
   const cancelVideo = useCallback(async (id: string) => {
     const video = videos.find(v => v.id === id);
@@ -663,12 +687,13 @@ export function useVideoUpload(
     }
 
     try {
-      // Update database status to error (CANCELLED not in DB constraint)
+      // Update database status to CANCELLED (durable - edge function will respect this)
       await (supabase as any)
         .from('meta_ad_videos')
         .update({ 
-          status: 'error', 
+          status: 'CANCELLED', 
           error_message: 'Cancelled by user',
+          error_code: 'CANCELLED_BY_USER',
           updated_at: new Date().toISOString() 
         })
         .eq('id', video.video_id);
@@ -676,7 +701,7 @@ export function useVideoUpload(
       // Update local state
       setVideos(prev => prev.map(v => 
         v.id === id 
-          ? { ...v, status: 'error', error_message: 'Cancelled by user' }
+          ? { ...v, status: 'error', error_message: 'Cancelled by user', transcriptionStartTime: undefined }
           : v
       ));
 
@@ -718,7 +743,7 @@ export function useVideoUpload(
               ...v, 
               status: 'transcribing', 
               error_message: undefined,
-              extractionStartTime: Date.now(),
+              transcriptionStartTime: Date.now(), // Use transcriptionStartTime for stuck detection
             }
           : v
       ));

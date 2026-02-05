@@ -482,12 +482,17 @@ export function VideoUploadStep({
               );
               
               // Check if video is stuck (transcribing for more than 1 minute)
+              // Use transcriptionStartTime first (preferred), fallback to extractionStartTime
+              const startTime = video.transcriptionStartTime || video.extractionStartTime;
               const isStuck = video.status === 'transcribing' && 
-                video.extractionStartTime && 
-                (Date.now() - video.extractionStartTime) > STUCK_THRESHOLD_MS;
+                startTime && 
+                (Date.now() - startTime) > STUCK_THRESHOLD_MS;
               
               const isError = video.status === 'error';
-              const showCancelRetry = isStuck || isError;
+              // Show cancel button while processing (not just when stuck)
+              // Show retry button when in error state
+              const showCancel = isProcessing && onCancelVideo;
+              const showRetry = isError && onRetryTranscription;
 
               return (
                 <motion.div
@@ -618,27 +623,27 @@ export function VideoUploadStep({
                         </div>
                       )}
 
-                      {/* Cancel/Retry buttons */}
-                      {showCancelRetry && (onCancelVideo || onRetryTranscription) && (
+                      {/* Cancel/Retry buttons - Cancel available while processing, Retry when error */}
+                      {(showCancel || showRetry) && (
                         <div className="mt-3 flex items-center gap-2">
-                          {isStuck && onCancelVideo && (
+                          {showCancel && (
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={() => onCancelVideo(video.id)}
+                              onClick={() => onCancelVideo!(video.id)}
                               className="gap-1.5 border-[#ef4444]/30 bg-transparent text-[#ef4444] hover:bg-[#ef4444]/10"
                             >
                               <XCircle className="h-3.5 w-3.5" />
                               Cancel
                             </Button>
                           )}
-                          {isError && onRetryTranscription && (
+                          {showRetry && (
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={() => onRetryTranscription(video.id)}
+                              onClick={() => onRetryTranscription!(video.id)}
                               className="gap-1.5 border-blue-500/30 bg-transparent text-blue-400 hover:bg-blue-500/10"
                             >
                               <RotateCcw className="h-3.5 w-3.5" />

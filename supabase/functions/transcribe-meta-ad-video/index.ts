@@ -335,6 +335,21 @@ serve(async (req) => {
       );
     }
 
+    /**
+     * Helper to check if video has been cancelled
+     * Returns true if the video should stop processing
+     */
+    async function isCancelled(videoDbId: string): Promise<boolean> {
+      const { data, error } = await supabase
+        .from('meta_ad_videos')
+        .select('status')
+        .eq('id', videoDbId)
+        .single();
+      
+      if (error || !data) return false;
+      return data.status === 'CANCELLED';
+    }
+
     // Get videos to process
     let videosToProcess: any[] = [];
 
@@ -351,6 +366,15 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ error: 'Video not found' }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Check if already cancelled before starting
+      if (data.status === 'CANCELLED') {
+        console.log(`[TRANSCRIBE] Video ${video_id} is cancelled, skipping`);
+        return new Response(
+          JSON.stringify({ success: true, message: 'Video was cancelled', results: [{ video_id, status: 'cancelled' }] }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -385,6 +409,13 @@ serve(async (req) => {
     for (const video of videosToProcess) {
       console.log(`[TRANSCRIBE] Processing video ${video.video_id} for ad ${video.ad_id}`);
 
+      // Check if cancelled before starting
+      if (await isCancelled(video.id)) {
+        console.log(`[TRANSCRIBE] Video ${video.video_id} was cancelled, skipping`);
+        results.push({ video_id: video.video_id, status: 'cancelled' });
+        continue;
+      }
+
       // Check if source URL exists
       if (!video.video_source_url) {
         console.log(`[TRANSCRIBE] No source URL for video ${video.video_id}, skipping`);
@@ -410,6 +441,13 @@ serve(async (req) => {
 
         failed++;
         results.push({ video_id: video.video_id, status: 'failed', error: 'Download failed' });
+        continue;
+      }
+
+      // Check if cancelled after download (expensive operation)
+      if (await isCancelled(video.id)) {
+        console.log(`[TRANSCRIBE] Video ${video.video_id} was cancelled after download, stopping`);
+        results.push({ video_id: video.video_id, status: 'cancelled' });
         continue;
       }
 
@@ -440,6 +478,13 @@ serve(async (req) => {
 
         failed++;
         results.push({ video_id: video.video_id, status: 'failed', error: 'Transcription failed' });
+        continue;
+      }
+
+      // Check if cancelled after transcription (expensive operation)
+      if (await isCancelled(video.id)) {
+        console.log(`[TRANSCRIBE] Video ${video.video_id} was cancelled after transcription, stopping`);
+        results.push({ video_id: video.video_id, status: 'cancelled' });
         continue;
       }
 

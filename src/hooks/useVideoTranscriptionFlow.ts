@@ -41,7 +41,7 @@ export interface TranscriptionFlowReturn {
 
 const DEFAULT_POLL_INTERVAL_MS = 3000;
 const DEFAULT_MAX_WAIT_MS = 5 * 60 * 1000; // 5 minutes
-const TERMINAL_STATUSES = ['TRANSCRIBED', 'ANALYZED', 'ERROR', 'FAILED', 'TRANSCRIPT_FAILED', 'COMPLETED', 'error'];
+const TERMINAL_STATUSES = ['TRANSCRIBED', 'ANALYZED', 'ERROR', 'FAILED', 'TRANSCRIPT_FAILED', 'COMPLETED', 'CANCELLED', 'error', 'URL_EXPIRED', 'URL_INACCESSIBLE'];
 
 // =============================================================================
 // Hook Implementation
@@ -131,8 +131,11 @@ export function useVideoTranscriptionFlow(
 
         // Check for terminal status
         if (TERMINAL_STATUSES.includes(currentStatus)) {
-          if (currentStatus === 'ERROR' || currentStatus === 'FAILED' || currentStatus === 'TRANSCRIPT_FAILED') {
-            onError?.(videoId, `Transcription failed (status: ${currentStatus})`);
+          // Handle all failure/cancelled statuses
+          const failureStatuses = ['ERROR', 'FAILED', 'TRANSCRIPT_FAILED', 'CANCELLED', 'error', 'URL_EXPIRED', 'URL_INACCESSIBLE'];
+          if (failureStatuses.includes(currentStatus)) {
+            const message = currentStatus === 'CANCELLED' ? 'Transcription cancelled' : `Transcription failed (status: ${currentStatus})`;
+            onError?.(videoId, message);
             return null;
           }
           return currentStatus;
