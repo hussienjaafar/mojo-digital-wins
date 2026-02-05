@@ -5,7 +5,7 @@
  * for the Ad Copy Studio workflow. Works with publicly shared links without
  * requiring a Google API key.
  */
-
+  
 // ============================================================================
 // Error Types
 // ============================================================================
@@ -84,6 +84,16 @@ export interface GDriveFileMetadata {
 export interface GDriveDownloadResult {
   blob: Blob;
   filename: string;
+}
+
+/**
+ * Result when streaming is used (returns Response instead of Blob)
+ */
+export interface GDriveStreamResult {
+  response: Response;
+  filename: string;
+  contentType: string;
+  contentLength: number | null;
 }
 
 // ============================================================================
@@ -439,4 +449,191 @@ export async function downloadFromGDrive(fileId: string): Promise<GDriveDownload
   console.log(`[gdrive] Successfully downloaded: ${filename} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
 
   return { blob, filename };
+}
+
+// ============================================================================
+// Streaming Download Functions (Memory Efficient)
+// ============================================================================
+
+/**
+ * Get a streaming response from Google Drive without buffering the entire file.
+ * This is memory-efficient and suitable for large files.
+ * 
+ * Returns the Response object which can be streamed directly to storage.
+ *
+ * @param fileId - Google Drive file ID
+ * @returns Response object with streaming body, filename, and content info
+ * @throws GDriveError for various failure conditions
+ */
+export async function streamFromGDrive(fileId: string): Promise<GDriveStreamResult> {
+  console.log(`[gdrive] Attempting streaming download for file ID: ${fileId}`);
+
+  // Try multiple download strategies
+  const downloadStrategies = [
+    `https://drive.google.com/uc?id=${fileId}&export=download&confirm=t`,
+    `https://drive.google.com/uc?id=${fileId}&export=download&confirm=yes`,
+    `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`,
+  ];
+
+  let lastError: Error | null = null;
+  let successResponse: Response | null = null;
+  let filename = `gdrive_${fileId}.mp4`;
+
+  for (const url of downloadStrategies) {
+    console.log(`[gdrive] Trying: ${url.substring(0, 70)}...`);
+    
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+        redirect: 'follow',
+      });
+
+      if (!response.ok) {
+        console.log(`[gdrive] HTTP ${response.status} from ${url.substring(0, 50)}...`);
+        await response.text(); // Consume body
+        continue;
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      
+      // If we get HTML, it's the virus scan warning page
+      if (contentType.includes('text/html')) {
+        const html = await response.text();
+
+        // Check for access denied
+        if (html.includes('Access Denied') || html.includes('No permission') || html.includes('Sign in')) {
+          throw new GDriveError(
+            'ACCESS_DENIED',
+            'Access denied when downloading file',
+            'Please ensure the file is shared with "Anyone with the link" permission'
+          );
+        }
+
+        // Try to extract confirmation token
+        const confirmPatterns = [
+          /name="confirm" value="([^"]+)"/,
+          /confirm=([a-zA-Z0-9_-]+)/,
+          /"confirm":"([^"]+)"/,
+          /download_warning_([a-zA-Z0-9_-]+)=([a-zA-Z0-9_-]+)/,
+        ];
+
+        let confirmToken: string | null = null;
+        for (const pattern of confirmPatterns) {
+          const match = html.match(pattern);
+          if (match) {
+            confirmToken = match[1] || match[2];
+            console.log(`[gdrive] Found confirmation token with pattern: ${pattern.toString().substring(0, 40)}...`);
+            break;
+          }
+        }
+
+        if (confirmToken) {
+          // Add the confirmation URL as next strategy
+          const confirmedUrl = `https://drive.google.com/uc?id=${fileId}&export=download&confirm=${confirmToken}`;
+          console.log(`[gdrive] Trying extracted token: ${confirmedUrl.substring(0, 70)}...`);
+          
+          const confirmedResponse = await fetch(confirmedUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+            redirect: 'follow',
+          });
+
+          if (confirmedResponse.ok) {
+            const confirmedContentType = confirmedResponse.headers.get('content-type') || '';
+            if (!confirmedContentType.includes('text/html')) {
+              // Extract filename
+              const disposition = confirmedResponse.headers.get('content-disposition');
+              if (disposition) {
+                const fnMatch = disposition.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+                if (fnMatch) {
+                  try {
+                    filename = decodeURIComponent(fnMatch[1].replace(/"/g, ''));
+                  } catch {
+                    // Keep default
+                  }
+                }
+              }
+              successResponse = confirmedResponse;
+              break;
+            }
+          }
+          await confirmedResponse.text(); // Consume body
+        }
+        continue;
+      }
+
+      // Got a binary response - success!
+      const disposition = response.headers.get('content-disposition');
+      if (disposition) {
+        const fnMatch = disposition.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+        if (fnMatch) {
+          try {
+            filename = decodeURIComponent(fnMatch[1].replace(/"/g, ''));
+          } catch {
+            // Keep default
+          }
+        }
+      }
+      successResponse = response;
+      break;
+
+    } catch (error) {
+      if (error instanceof GDriveError) {
+        throw error;
+      }
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.log(`[gdrive] Strategy failed: ${lastError.message}`);
+    }
+  }
+
+  if (!successResponse) {
+    throw new GDriveError(
+      'VIRUS_SCAN_TIMEOUT',
+      'Could not download file from Google Drive. The file may be too large for automated download.',
+      'Please download the file manually from Google Drive and use the direct upload feature instead.'
+    );
+  }
+
+  const contentType = successResponse.headers.get('content-type') || 'video/mp4';
+  const contentLengthHeader = successResponse.headers.get('content-length');
+  const contentLength = contentLengthHeader ? parseInt(contentLengthHeader, 10) : null;
+
+  // Validate it looks like a video
+  const lowerFilename = filename.toLowerCase();
+  const isVideo = contentType.includes('video') || 
+                  contentType.includes('octet-stream') ||
+                  ['.mp4', '.mov', '.webm', '.m4v', '.mpeg', '.avi'].some(ext => lowerFilename.endsWith(ext));
+
+  if (!isVideo) {
+    await successResponse.text(); // Consume body
+    throw new GDriveError(
+      'WRONG_FILE_TYPE',
+      `File does not appear to be a video: ${filename} (${contentType})`,
+      'Please upload a video file. Supported formats: MP4, MOV, WebM, M4V'
+    );
+  }
+
+  // Check file size if available
+  if (contentLength && contentLength > MAX_FILE_SIZE) {
+    await successResponse.text(); // Consume body
+    const sizeMB = Math.round(contentLength / (1024 * 1024));
+    const maxMB = Math.round(MAX_FILE_SIZE / (1024 * 1024));
+    throw new GDriveError(
+      'FILE_TOO_LARGE',
+      `File size (${sizeMB}MB) exceeds maximum allowed (${maxMB}MB)`,
+      'Please upload a smaller video file or compress the video'
+    );
+  }
+
+  console.log(`[gdrive] Stream ready: ${filename} (${contentLength ? (contentLength / 1024 / 1024).toFixed(2) + ' MB' : 'size unknown'})`);
+
+  return {
+    response: successResponse,
+    filename,
+    contentType,
+    contentLength,
+  };
 }

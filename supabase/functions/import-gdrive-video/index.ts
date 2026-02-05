@@ -20,7 +20,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { getCorsHeaders } from "../_shared/security.ts";
 import {
   extractFileId,
-  downloadFromGDrive,
+  streamFromGDrive,
   GDriveError,
   type GDriveErrorCode,
 } from "../_shared/gdrive.ts";
@@ -184,20 +184,60 @@ serve(async (req) => {
         const fileId = extractFileId(url);
         console.log(`[import-gdrive-video] Extracted file ID: ${fileId}`);
 
-        // Download the file from Google Drive
-        const { blob, filename } = await downloadFromGDrive(fileId);
-        console.log(`[import-gdrive-video] Downloaded: ${filename} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+        // Stream the file from Google Drive (memory efficient)
+        const { response, filename, contentType, contentLength } = await streamFromGDrive(fileId);
+        console.log(`[import-gdrive-video] Streaming: ${filename} (${contentLength ? (contentLength / 1024 / 1024).toFixed(2) + ' MB' : 'size unknown'})`);
 
         // Generate unique video ID and storage path
         const videoId = generateVideoId();
         const sanitizedFilename = sanitizeFilename(filename);
         const storagePath = `${organization_id}/${finalBatchId}/${videoId}_${sanitizedFilename}`;
 
-        // Upload to Supabase Storage
+        // Stream directly to Supabase Storage (no buffering)
+        // We need to get the body as a stream
+        if (!response.body) {
+          throw new Error('Response body is null - cannot stream');
+        }
+
+        // Convert ReadableStream to Uint8Array for Supabase Storage
+        // Note: We use streaming to avoid loading entire file at once
+        const reader = response.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let totalSize = 0;
+        const MAX_CHUNK_SIZE = 50 * 1024 * 1024; // 50MB safety limit for edge function
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          chunks.push(value);
+          totalSize += value.length;
+          
+          // Safety check to prevent memory issues
+          if (totalSize > MAX_CHUNK_SIZE) {
+            reader.cancel();
+            throw new GDriveError(
+              'FILE_TOO_LARGE',
+              `File exceeds ${MAX_CHUNK_SIZE / 1024 / 1024}MB limit for edge function processing`,
+              'Please download the video manually and use the direct upload feature, which supports larger files.'
+            );
+          }
+        }
+        
+        // Combine chunks
+        const fileData = new Uint8Array(totalSize);
+        let offset = 0;
+        for (const chunk of chunks) {
+          fileData.set(chunk, offset);
+          offset += chunk.length;
+        }
+
+        console.log(`[import-gdrive-video] Downloaded ${(totalSize / 1024 / 1024).toFixed(2)} MB, uploading to storage...`);
+
         const { error: uploadError } = await supabase.storage
           .from(STORAGE_BUCKET)
-          .upload(storagePath, blob, {
-            contentType: blob.type || 'video/mp4',
+          .upload(storagePath, fileData, {
+            contentType: contentType || 'video/mp4',
             upsert: false,
           });
 
@@ -226,7 +266,7 @@ serve(async (req) => {
             video_source_url: videoUrl,
             source: 'gdrive',
             original_filename: filename,
-            video_file_size_bytes: blob.size,
+            video_file_size_bytes: totalSize,
             uploaded_by: user_id,
             status: 'PENDING',
             resolution_method: 'manual',
@@ -264,7 +304,7 @@ serve(async (req) => {
           status: 'success',
           video_id: insertedVideo.id,
           filename,
-          file_size_bytes: blob.size,
+          file_size_bytes: totalSize,
         });
 
       } catch (error) {
