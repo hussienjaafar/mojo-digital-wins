@@ -233,6 +233,7 @@ export function useVideoUpload(
                     progress: mappedProgress,
                     extractionStage: progress.stage,
                     extractionElapsedMs: progress.elapsedMs,
+                    extractionMessage: progress.message, // Pass real message from extractor
                   });
                 },
               });
@@ -271,12 +272,18 @@ export function useVideoUpload(
              let errorMessage = 'Audio extraction failed';
              let canSkip = false;
              
-             if (extractError.message?.includes('EXTRACTION_TIMEOUT')) {
+             if (extractError.message?.includes('FFMPEG_LOAD_TIMEOUT')) {
+               errorMessage = 'Audio processor download/initialization timed out. Please check your network and retry.';
+               canSkip = file.size <= 50 * 1024 * 1024; // Allow skip for files under 50MB
+             } else if (extractError.message?.includes('EXTRACTION_TIMEOUT')) {
                errorMessage = 'Audio extraction timed out after 3 minutes. You can retry or upload the original video.';
                canSkip = file.size <= 50 * 1024 * 1024; // Allow skip for files under 50MB
              } else if (extractError.message?.includes('EXTRACTION_MEMORY')) {
                errorMessage = 'File too large for browser memory. Try a smaller video file.';
                canSkip = false;
+             } else if (extractError.message?.includes('Failed to load audio processor')) {
+               errorMessage = 'Could not download audio processor. Please check your network and retry.';
+               canSkip = file.size <= 50 * 1024 * 1024;
              } else {
                errorMessage = extractError.message || 'Audio extraction failed';
                canSkip = file.size <= 50 * 1024 * 1024;
