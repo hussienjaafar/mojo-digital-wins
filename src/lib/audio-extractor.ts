@@ -6,14 +6,15 @@
  *
  * Features:
  * - Lazy-loads FFmpeg.wasm (~30MB) on first use, cached by browser
- * - WORKERFS mount for zero-copy file access (major performance improvement)
+ * - Chunked file reading with progress reporting
  * - Copy-first extraction: tries stream copy before re-encoding
+ * - Timeout protection to prevent infinite hangs
  * - Diagnostics report for debugging slow extractions
  * - Progress reporting with stage visibility
  */
 
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { toBlobURL, fetchFile } from '@ffmpeg/util';
+import { toBlobURL } from '@ffmpeg/util';
 
 // =============================================================================
 // Types
@@ -21,7 +22,8 @@ import { toBlobURL, fetchFile } from '@ffmpeg/util';
 
 export type ExtractionStage = 
   | 'loading' 
-  | 'mounting' 
+  | 'reading'
+  | 'writing'
   | 'copy-attempt' 
   | 'reencode' 
   | 'finalizing';
@@ -35,7 +37,8 @@ export interface AudioExtractionProgress {
 
 export interface ExtractionTimings {
   wasmLoadMs: number;
-  mountMs: number;
+  readFileMs: number;
+  writeFileMs: number;
   copyAttemptMs: number;
   reencodeMs: number;
   readOutputMs: number;
@@ -58,8 +61,6 @@ export interface DiagnosticsReport {
     mode: 'copy' | 'reencode';
     detectedCodec: string;
     outputFormat: string;
-    mountUsed: boolean;
-    mountFailed: boolean;
     copyAttempted: boolean;
     copySucceeded: boolean;
   };
@@ -80,7 +81,18 @@ export interface AudioExtractionResult {
 export interface AudioExtractorOptions {
   onProgress?: (progress: AudioExtractionProgress) => void;
   enableDiagnostics?: boolean;
+  timeoutMs?: number;
 }
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+// 3 minute timeout for extraction (reasonable for most files)
+const DEFAULT_EXTRACTION_TIMEOUT_MS = 3 * 60 * 1000;
+
+// 10MB chunks for reading files
+const FILE_CHUNK_SIZE = 10 * 1024 * 1024;
 
 // =============================================================================
 // Singleton FFmpeg Instance
@@ -189,89 +201,45 @@ export function isFFmpegLoaded(): boolean {
 }
 
 // =============================================================================
-// File Mounting (WORKERFS)
+// Chunked File Reading
 // =============================================================================
 
-interface MountResult {
-  inputPath: string;
-  mounted: boolean;
-  mountFailed: boolean;
-  cleanup: () => Promise<void>;
-}
-
 /**
- * Try to mount file using WORKERFS for zero-copy access.
- * Falls back to writeFile if mount fails.
+ * Read a file in chunks with progress reporting
+ * This prevents memory pressure and shows real progress during file preparation
  */
-async function mountOrWriteFile(
-  ffmpeg: FFmpeg,
+async function readFileWithProgress(
   file: File,
-  onProgress?: (progress: AudioExtractionProgress) => void
-): Promise<MountResult> {
-  const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const mountDir = '/work';
-  const mountPath = `${mountDir}/${sanitizedName}`;
+  onProgress: (percent: number, message: string) => void
+): Promise<Uint8Array> {
+  const chunks: Uint8Array[] = [];
+  let offset = 0;
+  const totalSize = file.size;
   
-  onProgress?.({
-    stage: 'mounting',
-    percent: 0,
-    message: 'Preparing video file...',
-  });
-
-  // Try WORKERFS mount first (zero-copy, much faster for large files)
-  try {
-    // Create mount directory
-    try {
-      await ffmpeg.createDir(mountDir);
-    } catch {
-      // Directory might already exist, ignore
-    }
-
-    // Mount the file using WORKERFS
-    // @ts-ignore - FFmpeg.wasm types don't include mount method but it exists
-    await ffmpeg.mount('WORKERFS', { files: [file] }, mountDir);
+  console.log(`[AudioExtractor] Reading file in chunks: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
+  
+  while (offset < totalSize) {
+    const chunkEnd = Math.min(offset + FILE_CHUNK_SIZE, totalSize);
+    const chunk = file.slice(offset, chunkEnd);
     
-    console.log(`[AudioExtractor] WORKERFS mount successful: ${mountPath}`);
+    const buffer = await chunk.arrayBuffer();
+    chunks.push(new Uint8Array(buffer));
     
-    return {
-      inputPath: mountPath,
-      mounted: true,
-      mountFailed: false,
-      cleanup: async () => {
-        try {
-          // @ts-ignore
-          await ffmpeg.unmount(mountDir);
-          await ffmpeg.deleteDir(mountDir);
-        } catch (e) {
-          console.warn('[AudioExtractor] Cleanup warning:', e);
-        }
-      },
-    };
-  } catch (mountError) {
-    console.warn('[AudioExtractor] WORKERFS mount failed, falling back to writeFile:', mountError);
-    addToLogBuffer(`WORKERFS mount failed: ${mountError}`);
-    
-    // Fallback: read file into memory and write to virtual FS
-    const inputFileName = 'input_video' + getExtension(file.name);
-    
-    console.time('[FFmpeg] Write Input (fallback)');
-    const fileData = await fetchFile(file);
-    await ffmpeg.writeFile(inputFileName, fileData);
-    console.timeEnd('[FFmpeg] Write Input (fallback)');
-    
-    return {
-      inputPath: inputFileName,
-      mounted: false,
-      mountFailed: true,
-      cleanup: async () => {
-        try {
-          await ffmpeg.deleteFile(inputFileName);
-        } catch (e) {
-          console.warn('[AudioExtractor] Cleanup warning:', e);
-        }
-      },
-    };
+    offset = chunkEnd;
+    const percent = Math.round((offset / totalSize) * 100);
+    onProgress(percent, `Reading file: ${percent}%`);
   }
+  
+  // Combine chunks into single Uint8Array
+  const combined = new Uint8Array(totalSize);
+  let position = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk, position);
+    position += chunk.length;
+  }
+  
+  console.log(`[AudioExtractor] File read complete: ${chunks.length} chunks`);
+  return combined;
 }
 
 // =============================================================================
@@ -281,13 +249,18 @@ async function mountOrWriteFile(
 /**
  * Extract audio from a video file using FFmpeg.wasm
  *
- * Uses WORKERFS for zero-copy file access and copy-first extraction strategy.
+ * Uses chunked file reading with progress and copy-first extraction strategy.
  */
 export async function extractAudio(
   videoFile: File,
   options: AudioExtractorOptions = {}
 ): Promise<AudioExtractionResult> {
-  const { onProgress, enableDiagnostics = false } = options;
+  const { 
+    onProgress, 
+    enableDiagnostics = false,
+    timeoutMs = DEFAULT_EXTRACTION_TIMEOUT_MS,
+  } = options;
+  
   const originalFilename = videoFile.name;
   const startTime = performance.now();
   
@@ -297,7 +270,8 @@ export async function extractAudio(
   
   const timings: ExtractionTimings = {
     wasmLoadMs: 0,
-    mountMs: 0,
+    readFileMs: 0,
+    writeFileMs: 0,
     copyAttemptMs: 0,
     reencodeMs: 0,
     readOutputMs: 0,
@@ -308,29 +282,72 @@ export async function extractAudio(
   let detectedCodec = 'unknown';
   let copyAttempted = false;
   let copySucceeded = false;
-  let mountUsed = false;
-  let mountFailed = false;
 
   console.log(`[AudioExtractor] Starting extraction for: ${originalFilename} (${(videoFile.size / 1024 / 1024).toFixed(2)} MB)`);
 
-  // Load FFmpeg
-  const wasmStart = performance.now();
-  const ffmpeg = await getFFmpeg(onProgress);
-  timings.wasmLoadMs = performance.now() - wasmStart;
+  // Create abort controller for timeout
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => {
+    abortController.abort();
+  }, timeoutMs);
 
-  let mountResult: MountResult | null = null;
-  
   try {
-    // Mount or write file
-    const mountStart = performance.now();
-    mountResult = await mountOrWriteFile(ffmpeg, videoFile, onProgress);
-    timings.mountMs = performance.now() - mountStart;
-    mountUsed = mountResult.mounted;
-    mountFailed = mountResult.mountFailed;
+    // Load FFmpeg
+    const wasmStart = performance.now();
+    const ffmpeg = await getFFmpeg(onProgress);
+    timings.wasmLoadMs = performance.now() - wasmStart;
+
+    // Check if aborted
+    if (abortController.signal.aborted) {
+      throw new Error('EXTRACTION_TIMEOUT');
+    }
+
+    // Read file in chunks with progress
+    onProgress?.({
+      stage: 'reading',
+      percent: 0,
+      message: 'Reading video file...',
+      elapsedMs: performance.now() - startTime,
+    });
+
+    const readStart = performance.now();
+    const fileData = await readFileWithProgress(videoFile, (percent, message) => {
+      // Map reading progress to 0-20% of total
+      const mappedPercent = Math.round(percent * 0.2);
+      onProgress?.({
+        stage: 'reading',
+        percent: mappedPercent,
+        message,
+        elapsedMs: performance.now() - startTime,
+      });
+    });
+    timings.readFileMs = performance.now() - readStart;
+
+    // Check if aborted
+    if (abortController.signal.aborted) {
+      throw new Error('EXTRACTION_TIMEOUT');
+    }
+
+    // Write file to FFmpeg virtual filesystem
+    onProgress?.({
+      stage: 'writing',
+      percent: 20,
+      message: 'Preparing for extraction...',
+      elapsedMs: performance.now() - startTime,
+    });
+
+    const inputFileName = 'input_video' + getExtension(videoFile.name);
     
-    const inputPath = mountResult.inputPath;
+    const writeStart = performance.now();
+    await ffmpeg.writeFile(inputFileName, fileData);
+    timings.writeFileMs = performance.now() - writeStart;
     
-    console.log(`[AudioExtractor] File ready at ${inputPath} (mount: ${mountUsed}, fallback: ${mountFailed})`);
+    console.log(`[AudioExtractor] File written to virtual FS in ${timings.writeFileMs.toFixed(0)}ms`);
+
+    // Check if aborted
+    if (abortController.signal.aborted) {
+      throw new Error('EXTRACTION_TIMEOUT');
+    }
 
     // =========================================================================
     // COPY-FIRST STRATEGY: Try stream copy, fall back to re-encode
@@ -342,7 +359,7 @@ export async function extractAudio(
     // Attempt 1: Try copy mode directly (fastest path)
     onProgress?.({
       stage: 'copy-attempt',
-      percent: 10,
+      percent: 25,
       message: 'Trying fast stream copy...',
       elapsedMs: performance.now() - startTime,
     });
@@ -353,7 +370,7 @@ export async function extractAudio(
     try {
       // Use explicit stream mapping for reliability
       await ffmpeg.exec([
-        '-i', inputPath,
+        '-i', inputFileName,
         '-map', '0:a:0',      // Select first audio stream
         '-vn',                 // No video
         '-sn',                 // No subtitles
@@ -373,12 +390,19 @@ export async function extractAudio(
         
         timings.readOutputMs = 0; // Already read
         
+        // Cleanup input file
+        try {
+          await ffmpeg.deleteFile(inputFileName);
+        } catch (e) {
+          console.warn('[AudioExtractor] Cleanup warning:', e);
+        }
+        
         // Build result
         const audioBlob = createBlob(outputData, 'audio/mp4');
         const audioFilename = originalFilename.replace(/\.[^.]+$/, '.m4a');
         const audioFile = new File([audioBlob], audioFilename, { type: 'audio/mp4' });
         
-        // Cleanup
+        // Cleanup output
         await ffmpeg.deleteFile(outputM4A);
         
         timings.totalMs = performance.now() - startTime;
@@ -402,14 +426,13 @@ export async function extractAudio(
           result.diagnostics = buildDiagnostics(videoFile, timings, {
             mode: 'copy',
             detectedCodec,
-            mountUsed,
-            mountFailed,
             copyAttempted,
             copySucceeded,
           });
         }
         
         logExtractionSummary(result);
+        clearTimeout(timeoutId);
         return result;
       }
     } catch (copyError) {
@@ -418,11 +441,16 @@ export async function extractAudio(
     }
     
     timings.copyAttemptMs = performance.now() - copyStart;
+
+    // Check if aborted
+    if (abortController.signal.aborted) {
+      throw new Error('EXTRACTION_TIMEOUT');
+    }
     
     // Attempt 2: Re-encode with optimized settings for speech
     onProgress?.({
       stage: 'reencode',
-      percent: 20,
+      percent: 30,
       message: 'Converting audio (this may take a moment)...',
       elapsedMs: performance.now() - startTime,
     });
@@ -430,9 +458,9 @@ export async function extractAudio(
     const reencodeStart = performance.now();
     
     // Set up progress tracking
-    let lastPercent = 20;
+    let lastPercent = 30;
     const progressHandler = ({ progress }: { progress: number }) => {
-      const percent = Math.min(95, 20 + Math.round(progress * 75));
+      const percent = Math.min(95, 30 + Math.round(progress * 65));
       if (percent > lastPercent) {
         lastPercent = percent;
         onProgress?.({
@@ -452,7 +480,7 @@ export async function extractAudio(
     
     try {
       await ffmpeg.exec([
-        '-i', inputPath,
+        '-i', inputFileName,
         '-vn',                     // No video
         '-c:a', 'aac',             // AAC encoder
         '-b:a', '64k',             // 64kbps (sufficient for speech)
@@ -473,7 +501,7 @@ export async function extractAudio(
       // Fallback to MP3
       try {
         await ffmpeg.exec([
-          '-i', inputPath,
+          '-i', inputFileName,
           '-vn',
           '-c:a', 'libmp3lame',
           '-b:a', '64k',
@@ -505,12 +533,17 @@ export async function extractAudio(
       elapsedMs: performance.now() - startTime,
     });
 
-    const readStart = performance.now();
+    const readOutputStart = performance.now();
     const audioData = await ffmpeg.readFile(finalOutput);
-    timings.readOutputMs = performance.now() - readStart;
+    timings.readOutputMs = performance.now() - readOutputStart;
 
-    // Cleanup output file
-    await ffmpeg.deleteFile(finalOutput);
+    // Cleanup files
+    try {
+      await ffmpeg.deleteFile(inputFileName);
+      await ffmpeg.deleteFile(finalOutput);
+    } catch (e) {
+      console.warn('[AudioExtractor] Cleanup warning:', e);
+    }
 
     // Build result
     const audioBlob = createBlob(audioData, outputMimeType);
@@ -538,21 +571,31 @@ export async function extractAudio(
       result.diagnostics = buildDiagnostics(videoFile, timings, {
         mode: 'reencode',
         detectedCodec,
-        mountUsed,
-        mountFailed,
         copyAttempted,
         copySucceeded,
       });
     }
 
     logExtractionSummary(result);
+    clearTimeout(timeoutId);
     return result;
 
-  } finally {
-    // Always cleanup mount
-    if (mountResult) {
-      await mountResult.cleanup();
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    collectLogs = false;
+    
+    // Handle timeout specifically
+    if (error.message === 'EXTRACTION_TIMEOUT' || abortController.signal.aborted) {
+      throw new Error('EXTRACTION_TIMEOUT: Audio extraction took too long. Try a smaller file or skip extraction.');
     }
+    
+    // Handle memory errors
+    if (error.message?.includes('memory') || error.message?.includes('OOM')) {
+      throw new Error('EXTRACTION_MEMORY: File too large for browser memory. Try a smaller file.');
+    }
+    
+    throw error;
+  } finally {
     collectLogs = false;
   }
 }
@@ -583,7 +626,8 @@ function logExtractionSummary(result: AudioExtractionResult) {
     mode: result.extractionMode,
     timings: {
       wasmLoad: `${result.timings.wasmLoadMs.toFixed(0)}ms`,
-      mount: `${result.timings.mountMs.toFixed(0)}ms`,
+      readFile: `${result.timings.readFileMs.toFixed(0)}ms`,
+      writeFile: `${result.timings.writeFileMs.toFixed(0)}ms`,
       copyAttempt: `${result.timings.copyAttemptMs.toFixed(0)}ms`,
       reencode: `${result.timings.reencodeMs.toFixed(0)}ms`,
       readOutput: `${result.timings.readOutputMs.toFixed(0)}ms`,
@@ -598,8 +642,6 @@ function buildDiagnostics(
   extraction: {
     mode: 'copy' | 'reencode';
     detectedCodec: string;
-    mountUsed: boolean;
-    mountFailed: boolean;
     copyAttempted: boolean;
     copySucceeded: boolean;
   }
@@ -620,8 +662,6 @@ function buildDiagnostics(
       mode: extraction.mode,
       detectedCodec: extraction.detectedCodec,
       outputFormat: extraction.mode === 'copy' ? 'm4a' : 'mp3/m4a',
-      mountUsed: extraction.mountUsed,
-      mountFailed: extraction.mountFailed,
       copyAttempted: extraction.copyAttempted,
       copySucceeded: extraction.copySucceeded,
     },
@@ -680,14 +720,13 @@ export function formatDiagnosticsReport(report: DiagnosticsReport): string {
     `Mode: ${report.extraction.mode}`,
     `Detected Codec: ${report.extraction.detectedCodec}`,
     `Output Format: ${report.extraction.outputFormat}`,
-    `WORKERFS Mount Used: ${report.extraction.mountUsed}`,
-    `Mount Failed (fallback): ${report.extraction.mountFailed}`,
     `Copy Attempted: ${report.extraction.copyAttempted}`,
     `Copy Succeeded: ${report.extraction.copySucceeded}`,
     '',
     '## Timings',
     `WASM Load: ${report.timings.wasmLoadMs.toFixed(0)}ms`,
-    `Mount/Write: ${report.timings.mountMs.toFixed(0)}ms`,
+    `Read File: ${report.timings.readFileMs.toFixed(0)}ms`,
+    `Write File: ${report.timings.writeFileMs.toFixed(0)}ms`,
     `Copy Attempt: ${report.timings.copyAttemptMs.toFixed(0)}ms`,
     `Re-encode: ${report.timings.reencodeMs.toFixed(0)}ms`,
     `Read Output: ${report.timings.readOutputMs.toFixed(0)}ms`,
@@ -696,8 +735,8 @@ export function formatDiagnosticsReport(report: DiagnosticsReport): string {
   ];
 
   if (report.ffmpegLogs.length > 0) {
-    lines.push('## FFmpeg Logs (last 200 lines)');
-    lines.push(...report.ffmpegLogs.slice(-50)); // Include last 50 in report
+    lines.push('## FFmpeg Logs (last 50 lines)');
+    lines.push(...report.ffmpegLogs.slice(-50));
   }
 
   return lines.join('\n');

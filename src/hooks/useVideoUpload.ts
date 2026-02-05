@@ -11,7 +11,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { extractAudio, shouldExtractAudio, isFFmpegSupported, formatDiagnosticsReport, type DiagnosticsReport, type ExtractionStage } from '@/lib/audio-extractor';
+import { extractAudio, shouldExtractAudio, isFFmpegSupported, type ExtractionStage } from '@/lib/audio-extractor';
 import type {
   VideoUpload,
   ImportGDriveResponse,
@@ -225,6 +225,7 @@ export function useVideoUpload(
             try {
               const { audioFile, originalFilename, extractionMode, timings, diagnostics } = await extractAudio(file, {
                 enableDiagnostics,
+                timeoutMs: 3 * 60 * 1000, // 3 minute timeout
                 onProgress: (progress) => {
                   // Map extraction progress to 0-40% of total progress
                   const mappedProgress = Math.round(progress.percent * 0.4);
@@ -243,7 +244,6 @@ export function useVideoUpload(
               const wasSlowExtraction = extractionDurationSec > 20;
               if (wasSlowExtraction && diagnostics) {
                 console.log('[useVideoUpload] Slow extraction detected, diagnostics available');
-                // Store diagnostics for UI to access
                 updateVideo(video.id, {
                   extractionDiagnostics: diagnostics,
                   extractionMode,
@@ -254,7 +254,6 @@ export function useVideoUpload(
               storageBucket = AUDIO_BUCKET;
               extractedAudioFilename = audioFile.name;
               storagePath = `${organizationId}/${batchId}/${videoId}_${sanitizeFilename(audioFile.name)}`;
-              // Support both M4A (copy mode) and MP3 (re-encode mode)
               contentType = audioFile.type || 'audio/mpeg';
               
               console.log(`[useVideoUpload] Audio extracted: ${audioFile.name} (${(audioFile.size / 1024 / 1024).toFixed(2)}MB), mode: ${extractionMode}`);
@@ -263,19 +262,47 @@ export function useVideoUpload(
                 progress: 40,
                 extractionStage: undefined,
                 extractionElapsedMs: undefined,
+                extractionMode,
               });
            } catch (extractError: any) {
              console.error('[useVideoUpload] Audio extraction failed:', extractError);
-             // Fall back to uploading the original file
-             console.log('[useVideoUpload] Falling back to original file upload');
-             fileToUpload = file;
-             storageBucket = STORAGE_BUCKET;
-             storagePath = `${organizationId}/${batchId}/${videoId}_${sanitizedFilename}`;
-             contentType = file.type;
-             updateVideo(video.id, { 
-               extractionStage: undefined,
-               extractionElapsedMs: undefined,
-             });
+             
+             // Determine error type and message
+             let errorMessage = 'Audio extraction failed';
+             let canSkip = false;
+             
+             if (extractError.message?.includes('EXTRACTION_TIMEOUT')) {
+               errorMessage = 'Audio extraction timed out after 3 minutes. You can retry or upload the original video.';
+               canSkip = file.size <= 50 * 1024 * 1024; // Allow skip for files under 50MB
+             } else if (extractError.message?.includes('EXTRACTION_MEMORY')) {
+               errorMessage = 'File too large for browser memory. Try a smaller video file.';
+               canSkip = false;
+             } else {
+               errorMessage = extractError.message || 'Audio extraction failed';
+               canSkip = file.size <= 50 * 1024 * 1024;
+             }
+             
+             // For smaller files, fall back to original upload
+             if (canSkip) {
+               console.log('[useVideoUpload] Falling back to original file upload');
+               fileToUpload = file;
+               storageBucket = STORAGE_BUCKET;
+               storagePath = `${organizationId}/${batchId}/${videoId}_${sanitizedFilename}`;
+               contentType = file.type;
+               updateVideo(video.id, { 
+                 extractionStage: undefined,
+                 extractionElapsedMs: undefined,
+               });
+             } else {
+               // Can't skip - report error
+               updateVideo(video.id, {
+                 status: 'error',
+                 error_message: errorMessage,
+                 extractionStage: undefined,
+                 extractionElapsedMs: undefined,
+               });
+               continue;
+             }
            }
          }
 

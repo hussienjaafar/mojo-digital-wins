@@ -51,7 +51,7 @@ export interface VideoUpload {
   meets_meta_specs?: boolean;
   meta_spec_issues?: SpecIssue[];
   // Audio extraction diagnostics
-  extractionStage?: 'loading' | 'mounting' | 'copy-attempt' | 'reencode' | 'finalizing';
+  extractionStage?: 'loading' | 'reading' | 'writing' | 'copy-attempt' | 'reencode' | 'finalizing';
   extractionStartTime?: number;
   extractionElapsedMs?: number;
   extractionMode?: 'copy' | 'reencode';
