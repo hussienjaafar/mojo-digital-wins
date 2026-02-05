@@ -359,7 +359,7 @@ export function useVideoUpload(
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
-          .select('id')
+          .select('id, video_id')
           .single();
 
         if (dbError) {
@@ -384,14 +384,40 @@ export function useVideoUpload(
           continue;
         }
 
-        // Update video with success state
+        // Update video with transcribing status (transcription will be triggered)
         const updatedVideo: Partial<VideoUpload> = {
           video_id: insertedVideo.id,
-          status: 'ready',
-          progress: 100,
+          status: 'transcribing',
+          progress: 80,
         };
 
         updateVideo(video.id, updatedVideo);
+
+        console.log(`[useVideoUpload] Successfully uploaded: ${file.name} -> ${insertedVideo.id}`);
+
+        // Trigger transcription edge function
+        try {
+          console.log(`[useVideoUpload] Triggering transcription for video_id: ${insertedVideo.video_id}`);
+          const { error: transcribeError } = await supabase.functions.invoke('transcribe-meta-ad-video', {
+            body: {
+              organization_id: organizationId,
+              video_id: insertedVideo.video_id, // Use video_id column, not id
+              mode: 'single',
+            },
+          });
+
+          if (transcribeError) {
+            console.error('[useVideoUpload] Transcription trigger error:', transcribeError);
+            // Don't fail the upload - just log the error
+            // The transcription can be retried later
+          } else {
+            console.log('[useVideoUpload] Transcription triggered successfully');
+          }
+        } catch (transcribeErr) {
+          console.error('[useVideoUpload] Failed to trigger transcription:', transcribeErr);
+          // Don't fail the upload - transcription can be retried
+        }
+
         uploadSuccessCount++;
 
         // Notify parent component
@@ -401,8 +427,6 @@ export function useVideoUpload(
             ...updatedVideo,
           } as VideoUpload);
         }
-
-        console.log(`[useVideoUpload] Successfully uploaded: ${file.name} -> ${insertedVideo.id}`);
       } catch (err: any) {
         console.error('[useVideoUpload] Upload error:', err);
         updateVideo(video.id, {
