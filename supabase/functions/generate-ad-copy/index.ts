@@ -95,7 +95,8 @@ interface TranscriptData {
 // =============================================================================
 
 const META_COPY_LIMITS = {
-  primary_text_visible: 125,
+  primary_text_visible: 125, // Hook must fit here (before "See More")
+  primary_text_max: 300,     // Extended context after hook
   headline_max: 40,
   description_max: 30,
 };
@@ -104,48 +105,97 @@ const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const DEFAULT_CTA_TYPE = 'DONATE_NOW';
 
 // =============================================================================
-// Helper Functions
+// Copywriting Framework Definitions
 // =============================================================================
 
+const COPYWRITING_FRAMEWORKS = {
+  PAS: {
+    name: 'PAS (Problem-Agitate-Solution)',
+    instruction: `
+      - PROBLEM: Open with the threat/danger the opponent poses
+      - AGITATE: Intensify the stakes - what happens if we fail?
+      - SOLUTION: Position the candidate + donor's contribution as the solution
+      Example flow: "[Threat] → [Consequences] → [Your donation stops this]"`,
+  },
+  BAB: {
+    name: 'BAB (Before-After-Bridge)',
+    instruction: `
+      - BEFORE: Paint the current danger/injustice
+      - AFTER: Visualize the future we're fighting for
+      - BRIDGE: "Your donation makes this possible"
+      Example flow: "[Dark present] → [Bright future] → [You make the difference]"`,
+  },
+  AIDA: {
+    name: 'AIDA (Attention-Interest-Desire-Action)',
+    instruction: `
+      - ATTENTION: Pattern interrupt hook - stop the scroll
+      - INTEREST: Compelling detail, stat, or reveal
+      - DESIRE: What donor will feel/achieve
+      - ACTION: Urgent CTA with specific ask
+      Example flow: "[Shocking fact] → [Why it matters] → [Feel empowered] → [Donate now]"`,
+  },
+  SOCIAL_PROOF: {
+    name: 'Social Proof + Urgency',
+    instruction: `
+      - MOMENTUM: Reference donor counts, grassroots movement ("23,847 donors this week")
+      - DEADLINE: Create time pressure ("48 hours left", "midnight deadline")
+      - COLLECTIVE: "Join [X] patriots/progressives who..."
+      Example flow: "[Others are acting] → [Time is running out] → [Join the movement]"`,
+  },
+  IDENTITY: {
+    name: 'Identity + Empowerment',
+    instruction: `
+      - IDENTITY: "If you believe in [value]...", "For every [identity] who..."
+      - IMPACT: Specific dollar impact ("Your $27 provides...")
+      - VALUES: Call to shared beliefs, not just wallet
+      Example flow: "[You are this person] → [Your money does this] → [Live your values]"`,
+  },
+};
+
 /**
- * Build ActBlue tracking URL
+ * Detect audience segment type for tone adaptation
  */
-function buildTrackingUrl(
-  orgSlug: string,
-  actblueFormName: string,
-  refcode: string,
-  amount?: number,
-  recurring?: boolean
-): string {
-  const baseUrl = `https://molitico.com/r/${orgSlug}/${actblueFormName}`;
-  const params = new URLSearchParams();
-  params.set('refcode', refcode);
-  if (amount !== undefined) {
-    params.set('amount', amount.toString());
+function getSegmentTone(segmentDescription: string): string {
+  const desc = segmentDescription.toLowerCase();
+  
+  if (desc.includes('progressive') || desc.includes('activist') || desc.includes('liberal')) {
+    return 'PROGRESSIVE_BASE: Use values-forward, movement language. Emphasize collective action and systemic change.';
   }
-  if (recurring !== undefined) {
-    params.set('recurring', recurring.toString());
+  if (desc.includes('swing') || desc.includes('persuadable') || desc.includes('independent')) {
+    return 'SWING_VOTERS: Focus on fear of loss and specific tangible impacts. Avoid partisan language. Lead with consequences.';
   }
-  return `${baseUrl}?${params.toString()}`;
+  if (desc.includes('high-dollar') || desc.includes('major donor') || desc.includes('whale')) {
+    return 'HIGH-DOLLAR: Use empowerment and strategic framing. Make them feel like insiders. Emphasize outsized impact.';
+  }
+  if (desc.includes('grassroots') || desc.includes('small-dollar') || desc.includes('first-time')) {
+    return 'GRASSROOTS: Maximum urgency, collective action. "$5 is all it takes." Make small feel powerful.';
+  }
+  
+  return 'GENERAL: Balance urgency with values. Use "you" language heavily. Create personal stake.';
 }
 
 /**
- * Build the GPT-4 prompt for generating ad copy
+ * Build the research-backed GPT-4 prompt for generating high-converting ad copy
  */
 function buildPrompt(transcript: TranscriptData, segment: AudienceSegment): string {
-  return `You are an expert political fundraising copywriter specializing in Meta ads.
-Generate high-converting ad copy based on this video transcript analysis.
+  const segmentTone = getSegmentTone(segment.description);
+  
+  return `You are a world-class political fundraising copywriter who has raised $50M+ through Meta ads for progressive campaigns.
+
+You deeply understand:
+- Donor psychology and what triggers donations (urgency, identity, fear of loss, empowerment)
+- Meta's algorithm and what drives engagement (emotional resonance, scroll-stopping hooks)
+- ActBlue optimization and conversion tactics
 
 ## VIDEO ANALYSIS
 Transcript: ${transcript.transcript_text || 'No transcript available'}
 Primary Issue: ${transcript.issue_primary || 'Not specified'}
 Political Stances: ${(transcript.political_stances || []).join(', ') || 'Not specified'}
-Tone: ${transcript.tone_primary || 'Not specified'}
-Tone Tags: ${(transcript.tone_tags || []).join(', ') || 'None'}
+Tone: ${transcript.tone_primary || 'Not specified'} (Tags: ${(transcript.tone_tags || []).join(', ') || 'None'})
 Targets Attacked: ${(transcript.targets_attacked || []).join(', ') || 'None'}
 Targets Supported: ${(transcript.targets_supported || []).join(', ') || 'None'}
 Donor Pain Points: ${(transcript.donor_pain_points || []).join(', ') || 'Not specified'}
-Key Phrases: ${(transcript.key_phrases || []).join(', ') || 'Not specified'}
+Key Phrases to Incorporate: ${(transcript.key_phrases || []).join(', ') || 'None'}
 CTA from Video: ${transcript.cta_text || 'Not specified'}
 Urgency Level: ${transcript.urgency_level || 'medium'}
 Values Appealed: ${(transcript.values_appealed || []).join(', ') || 'Not specified'}
@@ -153,31 +203,100 @@ Values Appealed: ${(transcript.values_appealed || []).join(', ') || 'Not specifi
 ## TARGET AUDIENCE
 Name: ${segment.name}
 Description: ${segment.description}
+Tone Guidance: ${segmentTone}
 
-## CHARACTER LIMITS (STRICT)
-- Primary Text: Maximum ${META_COPY_LIMITS.primary_text_visible} characters (visible without "See More")
-- Headline: Maximum ${META_COPY_LIMITS.headline_max} characters
-- Description: Maximum ${META_COPY_LIMITS.description_max} characters
+## CHARACTER LIMITS (CRITICAL - COUNT CAREFULLY)
+- Primary Text: ${META_COPY_LIMITS.primary_text_max} characters MAX (but first ${META_COPY_LIMITS.primary_text_visible} chars are visible before "See More" - this is your HOOK)
+- Headline: ${META_COPY_LIMITS.headline_max} characters MAX
+- Description: ${META_COPY_LIMITS.description_max} characters MAX
 
-## INSTRUCTIONS
-Generate 5 genuinely different variations for each element.
-Each variation should take a different angle:
-1. Pain point focus - highlight the problem/threat
-2. Solution focus - emphasize what the candidate/cause will do
-3. Enemy focus - attack the opposition
-4. Values focus - appeal to core beliefs
-5. Urgency focus - create immediate need to act
+## COPYWRITING FRAMEWORKS - USE EXACTLY ONE PER VARIATION
 
-CRITICAL: Strictly adhere to character limits. Count characters carefully.
-- Primary texts MUST be under ${META_COPY_LIMITS.primary_text_visible} characters
-- Headlines MUST be under ${META_COPY_LIMITS.headline_max} characters
-- Descriptions MUST be under ${META_COPY_LIMITS.description_max} characters
+Generate 5 variations, each using a DIFFERENT framework:
 
-Return valid JSON only (no markdown, no explanation):
+**Variation 1 - ${COPYWRITING_FRAMEWORKS.PAS.name}:**${COPYWRITING_FRAMEWORKS.PAS.instruction}
+
+**Variation 2 - ${COPYWRITING_FRAMEWORKS.BAB.name}:**${COPYWRITING_FRAMEWORKS.BAB.instruction}
+
+**Variation 3 - ${COPYWRITING_FRAMEWORKS.AIDA.name}:**${COPYWRITING_FRAMEWORKS.AIDA.instruction}
+
+**Variation 4 - ${COPYWRITING_FRAMEWORKS.SOCIAL_PROOF.name}:**${COPYWRITING_FRAMEWORKS.SOCIAL_PROOF.instruction}
+
+**Variation 5 - ${COPYWRITING_FRAMEWORKS.IDENTITY.name}:**${COPYWRITING_FRAMEWORKS.IDENTITY.instruction}
+
+## HOOK REQUIREMENTS (FIRST ${META_COPY_LIMITS.primary_text_visible} CHARACTERS - CRITICAL)
+
+The first ${META_COPY_LIMITS.primary_text_visible} characters MUST stop the scroll. Use pattern interrupts:
+- Lead with conflict, threat, or surprise
+- Use "you" language - make it personal immediately
+- Create curiosity gap or fear of missing out
+- NEVER start with the candidate's name or generic statements
+- NEVER start with "Join us" or "Help us" - start with THEM
+
+HOOK PATTERNS (choose appropriate style):
+- PAIN: "[Opponent] just [harmful action]. We can't let this stand."
+- URGENCY: "DEADLINE: [Time]. [X] donors needed to hit our goal."
+- CURIOSITY: "They don't want you to see this..."
+- IDENTITY: "If you believe in [value], this is your moment."
+- THREAT: "They're spending millions against us. We're fighting back."
+- QUESTION: "What happens if [candidate] loses this race?"
+
+## POLITICAL FUNDRAISING PSYCHOLOGY (APPLY TO ALL VARIATIONS)
+
+URGENCY TACTICS:
+- Deadlines ("midnight tonight", "24 hours left")
+- Matching opportunities ("Every dollar = $2")
+- Thresholds ("127 donors away from our goal")
+- Opponent momentum ("They just raised $X")
+
+IDENTITY REINFORCEMENT:
+- "Donors like you" / "Patriots who care"
+- Shared values language
+- In-group signaling
+
+ENEMY FRAMING:
+- Clear villain (opponent, special interests)
+- Contrast (us vs. them)
+- Stakes if enemy wins
+
+EMPOWERMENT:
+- Specific donation impact ("Your $27 = [specific outcome]")
+- Donor as hero of the story
+- Agency and control
+
+## META ALGORITHM OPTIMIZATION
+
+- Emotionally resonant copy ranks higher (quality score)
+- Clear benefit in first line improves click-through
+- Authentic, passionate voice > polished marketing speak
+- Match energy and tone to landing page intent
+- Copy that drives engagement (likes, shares, comments) costs less
+
+## OUTPUT REQUIREMENTS
+
+Return ONLY valid JSON (no markdown, no explanation):
 {
-  "primary_texts": ["text1", "text2", "text3", "text4", "text5"],
-  "headlines": ["headline1", "headline2", "headline3", "headline4", "headline5"],
-  "descriptions": ["desc1", "desc2", "desc3", "desc4", "desc5"]
+  "primary_texts": [
+    "PAS variation (${META_COPY_LIMITS.primary_text_max} chars max, hook in first ${META_COPY_LIMITS.primary_text_visible})",
+    "BAB variation...",
+    "AIDA variation...",
+    "Social Proof variation...",
+    "Identity variation..."
+  ],
+  "headlines": [
+    "PAS headline (${META_COPY_LIMITS.headline_max} chars max, action-oriented)",
+    "BAB headline...",
+    "AIDA headline...",
+    "Social Proof headline...",
+    "Identity headline..."
+  ],
+  "descriptions": [
+    "PAS description (${META_COPY_LIMITS.description_max} chars max, urgency/proof/value)",
+    "BAB description...",
+    "AIDA description...",
+    "Social Proof description...",
+    "Identity description..."
+  ]
 }`;
 }
 
@@ -203,13 +322,21 @@ async function generateCopyForSegment(
         messages: [
           {
             role: 'system',
-            content: 'You are an expert political ad copywriter. Return only valid JSON with no markdown formatting or explanation.',
+            content: `You are a world-class political fundraising copywriter who has raised $50M+ through Meta ads for progressive campaigns. You understand donor psychology, Meta's algorithm, and ActBlue conversion tactics. 
+
+CRITICAL RULES:
+1. Return ONLY valid JSON - no markdown, no explanation, no code blocks
+2. Each variation must use a DIFFERENT copywriting framework (PAS, BAB, AIDA, Social Proof, Identity)
+3. First 125 characters of primary_text MUST be a scroll-stopping hook
+4. Never start with candidate's name - start with conflict, urgency, or "you"
+5. Include urgency elements in EVERY variation
+6. Count characters precisely - violations ruin Meta delivery`,
           },
           { role: 'user', content: prompt },
         ],
         response_format: { type: 'json_object' },
-        temperature: 0.7,
-        max_tokens: 2000,
+        temperature: 0.8, // Slightly higher for more creative variation
+        max_tokens: 3000, // More tokens for longer, richer copy
       }),
     });
 
@@ -276,9 +403,10 @@ function createMetaReadyCopy(
   );
 
   for (let i = 0; i < numVariations; i++) {
+    // Use primary_text_max for validation (allows extended context beyond visible hook)
     const primaryValidated = validateAndFormat(
       generatedCopy.primary_texts[i] || '',
-      META_COPY_LIMITS.primary_text_visible
+      META_COPY_LIMITS.primary_text_max
     );
     const headlineValidated = validateAndFormat(
       generatedCopy.headlines[i] || '',
@@ -542,7 +670,7 @@ serve(async (req) => {
         tracking_url: trackingUrl,
         copy_validation_status: validationStatus,
         generation_model: 'gpt-4-turbo-preview',
-        generation_prompt_version: '1.0',
+        generation_prompt_version: '2.0-frameworks',
         generated_at: generatedAt,
         created_at: generatedAt,
         updated_at: generatedAt,
