@@ -16,7 +16,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+ import { motion, AnimatePresence, type Easing } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -80,7 +80,7 @@ const stepVariants = {
     x: 0,
     transition: {
       duration: 0.3,
-      ease: 'easeOut',
+       ease: 'easeOut' as Easing,
     },
   },
   exit: {
@@ -88,7 +88,7 @@ const stepVariants = {
     x: -50,
     transition: {
       duration: 0.2,
-      ease: 'easeIn',
+       ease: 'easeIn' as Easing,
     },
   },
 };

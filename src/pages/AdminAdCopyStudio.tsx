@@ -136,7 +136,7 @@ export default function AdminAdCopyStudio() {
           (data || [])
             .map((tx: { contribution_form: string | null }) => tx.contribution_form)
             .filter((form: string | null): form is string => Boolean(form))
-        )].sort();
+       )].sort() as string[];
 
         if (isMounted) {
           setFormsError(null);
