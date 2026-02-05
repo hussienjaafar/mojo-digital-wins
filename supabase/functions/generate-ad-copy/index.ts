@@ -426,11 +426,12 @@ serve(async (req) => {
 
     console.log(`[generate-ad-copy] Starting generation for org ${organization_id}, transcript ${transcript_id}`);
 
-    // Fetch transcript from database
+    // Fetch transcript from database (fetch first, then validate org membership)
     const { data: transcript, error: transcriptError } = await supabase
       .from('meta_ad_transcripts')
       .select(`
         id,
+        organization_id,
         transcript_text,
         issue_primary,
         political_stances,
@@ -445,14 +446,25 @@ serve(async (req) => {
         values_appealed
       `)
       .eq('id', transcript_id)
-      .eq('organization_id', organization_id)
-      .single();
+      .maybeSingle();
 
     if (transcriptError || !transcript) {
       console.error('[generate-ad-copy] Transcript not found:', transcriptError);
       return new Response(
-        JSON.stringify({ success: false, error: 'Transcript not found' }),
+        JSON.stringify({ success: false, error: 'Transcript not found. It may have been deleted.' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate transcript belongs to the requested organization
+    if (transcript.organization_id !== organization_id) {
+      console.error(`[generate-ad-copy] Org mismatch: transcript belongs to ${transcript.organization_id}, request for ${organization_id}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'This transcript belongs to a different organization. Please select the correct organization or start a new session.' 
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
