@@ -16,7 +16,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
- import { motion, AnimatePresence, type Easing } from 'framer-motion';
+import { motion, AnimatePresence, type Easing } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,6 +32,7 @@ import { Loader2, RotateCcw, Sparkles } from 'lucide-react';
 import { useAdCopyStudio } from '@/hooks/useAdCopyStudio';
 import { useVideoUpload } from '@/hooks/useVideoUpload';
 import { useAdCopyGeneration } from '@/hooks/useAdCopyGeneration';
+import { useVideoTranscriptionFlow } from '@/hooks/useVideoTranscriptionFlow';
 
 // Components
 import { WizardStepIndicator } from './WizardStepIndicator';
@@ -42,7 +43,7 @@ import { CopyGenerationStep } from './steps/CopyGenerationStep';
 import { CopyExportStep } from './steps/CopyExportStep';
 
 // Types
-import type { CampaignConfig, AudienceSegment } from '@/types/ad-copy-studio';
+import type { CampaignConfig, AudienceSegment, TranscriptAnalysis, VideoUpload } from '@/types/ad-copy-studio';
 
 // =============================================================================
 // Types
@@ -163,13 +164,46 @@ export function AdCopyWizard({
     return stepData.config || DEFAULT_CAMPAIGN_CONFIG;
   });
 
-  // Track analyses (mock for now, would come from transcript service)
-  const [analyses, setAnalyses] = useState<Record<string, any>>(() => {
+  // Track analyses (fetched from transcription service)
+  const [analyses, setAnalyses] = useState<Record<string, TranscriptAnalysis>>(() => {
     return stepData.analyses || {};
   });
 
+  // Track video statuses locally for UI updates
+  const [videoStatuses, setVideoStatuses] = useState<Record<string, string>>({});
+
+  // Track transcript IDs for each video (needed for copy generation)
+  const [transcriptIds, setTranscriptIds] = useState<Record<string, string>>({});
+
   // Ref to track if step 4 auto-advance has already been triggered
   const hasCompletedStep4Ref = useRef(false);
+
+  // Track which videos we've already started processing
+  const processingVideosRef = useRef<Set<string>>(new Set());
+
+  // =========================================================================
+  // Transcription Flow Hook
+  // =========================================================================
+
+  const {
+    fetchAnalysis,
+    pollForCompletion,
+  } = useVideoTranscriptionFlow({
+    organizationId,
+    onStatusChange: (videoId, status) => {
+      console.log(`[AdCopyWizard] Video ${videoId} status changed to: ${status}`);
+      setVideoStatuses(prev => ({ ...prev, [videoId]: status }));
+    },
+    onAnalysisReady: (videoId, analysis) => {
+      console.log(`[AdCopyWizard] Analysis ready for video: ${videoId}`);
+      setAnalyses(prev => ({ ...prev, [videoId]: analysis }));
+      // Also update stepData
+      updateStepData({ analyses: { ...analyses, [videoId]: analysis } });
+    },
+    onError: (videoId, error) => {
+      console.error(`[AdCopyWizard] Transcription error for video ${videoId}:`, error);
+    },
+  });
 
   // =========================================================================
   // Effects
@@ -188,6 +222,50 @@ export function AdCopyWizard({
       setAnalyses(stepData.analyses);
     }
   }, [stepData.analyses]);
+
+  // Poll for transcription completion and fetch analyses for videos in transcribing state
+  useEffect(() => {
+    const currentVideos = videos.length > 0 ? videos : (stepData.videos || []);
+    
+    // Find videos that need processing (have video_id but no analysis yet)
+    const videosNeedingProcessing = currentVideos.filter((v: VideoUpload) => {
+      if (!v.video_id) return false;
+      if (analyses[v.video_id]) return false; // Already have analysis
+      if (processingVideosRef.current.has(v.video_id)) return false; // Already processing
+      return v.status === 'transcribing' || v.status === 'analyzing' || v.status === 'ready';
+    });
+
+    // Start processing for each video
+    videosNeedingProcessing.forEach(async (video: VideoUpload) => {
+      const videoId = video.video_id!;
+      processingVideosRef.current.add(videoId);
+
+      console.log(`[AdCopyWizard] Starting to poll/fetch analysis for video: ${videoId}`);
+
+      // First try to fetch existing analysis (in case transcription already completed)
+      let result = await fetchAnalysis(videoId);
+      
+      if (!result) {
+        // No analysis yet - poll for completion
+        console.log(`[AdCopyWizard] No analysis found, polling for completion: ${videoId}`);
+        const finalStatus = await pollForCompletion(videoId);
+        
+        if (finalStatus === 'TRANSCRIBED' || finalStatus === 'ANALYZED') {
+          // Now fetch the analysis
+          result = await fetchAnalysis(videoId);
+        }
+      }
+
+      if (result) {
+        const { analysis, transcriptId } = result;
+        setAnalyses(prev => ({ ...prev, [videoId]: analysis }));
+        setTranscriptIds(prev => ({ ...prev, [videoId]: transcriptId }));
+        updateStepData({ analyses: { ...analyses, [videoId]: analysis } });
+      }
+
+      processingVideosRef.current.delete(videoId);
+    });
+  }, [videos, stepData.videos, analyses, fetchAnalysis, pollForCompletion, updateStepData]);
 
   // =========================================================================
   // Handlers
@@ -219,19 +297,22 @@ export function AdCopyWizard({
     const sourceVideos = videos.length > 0 ? videos : (stepData.videos || []);
     const primaryVideo = sourceVideos[0];
 
-    // Validate that we have a video with a transcript_id before generating
+    // Validate that we have a video before generating
     if (!primaryVideo) {
       console.error('[AdCopyWizard] No video available for generation');
       return;
     }
 
-    if (!primaryVideo.transcript_id) {
+    // Get transcript_id from our tracked state (or from video object as fallback)
+    const transcriptId = transcriptIds[primaryVideo.video_id!] || primaryVideo.transcript_id;
+
+    if (!transcriptId) {
       console.error('[AdCopyWizard] Video does not have a transcript_id - transcription may still be in progress');
       return;
     }
 
     await generateCopy({
-      transcriptId: primaryVideo.transcript_id,
+      transcriptId,
       videoId: primaryVideo.video_id,
       audienceSegments: campaignConfig.audience_segments,
       actblueFormName: campaignConfig.actblue_form_name,
@@ -239,7 +320,7 @@ export function AdCopyWizard({
       amountPreset: campaignConfig.amount_preset,
       recurringDefault: campaignConfig.recurring_default,
     });
-  }, [generateCopy, videos, stepData.videos, campaignConfig]);
+  }, [generateCopy, videos, stepData.videos, campaignConfig, transcriptIds]);
 
   // Auto-advance to export step when generation completes
   // eslint-disable-next-line react-hooks/exhaustive-deps -- completeStep is intentionally excluded
@@ -304,10 +385,19 @@ export function AdCopyWizard({
         );
 
       case 2:
+        // Map analyses by video.id (local ID) for TranscriptReviewStep
+        // Our analyses are keyed by video.video_id (database ID)
+        const mappedAnalyses: Record<string, TranscriptAnalysis> = {};
+        currentVideos.forEach((v: VideoUpload) => {
+          if (v.video_id && analyses[v.video_id]) {
+            mappedAnalyses[v.id] = analyses[v.video_id];
+          }
+        });
+
         return (
           <TranscriptReviewStep
             videos={currentVideos}
-            analyses={analyses}
+            analyses={mappedAnalyses}
             onBack={() => handleGoBack(1)}
             onComplete={handleTranscriptReviewComplete}
           />
