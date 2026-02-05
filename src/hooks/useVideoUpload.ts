@@ -663,11 +663,11 @@ export function useVideoUpload(
     }
 
     try {
-      // Update database status to CANCELLED
+      // Update database status to error (CANCELLED not in DB constraint)
       await (supabase as any)
         .from('meta_ad_videos')
         .update({ 
-          status: 'CANCELLED', 
+          status: 'error', 
           error_message: 'Cancelled by user',
           updated_at: new Date().toISOString() 
         })

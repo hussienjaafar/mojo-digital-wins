@@ -41,7 +41,7 @@ export interface TranscriptionFlowReturn {
 
 const DEFAULT_POLL_INTERVAL_MS = 3000;
 const DEFAULT_MAX_WAIT_MS = 5 * 60 * 1000; // 5 minutes
-const TERMINAL_STATUSES = ['TRANSCRIBED', 'ANALYZED', 'ERROR', 'FAILED', 'TRANSCRIPT_FAILED', 'CANCELLED'];
+const TERMINAL_STATUSES = ['TRANSCRIBED', 'ANALYZED', 'ERROR', 'FAILED', 'TRANSCRIPT_FAILED', 'COMPLETED', 'error'];
 
 // =============================================================================
 // Hook Implementation
