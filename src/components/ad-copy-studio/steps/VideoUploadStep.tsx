@@ -12,7 +12,7 @@
  * - Error handling with dismiss capability
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ import {
   HardDrive,
 } from 'lucide-react';
 import type { VideoUpload } from '@/types/ad-copy-studio';
+import { preloadFFmpeg, isFFmpegSupported } from '@/lib/audio-extractor';
 
 // =============================================================================
 // Types
@@ -149,6 +150,17 @@ export function VideoUploadStep({
   const [gdriveUrl, setGdriveUrl] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Preload FFmpeg.wasm when component mounts (reduces wait time during upload)
+  useEffect(() => {
+    if (isFFmpegSupported()) {
+      // Delay preload slightly to not block initial render
+      const timer = setTimeout(() => {
+        preloadFFmpeg();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   // Computed
   const hasReadyVideos = videos.some((v) => v.status === 'ready');

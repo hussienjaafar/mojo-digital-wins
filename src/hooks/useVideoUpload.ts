@@ -11,7 +11,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
- import { extractAudio, shouldExtractAudio, isFFmpegSupported } from '@/lib/audio-extractor';
+import { extractAudio, shouldExtractAudio, isFFmpegSupported } from '@/lib/audio-extractor';
 import type {
   VideoUpload,
   ImportGDriveResponse,
@@ -213,23 +213,25 @@ export function useVideoUpload(
            console.log(`[useVideoUpload] Large file detected (${(file.size / 1024 / 1024).toFixed(1)}MB), extracting audio...`);
            updateVideo(video.id, { status: 'extracting', progress: 0 });
            
-           try {
-             const { audioFile, originalFilename } = await extractAudio(file, {
-               onProgress: (progress) => {
-                 // Map extraction progress to 0-40% of total progress
-                 const mappedProgress = Math.round(progress.percent * 0.4);
-                 updateVideo(video.id, { progress: mappedProgress });
-               },
-             });
+            try {
+              const { audioFile, originalFilename, extractionMode, timings } = await extractAudio(file, {
+                onProgress: (progress) => {
+                  // Map extraction progress to 0-40% of total progress
+                  const mappedProgress = Math.round(progress.percent * 0.4);
+                  updateVideo(video.id, { progress: mappedProgress });
+                },
+              });
+              console.log(`[useVideoUpload] Extraction complete in ${(timings.totalMs / 1000).toFixed(1)}s (${extractionMode} mode)`);
              
-             fileToUpload = audioFile;
-             storageBucket = AUDIO_BUCKET;
-             extractedAudioFilename = audioFile.name;
-             storagePath = `${organizationId}/${batchId}/${videoId}_${sanitizeFilename(audioFile.name)}`;
-             contentType = 'audio/mpeg';
-             
-             console.log(`[useVideoUpload] Audio extracted: ${audioFile.name} (${(audioFile.size / 1024 / 1024).toFixed(2)}MB)`);
-             updateVideo(video.id, { status: 'uploading', progress: 40 });
+              fileToUpload = audioFile;
+              storageBucket = AUDIO_BUCKET;
+              extractedAudioFilename = audioFile.name;
+              storagePath = `${organizationId}/${batchId}/${videoId}_${sanitizeFilename(audioFile.name)}`;
+              // Support both M4A (copy mode) and MP3 (re-encode mode)
+              contentType = audioFile.type || 'audio/mpeg';
+              
+              console.log(`[useVideoUpload] Audio extracted: ${audioFile.name} (${(audioFile.size / 1024 / 1024).toFixed(2)}MB), mode: ${extractionMode}`);
+              updateVideo(video.id, { status: 'uploading', progress: 40 });
            } catch (extractError: any) {
              console.error('[useVideoUpload] Audio extraction failed:', extractError);
              // Fall back to uploading the original file
