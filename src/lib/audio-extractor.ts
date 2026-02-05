@@ -98,7 +98,9 @@ const FFMPEG_LOAD_TIMEOUT_MS = 60 * 1000;
 const FILE_CHUNK_SIZE = 10 * 1024 * 1024;
 
 // CDN sources for FFmpeg core files (fallback order)
+// Note: cdnjs uses a different path structure than npm CDNs
 const CDN_SOURCES = [
+  'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.6/esm',
   'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm',
   'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm',
 ];
@@ -196,7 +198,8 @@ async function fetchToBlobURL(
 
 /**
  * Try to load FFmpeg from a CDN with progress tracking
- * Now fetches ALL THREE required files: core.js, core.wasm, and worker.js
+ * Single-threaded FFmpeg.wasm only needs: ffmpeg-core.js and ffmpeg-core.wasm
+ * (No worker file needed - that's only for @ffmpeg/core-mt multi-threaded version)
  */
 async function loadFFmpegFromCDN(
   ffmpeg: FFmpeg,
@@ -208,12 +211,10 @@ async function loadFFmpegFromCDN(
   let coreTotal = 0;
   let wasmLoaded = 0;
   let wasmTotal = 0;
-  let workerLoaded = 0;
-  let workerTotal = 0;
 
   const updateProgress = () => {
-    const totalSize = coreTotal + wasmTotal + workerTotal;
-    const loadedSize = coreLoaded + wasmLoaded + workerLoaded;
+    const totalSize = coreTotal + wasmTotal;
+    const loadedSize = coreLoaded + wasmLoaded;
     if (totalSize > 0) {
       const percent = Math.round((loadedSize / totalSize) * 90); // 0-90% for downloads
       const loadedMB = (loadedSize / 1024 / 1024).toFixed(1);
@@ -228,8 +229,8 @@ async function loadFFmpegFromCDN(
     }
   };
 
-  // Fetch ALL THREE files with progress tracking
-  const [coreURL, wasmURL, workerURL] = await Promise.all([
+  // Fetch only the TWO required files (no worker needed for single-threaded mode)
+  const [coreURL, wasmURL] = await Promise.all([
     fetchToBlobURL(
       `${baseURL}/ffmpeg-core.js`,
       'text/javascript',
@@ -250,16 +251,6 @@ async function loadFFmpegFromCDN(
       },
       signal
     ),
-    fetchToBlobURL(
-      `${baseURL}/ffmpeg-core.worker.js`,
-      'text/javascript',
-      (loaded, total) => {
-        workerLoaded = loaded;
-        workerTotal = total || 1024 * 50; // Estimate ~50KB for worker
-        updateProgress();
-      },
-      signal
-    ),
   ]);
 
   // Report initialization phase
@@ -271,8 +262,8 @@ async function loadFFmpegFromCDN(
   onProgress(initProgress);
   notifyLoadProgress(initProgress);
 
-  // Load FFmpeg with ALL THREE URLs - this prevents the hang!
-  await ffmpeg.load({ coreURL, wasmURL, workerURL });
+  // Load FFmpeg with only coreURL and wasmURL (single-threaded mode)
+  await ffmpeg.load({ coreURL, wasmURL });
 }
 
 /**
