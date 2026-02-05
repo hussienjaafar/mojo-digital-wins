@@ -13,9 +13,11 @@
  * - WizardStepIndicator for progress tracking
  * - Framer Motion transitions between steps
  * - State persistence through useAdCopyStudio hook
+ * - Backend status synchronization on load
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence, type Easing } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -140,6 +142,8 @@ export function AdCopyWizard({
     organizationId,
     batchId: session?.batch_id || crypto.randomUUID(),
     userId,
+    // Pass session videos as initialVideos for hydration after refresh
+    initialVideos: stepData.videos,
     onUploadComplete: (video) => {
       // Update step data when upload completes
       const updatedVideos = [...(stepData.videos || []), video];
@@ -234,6 +238,78 @@ export function AdCopyWizard({
     }
   }, [stepData.analyses]);
 
+  // Sync video statuses from backend on load
+  // This ensures UI reflects the true database state after refresh
+  useEffect(() => {
+    const syncBackendStatuses = async () => {
+      const currentVideos = videos.length > 0 ? videos : (stepData.videos || []);
+      const videoDbIds = currentVideos
+        .filter((v: VideoUpload) => v.video_id)
+        .map((v: VideoUpload) => v.video_id);
+
+      if (videoDbIds.length === 0) return;
+
+      try {
+        const { data, error } = await (supabase as any)
+          .from('meta_ad_videos')
+          .select('id, status, error_message, updated_at')
+          .in('id', videoDbIds);
+
+        if (error || !data) {
+          console.error('[AdCopyWizard] Failed to sync backend statuses:', error);
+          return;
+        }
+
+        // Map backend status to UI status
+        const statusMap: Record<string, VideoUpload['status']> = {
+          'CANCELLED': 'error',
+          'ERROR': 'error',
+          'FAILED': 'error',
+          'TRANSCRIPT_FAILED': 'error',
+          'error': 'error',
+          'URL_EXPIRED': 'error',
+          'URL_INACCESSIBLE': 'error',
+          'TRANSCRIBED': 'ready',
+          'ANALYZED': 'ready',
+          'COMPLETED': 'ready',
+          'PENDING': 'transcribing',
+          'URL_FETCHED': 'transcribing',
+          'DOWNLOADED': 'transcribing',
+          'TRANSCRIBING': 'transcribing',
+        };
+
+        let hasChanges = false;
+        data.forEach((dbVideo: any) => {
+          const uiStatus = statusMap[dbVideo.status] || 'transcribing';
+          const currentVideo = currentVideos.find((v: VideoUpload) => v.video_id === dbVideo.id);
+          
+          if (currentVideo && currentVideo.status !== uiStatus) {
+            hasChanges = true;
+            console.log(`[AdCopyWizard] Syncing video ${dbVideo.id}: ${currentVideo.status} -> ${uiStatus} (backend: ${dbVideo.status})`);
+            
+            // Update via hook
+            updateVideoStatus(dbVideo.id, uiStatus, dbVideo.error_message);
+            
+            // Add to failed set if terminal failure
+            if (uiStatus === 'error') {
+              failedVideosRef.current.add(dbVideo.id);
+            }
+          }
+        });
+
+        if (hasChanges) {
+          console.log('[AdCopyWizard] Backend status sync complete');
+        }
+      } catch (err) {
+        console.error('[AdCopyWizard] Error syncing backend statuses:', err);
+      }
+    };
+
+    // Run sync after a short delay to allow hydration to complete
+    const timer = setTimeout(syncBackendStatuses, 500);
+    return () => clearTimeout(timer);
+  }, [videos, stepData.videos, updateVideoStatus]);
+
   // Poll for transcription completion and fetch analyses for videos in transcribing state
   useEffect(() => {
     const currentVideos = videos.length > 0 ? videos : (stepData.videos || []);
@@ -280,7 +356,7 @@ export function AdCopyWizard({
     });
   }, [videos, stepData.videos, analyses, fetchAnalysis, pollForCompletion, updateStepData]);
 
-  // Handle cancel video - also cancels polling
+  // Handle cancel video - also cancels polling and updates stepData
   const handleCancelVideo = useCallback(async (id: string) => {
     const video = videos.find(v => v.id === id) || (stepData.videos || []).find((v: VideoUpload) => v.id === id);
     if (video?.video_id) {
@@ -290,9 +366,15 @@ export function AdCopyWizard({
       cancelPolling(video.video_id);
     }
     await cancelVideo(id);
-  }, [videos, stepData.videos, cancelVideo, cancelPolling]);
+    
+    // Update stepData to persist cancelled state
+    const updatedVideos = (stepData.videos || []).map((v: VideoUpload) =>
+      v.id === id ? { ...v, status: 'error' as const, error_message: 'Cancelled by user' } : v
+    );
+    updateStepData({ videos: updatedVideos });
+  }, [videos, stepData.videos, cancelVideo, cancelPolling, updateStepData]);
 
-  // Handle retry transcription - clears failed state
+  // Handle retry transcription - clears failed state and updates stepData
   const handleRetryTranscription = useCallback(async (id: string) => {
     const video = videos.find(v => v.id === id) || (stepData.videos || []).find((v: VideoUpload) => v.id === id);
     if (video?.video_id) {
@@ -302,7 +384,13 @@ export function AdCopyWizard({
       processingVideosRef.current.delete(video.video_id);
     }
     await retryTranscription(id);
-  }, [videos, stepData.videos, retryTranscription]);
+    
+    // Update stepData to persist transcribing state
+    const updatedVideos = (stepData.videos || []).map((v: VideoUpload) =>
+      v.id === id ? { ...v, status: 'transcribing' as const, error_message: undefined, transcriptionStartTime: Date.now() } : v
+    );
+    updateStepData({ videos: updatedVideos });
+  }, [videos, stepData.videos, retryTranscription, updateStepData]);
 
   // =========================================================================
   // Handlers

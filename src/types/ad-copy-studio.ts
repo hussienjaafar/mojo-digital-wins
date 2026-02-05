@@ -58,6 +58,10 @@ export interface VideoUpload {
   extractionDiagnostics?: any; // DiagnosticsReport from audio-extractor
   // Real-time extraction message (from progress callback)
   extractionMessage?: string;
+  // Transcription timing (for stuck detection - works even after refresh)
+  transcriptionStartTime?: number;
+  // Backend updated_at timestamp (ISO string from DB, used to restore transcriptionStartTime after refresh)
+  backendUpdatedAt?: string;
 }
 
 export interface SpecIssue {
