@@ -11,6 +11,7 @@
  * - Timeout protection to prevent infinite hangs
  * - Diagnostics report for debugging slow extractions
  * - Progress reporting with stage visibility
+ * - Subscriber model for progress updates (supports preload)
  */
 
 import { FFmpeg } from '@ffmpeg/ffmpeg';
@@ -90,8 +91,8 @@ export interface AudioExtractorOptions {
 // 3 minute timeout for extraction (reasonable for most files)
 const DEFAULT_EXTRACTION_TIMEOUT_MS = 3 * 60 * 1000;
 
-// 30 second timeout for FFmpeg loading
-const FFMPEG_LOAD_TIMEOUT_MS = 30 * 1000;
+// 60 second timeout for FFmpeg loading (covers downloads + initialization)
+const FFMPEG_LOAD_TIMEOUT_MS = 60 * 1000;
 
 // 10MB chunks for reading files
 const FILE_CHUNK_SIZE = 10 * 1024 * 1024;
@@ -108,6 +109,24 @@ const CDN_SOURCES = [
 
 let ffmpegInstance: FFmpeg | null = null;
 let ffmpegLoadPromise: Promise<FFmpeg> | null = null;
+
+// Subscriber model for progress updates (allows late-joining)
+type ProgressCallback = (progress: AudioExtractionProgress) => void;
+const loadProgressSubscribers = new Set<ProgressCallback>();
+
+function notifyLoadProgress(progress: AudioExtractionProgress) {
+  for (const callback of loadProgressSubscribers) {
+    try {
+      callback(progress);
+    } catch (e) {
+      console.warn('[AudioExtractor] Progress callback error:', e);
+    }
+  }
+}
+
+function clearLoadProgressSubscribers() {
+  loadProgressSubscribers.clear();
+}
 
 // Log ring buffer for diagnostics (last 200 lines)
 const LOG_BUFFER_SIZE = 200;
@@ -177,6 +196,7 @@ async function fetchToBlobURL(
 
 /**
  * Try to load FFmpeg from a CDN with progress tracking
+ * Now fetches ALL THREE required files: core.js, core.wasm, and worker.js
  */
 async function loadFFmpegFromCDN(
   ffmpeg: FFmpeg,
@@ -188,24 +208,28 @@ async function loadFFmpegFromCDN(
   let coreTotal = 0;
   let wasmLoaded = 0;
   let wasmTotal = 0;
+  let workerLoaded = 0;
+  let workerTotal = 0;
 
   const updateProgress = () => {
-    const totalSize = coreTotal + wasmTotal;
-    const loadedSize = coreLoaded + wasmLoaded;
+    const totalSize = coreTotal + wasmTotal + workerTotal;
+    const loadedSize = coreLoaded + wasmLoaded + workerLoaded;
     if (totalSize > 0) {
-      const percent = Math.round((loadedSize / totalSize) * 100);
+      const percent = Math.round((loadedSize / totalSize) * 90); // 0-90% for downloads
       const loadedMB = (loadedSize / 1024 / 1024).toFixed(1);
       const totalMB = (totalSize / 1024 / 1024).toFixed(1);
-      onProgress({
+      const progress: AudioExtractionProgress = {
         stage: 'loading',
         percent,
         message: `Downloading audio processor (${loadedMB}MB / ${totalMB}MB)...`,
-      });
+      };
+      onProgress(progress);
+      notifyLoadProgress(progress);
     }
   };
 
-  // Fetch both files with progress tracking
-  const [coreURL, wasmURL] = await Promise.all([
+  // Fetch ALL THREE files with progress tracking
+  const [coreURL, wasmURL, workerURL] = await Promise.all([
     fetchToBlobURL(
       `${baseURL}/ffmpeg-core.js`,
       'text/javascript',
@@ -226,19 +250,46 @@ async function loadFFmpegFromCDN(
       },
       signal
     ),
+    fetchToBlobURL(
+      `${baseURL}/ffmpeg-core.worker.js`,
+      'text/javascript',
+      (loaded, total) => {
+        workerLoaded = loaded;
+        workerTotal = total || 1024 * 50; // Estimate ~50KB for worker
+        updateProgress();
+      },
+      signal
+    ),
   ]);
 
-  await ffmpeg.load({ coreURL, wasmURL });
+  // Report initialization phase
+  const initProgress: AudioExtractionProgress = {
+    stage: 'loading',
+    percent: 95,
+    message: 'Initializing audio processor...',
+  };
+  onProgress(initProgress);
+  notifyLoadProgress(initProgress);
+
+  // Load FFmpeg with ALL THREE URLs - this prevents the hang!
+  await ffmpeg.load({ coreURL, wasmURL, workerURL });
 }
 
 /**
  * Get or initialize the FFmpeg instance (singleton pattern)
+ * Supports late-joining progress callbacks via subscriber model
  */
 async function getFFmpeg(onProgress?: (progress: AudioExtractionProgress) => void): Promise<FFmpeg> {
   if (ffmpegInstance?.loaded) {
     return ffmpegInstance;
   }
 
+  // Register progress callback if provided (supports late-joining)
+  if (onProgress) {
+    loadProgressSubscribers.add(onProgress);
+  }
+
+  // If already loading, return existing promise (late-joiner will get progress)
   if (ffmpegLoadPromise) {
     return ffmpegLoadPromise;
   }
@@ -247,12 +298,12 @@ async function getFFmpeg(onProgress?: (progress: AudioExtractionProgress) => voi
     console.log('[AudioExtractor] Loading FFmpeg.wasm...');
     const loadStart = performance.now();
     
-    const progressCallback = onProgress ?? (() => {});
-    progressCallback({
+    const initialProgress: AudioExtractionProgress = {
       stage: 'loading',
       percent: 0,
       message: 'Starting audio processor download...',
-    });
+    };
+    notifyLoadProgress(initialProgress);
 
     const ffmpeg = new FFmpeg();
 
@@ -261,10 +312,10 @@ async function getFFmpeg(onProgress?: (progress: AudioExtractionProgress) => voi
       addToLogBuffer(message);
     });
 
-    // Create abort controller for timeout
-    const abortController = new AbortController();
-    const timeoutId = setTimeout(() => {
-      abortController.abort();
+    // Create abort controller for per-CDN fetch timeout
+    const fetchAbortController = new AbortController();
+    const fetchTimeoutId = setTimeout(() => {
+      fetchAbortController.abort();
     }, FFMPEG_LOAD_TIMEOUT_MS);
 
     let lastError: Error | null = null;
@@ -275,27 +326,38 @@ async function getFFmpeg(onProgress?: (progress: AudioExtractionProgress) => voi
       console.log(`[AudioExtractor] Trying CDN ${i + 1}/${CDN_SOURCES.length}: ${baseURL}`);
       
       try {
-        await loadFFmpegFromCDN(ffmpeg, baseURL, progressCallback, abortController.signal);
+        // Wrap the entire load attempt in a race with timeout
+        const loadWithTimeout = Promise.race([
+          loadFFmpegFromCDN(ffmpeg, baseURL, (p) => notifyLoadProgress(p), fetchAbortController.signal),
+          new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('FFMPEG_INIT_TIMEOUT')), FFMPEG_LOAD_TIMEOUT_MS);
+          }),
+        ]);
         
-        clearTimeout(timeoutId);
+        await loadWithTimeout;
+        
+        clearTimeout(fetchTimeoutId);
         const loadTime = performance.now() - loadStart;
         console.log(`[AudioExtractor] FFmpeg.wasm loaded in ${loadTime.toFixed(0)}ms from ${baseURL}`);
         
-        progressCallback({
+        const readyProgress: AudioExtractionProgress = {
           stage: 'loading',
           percent: 100,
           message: 'Audio processor ready',
-        });
+        };
+        notifyLoadProgress(readyProgress);
 
         ffmpegInstance = ffmpeg;
+        clearLoadProgressSubscribers();
         return ffmpeg;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         
-        if (abortController.signal.aborted) {
+        if (fetchAbortController.signal.aborted || lastError.message?.includes('TIMEOUT')) {
           console.error('[AudioExtractor] FFmpeg load timed out');
-          clearTimeout(timeoutId);
+          clearTimeout(fetchTimeoutId);
           ffmpegLoadPromise = null;
+          clearLoadProgressSubscribers();
           throw new Error('FFMPEG_LOAD_TIMEOUT');
         }
         
@@ -305,8 +367,9 @@ async function getFFmpeg(onProgress?: (progress: AudioExtractionProgress) => voi
     }
 
     // All CDNs failed
-    clearTimeout(timeoutId);
+    clearTimeout(fetchTimeoutId);
     ffmpegLoadPromise = null;
+    clearLoadProgressSubscribers();
     console.error('[AudioExtractor] All CDNs failed to load FFmpeg.wasm');
     throw new Error(`Failed to load audio processor: ${lastError?.message || 'Unknown error'}`);
   })();
@@ -324,6 +387,8 @@ export async function preloadFFmpeg(): Promise<void> {
     console.log('[AudioExtractor] Preload complete');
   } catch (error) {
     console.warn('[AudioExtractor] Preload failed (will retry on use):', error);
+    // Reset promise so next attempt can retry
+    ffmpegLoadPromise = null;
   }
 }
 
@@ -499,313 +564,198 @@ export async function extractAudio(
     });
 
     copyAttempted = true;
+    let extractionMode: 'copy' | 'reencode' = 'copy';
+    let outputFileName = outputM4A;
+
     const copyStart = performance.now();
-    
     try {
-      // Use explicit stream mapping for reliability
+      // Try stream copy - works for AAC/MP3 audio in most MP4s
       await ffmpeg.exec([
         '-i', inputFileName,
-        '-map', '0:a:0',      // Select first audio stream
-        '-vn',                 // No video
-        '-sn',                 // No subtitles
-        '-c:a', 'copy',       // Copy audio codec
-        '-y',                  // Overwrite
+        '-vn',              // No video
+        '-acodec', 'copy',  // Stream copy audio
+        '-y',               // Overwrite
         outputM4A,
       ]);
-      
-      timings.copyAttemptMs = performance.now() - copyStart;
-      
-      // Verify output exists and has content
-      const outputData = await ffmpeg.readFile(outputM4A);
-      if (outputData && (typeof outputData !== 'string' ? outputData.length > 1000 : outputData.length > 1000)) {
+
+      // Check if output file exists and has content
+      const copyOutput = await ffmpeg.readFile(outputM4A);
+      if (copyOutput instanceof Uint8Array && copyOutput.length > 1000) {
         copySucceeded = true;
-        detectedCodec = 'aac (copy)';
-        console.log(`[AudioExtractor] Copy mode succeeded in ${timings.copyAttemptMs.toFixed(0)}ms`);
-        
-        timings.readOutputMs = 0; // Already read
-        
-        // Cleanup input file
-        try {
-          await ffmpeg.deleteFile(inputFileName);
-        } catch (e) {
-          console.warn('[AudioExtractor] Cleanup warning:', e);
-        }
-        
-        // Build result
-        const audioBlob = createBlob(outputData, 'audio/mp4');
-        const audioFilename = originalFilename.replace(/\.[^.]+$/, '.m4a');
-        const audioFile = new File([audioBlob], audioFilename, { type: 'audio/mp4' });
-        
-        // Cleanup output
-        await ffmpeg.deleteFile(outputM4A);
-        
-        timings.totalMs = performance.now() - startTime;
-        
-        onProgress?.({
-          stage: 'finalizing',
-          percent: 100,
-          message: 'Audio extraction complete (copy mode)',
-          elapsedMs: timings.totalMs,
-        });
-        
-        const result: AudioExtractionResult = {
-          audioBlob,
-          audioFile,
-          originalFilename,
-          extractionMode: 'copy',
-          timings,
-        };
-        
-        if (enableDiagnostics) {
-          result.diagnostics = buildDiagnostics(videoFile, timings, {
-            mode: 'copy',
-            detectedCodec,
-            copyAttempted,
-            copySucceeded,
-          });
-        }
-        
-        logExtractionSummary(result);
-        clearTimeout(timeoutId);
-        return result;
+        timings.copyAttemptMs = performance.now() - copyStart;
+        console.log(`[AudioExtractor] Stream copy succeeded in ${timings.copyAttemptMs.toFixed(0)}ms`);
+      } else {
+        throw new Error('Copy output too small or invalid');
       }
     } catch (copyError) {
-      console.log('[AudioExtractor] Copy mode failed, trying re-encode:', copyError);
-      addToLogBuffer(`Copy attempt failed: ${copyError}`);
+      console.log('[AudioExtractor] Stream copy failed, falling back to re-encode:', copyError);
+      timings.copyAttemptMs = performance.now() - copyStart;
+      extractionMode = 'reencode';
+      outputFileName = outputMP3;
+      
+      // Check if aborted
+      if (abortController.signal.aborted) {
+        throw new Error('EXTRACTION_TIMEOUT');
+      }
+
+      // Attempt 2: Re-encode to optimized speech format
+      onProgress?.({
+        stage: 'reencode',
+        percent: 40,
+        message: 'Converting audio (this may take a minute)...',
+        elapsedMs: performance.now() - startTime,
+      });
+
+      const reencodeStart = performance.now();
+      await ffmpeg.exec([
+        '-i', inputFileName,
+        '-vn',              // No video
+        '-b:a', '64k',      // 64kbps bitrate (optimal for speech)
+        '-ar', '16000',     // 16kHz sample rate (Whisper optimal)
+        '-ac', '1',         // Mono
+        '-y',               // Overwrite
+        outputMP3,
+      ]);
+      timings.reencodeMs = performance.now() - reencodeStart;
+      console.log(`[AudioExtractor] Re-encode completed in ${timings.reencodeMs.toFixed(0)}ms`);
     }
-    
-    timings.copyAttemptMs = performance.now() - copyStart;
 
     // Check if aborted
     if (abortController.signal.aborted) {
       throw new Error('EXTRACTION_TIMEOUT');
     }
-    
-    // Attempt 2: Re-encode with optimized settings for speech
-    onProgress?.({
-      stage: 'reencode',
-      percent: 30,
-      message: 'Converting audio (this may take a moment)...',
-      elapsedMs: performance.now() - startTime,
-    });
 
-    const reencodeStart = performance.now();
-    
-    // Set up progress tracking
-    let lastPercent = 30;
-    const progressHandler = ({ progress }: { progress: number }) => {
-      const percent = Math.min(95, 30 + Math.round(progress * 65));
-      if (percent > lastPercent) {
-        lastPercent = percent;
-        onProgress?.({
-          stage: 'reencode',
-          percent,
-          message: `Converting audio... ${percent}%`,
-          elapsedMs: performance.now() - startTime,
-        });
-      }
-    };
-    ffmpeg.on('progress', progressHandler);
-
-    // Try AAC first (often faster than MP3 in WASM)
-    let reencodeSucceeded = false;
-    let finalOutput = outputMP3;
-    let outputMimeType = 'audio/mpeg';
-    
-    try {
-      await ffmpeg.exec([
-        '-i', inputFileName,
-        '-vn',                     // No video
-        '-c:a', 'aac',             // AAC encoder
-        '-b:a', '64k',             // 64kbps (sufficient for speech)
-        '-ar', '16000',            // 16kHz (Whisper's native rate)
-        '-ac', '1',                // Mono
-        '-y',
-        outputM4A,
-      ]);
-      
-      finalOutput = outputM4A;
-      outputMimeType = 'audio/mp4';
-      reencodeSucceeded = true;
-      detectedCodec = 'reencode-aac';
-    } catch (aacError) {
-      console.log('[AudioExtractor] AAC encode failed, trying MP3:', aacError);
-      addToLogBuffer(`AAC encode failed: ${aacError}`);
-      
-      // Fallback to MP3
-      try {
-        await ffmpeg.exec([
-          '-i', inputFileName,
-          '-vn',
-          '-c:a', 'libmp3lame',
-          '-b:a', '64k',
-          '-ar', '16000',
-          '-ac', '1',
-          '-y',
-          outputMP3,
-        ]);
-        
-        finalOutput = outputMP3;
-        outputMimeType = 'audio/mpeg';
-        reencodeSucceeded = true;
-        detectedCodec = 'reencode-mp3';
-      } catch (mp3Error) {
-        console.error('[AudioExtractor] All encoding attempts failed:', mp3Error);
-        addToLogBuffer(`MP3 encode failed: ${mp3Error}`);
-        throw new Error('Failed to extract audio: all encoding methods failed');
-      }
-    }
-    
-    ffmpeg.off('progress', progressHandler);
-    timings.reencodeMs = performance.now() - reencodeStart;
-
-    // Read output
+    // Read the output file
     onProgress?.({
       stage: 'finalizing',
-      percent: 95,
+      percent: 90,
       message: 'Finalizing audio file...',
       elapsedMs: performance.now() - startTime,
     });
 
     const readOutputStart = performance.now();
-    const audioData = await ffmpeg.readFile(finalOutput);
+    const outputData = await ffmpeg.readFile(outputFileName);
     timings.readOutputMs = performance.now() - readOutputStart;
 
-    // Cleanup files
-    try {
-      await ffmpeg.deleteFile(inputFileName);
-      await ffmpeg.deleteFile(finalOutput);
-    } catch (e) {
-      console.warn('[AudioExtractor] Cleanup warning:', e);
+    if (!(outputData instanceof Uint8Array) || outputData.length < 1000) {
+      throw new Error('Failed to extract audio: output file is empty or invalid');
     }
 
-    // Build result
-    const audioBlob = createBlob(audioData, outputMimeType);
-    const audioFilename = originalFilename.replace(/\.[^.]+$/, finalOutput === outputM4A ? '.m4a' : '.mp3');
-    const audioFile = new File([audioBlob], audioFilename, { type: outputMimeType });
+    // Clean up virtual filesystem
+    try {
+      await ffmpeg.deleteFile(inputFileName);
+      if (copySucceeded && extractionMode === 'reencode') {
+        await ffmpeg.deleteFile(outputM4A);
+      }
+      await ffmpeg.deleteFile(outputFileName);
+    } catch (cleanupError) {
+      console.warn('[AudioExtractor] Cleanup warning:', cleanupError);
+    }
+
+    // Create output blob and file
+    const mimeType = extractionMode === 'copy' ? 'audio/mp4' : 'audio/mpeg';
+    const fileExtension = extractionMode === 'copy' ? '.m4a' : '.mp3';
+    const audioBlob = new Blob([outputData.buffer as ArrayBuffer], { type: mimeType });
+    
+    const baseName = originalFilename.replace(/\.[^.]+$/, '');
+    const audioFilename = `${baseName}_audio${fileExtension}`;
+    const audioFile = new File([audioBlob], audioFilename, { type: mimeType });
 
     timings.totalMs = performance.now() - startTime;
+    clearTimeout(timeoutId);
 
-    onProgress?.({
-      stage: 'finalizing',
-      percent: 100,
-      message: 'Audio extraction complete',
-      elapsedMs: timings.totalMs,
-    });
+    console.log(`[AudioExtractor] Extraction complete: ${(audioFile.size / 1024 / 1024).toFixed(2)}MB in ${(timings.totalMs / 1000).toFixed(1)}s (${extractionMode} mode)`);
 
-    const result: AudioExtractionResult = {
+    // Build diagnostics if enabled
+    let diagnostics: DiagnosticsReport | undefined;
+    if (enableDiagnostics) {
+      diagnostics = {
+        browser: {
+          userAgent: navigator.userAgent,
+          hardwareConcurrency: navigator.hardwareConcurrency || 0,
+          crossOriginIsolated: self.crossOriginIsolated ?? false,
+          sharedArrayBufferAvailable: typeof SharedArrayBuffer !== 'undefined',
+        },
+        file: {
+          name: originalFilename,
+          size: videoFile.size,
+          type: videoFile.type,
+        },
+        extraction: {
+          mode: extractionMode,
+          detectedCodec,
+          outputFormat: fileExtension.replace('.', ''),
+          copyAttempted,
+          copySucceeded,
+        },
+        timings,
+        ffmpegLogs: getLogBuffer(),
+      };
+    }
+
+    collectLogs = false;
+
+    return {
       audioBlob,
       audioFile,
       originalFilename,
-      extractionMode: 'reencode',
+      extractionMode,
       timings,
+      diagnostics,
     };
-
-    if (enableDiagnostics) {
-      result.diagnostics = buildDiagnostics(videoFile, timings, {
-        mode: 'reencode',
-        detectedCodec,
-        copyAttempted,
-        copySucceeded,
-      });
-    }
-
-    logExtractionSummary(result);
-    clearTimeout(timeoutId);
-    return result;
-
-  } catch (error: any) {
+  } catch (error) {
     clearTimeout(timeoutId);
     collectLogs = false;
     
-    // Handle timeout specifically
-    if (error.message === 'EXTRACTION_TIMEOUT' || abortController.signal.aborted) {
-      throw new Error('EXTRACTION_TIMEOUT: Audio extraction took too long. Try a smaller file or skip extraction.');
-    }
+    console.error('[AudioExtractor] Extraction failed:', error);
     
-    // Handle memory errors
-    if (error.message?.includes('memory') || error.message?.includes('OOM')) {
-      throw new Error('EXTRACTION_MEMORY: File too large for browser memory. Try a smaller file.');
+    // Provide specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('EXTRACTION_TIMEOUT') || abortController.signal.aborted) {
+        throw new Error('EXTRACTION_TIMEOUT: Audio extraction timed out. The file may be too large or complex.');
+      }
+      if (error.message.includes('memory') || error.message.includes('Memory')) {
+        throw new Error('EXTRACTION_MEMORY: Insufficient memory to process this file.');
+      }
     }
     
     throw error;
-  } finally {
-    collectLogs = false;
   }
 }
 
 // =============================================================================
-// Utilities
+// Utility Functions
 // =============================================================================
 
-function createBlob(data: Uint8Array | string, mimeType: string): Blob {
-  if (typeof data === 'string') {
-    return new Blob([new TextEncoder().encode(data)], { type: mimeType });
-  }
-  const buffer = new ArrayBuffer(data.length);
-  const view = new Uint8Array(buffer);
-  view.set(data);
-  return new Blob([buffer], { type: mimeType });
-}
-
+/**
+ * Get file extension from filename
+ */
 function getExtension(filename: string): string {
   const match = filename.match(/\.[^.]+$/);
-  return match ? match[0] : '.mp4';
-}
-
-function logExtractionSummary(result: AudioExtractionResult) {
-  console.log(`[AudioExtractor] Extraction complete:`, {
-    file: result.audioFile.name,
-    size: `${(result.audioFile.size / 1024 / 1024).toFixed(2)}MB`,
-    mode: result.extractionMode,
-    timings: {
-      wasmLoad: `${result.timings.wasmLoadMs.toFixed(0)}ms`,
-      readFile: `${result.timings.readFileMs.toFixed(0)}ms`,
-      writeFile: `${result.timings.writeFileMs.toFixed(0)}ms`,
-      copyAttempt: `${result.timings.copyAttemptMs.toFixed(0)}ms`,
-      reencode: `${result.timings.reencodeMs.toFixed(0)}ms`,
-      readOutput: `${result.timings.readOutputMs.toFixed(0)}ms`,
-      total: `${result.timings.totalMs.toFixed(0)}ms`,
-    },
-  });
-}
-
-function buildDiagnostics(
-  file: File,
-  timings: ExtractionTimings,
-  extraction: {
-    mode: 'copy' | 'reencode';
-    detectedCodec: string;
-    copyAttempted: boolean;
-    copySucceeded: boolean;
-  }
-): DiagnosticsReport {
-  return {
-    browser: {
-      userAgent: navigator.userAgent,
-      hardwareConcurrency: navigator.hardwareConcurrency || 0,
-      crossOriginIsolated: typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : false,
-      sharedArrayBufferAvailable: typeof SharedArrayBuffer !== 'undefined',
-    },
-    file: {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-    },
-    extraction: {
-      mode: extraction.mode,
-      detectedCodec: extraction.detectedCodec,
-      outputFormat: extraction.mode === 'copy' ? 'm4a' : 'mp3/m4a',
-      copyAttempted: extraction.copyAttempted,
-      copySucceeded: extraction.copySucceeded,
-    },
-    timings,
-    ffmpegLogs: getLogBuffer(),
-  };
+  return match ? match[0].toLowerCase() : '.mp4';
 }
 
 /**
- * Check if a file should have its audio extracted before upload
+ * Check if FFmpeg.wasm is supported in this browser
+ */
+export function isFFmpegSupported(): boolean {
+  // FFmpeg.wasm requires:
+  // 1. WebAssembly support
+  // 2. SharedArrayBuffer (for threading) OR single-threaded mode
+  // Modern browsers support WASM, but SAB requires COOP/COEP headers
+  
+  if (typeof WebAssembly === 'undefined') {
+    console.warn('[AudioExtractor] WebAssembly not supported');
+    return false;
+  }
+
+  // We use the non-threaded version which doesn't require SharedArrayBuffer
+  return true;
+}
+
+/**
+ * Check if a file should have audio extracted
+ * (files over 25MB benefit from audio extraction for transcription)
  */
 export function shouldExtractAudio(file: File): boolean {
   const EXTRACTION_THRESHOLD_BYTES = 25 * 1024 * 1024; // 25MB
@@ -813,64 +763,46 @@ export function shouldExtractAudio(file: File): boolean {
 }
 
 /**
- * Check if the browser supports FFmpeg.wasm
- */
-export function isFFmpegSupported(): boolean {
-  try {
-    if (typeof WebAssembly === 'undefined') {
-      console.warn('[AudioExtractor] WebAssembly not supported');
-      return false;
-    }
-
-    if (typeof SharedArrayBuffer === 'undefined') {
-      console.info('[AudioExtractor] SharedArrayBuffer not available, will use single-threaded mode');
-    }
-
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Format diagnostics report as copyable text
+ * Format a diagnostics report for display/logging
  */
 export function formatDiagnosticsReport(report: DiagnosticsReport): string {
-  const lines = [
+  const lines: string[] = [
     '=== Audio Extraction Diagnostics ===',
     '',
-    '## Browser',
+    '-- Browser --',
     `User Agent: ${report.browser.userAgent}`,
     `CPU Cores: ${report.browser.hardwareConcurrency}`,
     `Cross-Origin Isolated: ${report.browser.crossOriginIsolated}`,
     `SharedArrayBuffer: ${report.browser.sharedArrayBufferAvailable}`,
     '',
-    '## File',
+    '-- File --',
     `Name: ${report.file.name}`,
     `Size: ${(report.file.size / 1024 / 1024).toFixed(2)} MB`,
     `Type: ${report.file.type}`,
     '',
-    '## Extraction',
+    '-- Extraction --',
     `Mode: ${report.extraction.mode}`,
     `Detected Codec: ${report.extraction.detectedCodec}`,
     `Output Format: ${report.extraction.outputFormat}`,
     `Copy Attempted: ${report.extraction.copyAttempted}`,
     `Copy Succeeded: ${report.extraction.copySucceeded}`,
     '',
-    '## Timings',
+    '-- Timings --',
     `WASM Load: ${report.timings.wasmLoadMs.toFixed(0)}ms`,
     `Read File: ${report.timings.readFileMs.toFixed(0)}ms`,
     `Write File: ${report.timings.writeFileMs.toFixed(0)}ms`,
     `Copy Attempt: ${report.timings.copyAttemptMs.toFixed(0)}ms`,
     `Re-encode: ${report.timings.reencodeMs.toFixed(0)}ms`,
     `Read Output: ${report.timings.readOutputMs.toFixed(0)}ms`,
-    `Total: ${report.timings.totalMs.toFixed(0)}ms`,
+    `Total: ${report.timings.totalMs.toFixed(0)}ms (${(report.timings.totalMs / 1000).toFixed(1)}s)`,
     '',
   ];
 
   if (report.ffmpegLogs.length > 0) {
-    lines.push('## FFmpeg Logs (last 50 lines)');
-    lines.push(...report.ffmpegLogs.slice(-50));
+    lines.push('-- Last FFmpeg Logs --');
+    // Show last 20 log lines
+    const lastLogs = report.ffmpegLogs.slice(-20);
+    lines.push(...lastLogs);
   }
 
   return lines.join('\n');

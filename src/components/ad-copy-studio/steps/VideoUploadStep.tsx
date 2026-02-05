@@ -541,7 +541,8 @@ export function VideoUploadStep({
                            {video.status === 'extracting' && (
                              <div className="mt-1 flex items-center justify-between text-xs text-[#94a3b8]">
                                <span>
-                                 {getExtractionStageLabel(video.extractionStage)}
+                                 {/* Show real extraction message if available, fallback to stage label */}
+                                 {video.extractionMessage || getExtractionStageLabel(video.extractionStage)}
                                </span>
                                {video.extractionStartTime && (
                                  <ExtractionTimer startTime={video.extractionStartTime} />

@@ -56,6 +56,8 @@ export interface VideoUpload {
   extractionElapsedMs?: number;
   extractionMode?: 'copy' | 'reencode';
   extractionDiagnostics?: any; // DiagnosticsReport from audio-extractor
+  // Real-time extraction message (from progress callback)
+  extractionMessage?: string;
 }
 
 export interface SpecIssue {
