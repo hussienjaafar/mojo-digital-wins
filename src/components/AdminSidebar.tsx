@@ -33,6 +33,7 @@ import {
   HeartPulse,
   Layers,
   Map,
+  Sparkles,
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import {
@@ -93,6 +94,7 @@ export const navigationGroups: NavigationGroup[] = [
       { title: "Daily Briefing", icon: Calendar, value: "daily-briefing" },
       { title: "News & Trends", icon: Newspaper, value: "news" },
       { title: "Analytics", icon: BarChart3, value: "content-analytics" },
+      { title: "Ad Copy Studio", icon: Sparkles, value: "ad-copy-studio" },
       { title: "Critical Alerts", icon: AlertTriangle, value: "critical-alerts" },
       { title: "Bills", icon: ScrollText, value: "bills" },
       { title: "Voter Impact Map", icon: Map, value: "voter-impact-map" },

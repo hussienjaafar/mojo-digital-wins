@@ -143,6 +143,8 @@ const Admin = () => {
       navigate("/admin/voter-impact-map");
     } else if (activeTab === "contacts") {
       navigate("/admin/contacts");
+    } else if (activeTab === "ad-copy-studio") {
+      navigate("/admin/ad-copy-studio");
     }
   }, [activeTab, navigate]);
 
@@ -417,6 +419,9 @@ const Admin = () => {
       case "coverage-governance":
         return <CoverageGovernancePanel />;
       case "voter-impact-map":
+        // Navigation handled in useEffect
+        return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
+      case "ad-copy-studio":
         // Navigation handled in useEffect
         return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
       case "voter-data-import":
