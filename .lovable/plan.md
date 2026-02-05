@@ -1,155 +1,158 @@
 
-# Debugging & Optimizing FFmpeg.wasm Audio Extraction Performance
+## Goal
+Deeply investigate why client-side audio extraction is still slow and make it reliably fast for typical MP4 uploads (especially AAC-in-MP4), with clear diagnostics when it’s not.
 
-## Problem Analysis
+## What we know from the codebase (current state)
+From `src/lib/audio-extractor.ts`:
+- Extraction is split into phases with timings:
+  - `wasmLoadMs`, `writeInputMs`, `probeMs`, `extractMs`, `readOutputMs`, `totalMs`
+- Even in “copy mode”, we still do:
+  1) `await fetchFile(videoFile)` (reads the entire file into memory)
+  2) `await ffmpeg.writeFile(...)` (ships a large Uint8Array to the worker)
+  3) then `ffmpeg.exec(...)`
 
-Based on code review and research, the slow audio extraction is caused by multiple factors:
+From `src/hooks/useVideoUpload.ts`:
+- For files > 25MB, we extract audio first, then upload the extracted audio.
+- The UI progress mapping treats extraction as 0–40% overall progress.
 
-### Root Causes Identified
+From `src/components/ad-copy-studio/steps/VideoUploadStep.tsx`:
+- FFmpeg preloads after 1s (good), but that only solves core download/load time.
 
-| Issue | Impact | Current Code |
-|-------|--------|--------------|
-| **Re-encoding audio** | Very slow - CPU-intensive transcoding | Uses `-acodec libmp3lame` which re-encodes |
-| **Single-threaded mode** | 3-10x slower than multi-threaded | No SharedArrayBuffer (requires COOP/COEP headers) |
-| **Large WASM download** | ~30MB download on first use | Loading from unpkg CDN |
-| **Full file buffering** | Memory pressure for large files | `fetchFile()` loads entire video into memory |
-| **High quality settings** | Slower encoding | `-q:a 2` is VBR ~190kbps |
+## Likely root causes of “still very long”
+1) **Input write step dominates**: `fetchFile(videoFile)` + `writeFile` must read/copy the full video into FFmpeg’s virtual FS. For 150–500MB, this can take a long time and spike memory. This cost exists even when we do fast `-acodec copy`.
+2) **Console log overhead**: We currently attach a global `ffmpeg.on('log', ...)` that prints every FFmpeg log line. FFmpeg can emit a lot of logs; heavy `console.log` can materially slow long-running operations.
+3) **We still may be re-encoding in practice**: If probe fails to detect AAC/MP3 correctly, or input has an unusual codec, we fall back to re-encode. Even with optimized settings, WASM re-encoding can be slow on some machines.
+4) **Single-threaded runtime**: Multi-threaded FFmpeg.wasm requires cross-origin isolation headers; if unavailable, we’re in a slower mode. Even if copy-mode is fast, any re-encode becomes painful.
 
-### Current FFmpeg Command (Slow)
-```
-ffmpeg -i input.mp4 -vn -acodec libmp3lame -q:a 2 -ar 44100 -ac 1 output.mp3
-```
-This **re-encodes** audio using LAME MP3 encoder, which is CPU-intensive in WebAssembly.
+## Investigation-first approach (what we’ll build to debug deeply)
+### A) Add a “Diagnostics Report” for every extraction
+Implement a structured debug report that can be copied to clipboard from the UI when extraction is slow or fails:
+- Browser info: `navigator.userAgent`, `navigator.hardwareConcurrency`
+- Security/runtime: `crossOriginIsolated`, `typeof SharedArrayBuffer !== 'undefined'`
+- File stats: size, extension, mime type
+- Codec detection results (what we *think* codec is)
+- Extraction mode used: copy vs reencode
+- Timings: wasmLoad/write/probe/extract/read/total
+- A capped ring buffer of FFmpeg log lines (last N=200), only collected when diagnostics is enabled or extraction exceeds a threshold (ex: 20s)
 
-## Optimization Strategy
+Where it will surface:
+- In `VideoUploadStep`, add a “View extraction details” link for items in `extracting` or `error`.
+- Optionally auto-show it if `totalMs > X`.
 
-### 1. Use Copy Codec When Possible (Fastest)
+### B) Make timings visible during extraction (not only at the end)
+Right now, timings are logged when extraction completes. If it takes minutes, we need visibility mid-flight.
+- Show “Stage: Loading / Preparing file / Probing / Extracting / Finalizing”
+- Show elapsed time since extraction start
+- Show which stage is currently consuming time (especially “Preparing file” vs “Extracting”)
 
-If the source video has AAC audio (most MP4s do), we can **copy it directly** without re-encoding:
+## Performance fixes we’ll implement (based on strongest bottlenecks)
+### 1) Avoid the full-file copy into MEMFS by using `WORKERFS` mount (major improvement)
+Replace:
+- `await ffmpeg.writeFile(inputFileName, await fetchFile(videoFile))`
 
-```
-ffmpeg -i input.mp4 -vn -acodec copy output.m4a
-```
+With:
+- `await ffmpeg.createDir('/work')`
+- `await ffmpeg.mount(FFFSType.WORKERFS, { files: [videoFile] }, '/work')`
+- Use input path like `/work/${videoFile.name}` (sanitized as needed)
 
-This is **nearly instant** because it just extracts the audio stream without any processing.
+Why:
+- `WORKERFS` lets FFmpeg access the File without us first converting it to a huge Uint8Array and transferring it to the worker.
+- This typically reduces both time and memory pressure dramatically for large files.
 
-**Trade-off**: Output format matches source (usually AAC/M4A), not MP3. Whisper supports both.
+Cleanup:
+- Ensure `unmount('/work')` and directory cleanup happens in `finally` to avoid accumulating mounted FS state across runs.
 
-### 2. Detect Audio Codec First
+### 2) Remove (or gate) the always-on `ffmpeg.on('log', console.log...)` handler
+Change to:
+- Default: do not print every FFmpeg log line.
+- Debug mode only: capture logs into a ring buffer, optionally print a minimal subset.
+This prevents console I/O from becoming the bottleneck.
 
-Before extraction, probe the video to determine if copy is possible:
+### 3) Replace “probe by failing ffmpeg -i” with ffprobe or “try copy first”
+Current probe:
+- `ffmpeg.exec(['-i', input])` (expected to fail) and parse logs.
 
-```
-ffmpeg -i input.mp4  (parse output for audio codec info)
-```
+Improve to one of:
+- Preferred: **try copy extraction first** (fast path) and if it fails, fall back to re-encode.
+  - This avoids a whole extra run for the common AAC case.
+- Or: use `ffmpeg.ffprobe(...)` with `-show_entries stream=codec_name,codec_type` output to a file, then read + parse. This is more deterministic and produces less noisy output than parsing logs.
 
-If audio is AAC → use copy codec (instant)
-If audio is something else → fall back to re-encode
+### 4) Make re-encode faster by switching default fallback to AAC-in-M4A (optional but likely worthwhile)
+If copy mode is not possible:
+- Instead of MP3 (`libmp3lame`), try:
+  - `-c:a aac -b:a 64k -ar 16000 -ac 1 output.m4a`
+Rationale:
+- AAC encoding is often faster than LAME MP3 in constrained environments.
+- Whisper accepts M4A.
+Fallback if AAC encoder is unavailable:
+- Keep the current MP3 fallback.
 
-### 3. Optimize Re-encoding Settings (When Needed)
+### 5) Improve the command for copy mode reliability
+When copying:
+- Add explicit stream selection to avoid edge cases:
+  - `-map 0:a:0 -vn -c:a copy`
+Optionally add:
+- `-sn -dn` to ignore subtitle/data streams that sometimes complicate mapping.
 
-If re-encoding is necessary, use faster settings:
+## Concrete file-level implementation plan
+### File 1: `src/lib/audio-extractor.ts`
+1) Add a `Diagnostics` capability:
+   - `enableDiagnostics?: boolean`
+   - `onDiagnostics?: (report) => void`
+   - ring buffer for FFmpeg logs (last 200 lines)
+2) Stop globally logging FFmpeg output by default.
+3) Implement `WORKERFS` mount-based input handling:
+   - mount `/work` with the actual `File`
+   - use mounted path as input
+   - ensure `unmount` in `finally`
+4) Change extraction flow:
+   - Attempt copy mode first (to `.m4a`), measure, if non-zero exit or error → fallback
+   - Fallback to re-encode (prefer AAC → fallback MP3)
+5) Ensure timings measure:
+   - mount time (new)
+   - copy attempt time (new)
+   - fallback time (new)
+6) Return richer result:
+   - include `diagnosticsReport` optionally
+   - include `selectedOutputMimeType` and extension reliably
 
-| Setting | Current | Optimized | Impact |
-|---------|---------|-----------|--------|
-| Quality | `-q:a 2` (VBR ~190kbps) | `-b:a 64k` (CBR 64kbps) | 3x faster, fine for speech |
-| Sample rate | 44100 Hz | 16000 Hz | 2x faster, ideal for Whisper |
-| Channels | Mono (good) | Mono | Keep as-is |
+### File 2: `src/hooks/useVideoUpload.ts`
+1) Store extraction debug info per video (in-memory only):
+   - last timings
+   - mode used
+   - output type
+2) If extraction exceeds a threshold (e.g., 30s), set a “slow extraction” flag that enables diagnostics collection.
+3) Ensure contentType handling is robust for `.m4a`.
 
-Optimized command for speech:
-```
-ffmpeg -i input.mp4 -vn -acodec libmp3lame -b:a 64k -ar 16000 -ac 1 output.mp3
-```
+### File 3: `src/components/ad-copy-studio/steps/VideoUploadStep.tsx`
+1) Add a “Details” UI affordance for each video row:
+   - When status is `extracting`, show stage + elapsed time
+   - When status is `ready` after extraction, show “Extracted as M4A (copy)” or “Converted to M4A (re-encode)”
+   - When slow/error, show a “Copy diagnostic report” button
+2) Make sure progress UI doesn’t look “stuck” in copy mode:
+   - Copy operations may complete without many progress events; we’ll show stage-based activity (spinner + elapsed time) even if percent doesn’t move.
 
-### 4. Enable Multi-Threading (Requires Server Config)
+## How we’ll validate (deep investigation checklist)
+1) Run extraction on a known AAC-in-MP4 file:
+   - Expect: mount time small, copy attempt succeeds, total time drops substantially.
+2) Confirm which stage was slow before vs after:
+   - Expect the biggest reduction in the “writeInput/mount” phase.
+3) Test on at least two browsers (Chrome + Safari if possible):
+   - Ensure mount works; if not, diagnostics report should clearly explain and we’ll gracefully fall back to current approach.
+4) Confirm output uploads + downstream transcription still work with `.m4a`.
+5) Confirm memory doesn’t balloon across multiple extractions (unmount cleanup).
 
-FFmpeg.wasm can use multi-threading with SharedArrayBuffer, but requires specific HTTP headers:
+## Risks / fallbacks
+- `WORKERFS` can be finicky depending on environment; if mount fails:
+  - fall back to the existing `fetchFile + writeFile` path automatically
+  - include the mount failure in diagnostics
+- AAC encoder availability:
+  - If `-c:a aac` fails, automatically fallback to MP3 re-encode.
 
-```
-Cross-Origin-Opener-Policy: same-origin
-Cross-Origin-Embedder-Policy: require-corp
-```
-
-This provides **3-5x speedup** but requires Lovable platform support.
-
-### 5. Add Progress Visibility & Timing
-
-Add detailed timing logs to understand where time is spent:
-- WASM loading time
-- File writing time
-- Extraction/encoding time
-- File reading time
-
-## Implementation Plan
-
-### Step 1: Add Codec Detection & Copy Mode
-
-Update `src/lib/audio-extractor.ts`:
-
-1. Add a `probeVideo()` function to detect audio codec
-2. If audio is AAC/MP3 → use `-acodec copy` for instant extraction
-3. Output as `.m4a` (for AAC) or `.mp3` (for MP3 source)
-4. Fall back to re-encode only when necessary
-
-### Step 2: Optimize Re-encoding Settings for Speech
-
-When re-encoding is needed:
-- Lower bitrate: 64kbps (sufficient for speech transcription)
-- Lower sample rate: 16kHz (Whisper's native rate)
-- Use CBR instead of VBR (faster encoding)
-
-### Step 3: Add Performance Timing
-
-Add detailed timing to identify bottlenecks:
-```typescript
-console.time('[FFmpeg] WASM Load');
-console.time('[FFmpeg] Write Input');
-console.time('[FFmpeg] Extract');
-console.time('[FFmpeg] Read Output');
-```
-
-### Step 4: Preload FFmpeg WASM
-
-Add option to preload FFmpeg during idle time so it's ready when needed:
-- Trigger preload when user navigates to Ad Copy Studio
-- Cache the loaded instance
-
-### Step 5: Update Storage & Database
-
-- Support both `.mp3` and `.m4a` audio files
-- Update content type detection
-
-## Expected Performance Improvements
-
-| Scenario | Current Time | After Optimization |
-|----------|--------------|-------------------|
-| AAC audio in MP4 (copy mode) | 30-60 seconds | 2-5 seconds |
-| Non-AAC audio (optimized re-encode) | 30-60 seconds | 10-20 seconds |
-| WASM preloaded | N/A | Saves 5-15 seconds |
-
-## File Changes Summary
-
-| File | Change |
-|------|--------|
-| `src/lib/audio-extractor.ts` | Add codec detection, copy mode, optimized encoding settings, timing logs |
-| `src/hooks/useVideoUpload.ts` | Handle .m4a output, trigger FFmpeg preload |
-| `src/components/ad-copy-studio/steps/VideoUploadStep.tsx` | Add preload trigger on component mount |
-
-## Technical Details
-
-### Codec Detection Approach
-
-FFmpeg outputs codec info to stderr when probing. We'll parse this:
-```
-Stream #0:1: Audio: aac (LC), 48000 Hz, stereo
-```
-
-### Whisper Compatibility
-
-OpenAI Whisper supports: mp3, mp4, mpeg, mpga, m4a, wav, webm
-
-Both MP3 and M4A are fully supported, so using copy mode with M4A output is safe.
-
-### Browser Compatibility
-
-Copy codec mode works in all browsers since it doesn't require heavy CPU processing. The optimization benefits all users regardless of device speed.
+## Expected outcome
+After these changes:
+- Standard MP4s with AAC audio should be fast because:
+  - no full-file copy into MEMFS (WORKERFS)
+  - copy-first extraction path
+  - reduced console overhead
+- When extraction is slow, you will get a clear report showing exactly where time is spent (mount/copy/encode) and why (copy failed, no SAB, etc.).
