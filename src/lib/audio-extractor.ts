@@ -14,7 +14,6 @@
  */
 
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { toBlobURL } from '@ffmpeg/util';
 
 // =============================================================================
 // Types
@@ -91,8 +90,17 @@ export interface AudioExtractorOptions {
 // 3 minute timeout for extraction (reasonable for most files)
 const DEFAULT_EXTRACTION_TIMEOUT_MS = 3 * 60 * 1000;
 
+// 30 second timeout for FFmpeg loading
+const FFMPEG_LOAD_TIMEOUT_MS = 30 * 1000;
+
 // 10MB chunks for reading files
 const FILE_CHUNK_SIZE = 10 * 1024 * 1024;
+
+// CDN sources for FFmpeg core files (fallback order)
+const CDN_SOURCES = [
+  'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm',
+  'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm',
+];
 
 // =============================================================================
 // Singleton FFmpeg Instance
@@ -123,6 +131,107 @@ function getLogBuffer(): string[] {
 }
 
 /**
+ * Fetch a file with progress tracking
+ */
+async function fetchWithProgress(
+  url: string,
+  onProgress: (loaded: number, total: number) => void,
+  signal?: AbortSignal
+): Promise<Blob> {
+  const response = await fetch(url, { signal });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  
+  const contentLength = response.headers.get('content-length');
+  const total = contentLength ? parseInt(contentLength, 10) : 0;
+  
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('No response body');
+  
+  const chunks: BlobPart[] = [];
+  let loaded = 0;
+  
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value.slice().buffer);
+    loaded += value.length;
+    onProgress(loaded, total);
+  }
+  
+  return new Blob(chunks);
+}
+
+/**
+ * Create a blob URL from fetched content with progress
+ */
+async function fetchToBlobURL(
+  url: string,
+  mimeType: string,
+  onProgress: (loaded: number, total: number) => void,
+  signal?: AbortSignal
+): Promise<string> {
+  const blob = await fetchWithProgress(url, onProgress, signal);
+  const typedBlob = new Blob([blob], { type: mimeType });
+  return URL.createObjectURL(typedBlob);
+}
+
+/**
+ * Try to load FFmpeg from a CDN with progress tracking
+ */
+async function loadFFmpegFromCDN(
+  ffmpeg: FFmpeg,
+  baseURL: string,
+  onProgress: (progress: AudioExtractionProgress) => void,
+  signal: AbortSignal
+): Promise<void> {
+  let coreLoaded = 0;
+  let coreTotal = 0;
+  let wasmLoaded = 0;
+  let wasmTotal = 0;
+
+  const updateProgress = () => {
+    const totalSize = coreTotal + wasmTotal;
+    const loadedSize = coreLoaded + wasmLoaded;
+    if (totalSize > 0) {
+      const percent = Math.round((loadedSize / totalSize) * 100);
+      const loadedMB = (loadedSize / 1024 / 1024).toFixed(1);
+      const totalMB = (totalSize / 1024 / 1024).toFixed(1);
+      onProgress({
+        stage: 'loading',
+        percent,
+        message: `Downloading audio processor (${loadedMB}MB / ${totalMB}MB)...`,
+      });
+    }
+  };
+
+  // Fetch both files with progress tracking
+  const [coreURL, wasmURL] = await Promise.all([
+    fetchToBlobURL(
+      `${baseURL}/ffmpeg-core.js`,
+      'text/javascript',
+      (loaded, total) => {
+        coreLoaded = loaded;
+        coreTotal = total || 1024 * 100; // Estimate ~100KB for JS
+        updateProgress();
+      },
+      signal
+    ),
+    fetchToBlobURL(
+      `${baseURL}/ffmpeg-core.wasm`,
+      'application/wasm',
+      (loaded, total) => {
+        wasmLoaded = loaded;
+        wasmTotal = total || 1024 * 1024 * 30; // Estimate ~30MB for WASM
+        updateProgress();
+      },
+      signal
+    ),
+  ]);
+
+  await ffmpeg.load({ coreURL, wasmURL });
+}
+
+/**
  * Get or initialize the FFmpeg instance (singleton pattern)
  */
 async function getFFmpeg(onProgress?: (progress: AudioExtractionProgress) => void): Promise<FFmpeg> {
@@ -138,10 +247,11 @@ async function getFFmpeg(onProgress?: (progress: AudioExtractionProgress) => voi
     console.log('[AudioExtractor] Loading FFmpeg.wasm...');
     const loadStart = performance.now();
     
-    onProgress?.({
+    const progressCallback = onProgress ?? (() => {});
+    progressCallback({
       stage: 'loading',
       percent: 0,
-      message: 'Loading audio processor...',
+      message: 'Starting audio processor download...',
     });
 
     const ffmpeg = new FFmpeg();
@@ -151,30 +261,54 @@ async function getFFmpeg(onProgress?: (progress: AudioExtractionProgress) => voi
       addToLogBuffer(message);
     });
 
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+    // Create abort controller for timeout
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      abortController.abort();
+    }, FFMPEG_LOAD_TIMEOUT_MS);
 
-    try {
-      await ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-      });
+    let lastError: Error | null = null;
 
-      const loadTime = performance.now() - loadStart;
-      console.log(`[AudioExtractor] FFmpeg.wasm loaded in ${loadTime.toFixed(0)}ms`);
+    // Try each CDN source
+    for (let i = 0; i < CDN_SOURCES.length; i++) {
+      const baseURL = CDN_SOURCES[i];
+      console.log(`[AudioExtractor] Trying CDN ${i + 1}/${CDN_SOURCES.length}: ${baseURL}`);
       
-      onProgress?.({
-        stage: 'loading',
-        percent: 100,
-        message: 'Audio processor ready',
-      });
+      try {
+        await loadFFmpegFromCDN(ffmpeg, baseURL, progressCallback, abortController.signal);
+        
+        clearTimeout(timeoutId);
+        const loadTime = performance.now() - loadStart;
+        console.log(`[AudioExtractor] FFmpeg.wasm loaded in ${loadTime.toFixed(0)}ms from ${baseURL}`);
+        
+        progressCallback({
+          stage: 'loading',
+          percent: 100,
+          message: 'Audio processor ready',
+        });
 
-      ffmpegInstance = ffmpeg;
-      return ffmpeg;
-    } catch (error) {
-      console.error('[AudioExtractor] Failed to load FFmpeg.wasm:', error);
-      ffmpegLoadPromise = null;
-      throw new Error('Failed to load audio processor. Please try again or use a smaller file.');
+        ffmpegInstance = ffmpeg;
+        return ffmpeg;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        
+        if (abortController.signal.aborted) {
+          console.error('[AudioExtractor] FFmpeg load timed out');
+          clearTimeout(timeoutId);
+          ffmpegLoadPromise = null;
+          throw new Error('FFMPEG_LOAD_TIMEOUT');
+        }
+        
+        console.warn(`[AudioExtractor] CDN ${i + 1} failed:`, error);
+        // Continue to next CDN
+      }
     }
+
+    // All CDNs failed
+    clearTimeout(timeoutId);
+    ffmpegLoadPromise = null;
+    console.error('[AudioExtractor] All CDNs failed to load FFmpeg.wasm');
+    throw new Error(`Failed to load audio processor: ${lastError?.message || 'Unknown error'}`);
   })();
 
   return ffmpegLoadPromise;
