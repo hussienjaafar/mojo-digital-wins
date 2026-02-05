@@ -32,7 +32,7 @@ import {
   HardDrive,
 } from 'lucide-react';
 import type { VideoUpload } from '@/types/ad-copy-studio';
-import { preloadFFmpeg, isFFmpegSupported } from '@/lib/audio-extractor';
+import { preloadFFmpeg, isFFmpegSupported, formatDiagnosticsReport } from '@/lib/audio-extractor';
 
 // =============================================================================
 // Types
@@ -70,6 +70,48 @@ function formatFileSize(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+/**
+ * Get human-readable label for extraction stage
+ */
+function getExtractionStageLabel(stage?: string): string {
+  switch (stage) {
+    case 'loading':
+      return 'Loading audio processor...';
+    case 'mounting':
+      return 'Preparing file...';
+    case 'copy-attempt':
+      return 'Trying fast stream copy...';
+    case 'reencode':
+      return 'Converting audio...';
+    case 'finalizing':
+      return 'Finalizing...';
+    default:
+      return 'Extracting audio...';
+  }
+}
+
+/**
+ * Timer component that shows elapsed time
+ */
+function ExtractionTimer({ startTime }: { startTime: number }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  const minutes = Math.floor(elapsed / 60);
+  const seconds = elapsed % 60;
+  const display = minutes > 0 
+    ? `${minutes}:${String(seconds).padStart(2, '0')}`
+    : `${seconds}s`;
+
+  return <span className="tabular-nums">{display}</span>;
 }
 
 /**
@@ -495,10 +537,43 @@ export function VideoUploadStep({
                              indicatorClassName={video.status === 'extracting' ? 'bg-[#f59e0b]' : 'bg-blue-500'}
                           />
                            {video.status === 'extracting' && (
-                             <p className="mt-1 text-xs text-[#94a3b8]">
-                               Extracting audio locally for faster transcription...
-                             </p>
+                             <div className="mt-1 flex items-center justify-between text-xs text-[#94a3b8]">
+                               <span>
+                                 {getExtractionStageLabel(video.extractionStage)}
+                               </span>
+                               {video.extractionStartTime && (
+                                 <ExtractionTimer startTime={video.extractionStartTime} />
+                               )}
+                             </div>
                            )}
+                        </div>
+                      )}
+
+                      {/* Extraction mode badge (after ready) */}
+                      {video.status === 'ready' && video.extractionMode && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className={cn(
+                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs',
+                            video.extractionMode === 'copy' 
+                              ? 'bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/30'
+                              : 'bg-[#f59e0b]/10 text-[#f59e0b] border border-[#f59e0b]/30'
+                          )}>
+                            {video.extractionMode === 'copy' ? '⚡ Stream copy' : '🔄 Re-encoded'}
+                          </span>
+                          {video.extractionDiagnostics && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const report = formatDiagnosticsReport(video.extractionDiagnostics);
+                                navigator.clipboard.writeText(report);
+                                // Could add toast here
+                                console.log('Diagnostics copied to clipboard');
+                              }}
+                              className="text-xs text-blue-400 hover:text-blue-300 hover:underline"
+                            >
+                              Copy diagnostics
+                            </button>
+                          )}
                         </div>
                       )}
 

@@ -11,7 +11,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { extractAudio, shouldExtractAudio, isFFmpegSupported } from '@/lib/audio-extractor';
+import { extractAudio, shouldExtractAudio, isFFmpegSupported, formatDiagnosticsReport, type DiagnosticsReport, type ExtractionStage } from '@/lib/audio-extractor';
 import type {
   VideoUpload,
   ImportGDriveResponse,
@@ -211,17 +211,44 @@ export function useVideoUpload(
          // Extract audio for large files
          if (needsAudioExtraction) {
            console.log(`[useVideoUpload] Large file detected (${(file.size / 1024 / 1024).toFixed(1)}MB), extracting audio...`);
-           updateVideo(video.id, { status: 'extracting', progress: 0 });
+           const extractionStartTime = Date.now();
+           updateVideo(video.id, { 
+             status: 'extracting', 
+             progress: 0,
+             extractionStage: 'loading',
+             extractionStartTime,
+           });
+           
+           // Enable diagnostics for slow extractions (> 30s threshold checked after)
+           const enableDiagnostics = true; // Always collect, conditionally show
            
             try {
-              const { audioFile, originalFilename, extractionMode, timings } = await extractAudio(file, {
+              const { audioFile, originalFilename, extractionMode, timings, diagnostics } = await extractAudio(file, {
+                enableDiagnostics,
                 onProgress: (progress) => {
                   // Map extraction progress to 0-40% of total progress
                   const mappedProgress = Math.round(progress.percent * 0.4);
-                  updateVideo(video.id, { progress: mappedProgress });
+                  updateVideo(video.id, { 
+                    progress: mappedProgress,
+                    extractionStage: progress.stage,
+                    extractionElapsedMs: progress.elapsedMs,
+                  });
                 },
               });
-              console.log(`[useVideoUpload] Extraction complete in ${(timings.totalMs / 1000).toFixed(1)}s (${extractionMode} mode)`);
+              
+              const extractionDurationSec = timings.totalMs / 1000;
+              console.log(`[useVideoUpload] Extraction complete in ${extractionDurationSec.toFixed(1)}s (${extractionMode} mode)`);
+              
+              // Store diagnostics if extraction was slow (> 20s)
+              const wasSlowExtraction = extractionDurationSec > 20;
+              if (wasSlowExtraction && diagnostics) {
+                console.log('[useVideoUpload] Slow extraction detected, diagnostics available');
+                // Store diagnostics for UI to access
+                updateVideo(video.id, {
+                  extractionDiagnostics: diagnostics,
+                  extractionMode,
+                });
+              }
              
               fileToUpload = audioFile;
               storageBucket = AUDIO_BUCKET;
@@ -231,7 +258,12 @@ export function useVideoUpload(
               contentType = audioFile.type || 'audio/mpeg';
               
               console.log(`[useVideoUpload] Audio extracted: ${audioFile.name} (${(audioFile.size / 1024 / 1024).toFixed(2)}MB), mode: ${extractionMode}`);
-              updateVideo(video.id, { status: 'uploading', progress: 40 });
+              updateVideo(video.id, { 
+                status: 'uploading', 
+                progress: 40,
+                extractionStage: undefined,
+                extractionElapsedMs: undefined,
+              });
            } catch (extractError: any) {
              console.error('[useVideoUpload] Audio extraction failed:', extractError);
              // Fall back to uploading the original file
@@ -240,6 +272,10 @@ export function useVideoUpload(
              storageBucket = STORAGE_BUCKET;
              storagePath = `${organizationId}/${batchId}/${videoId}_${sanitizedFilename}`;
              contentType = file.type;
+             updateVideo(video.id, { 
+               extractionStage: undefined,
+               extractionElapsedMs: undefined,
+             });
            }
          }
 

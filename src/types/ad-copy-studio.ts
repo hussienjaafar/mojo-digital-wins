@@ -39,7 +39,7 @@ export interface VideoUpload {
   source: 'uploaded' | 'gdrive';
   filename: string;
   file_size_bytes: number;
-   status: 'pending' | 'uploading' | 'extracting' | 'transcribing' | 'analyzing' | 'ready' | 'error';
+  status: 'pending' | 'uploading' | 'extracting' | 'transcribing' | 'analyzing' | 'ready' | 'error';
   progress: number;
   error_message?: string;
   video_id?: string;
@@ -50,6 +50,12 @@ export interface VideoUpload {
   codec?: string;
   meets_meta_specs?: boolean;
   meta_spec_issues?: SpecIssue[];
+  // Audio extraction diagnostics
+  extractionStage?: 'loading' | 'mounting' | 'copy-attempt' | 'reencode' | 'finalizing';
+  extractionStartTime?: number;
+  extractionElapsedMs?: number;
+  extractionMode?: 'copy' | 'reencode';
+  extractionDiagnostics?: any; // DiagnosticsReport from audio-extractor
 }
 
 export interface SpecIssue {
