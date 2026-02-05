@@ -114,6 +114,7 @@ export default function AdminAdCopyStudio() {
       try {
         // Fetch distinct ActBlue form names from transactions for this organization
         // Using actblue_transactions_secure view (the canonical source)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- View not in generated types
         const { data, error } = await (supabase as any)
           .from('actblue_transactions_secure')
           .select('contribution_form')

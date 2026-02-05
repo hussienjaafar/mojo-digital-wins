@@ -198,9 +198,9 @@ export function useAdCopyGeneration(
         title: 'Copy generated successfully',
         description: `Generated ${totalVariations} ad variations`,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[useAdCopyGeneration] Generation error:', err);
-      const message = err?.message || 'Failed to generate ad copy';
+      const message = err instanceof Error ? err.message : 'Failed to generate ad copy';
       setError(message);
       toast({
         title: 'Generation failed',
