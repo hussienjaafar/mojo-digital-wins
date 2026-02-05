@@ -210,9 +210,47 @@ function isVideoFile(mimeType: string | null, filename: string): boolean {
 // ============================================================================
 
 /**
+ * Standard headers for Google Drive requests
+ */
+const GDRIVE_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': '*/*',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
+
+/**
+ * Try to download file using a specific URL
+ * Returns null if the response is HTML (not the actual file)
+ */
+async function tryDownload(url: string): Promise<Response | null> {
+  try {
+    const response = await fetch(url, {
+      headers: GDRIVE_HEADERS,
+      redirect: 'follow',
+    });
+
+    if (!response.ok) {
+      console.log(`[gdrive] URL returned ${response.status}: ${url.substring(0, 80)}...`);
+      return null;
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      // Got HTML instead of file - not successful
+      return null;
+    }
+
+    return response;
+  } catch (error) {
+    console.log(`[gdrive] Fetch failed for URL: ${error instanceof Error ? error.message : 'Unknown'}`);
+    return null;
+  }
+}
+
+/**
  * Download a file from Google Drive using public share link
  * Works without requiring a Google API key for publicly shared files.
- * Handles the virus scan confirmation for files >100MB.
+ * Uses multiple download strategies for reliability.
  *
  * @param fileId - Google Drive file ID
  * @returns The downloaded file as a Blob with filename
@@ -224,37 +262,51 @@ function isVideoFile(mimeType: string | null, filename: string): boolean {
  * // filename is 'campaign_video.mp4'
  */
 export async function downloadFromGDrive(fileId: string): Promise<GDriveDownloadResult> {
-  // Download URL - use direct download endpoint (works for public files without API key)
-  const downloadUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
-
   console.log(`[gdrive] Attempting download for file ID: ${fileId}`);
 
-  let response: Response;
-  try {
-    response = await fetch(downloadUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
-      redirect: 'follow',
-    });
-  } catch (error) {
-    throw new GDriveError(
-      'NETWORK_ERROR',
-      `Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      'Please check your internet connection and try again'
-    );
+  // Strategy 1: Try direct download with confirm=t (works for many files)
+  const directUrls = [
+    `https://drive.google.com/uc?id=${fileId}&export=download&confirm=t`,
+    `https://drive.google.com/uc?id=${fileId}&export=download&confirm=yes`,
+    `https://drive.google.com/uc?id=${fileId}&export=download`,
+  ];
+
+  let response: Response | null = null;
+
+  for (const url of directUrls) {
+    console.log(`[gdrive] Trying: ${url.substring(0, 70)}...`);
+    response = await tryDownload(url);
+    if (response) {
+      console.log(`[gdrive] Direct download succeeded`);
+      break;
+    }
   }
 
-  // For files >100MB, Google shows a virus scan warning page
-  // We need to extract the confirmation token and retry
-  const contentType = response.headers.get('content-type') || '';
+  // Strategy 2: If direct download failed, fetch the warning page and extract token
+  if (!response) {
+    console.log(`[gdrive] Direct downloads failed, trying to extract confirmation token`);
 
-  if (contentType.includes('text/html')) {
-    // This is the virus scan warning page
-    const html = await response.text();
+    const warningUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
+    let warningResponse: Response;
+
+    try {
+      warningResponse = await fetch(warningUrl, {
+        headers: GDRIVE_HEADERS,
+        redirect: 'follow',
+      });
+    } catch (error) {
+      throw new GDriveError(
+        'NETWORK_ERROR',
+        `Failed to connect to Google Drive: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'Please check your internet connection and try again'
+      );
+    }
+
+    const html = await warningResponse.text();
 
     // Check for access denied
-    if (html.includes('Access Denied') || html.includes('No permission') || html.includes('Sign in')) {
+    if (html.includes('Access Denied') || html.includes('No permission') ||
+        html.includes('Sign in') || html.includes('Request access')) {
       throw new GDriveError(
         'ACCESS_DENIED',
         'Access denied when downloading file',
@@ -262,80 +314,80 @@ export async function downloadFromGDrive(fileId: string): Promise<GDriveDownload
       );
     }
 
-    // Extract the confirmation token from the download warning page
-    // Google uses different patterns, try multiple
-    const confirmMatch = html.match(/confirm=([a-zA-Z0-9_-]+)/) ||
-                         html.match(/confirm=([^&"]+)/) ||
-                         html.match(/"confirm":"([^"]+)"/);
+    // Try multiple patterns to extract download link or confirmation
+    const patterns = [
+      // Direct download link in href
+      /href="(\/uc\?export=download[^"]+)"/,
+      /href='(\/uc\?export=download[^']+)'/,
+      // Download URL with confirm parameter
+      /"downloadUrl":"([^"]+)"/,
+      // Confirm token patterns
+      /confirm=([a-zA-Z0-9_-]{4,})&/,
+      /confirm=([a-zA-Z0-9_-]{4,})"/,
+      /name="confirm" value="([^"]+)"/,
+      /"confirm":"([^"]+)"/,
+      /\?confirm=([^&"']+)/,
+    ];
+
+    let downloadLink: string | null = null;
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match) {
+        const captured = match[1];
+
+        if (captured.startsWith('/uc') || captured.startsWith('http')) {
+          // It's a full or partial URL
+          downloadLink = captured.startsWith('http')
+            ? captured
+            : `https://drive.google.com${captured}`;
+        } else {
+          // It's a confirmation token
+          downloadLink = `https://drive.google.com/uc?id=${fileId}&export=download&confirm=${captured}`;
+        }
+
+        console.log(`[gdrive] Found download link/token with pattern: ${pattern.source.substring(0, 30)}...`);
+        break;
+      }
+    }
+
+    // Also try to find uuid for some versions
     const uuidMatch = html.match(/uuid=([a-zA-Z0-9_-]+)/);
 
-    if (confirmMatch) {
-      // Retry with confirmation token
-      const confirmToken = confirmMatch[1];
-      const uuid = uuidMatch ? uuidMatch[1] : '';
-
-      console.log(`[gdrive] Large file detected, retrying with confirmation token`);
-
-      const confirmedUrl = `https://drive.google.com/uc?id=${fileId}&export=download&confirm=${confirmToken}${uuid ? `&uuid=${uuid}` : ''}`;
-
-      let retryResponse: Response;
-      try {
-        retryResponse = await fetch(confirmedUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          },
-          redirect: 'follow',
-        });
-      } catch (error) {
-        throw new GDriveError(
-          'NETWORK_ERROR',
-          `Failed to download file after confirmation: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          'Please try again later'
-        );
+    if (downloadLink) {
+      if (uuidMatch && !downloadLink.includes('uuid=')) {
+        downloadLink += `&uuid=${uuidMatch[1]}`;
       }
 
-      if (!retryResponse.ok) {
-        throw new GDriveError(
-          mapStatusToErrorCode(retryResponse.status),
-          `Failed to download file: HTTP ${retryResponse.status}`,
-          'Please try again later'
-        );
-      }
+      // Unescape HTML entities
+      downloadLink = downloadLink.replace(/&amp;/g, '&');
 
-      // Check if we still got HTML (virus scan timeout or other issue)
-      const retryContentType = retryResponse.headers.get('content-type') || '';
-      if (retryContentType.includes('text/html')) {
-        throw new GDriveError(
-          'VIRUS_SCAN_TIMEOUT',
-          'Google Drive virus scan is taking too long',
-          'Please try again in a few minutes, or download the file manually and upload directly'
-        );
-      }
+      console.log(`[gdrive] Trying extracted link: ${downloadLink.substring(0, 80)}...`);
+      response = await tryDownload(downloadLink);
+    }
 
-      response = retryResponse;
-    } else {
-      // No confirmation token found - might be a different error
-      if (html.includes('too large') || html.includes('virus scan')) {
-        throw new GDriveError(
-          'VIRUS_SCAN_TIMEOUT',
-          'Could not bypass Google Drive virus scan',
-          'Please download the file manually and upload directly'
-        );
-      }
+    // Strategy 3: Try with a generic confirm token
+    if (!response) {
+      const genericUrls = [
+        `https://drive.google.com/uc?id=${fileId}&export=download&confirm=t&uuid=${uuidMatch?.[1] || ''}`,
+        `https://drive.google.com/uc?id=${fileId}&export=download&confirm=download`,
+        `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`,
+      ];
 
-      throw new GDriveError(
-        'FILE_NOT_FOUND',
-        'File not found or not accessible',
-        'Please verify the file exists and is shared with "Anyone with the link" permission'
-      );
+      for (const url of genericUrls) {
+        console.log(`[gdrive] Trying fallback: ${url.substring(0, 70)}...`);
+        response = await tryDownload(url);
+        if (response) break;
+      }
     }
   }
 
-  if (!response.ok) {
+  // If still no response, we couldn't download the file
+  if (!response) {
     throw new GDriveError(
-      mapStatusToErrorCode(response.status),
-      `Failed to download file: HTTP ${response.status}`,
-      'Please try again later'
+      'VIRUS_SCAN_TIMEOUT',
+      'Could not download file from Google Drive',
+      'The file may be too large for automatic download. Please download it manually and upload directly, or try a smaller file.'
     );
   }
 
@@ -372,6 +424,15 @@ export async function downloadFromGDrive(fileId: string): Promise<GDriveDownload
       'FILE_TOO_LARGE',
       `File size (${sizeMB}MB) exceeds maximum allowed (${maxMB}MB)`,
       'Please upload a smaller video file or compress the video'
+    );
+  }
+
+  // Final sanity check - blob shouldn't be tiny (likely an error page)
+  if (blob.size < 1000) {
+    throw new GDriveError(
+      'NETWORK_ERROR',
+      'Downloaded file is too small - likely an error occurred',
+      'Please verify the file exists and try again'
     );
   }
 
