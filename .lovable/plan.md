@@ -1,36 +1,53 @@
 
 
-## Fix: Add Missing RLS Policies for `meta_ad_videos` Table
+## Fix: RLS Policies for Admin-Only Video Management
 
 ### Problem
 
-The `meta_ad_videos` table is missing INSERT, UPDATE, and DELETE policies for authenticated users. Currently it only has:
+The new RLS policies for `meta_ad_videos` query `organization_memberships` to check access, but admin users:
+- Access organizations via the org selector (not membership)
+- Have no records in `organization_memberships` for the orgs they select
+- Only have a record in `user_roles` with role = 'admin'
 
-| Policy | Command | What it does |
-|--------|---------|--------------|
-| Users can view their org videos | SELECT | Allows viewing videos for active org members |
-| Service role full access | ALL | Allows backend/edge functions to manage videos |
+This causes the INSERT to fail with a 403 error.
 
-When a user tries to upload a video, the INSERT fails with a 403 error because there's no policy allowing authenticated users to insert records.
+### Current State
+
+| Table | User Record |
+|-------|-------------|
+| `user_roles` | `6037a48d...` has role `admin` |
+| `organization_memberships` | No record for this user in org `346d6aaf...` |
+
+The current policies check:
+```sql
+organization_id IN (
+  SELECT organization_id FROM organization_memberships 
+  WHERE user_id = auth.uid() AND status = 'active'
+)
+```
+
+This returns an empty set for admin users, blocking all operations.
 
 ### Solution
 
-Add three new RLS policies that allow authenticated users with active organization membership to:
-
-1. **INSERT** - Create new video records for their organization
-2. **UPDATE** - Modify video records for their organization  
-3. **DELETE** - Remove video records for their organization
+Update the three new RLS policies to also allow access when the user has the `admin` role. This uses the existing `has_role()` security definer function.
 
 ### Database Migration
 
 ```sql
--- Policy 1: Allow users to insert videos for their organizations
+-- Drop the existing policies that don't account for admin access
+DROP POLICY IF EXISTS "Users can insert videos for their org" ON public.meta_ad_videos;
+DROP POLICY IF EXISTS "Users can update videos for their org" ON public.meta_ad_videos;
+DROP POLICY IF EXISTS "Users can delete videos for their org" ON public.meta_ad_videos;
+
+-- Recreate with admin access included
 CREATE POLICY "Users can insert videos for their org"
   ON public.meta_ad_videos
   FOR INSERT
   TO authenticated
   WITH CHECK (
-    organization_id IN (
+    has_role(auth.uid(), 'admin') 
+    OR organization_id IN (
       SELECT organization_id 
       FROM organization_memberships 
       WHERE user_id = auth.uid() 
@@ -38,13 +55,13 @@ CREATE POLICY "Users can insert videos for their org"
     )
   );
 
--- Policy 2: Allow users to update videos for their organizations
 CREATE POLICY "Users can update videos for their org"
   ON public.meta_ad_videos
   FOR UPDATE
   TO authenticated
   USING (
-    organization_id IN (
+    has_role(auth.uid(), 'admin') 
+    OR organization_id IN (
       SELECT organization_id 
       FROM organization_memberships 
       WHERE user_id = auth.uid() 
@@ -52,7 +69,8 @@ CREATE POLICY "Users can update videos for their org"
     )
   )
   WITH CHECK (
-    organization_id IN (
+    has_role(auth.uid(), 'admin') 
+    OR organization_id IN (
       SELECT organization_id 
       FROM organization_memberships 
       WHERE user_id = auth.uid() 
@@ -60,13 +78,13 @@ CREATE POLICY "Users can update videos for their org"
     )
   );
 
--- Policy 3: Allow users to delete videos for their organizations
 CREATE POLICY "Users can delete videos for their org"
   ON public.meta_ad_videos
   FOR DELETE
   TO authenticated
   USING (
-    organization_id IN (
+    has_role(auth.uid(), 'admin') 
+    OR organization_id IN (
       SELECT organization_id 
       FROM organization_memberships 
       WHERE user_id = auth.uid() 
@@ -75,11 +93,13 @@ CREATE POLICY "Users can delete videos for their org"
   );
 ```
 
-### How the policies work
+### How the Updated Policies Work
 
-- **INSERT (WITH CHECK)**: Verifies the user has an active membership in the organization they're trying to create a video for
-- **UPDATE (USING + WITH CHECK)**: Verifies the user can only modify videos in their organization and can't move them to another org
-- **DELETE (USING)**: Verifies the user can only delete videos from their own organization
+| User Type | Access Logic |
+|-----------|--------------|
+| **Admin** | `has_role(auth.uid(), 'admin')` returns TRUE - full access to any org |
+| **Org Member** | Falls through to `organization_memberships` check - only their orgs |
+| **Neither** | Both conditions FALSE - access denied |
 
 ### Files to Change
 
@@ -87,9 +107,18 @@ CREATE POLICY "Users can delete videos for their org"
 
 ### Expected Result After Fix
 
-1. User uploads video file
-2. FFmpeg extracts audio (working)
-3. Audio uploads to storage (working)
-4. Database INSERT succeeds (currently failing - will be fixed)
-5. Video appears in the Ad Copy Studio
+1. Admin selects organization "A New Policy" from selector
+2. User uploads video file
+3. FFmpeg extracts audio (working)
+4. Audio uploads to storage (working)
+5. Database INSERT succeeds (the `has_role()` check passes)
+6. Video appears in the Ad Copy Studio
+
+### Security Considerations
+
+This is appropriate because:
+- The `has_role()` function is a `SECURITY DEFINER` function that safely queries `user_roles`
+- Admin users are already trusted with full system access
+- The `service_role` policy already grants similar access for backend operations
+- Organization-level access control remains intact for non-admin users
 
