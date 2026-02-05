@@ -448,7 +448,17 @@ describe('useAdCopyStudio Hook', () => {
       });
 
       // Complete step 1 with video data
-      const testVideoData = { videos: [{ id: 'video-1', filename: 'test.mp4' }] };
+     const testVideoData = { 
+       videos: [{ 
+         id: 'video-1', 
+         filename: 'test.mp4',
+         file: new File([], 'test.mp4'),
+         source: 'uploaded' as const,
+         file_size_bytes: 1024,
+         status: 'ready' as const,
+         progress: 100,
+       }] 
+     };
       await act(async () => {
         await result.current.completeStep(1, testVideoData);
       });
@@ -597,7 +607,15 @@ describe('useAdCopyStudio Hook', () => {
       });
 
       // Update step data
-      const newData = { config: { actblue_form_name: 'Test Form' } };
+     const newData = { 
+       config: { 
+         actblue_form_name: 'Test Form',
+         refcode: '',
+         refcode_auto_generated: true,
+         recurring_default: false,
+         audience_segments: [],
+       } 
+     };
       await act(async () => {
         await result.current.updateStepData(newData);
       });
@@ -628,7 +646,17 @@ describe('useAdCopyStudio Hook', () => {
       });
 
       // Update step data without session
-      const newData = { videos: [{ id: 'v1' }] };
+     const newData = { 
+       videos: [{ 
+         id: 'v1',
+         file: new File([], 'test.mp4'),
+         source: 'uploaded' as const,
+         filename: 'test.mp4',
+         file_size_bytes: 1024,
+         status: 'ready' as const,
+         progress: 100,
+       }] 
+     };
       await act(async () => {
         await result.current.updateStepData(newData);
       });

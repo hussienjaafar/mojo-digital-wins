@@ -40,7 +40,14 @@ export interface VideoFingerprint {
  * Meta Advantage+ and standard video ad requirements
  * Reference: https://www.facebook.com/business/help/103816146375741
  */
-const META_REQUIREMENTS = {
+ const META_REQUIREMENTS: {
+   supported_codecs: readonly string[];
+   min_resolution: number;
+   recommended_aspects: readonly string[];
+   max_duration_advantage_plus: number;
+   min_duration: number;
+   max_file_size_bytes: number;
+ } = {
   /** Supported video codecs */
   supported_codecs: ['h264', 'hevc', 'vp8', 'vp9'],
 
@@ -48,7 +55,7 @@ const META_REQUIREMENTS = {
   min_resolution: 1080,
 
   /** Recommended aspect ratios for different placements */
-  recommended_aspects: ['9:16', '1:1', '4:5'],
+   recommended_aspects: ['9:16', '1:1', '4:5'] as const,
 
   /** Maximum duration for Advantage+ catalog ads (seconds) */
   max_duration_advantage_plus: 30,
