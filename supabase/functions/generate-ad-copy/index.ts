@@ -105,6 +105,32 @@ const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const DEFAULT_CTA_TYPE = 'DONATE_NOW';
 
 // =============================================================================
+// Helper Functions
+// =============================================================================
+
+/**
+ * Build ActBlue tracking URL
+ */
+function buildTrackingUrl(
+  orgSlug: string,
+  actblueFormName: string,
+  refcode: string,
+  amount?: number,
+  recurring?: boolean
+): string {
+  const baseUrl = `https://molitico.com/r/${orgSlug}/${actblueFormName}`;
+  const params = new URLSearchParams();
+  params.set('refcode', refcode);
+  if (amount !== undefined) {
+    params.set('amount', amount.toString());
+  }
+  if (recurring !== undefined) {
+    params.set('recurring', recurring.toString());
+  }
+  return `${baseUrl}?${params.toString()}`;
+}
+
+// =============================================================================
 // Copywriting Framework Definitions
 // =============================================================================
 
