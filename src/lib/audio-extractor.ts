@@ -103,9 +103,10 @@ const FILE_CHUNK_SIZE = 10 * 1024 * 1024;
 // CDN sources for FFmpeg core files (fallback order)
 // IMPORTANT: Only CDNs that host BOTH ffmpeg-core.js AND ffmpeg-core.wasm
 // cdnjs does NOT host the .wasm file, so it's excluded
+// Using v0.12.10 for compatibility with @ffmpeg/ffmpeg v0.12.15
 const CDN_SOURCES = [
-  'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm',
-  'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm',
+  'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm',
+  'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm',
 ];
 
 // =============================================================================
