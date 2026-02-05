@@ -1,0 +1,488 @@
+/**
+ * AdCopyWizard - Main container component for the Ad Copy Studio wizard
+ *
+ * Orchestrates the 5-step workflow:
+ * 1. Upload - Upload campaign videos
+ * 2. Review - Review transcripts & analysis
+ * 3. Configure - Configure campaign settings
+ * 4. Generate - Generate ad copy
+ * 5. Export - Review & export copy
+ *
+ * Features:
+ * - Organization picker in header
+ * - WizardStepIndicator for progress tracking
+ * - Framer Motion transitions between steps
+ * - State persistence through useAdCopyStudio hook
+ */
+
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Loader2, RotateCcw, Sparkles } from 'lucide-react';
+
+// Hooks
+import { useAdCopyStudio } from '@/hooks/useAdCopyStudio';
+import { useVideoUpload } from '@/hooks/useVideoUpload';
+import { useAdCopyGeneration } from '@/hooks/useAdCopyGeneration';
+
+// Components
+import { WizardStepIndicator } from './WizardStepIndicator';
+import { VideoUploadStep } from './steps/VideoUploadStep';
+import { TranscriptReviewStep } from './steps/TranscriptReviewStep';
+import { CampaignConfigStep } from './steps/CampaignConfigStep';
+import { CopyGenerationStep } from './steps/CopyGenerationStep';
+import { CopyExportStep } from './steps/CopyExportStep';
+
+// Types
+import type { CampaignConfig, AudienceSegment } from '@/types/ad-copy-studio';
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface AdCopyWizardProps {
+  organizationId: string;
+  userId: string;
+  organizations: Array<{ id: string; name: string }>;
+  actblueForms: string[];
+  onOrganizationChange: (orgId: string) => void;
+}
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const DEFAULT_CAMPAIGN_CONFIG: CampaignConfig = {
+  actblue_form_name: '',
+  refcode: '',
+  refcode_auto_generated: true,
+  amount_preset: undefined,
+  recurring_default: false,
+  audience_segments: [],
+};
+
+// Animation variants for step transitions
+const stepVariants = {
+  initial: {
+    opacity: 0,
+    x: 50,
+  },
+  animate: {
+    opacity: 1,
+    x: 0,
+    transition: {
+      duration: 0.3,
+      ease: 'easeOut',
+    },
+  },
+  exit: {
+    opacity: 0,
+    x: -50,
+    transition: {
+      duration: 0.2,
+      ease: 'easeIn',
+    },
+  },
+};
+
+// =============================================================================
+// Component
+// =============================================================================
+
+export function AdCopyWizard({
+  organizationId,
+  userId,
+  organizations,
+  actblueForms,
+  onOrganizationChange,
+}: AdCopyWizardProps) {
+  // =========================================================================
+  // Hooks
+  // =========================================================================
+
+  const {
+    session,
+    currentStep,
+    completedSteps,
+    stepData,
+    isLoading,
+    isSaving,
+    error: sessionError,
+    goToStep,
+    completeStep,
+    updateStepData,
+    canNavigateToStep,
+    isStepCompleted,
+    resetSession,
+  } = useAdCopyStudio({ organizationId, userId });
+
+  const {
+    videos,
+    isUploading,
+    error: uploadError,
+    uploadFiles,
+    importGDriveUrls,
+    removeVideo,
+    clearError: clearUploadError,
+  } = useVideoUpload({
+    organizationId,
+    batchId: session?.batch_id || crypto.randomUUID(),
+    userId,
+    onUploadComplete: (video) => {
+      // Update step data when upload completes
+      const updatedVideos = [...(stepData.videos || []), video];
+      updateStepData({ videos: updatedVideos });
+    },
+  });
+
+  const {
+    generatedCopy,
+    metaReadyCopy,
+    trackingUrl,
+    isGenerating,
+    progress: generationProgress,
+    error: generationError,
+    generateCopy,
+    clearGeneration,
+  } = useAdCopyGeneration({ organizationId });
+
+  // =========================================================================
+  // Local State
+  // =========================================================================
+
+  // Campaign config state (persisted through stepData)
+  const [campaignConfig, setCampaignConfig] = useState<CampaignConfig>(() => {
+    return stepData.config || DEFAULT_CAMPAIGN_CONFIG;
+  });
+
+  // Track analyses (mock for now, would come from transcript service)
+  const [analyses, setAnalyses] = useState<Record<string, any>>(() => {
+    return stepData.analyses || {};
+  });
+
+  // Ref to track if step 4 auto-advance has already been triggered
+  const hasCompletedStep4Ref = useRef(false);
+
+  // =========================================================================
+  // Effects
+  // =========================================================================
+
+  // Sync campaign config from stepData when it changes
+  useEffect(() => {
+    if (stepData.config) {
+      setCampaignConfig(stepData.config);
+    }
+  }, [stepData.config]);
+
+  // Sync analyses from stepData
+  useEffect(() => {
+    if (stepData.analyses) {
+      setAnalyses(stepData.analyses);
+    }
+  }, [stepData.analyses]);
+
+  // =========================================================================
+  // Handlers
+  // =========================================================================
+
+  const handleUploadComplete = useCallback(async () => {
+    await completeStep(1, { videos });
+  }, [completeStep, videos]);
+
+  const handleTranscriptReviewComplete = useCallback(async () => {
+    await completeStep(2, { analyses });
+  }, [completeStep, analyses]);
+
+  const handleCampaignConfigChange = useCallback((config: CampaignConfig) => {
+    setCampaignConfig(config);
+    // Persist to step data
+    updateStepData({ config });
+  }, [updateStepData]);
+
+  const handleCampaignConfigComplete = useCallback(async () => {
+    await completeStep(3, { config: campaignConfig });
+  }, [completeStep, campaignConfig]);
+
+  const handleGenerate = useCallback(async () => {
+    // Reset step 4 completion tracking when starting a new generation
+    hasCompletedStep4Ref.current = false;
+
+    // Establish single source of truth: prefer videos from upload hook, fall back to stepData
+    const sourceVideos = videos.length > 0 ? videos : (stepData.videos || []);
+    const primaryVideo = sourceVideos[0];
+
+    // Validate that we have a video with a transcript_id before generating
+    if (!primaryVideo) {
+      console.error('[AdCopyWizard] No video available for generation');
+      return;
+    }
+
+    if (!primaryVideo.transcript_id) {
+      console.error('[AdCopyWizard] Video does not have a transcript_id - transcription may still be in progress');
+      return;
+    }
+
+    await generateCopy({
+      transcriptId: primaryVideo.transcript_id,
+      videoId: primaryVideo.video_id,
+      audienceSegments: campaignConfig.audience_segments,
+      actblueFormName: campaignConfig.actblue_form_name,
+      refcode: campaignConfig.refcode,
+      amountPreset: campaignConfig.amount_preset,
+      recurringDefault: campaignConfig.recurring_default,
+    });
+  }, [generateCopy, videos, stepData.videos, campaignConfig]);
+
+  // Auto-advance to export step when generation completes
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- completeStep is intentionally excluded
+  // to prevent race conditions. The ref guards against multiple completions.
+  useEffect(() => {
+    if (
+      generatedCopy &&
+      metaReadyCopy &&
+      trackingUrl &&
+      currentStep === 4 &&
+      !hasCompletedStep4Ref.current
+    ) {
+      hasCompletedStep4Ref.current = true;
+      completeStep(4, {
+        generated_copy: generatedCopy,
+        tracking_url: trackingUrl,
+      });
+    }
+  }, [generatedCopy, metaReadyCopy, trackingUrl, currentStep]);
+
+  const handleGoBack = useCallback((toStep: number) => {
+    goToStep(toStep as 1 | 2 | 3 | 4 | 5);
+  }, [goToStep]);
+
+  const handleStartNew = useCallback(async () => {
+    // Clear generation state
+    clearGeneration();
+    // Reset the session
+    await resetSession();
+    // Reset local state
+    setCampaignConfig(DEFAULT_CAMPAIGN_CONFIG);
+    setAnalyses({});
+  }, [clearGeneration, resetSession]);
+
+  const handleResetSession = useCallback(async () => {
+    if (window.confirm('Are you sure you want to reset the session? All progress will be lost.')) {
+      await handleStartNew();
+    }
+  }, [handleStartNew]);
+
+  // =========================================================================
+  // Render Helpers
+  // =========================================================================
+
+  const renderStepContent = () => {
+    // Use videos from hook or stepData
+    const currentVideos = videos.length > 0 ? videos : (stepData.videos || []);
+
+    switch (currentStep) {
+      case 1:
+        return (
+          <VideoUploadStep
+            videos={currentVideos}
+            isUploading={isUploading}
+            error={uploadError}
+            onUploadFiles={uploadFiles}
+            onImportGDrive={importGDriveUrls}
+            onRemoveVideo={removeVideo}
+            onClearError={clearUploadError}
+            onComplete={handleUploadComplete}
+          />
+        );
+
+      case 2:
+        return (
+          <TranscriptReviewStep
+            videos={currentVideos}
+            analyses={analyses}
+            onBack={() => handleGoBack(1)}
+            onComplete={handleTranscriptReviewComplete}
+          />
+        );
+
+      case 3:
+        return (
+          <CampaignConfigStep
+            config={campaignConfig}
+            onConfigChange={handleCampaignConfigChange}
+            actblueForms={actblueForms}
+            onBack={() => handleGoBack(2)}
+            onComplete={handleCampaignConfigComplete}
+          />
+        );
+
+      case 4:
+        return (
+          <CopyGenerationStep
+            config={campaignConfig}
+            isGenerating={isGenerating}
+            progress={generationProgress}
+            currentSegment={undefined}
+            error={generationError}
+            onGenerate={handleGenerate}
+            onBack={() => handleGoBack(3)}
+          />
+        );
+
+      case 5:
+        // Ensure we have generation data
+        const finalGeneratedCopy = generatedCopy || stepData.generated_copy || {};
+        const finalMetaReadyCopy = metaReadyCopy || {};
+        const finalTrackingUrl = trackingUrl || stepData.tracking_url || '';
+
+        return (
+          <CopyExportStep
+            generatedCopy={finalGeneratedCopy}
+            metaReadyCopy={finalMetaReadyCopy}
+            trackingUrl={finalTrackingUrl}
+            audienceSegments={campaignConfig.audience_segments}
+            onBack={() => handleGoBack(4)}
+            onStartNew={handleStartNew}
+          />
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  // =========================================================================
+  // Loading State
+  // =========================================================================
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <p className="text-sm text-[#94a3b8]">Loading Ad Copy Studio...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // Render
+  // =========================================================================
+
+  return (
+    <div className="flex flex-col gap-6 p-6 min-h-screen bg-[#0a0f1a]">
+      {/* Header */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-[#a855f7]">
+            <Sparkles className="h-5 w-5 text-white" aria-hidden="true" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-[#e2e8f0]">Ad Copy Studio</h1>
+            <p className="text-sm text-[#64748b]">Generate Meta ad copy from video content</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* Organization Picker */}
+          {organizations.length > 1 && (
+            <Select
+              value={organizationId}
+              onValueChange={onOrganizationChange}
+            >
+              <SelectTrigger
+                className="w-[200px] border-[#1e2a45] bg-[#141b2d] text-[#e2e8f0]"
+                aria-label="Select organization"
+              >
+                <SelectValue placeholder="Select organization" />
+              </SelectTrigger>
+              <SelectContent className="border-[#1e2a45] bg-[#141b2d]">
+                {organizations.map((org) => (
+                  <SelectItem
+                    key={org.id}
+                    value={org.id}
+                    className="text-[#e2e8f0] focus:bg-[#1e2a45] focus:text-[#e2e8f0]"
+                  >
+                    {org.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Reset Session Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleResetSession}
+            disabled={isSaving}
+            className="border-[#1e2a45] bg-transparent text-[#94a3b8] hover:bg-[#141b2d] hover:text-[#e2e8f0]"
+            aria-label="Reset Ad Copy Studio session"
+          >
+            <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
+            Reset
+          </Button>
+        </div>
+      </header>
+
+      {/* Step Indicator */}
+      <div className="rounded-lg border border-[#1e2a45] bg-[#141b2d] p-4">
+        <WizardStepIndicator
+          currentStep={currentStep}
+          completedSteps={completedSteps}
+          onStepClick={goToStep}
+          canNavigateToStep={canNavigateToStep}
+        />
+      </div>
+
+      {/* Error Display */}
+      {sessionError && (
+        <div
+          role="alert"
+          className="rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 p-4"
+        >
+          <p className="text-sm text-[#ef4444]">{sessionError}</p>
+        </div>
+      )}
+
+      {/* Step Content with Transitions */}
+      <main className="flex-1">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentStep}
+            variants={stepVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="rounded-lg border border-[#1e2a45] bg-[#141b2d]"
+          >
+            {renderStepContent()}
+          </motion.div>
+        </AnimatePresence>
+      </main>
+
+      {/* Saving Indicator */}
+      {isSaving && (
+        <div
+          className="fixed bottom-4 right-4 flex items-center gap-2 rounded-lg border border-[#1e2a45] bg-[#141b2d] px-4 py-2 shadow-lg"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+          <span className="text-sm text-[#94a3b8]">Saving...</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default AdCopyWizard;
