@@ -401,6 +401,181 @@ export type Database = {
           },
         ]
       }
+      ad_copy_generations: {
+        Row: {
+          actblue_form_name: string
+          amount_preset: number | null
+          audience_segments: Json
+          batch_id: string | null
+          batch_sequence: number | null
+          copy_validation_status: string | null
+          created_at: string | null
+          generated_at: string | null
+          generated_copy: Json | null
+          generation_model: string | null
+          generation_prompt_version: string | null
+          id: string
+          meta_ready_copy: Json | null
+          organization_id: string
+          recurring_default: boolean | null
+          refcode: string
+          refcode_auto_generated: boolean | null
+          tracking_url: string | null
+          transcript_ref: string | null
+          updated_at: string | null
+          video_ref: string | null
+        }
+        Insert: {
+          actblue_form_name: string
+          amount_preset?: number | null
+          audience_segments?: Json
+          batch_id?: string | null
+          batch_sequence?: number | null
+          copy_validation_status?: string | null
+          created_at?: string | null
+          generated_at?: string | null
+          generated_copy?: Json | null
+          generation_model?: string | null
+          generation_prompt_version?: string | null
+          id?: string
+          meta_ready_copy?: Json | null
+          organization_id: string
+          recurring_default?: boolean | null
+          refcode: string
+          refcode_auto_generated?: boolean | null
+          tracking_url?: string | null
+          transcript_ref?: string | null
+          updated_at?: string | null
+          video_ref?: string | null
+        }
+        Update: {
+          actblue_form_name?: string
+          amount_preset?: number | null
+          audience_segments?: Json
+          batch_id?: string | null
+          batch_sequence?: number | null
+          copy_validation_status?: string | null
+          created_at?: string | null
+          generated_at?: string | null
+          generated_copy?: Json | null
+          generation_model?: string | null
+          generation_prompt_version?: string | null
+          id?: string
+          meta_ready_copy?: Json | null
+          organization_id?: string
+          recurring_default?: boolean | null
+          refcode?: string
+          refcode_auto_generated?: boolean | null
+          tracking_url?: string | null
+          transcript_ref?: string | null
+          updated_at?: string | null
+          video_ref?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_copy_generations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_copy_generations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "ad_copy_generations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "ad_copy_generations_transcript_ref_fkey"
+            columns: ["transcript_ref"]
+            isOneToOne: false
+            referencedRelation: "meta_ad_transcripts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_copy_generations_video_ref_fkey"
+            columns: ["video_ref"]
+            isOneToOne: false
+            referencedRelation: "meta_ad_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ad_copy_studio_sessions: {
+        Row: {
+          batch_id: string
+          completed_steps: number[] | null
+          created_at: string | null
+          current_step: number
+          id: string
+          organization_id: string
+          status: string | null
+          step_data: Json | null
+          transcript_ids: string[] | null
+          updated_at: string | null
+          user_id: string
+          video_ids: string[] | null
+        }
+        Insert: {
+          batch_id?: string
+          completed_steps?: number[] | null
+          created_at?: string | null
+          current_step?: number
+          id?: string
+          organization_id: string
+          status?: string | null
+          step_data?: Json | null
+          transcript_ids?: string[] | null
+          updated_at?: string | null
+          user_id: string
+          video_ids?: string[] | null
+        }
+        Update: {
+          batch_id?: string
+          completed_steps?: number[] | null
+          created_at?: string | null
+          current_step?: number
+          id?: string
+          organization_id?: string
+          status?: string | null
+          step_data?: Json | null
+          transcript_ids?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+          video_ids?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_copy_studio_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_copy_studio_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "ad_copy_studio_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       ad_fatigue_alerts: {
         Row: {
           acknowledged_at: string | null
@@ -6064,21 +6239,32 @@ export type Database = {
           duration_seconds: number | null
           error_code: string | null
           error_message: string | null
+          fingerprint_duration_sec: number | null
+          fingerprint_transcript_hash: string | null
           id: string
           last_error_at: string | null
+          matched_meta_ad_id: string | null
+          meets_meta_specs: boolean | null
+          meta_spec_issues: Json | null
           organization_id: string
           original_filename: string | null
           resolution_method: string | null
           retry_count: number | null
           source: string | null
           status: string | null
+          thumbnail_timestamp_sec: number | null
           thumbnail_url: string | null
           transcribed_at: string | null
           updated_at: string | null
           uploaded_by: string | null
           url_fetched_at: string | null
+          video_aspect_ratio: string | null
+          video_bitrate_kbps: number | null
+          video_codec: string | null
           video_file_size_bytes: number | null
+          video_frame_rate: number | null
           video_id: string
+          video_resolution: string | null
           video_source_expires_at: string | null
           video_source_url: string | null
         }
@@ -6092,21 +6278,32 @@ export type Database = {
           duration_seconds?: number | null
           error_code?: string | null
           error_message?: string | null
+          fingerprint_duration_sec?: number | null
+          fingerprint_transcript_hash?: string | null
           id?: string
           last_error_at?: string | null
+          matched_meta_ad_id?: string | null
+          meets_meta_specs?: boolean | null
+          meta_spec_issues?: Json | null
           organization_id: string
           original_filename?: string | null
           resolution_method?: string | null
           retry_count?: number | null
           source?: string | null
           status?: string | null
+          thumbnail_timestamp_sec?: number | null
           thumbnail_url?: string | null
           transcribed_at?: string | null
           updated_at?: string | null
           uploaded_by?: string | null
           url_fetched_at?: string | null
+          video_aspect_ratio?: string | null
+          video_bitrate_kbps?: number | null
+          video_codec?: string | null
           video_file_size_bytes?: number | null
+          video_frame_rate?: number | null
           video_id: string
+          video_resolution?: string | null
           video_source_expires_at?: string | null
           video_source_url?: string | null
         }
@@ -6120,21 +6317,32 @@ export type Database = {
           duration_seconds?: number | null
           error_code?: string | null
           error_message?: string | null
+          fingerprint_duration_sec?: number | null
+          fingerprint_transcript_hash?: string | null
           id?: string
           last_error_at?: string | null
+          matched_meta_ad_id?: string | null
+          meets_meta_specs?: boolean | null
+          meta_spec_issues?: Json | null
           organization_id?: string
           original_filename?: string | null
           resolution_method?: string | null
           retry_count?: number | null
           source?: string | null
           status?: string | null
+          thumbnail_timestamp_sec?: number | null
           thumbnail_url?: string | null
           transcribed_at?: string | null
           updated_at?: string | null
           uploaded_by?: string | null
           url_fetched_at?: string | null
+          video_aspect_ratio?: string | null
+          video_bitrate_kbps?: number | null
+          video_codec?: string | null
           video_file_size_bytes?: number | null
+          video_frame_rate?: number | null
           video_id?: string
+          video_resolution?: string | null
           video_source_expires_at?: string | null
           video_source_url?: string | null
         }
@@ -8054,6 +8262,76 @@ export type Database = {
           source_type?: string
         }
         Relationships: []
+      }
+      organization_meta_settings: {
+        Row: {
+          advantage_audience: boolean | null
+          advantage_plus_creative: boolean | null
+          created_at: string | null
+          default_billing_event: string | null
+          default_objective: string | null
+          default_optimization_goal: string | null
+          meta_instagram_actor_id: string | null
+          meta_instagram_username: string | null
+          meta_page_id: string | null
+          meta_page_name: string | null
+          meta_pixel_id: string | null
+          organization_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          advantage_audience?: boolean | null
+          advantage_plus_creative?: boolean | null
+          created_at?: string | null
+          default_billing_event?: string | null
+          default_objective?: string | null
+          default_optimization_goal?: string | null
+          meta_instagram_actor_id?: string | null
+          meta_instagram_username?: string | null
+          meta_page_id?: string | null
+          meta_page_name?: string | null
+          meta_pixel_id?: string | null
+          organization_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          advantage_audience?: boolean | null
+          advantage_plus_creative?: boolean | null
+          created_at?: string | null
+          default_billing_event?: string | null
+          default_objective?: string | null
+          default_optimization_goal?: string | null
+          meta_instagram_actor_id?: string | null
+          meta_instagram_username?: string | null
+          meta_page_id?: string | null
+          meta_page_name?: string | null
+          meta_pixel_id?: string | null
+          organization_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_meta_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_meta_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "organization_meta_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
       }
       organization_profiles: {
         Row: {
