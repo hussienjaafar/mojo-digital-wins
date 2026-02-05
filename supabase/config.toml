@@ -209,6 +209,9 @@ verify_jwt = true
 [functions.generate-creative-recommendations]
 verify_jwt = true
 
+[functions.generate-ad-copy]
+verify_jwt = true
+
 [functions.transcribe-video-creative]
 verify_jwt = true
 
