@@ -407,3 +407,134 @@ verify_jwt = false  # Public helper to get client IP
 
 [functions.geolocate-ip]
 verify_jwt = false  # Internal IP geolocation lookup
+
+# --- META CAPI FUNCTIONS ---
+[functions.process-meta-capi-outbox]
+verify_jwt = false
+
+[functions.refresh-meta-tokens]
+verify_jwt = false
+
+[functions.retry-meta-conversions]
+verify_jwt = false
+
+[functions.resend-capi-with-full-fbclid]
+verify_jwt = false
+
+[functions.detect-capi-mismatches]
+verify_jwt = false
+
+[functions.backfill-recent-capi]
+verify_jwt = false
+
+# --- TREND ANALYSIS FUNCTIONS ---
+[functions.correlate-trends-campaigns]
+verify_jwt = false
+
+[functions.decay-stale-affinities]
+verify_jwt = false
+
+[functions.tag-trend-policy-domains]
+verify_jwt = false
+
+[functions.extract-trend-entities]
+verify_jwt = false
+
+[functions.extract-campaign-topics]
+verify_jwt = false
+
+[functions.get-trends-for-org]
+verify_jwt = false
+
+# --- SMS FUNCTIONS ---
+[functions.analyze-sms-campaigns]
+verify_jwt = false
+
+[functions.sync-sms-insights]
+verify_jwt = false
+
+[functions.cleanup-sms-events]
+verify_jwt = false
+
+[functions.reconcile-sms-refcodes]
+verify_jwt = false
+
+[functions.backfill-sms-refcodes]
+verify_jwt = false
+
+# --- ATTRIBUTION FUNCTIONS ---
+[functions.clickid-reconcile]
+verify_jwt = false
+
+[functions.backfill-click-attribution]
+verify_jwt = false
+
+# --- DONOR/LTV FUNCTIONS ---
+[functions.ltv-refresh]
+verify_jwt = false
+
+[functions.populate-donor-demographics]
+verify_jwt = false
+
+[functions.refresh-demographics-cache]
+verify_jwt = false
+
+# --- CREATIVE/AD FUNCTIONS ---
+[functions.detect-ad-fatigue]
+verify_jwt = false
+
+[functions.analyze-creative-motivation]
+verify_jwt = true
+
+[functions.import-gdrive-video]
+verify_jwt = true
+
+[functions.sync-meta-ad-videos]
+verify_jwt = false
+
+[functions.transcribe-meta-ad-video]
+verify_jwt = true
+
+# --- LEARNING/AI FUNCTIONS ---
+[functions.update-learning-signals]
+verify_jwt = false
+
+[functions.update-org-affinities]
+verify_jwt = false
+
+[functions.update-org-interest-model]
+verify_jwt = false
+
+[functions.compute-decision-scores]
+verify_jwt = false
+
+# --- BACKFILL FUNCTIONS ---
+[functions.backfill-daily-metrics]
+verify_jwt = false
+
+[functions.backfill-onboarding-state]
+verify_jwt = false
+
+[functions.backfill-actblue-phone-hashes]
+verify_jwt = false
+
+# --- PORTAL/CLIENT FUNCTIONS ---
+[functions.log-user-activity]
+verify_jwt = false
+
+[functions.manage-invitation]
+verify_jwt = false
+
+[functions.create-client-user]
+verify_jwt = false
+
+# --- TRACKING FUNCTIONS ---
+[functions.track-email-interaction]
+verify_jwt = false
+
+[functions.track-state-actions]
+verify_jwt = false
+
+# --- HEALTH/MONITORING FUNCTIONS ---
+[functions.check-integration-health]
+verify_jwt = false
