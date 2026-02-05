@@ -41,7 +41,7 @@ export interface TranscriptionFlowReturn {
 
 const DEFAULT_POLL_INTERVAL_MS = 3000;
 const DEFAULT_MAX_WAIT_MS = 5 * 60 * 1000; // 5 minutes
-const TERMINAL_STATUSES = ['TRANSCRIBED', 'ANALYZED', 'ERROR', 'FAILED'];
+const TERMINAL_STATUSES = ['TRANSCRIBED', 'ANALYZED', 'ERROR', 'FAILED', 'TRANSCRIPT_FAILED'];
 
 // =============================================================================
 // Hook Implementation
@@ -131,8 +131,8 @@ export function useVideoTranscriptionFlow(
 
         // Check for terminal status
         if (TERMINAL_STATUSES.includes(currentStatus)) {
-          if (currentStatus === 'ERROR' || currentStatus === 'FAILED') {
-            onError?.(videoId, 'Transcription failed');
+          if (currentStatus === 'ERROR' || currentStatus === 'FAILED' || currentStatus === 'TRANSCRIPT_FAILED') {
+            onError?.(videoId, `Transcription failed (status: ${currentStatus})`);
             return null;
           }
           return currentStatus;
