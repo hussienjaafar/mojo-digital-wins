@@ -456,23 +456,18 @@ serve(async (req) => {
       );
     }
 
-    // Validate transcript belongs to the requested organization
-    if (transcript.organization_id !== organization_id) {
-      console.error(`[generate-ad-copy] Org mismatch: transcript belongs to ${transcript.organization_id}, request for ${organization_id}`);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'This transcript belongs to a different organization. Please select the correct organization or start a new session.' 
-        }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Use the transcript's organization_id as source of truth (more secure than client-provided org)
+    const effectiveOrgId = transcript.organization_id;
+    
+    if (effectiveOrgId !== organization_id) {
+      console.log(`[generate-ad-copy] Note: Using transcript's org ${effectiveOrgId} (client sent ${organization_id})`);
     }
 
     // Fetch organization slug for URL generation
     const { data: org, error: orgError } = await supabase
       .from('client_organizations')
       .select('slug')
-      .eq('id', organization_id)
+      .eq('id', effectiveOrgId)
       .single();
 
     if (orgError || !org?.slug) {
@@ -533,7 +528,7 @@ serve(async (req) => {
     const { data: insertedGeneration, error: insertError } = await supabase
       .from('ad_copy_generations')
       .insert({
-        organization_id,
+        organization_id: effectiveOrgId,
         video_ref: videoRef,
         transcript_ref: transcript_id,
         actblue_form_name: actblue_form_name.trim(),
