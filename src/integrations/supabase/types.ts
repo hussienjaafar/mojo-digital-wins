@@ -6055,6 +6055,7 @@ export type Database = {
       meta_ad_transcripts: {
         Row: {
           ad_id: string
+          analysis_count: number | null
           analysis_model: string | null
           analysis_version: string | null
           analyzed_at: string | null
@@ -6074,6 +6075,7 @@ export type Database = {
           key_phrases: string[] | null
           language: string | null
           language_confidence: number | null
+          last_analyzed_at: string | null
           organization_id: string
           policy_positions: string[] | null
           political_stances: string[] | null
@@ -6095,6 +6097,8 @@ export type Database = {
           updated_at: string | null
           urgency_drivers: string[] | null
           urgency_level: string | null
+          user_context_post: string | null
+          user_context_pre: string | null
           values_appealed: string[] | null
           video_id: string
           video_ref: string | null
@@ -6103,6 +6107,7 @@ export type Database = {
         }
         Insert: {
           ad_id: string
+          analysis_count?: number | null
           analysis_model?: string | null
           analysis_version?: string | null
           analyzed_at?: string | null
@@ -6122,6 +6127,7 @@ export type Database = {
           key_phrases?: string[] | null
           language?: string | null
           language_confidence?: number | null
+          last_analyzed_at?: string | null
           organization_id: string
           policy_positions?: string[] | null
           political_stances?: string[] | null
@@ -6143,6 +6149,8 @@ export type Database = {
           updated_at?: string | null
           urgency_drivers?: string[] | null
           urgency_level?: string | null
+          user_context_post?: string | null
+          user_context_pre?: string | null
           values_appealed?: string[] | null
           video_id: string
           video_ref?: string | null
@@ -6151,6 +6159,7 @@ export type Database = {
         }
         Update: {
           ad_id?: string
+          analysis_count?: number | null
           analysis_model?: string | null
           analysis_version?: string | null
           analyzed_at?: string | null
@@ -6170,6 +6179,7 @@ export type Database = {
           key_phrases?: string[] | null
           language?: string | null
           language_confidence?: number | null
+          last_analyzed_at?: string | null
           organization_id?: string
           policy_positions?: string[] | null
           political_stances?: string[] | null
@@ -6191,6 +6201,8 @@ export type Database = {
           updated_at?: string | null
           urgency_drivers?: string[] | null
           urgency_level?: string | null
+          user_context_post?: string | null
+          user_context_pre?: string | null
           values_appealed?: string[] | null
           video_id?: string
           video_ref?: string | null

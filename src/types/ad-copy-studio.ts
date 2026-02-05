@@ -105,6 +105,11 @@ export interface TranscriptAnalysis {
   urgency_level: string;
   key_phrases: string[];
   cta_text?: string;
+  // Context and reanalysis tracking
+  user_context_pre?: string;
+  user_context_post?: string;
+  analysis_count?: number;
+  last_analyzed_at?: string;
 }
 
 // ============================================================================

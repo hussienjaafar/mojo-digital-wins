@@ -387,6 +387,9 @@ verify_jwt = false
 [functions.upload-video-for-transcription]
 verify_jwt = true  # Requires auth, accepts video uploads for transcription
 
+[functions.reanalyze-transcript]
+verify_jwt = true  # Requires auth for reanalyzing transcripts
+
 # --- AUTO-RECOVERY / SELF-HEALING ---
 [functions.recover-stuck-chunks]
 verify_jwt = false  # Runs on cron, validates CRON_SECRET internally

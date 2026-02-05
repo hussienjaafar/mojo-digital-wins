@@ -27,12 +27,28 @@ export interface FetchAnalysisResult {
   transcriptId: string;
 }
 
+export interface ReanalyzeOptions {
+  transcriptId: string;
+  transcriptText?: string;
+  userContextPre?: string;
+  userContextPost?: string;
+}
+
+export interface ReanalyzeResult {
+  success: boolean;
+  analysis: TranscriptAnalysis;
+  analysisCount: number;
+  analyzedAt: string;
+}
+
 export interface TranscriptionFlowReturn {
   triggerTranscription: (videoId: string) => Promise<boolean>;
   pollForCompletion: (videoId: string, maxWaitMs?: number) => Promise<string | null>;
   fetchAnalysis: (videoId: string) => Promise<FetchAnalysisResult | null>;
   processVideo: (videoId: string) => Promise<FetchAnalysisResult | null>;
   cancelPolling: (videoId: string) => void;
+  reanalyzeTranscript: (options: ReanalyzeOptions) => Promise<ReanalyzeResult | null>;
+  saveTranscript: (transcriptId: string, transcriptText: string) => Promise<boolean>;
 }
 
 // =============================================================================
@@ -202,6 +218,11 @@ export function useVideoTranscriptionFlow(
         urgency_level: data.urgency_level || 'medium',
         key_phrases: data.key_phrases || [],
         cta_text: data.cta_text,
+        // Context and reanalysis fields
+        user_context_pre: data.user_context_pre,
+        user_context_post: data.user_context_post,
+        analysis_count: data.analysis_count,
+        last_analyzed_at: data.last_analyzed_at,
       };
 
       console.log('[useVideoTranscriptionFlow] Analysis fetched successfully, transcript_id:', data.id);
@@ -245,11 +266,86 @@ export function useVideoTranscriptionFlow(
     }
   }, []);
 
+  /**
+   * Reanalyze a transcript with optional edited text and context
+   */
+  const reanalyzeTranscript = useCallback(async (
+    options: ReanalyzeOptions
+  ): Promise<ReanalyzeResult | null> => {
+    try {
+      console.log(`[useVideoTranscriptionFlow] Reanalyzing transcript: ${options.transcriptId}`);
+      
+      const { data, error } = await supabase.functions.invoke('reanalyze-transcript', {
+        body: {
+          organization_id: organizationId,
+          transcript_id: options.transcriptId,
+          transcript_text: options.transcriptText,
+          user_context_pre: options.userContextPre,
+          user_context_post: options.userContextPost,
+        },
+      });
+
+      if (error) {
+        console.error('[useVideoTranscriptionFlow] Reanalyze error:', error);
+        return null;
+      }
+
+      if (!data?.success) {
+        console.error('[useVideoTranscriptionFlow] Reanalyze failed:', data?.error);
+        return null;
+      }
+
+      console.log('[useVideoTranscriptionFlow] Reanalysis complete:', data);
+      return {
+        success: true,
+        analysis: data.analysis,
+        analysisCount: data.analysis_count,
+        analyzedAt: data.analyzed_at,
+      };
+    } catch (err: any) {
+      console.error('[useVideoTranscriptionFlow] Failed to reanalyze:', err);
+      return null;
+    }
+  }, [organizationId]);
+
+  /**
+   * Save transcript text without reanalyzing
+   */
+  const saveTranscript = useCallback(async (
+    transcriptId: string,
+    transcriptText: string
+  ): Promise<boolean> => {
+    try {
+      console.log(`[useVideoTranscriptionFlow] Saving transcript: ${transcriptId}`);
+      
+      const { error } = await (supabase as any)
+        .from('meta_ad_transcripts')
+        .update({ 
+          transcript_text: transcriptText.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', transcriptId);
+
+      if (error) {
+        console.error('[useVideoTranscriptionFlow] Save error:', error);
+        return false;
+      }
+
+      console.log('[useVideoTranscriptionFlow] Transcript saved successfully');
+      return true;
+    } catch (err: any) {
+      console.error('[useVideoTranscriptionFlow] Failed to save transcript:', err);
+      return false;
+    }
+  }, []);
+
   return {
     triggerTranscription,
     pollForCompletion,
     fetchAnalysis,
     processVideo,
     cancelPolling,
+    reanalyzeTranscript,
+    saveTranscript,
   };
 }

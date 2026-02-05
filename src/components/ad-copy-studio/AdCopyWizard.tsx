@@ -202,6 +202,8 @@ export function AdCopyWizard({
     fetchAnalysis,
     pollForCompletion,
     cancelPolling,
+    reanalyzeTranscript,
+    saveTranscript,
   } = useVideoTranscriptionFlow({
     organizationId,
     onStatusChange: (videoId, status) => {
@@ -522,18 +524,36 @@ export function AdCopyWizard({
         // Map analyses by video.id (local ID) for TranscriptReviewStep
         // Our analyses are keyed by video.video_id (database ID)
         const mappedAnalyses: Record<string, TranscriptAnalysis> = {};
+        const mappedTranscriptIds: Record<string, string> = {};
         currentVideos.forEach((v: VideoUpload) => {
           if (v.video_id && analyses[v.video_id]) {
             mappedAnalyses[v.id] = analyses[v.video_id];
           }
+          if (v.video_id && transcriptIds[v.video_id]) {
+            mappedTranscriptIds[v.id] = transcriptIds[v.video_id];
+          }
         });
+
+        // Handler to update analysis after reanalyze
+        const handleAnalysisUpdate = (videoId: string, analysis: TranscriptAnalysis) => {
+          // Find the video_id (database ID) from the local video ID
+          const video = currentVideos.find((v: VideoUpload) => v.id === videoId);
+          if (video?.video_id) {
+            setAnalyses(prev => ({ ...prev, [video.video_id!]: analysis }));
+            updateStepData({ analyses: { ...analyses, [video.video_id!]: analysis } });
+          }
+        };
 
         return (
           <TranscriptReviewStep
             videos={currentVideos}
             analyses={mappedAnalyses}
+            transcriptIds={mappedTranscriptIds}
             onBack={() => handleGoBack(1)}
             onComplete={handleTranscriptReviewComplete}
+            onReanalyze={reanalyzeTranscript}
+            onSaveTranscript={saveTranscript}
+            onAnalysisUpdate={handleAnalysisUpdate}
           />
         );
 
