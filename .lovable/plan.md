@@ -1,124 +1,174 @@
 
 
-## Fix: RLS Policies for Admin-Only Video Management
+## Fix: Connect Video Upload to Transcription Pipeline
 
-### Problem
+### Problem Identified
 
-The new RLS policies for `meta_ad_videos` query `organization_memberships` to check access, but admin users:
-- Access organizations via the org selector (not membership)
-- Have no records in `organization_memberships` for the orgs they select
-- Only have a record in `user_roles` with role = 'admin'
+When a video is uploaded in Ad Copy Studio:
+1. The video is uploaded to storage successfully
+2. A record is created in `meta_ad_videos` with status `PENDING`
+3. **The transcription edge function is never called**
+4. Step 2 shows "No analysis available" because the `analyses` object is empty
 
-This causes the INSERT to fail with a 403 error.
+### Current Flow (Broken)
 
-### Current State
-
-| Table | User Record |
-|-------|-------------|
-| `user_roles` | `6037a48d...` has role `admin` |
-| `organization_memberships` | No record for this user in org `346d6aaf...` |
-
-The current policies check:
-```sql
-organization_id IN (
-  SELECT organization_id FROM organization_memberships 
-  WHERE user_id = auth.uid() AND status = 'active'
-)
+```text
+Upload Video -> Storage -> DB Record (PENDING) -> [STOP]
+                                                     |
+Step 2: analyses = {} -> "No analysis available"
 ```
 
-This returns an empty set for admin users, blocking all operations.
+### Required Flow
 
-### Solution
-
-Update the three new RLS policies to also allow access when the user has the `admin` role. This uses the existing `has_role()` security definer function.
-
-### Database Migration
-
-```sql
--- Drop the existing policies that don't account for admin access
-DROP POLICY IF EXISTS "Users can insert videos for their org" ON public.meta_ad_videos;
-DROP POLICY IF EXISTS "Users can update videos for their org" ON public.meta_ad_videos;
-DROP POLICY IF EXISTS "Users can delete videos for their org" ON public.meta_ad_videos;
-
--- Recreate with admin access included
-CREATE POLICY "Users can insert videos for their org"
-  ON public.meta_ad_videos
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    has_role(auth.uid(), 'admin') 
-    OR organization_id IN (
-      SELECT organization_id 
-      FROM organization_memberships 
-      WHERE user_id = auth.uid() 
-      AND status = 'active'
-    )
-  );
-
-CREATE POLICY "Users can update videos for their org"
-  ON public.meta_ad_videos
-  FOR UPDATE
-  TO authenticated
-  USING (
-    has_role(auth.uid(), 'admin') 
-    OR organization_id IN (
-      SELECT organization_id 
-      FROM organization_memberships 
-      WHERE user_id = auth.uid() 
-      AND status = 'active'
-    )
-  )
-  WITH CHECK (
-    has_role(auth.uid(), 'admin') 
-    OR organization_id IN (
-      SELECT organization_id 
-      FROM organization_memberships 
-      WHERE user_id = auth.uid() 
-      AND status = 'active'
-    )
-  );
-
-CREATE POLICY "Users can delete videos for their org"
-  ON public.meta_ad_videos
-  FOR DELETE
-  TO authenticated
-  USING (
-    has_role(auth.uid(), 'admin') 
-    OR organization_id IN (
-      SELECT organization_id 
-      FROM organization_memberships 
-      WHERE user_id = auth.uid() 
-      AND status = 'active'
-    )
-  );
+```text
+Upload Video -> Storage -> DB Record (PENDING)
+                               |
+                               v
+                    Call transcribe-meta-ad-video
+                               |
+                               v
+                    Poll/wait for completion
+                               |
+                               v
+                    Fetch transcript from meta_ad_transcripts
+                               |
+                               v
+Step 2: analyses = { video_id: TranscriptAnalysis } -> Display analysis
 ```
 
-### How the Updated Policies Work
+### Solution Overview
 
-| User Type | Access Logic |
-|-----------|--------------|
-| **Admin** | `has_role(auth.uid(), 'admin')` returns TRUE - full access to any org |
-| **Org Member** | Falls through to `organization_memberships` check - only their orgs |
-| **Neither** | Both conditions FALSE - access denied |
+Add automatic transcription triggering after video upload completes, then fetch the analysis data for step 2.
 
-### Files to Change
+### Implementation Plan
 
-- **Database migration only** - No code changes needed
+#### 1. Create a new hook: `useVideoTranscriptionFlow.ts`
 
-### Expected Result After Fix
+This hook will manage the transcription workflow for Ad Copy Studio:
 
-1. Admin selects organization "A New Policy" from selector
-2. User uploads video file
-3. FFmpeg extracts audio (working)
-4. Audio uploads to storage (working)
-5. Database INSERT succeeds (the `has_role()` check passes)
-6. Video appears in the Ad Copy Studio
+- **triggerTranscription(videoId)**: Calls the `transcribe-meta-ad-video` edge function
+- **pollTranscriptionStatus(videoId)**: Polls `meta_ad_videos` status until complete
+- **fetchTranscriptAnalysis(videoId)**: Fetches analysis data from `meta_ad_transcripts`
 
-### Security Considerations
+```typescript
+// Key functions
+async function triggerTranscription(organizationId: string, videoId: string)
+async function waitForTranscription(videoId: string, maxWaitMs: number)
+async function fetchAnalysis(organizationId: string, videoId: string): TranscriptAnalysis
+```
 
-This is appropriate because:
-- The `has_role()` function is a `SECURITY DEFINER` function that safely queries `user_roles`
-- Admin users are already trusted with full system access
-- The `service_role` policy already grants similar access for backend operations
-- Organization-level access control remains intact for non-admin users
+#### 2. Modify `useVideoUpload.ts`
+
+After successful database insert, automatically trigger transcription:
+
+```typescript
+// After line ~395 where status becomes 'ready'
+// Call edge function to start transcription
+await supabase.functions.invoke('transcribe-meta-ad-video', {
+  body: {
+    organization_id: organizationId,
+    video_id: videoId,
+    mode: 'single',
+  },
+});
+```
+
+Update video status tracking to include transcription states:
+- `ready` -> `transcribing` -> `analyzing` -> `complete`
+
+#### 3. Modify `AdCopyWizard.tsx`
+
+Add logic to:
+1. Track transcription progress for uploaded videos
+2. Poll for transcription completion when videos are in pending states
+3. Fetch analysis data from `meta_ad_transcripts` when complete
+4. Populate the `analyses` state for step 2
+
+```typescript
+// Add effect to fetch analyses when videos are ready
+useEffect(() => {
+  const fetchAnalyses = async () => {
+    const readyVideos = currentVideos.filter(v => v.video_id);
+    for (const video of readyVideos) {
+      const analysis = await fetchTranscriptAnalysis(organizationId, video.video_id);
+      if (analysis) {
+        setAnalyses(prev => ({ ...prev, [video.id]: analysis }));
+      }
+    }
+  };
+  fetchAnalyses();
+}, [currentVideos]);
+```
+
+#### 4. Update Video Status Display
+
+In `VideoUploadStep.tsx`, update status progression:
+- `pending` -> Waiting to upload
+- `uploading` -> Uploading file
+- `extracting` -> Extracting audio (for large files)
+- `transcribing` -> Audio sent to Whisper API
+- `analyzing` -> GPT-4 analyzing transcript
+- `ready` -> Complete with analysis
+
+#### 5. Handle Edge Cases
+
+- **Transcription timeout**: Show error and allow retry
+- **API failures**: Surface error message and allow manual retry
+- **Large files**: Handle the longer processing time gracefully
+- **Multiple videos**: Process transcriptions in parallel with individual progress
+
+### Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/hooks/useVideoTranscriptionFlow.ts` | **New file** - Transcription workflow management |
+| `src/hooks/useVideoUpload.ts` | Trigger transcription after upload, track transcription status |
+| `src/components/ad-copy-studio/AdCopyWizard.tsx` | Fetch and populate analyses state |
+| `src/components/ad-copy-studio/steps/VideoUploadStep.tsx` | Update status display for transcription states |
+
+### Technical Details
+
+**Edge Function Call Pattern:**
+```typescript
+const { data, error } = await supabase.functions.invoke('transcribe-meta-ad-video', {
+  body: {
+    organization_id: organizationId,
+    video_id: videoId,
+    mode: 'single',
+  },
+});
+```
+
+**Polling Pattern:**
+```typescript
+// Poll meta_ad_videos.status until 'TRANSCRIBED'
+const pollInterval = 3000; // 3 seconds
+const maxAttempts = 60; // 3 minutes max
+```
+
+**Fetch Analysis Pattern:**
+```typescript
+const { data } = await supabase
+  .from('meta_ad_transcripts')
+  .select('*')
+  .eq('video_id', videoId)
+  .single();
+
+// Map to TranscriptAnalysis type
+const analysis: TranscriptAnalysis = {
+  transcript_text: data.transcript_text,
+  issue_primary: data.issue_primary,
+  issue_tags: data.issue_tags || [],
+  // ... rest of mapping
+};
+```
+
+### Expected Result
+
+After implementation:
+1. User uploads video
+2. Progress shows: Uploading -> Extracting -> Transcribing -> Analyzing -> Ready
+3. User proceeds to Step 2
+4. Transcript and analysis cards display correctly
+5. User can review and proceed to Step 3
 
