@@ -11,6 +11,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+ import { extractAudio, shouldExtractAudio, isFFmpegSupported } from '@/lib/audio-extractor';
 import type {
   VideoUpload,
   ImportGDriveResponse,
@@ -46,6 +47,7 @@ const MAX_VIDEOS = 5;
 const STORAGE_BUCKET = 'meta-ad-videos';
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo'];
 const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024; // 500MB
+ const AUDIO_BUCKET = 'meta-ad-audio'; // Bucket for extracted audio files
 
 // =============================================================================
 // Helper Functions
@@ -197,13 +199,53 @@ export function useVideoUpload(
         // Generate storage path
         const sanitizedFilename = sanitizeFilename(file.name);
         const videoId = `upload_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        const storagePath = `${organizationId}/${batchId}/${videoId}_${sanitizedFilename}`;
+         
+         // Determine if we should extract audio for large files
+         const needsAudioExtraction = shouldExtractAudio(file) && isFFmpegSupported();
+         let fileToUpload: File | Blob = file;
+         let storageBucket = STORAGE_BUCKET;
+         let storagePath = `${organizationId}/${batchId}/${videoId}_${sanitizedFilename}`;
+         let contentType = file.type;
+         let extractedAudioFilename: string | undefined;
+         
+         // Extract audio for large files
+         if (needsAudioExtraction) {
+           console.log(`[useVideoUpload] Large file detected (${(file.size / 1024 / 1024).toFixed(1)}MB), extracting audio...`);
+           updateVideo(video.id, { status: 'extracting', progress: 0 });
+           
+           try {
+             const { audioFile, originalFilename } = await extractAudio(file, {
+               onProgress: (progress) => {
+                 // Map extraction progress to 0-40% of total progress
+                 const mappedProgress = Math.round(progress.percent * 0.4);
+                 updateVideo(video.id, { progress: mappedProgress });
+               },
+             });
+             
+             fileToUpload = audioFile;
+             storageBucket = AUDIO_BUCKET;
+             extractedAudioFilename = audioFile.name;
+             storagePath = `${organizationId}/${batchId}/${videoId}_${sanitizeFilename(audioFile.name)}`;
+             contentType = 'audio/mpeg';
+             
+             console.log(`[useVideoUpload] Audio extracted: ${audioFile.name} (${(audioFile.size / 1024 / 1024).toFixed(2)}MB)`);
+             updateVideo(video.id, { status: 'uploading', progress: 40 });
+           } catch (extractError: any) {
+             console.error('[useVideoUpload] Audio extraction failed:', extractError);
+             // Fall back to uploading the original file
+             console.log('[useVideoUpload] Falling back to original file upload');
+             fileToUpload = file;
+             storageBucket = STORAGE_BUCKET;
+             storagePath = `${organizationId}/${batchId}/${videoId}_${sanitizedFilename}`;
+             contentType = file.type;
+           }
+         }
 
-        // Upload to Supabase Storage
+         // Upload to Supabase Storage (either extracted audio or original video)
         const { error: uploadError } = await supabase.storage
-          .from(STORAGE_BUCKET)
-          .upload(storagePath, file, {
-            contentType: file.type,
+           .from(storageBucket)
+           .upload(storagePath, fileToUpload, {
+             contentType,
             upsert: false,
           });
 
@@ -216,12 +258,12 @@ export function useVideoUpload(
           continue;
         }
 
-        // Update progress to 50% (upload complete, now creating record)
-        updateVideo(video.id, { progress: 50 });
+         // Update progress (upload complete, now creating record)
+         updateVideo(video.id, { progress: needsAudioExtraction ? 70 : 50 });
 
         // Get the public URL
         const { data: publicUrlData } = supabase.storage
-          .from(STORAGE_BUCKET)
+           .from(storageBucket)
           .getPublicUrl(storagePath);
 
         const videoUrl = publicUrlData?.publicUrl;
@@ -237,6 +279,8 @@ export function useVideoUpload(
             source: 'uploaded',
             original_filename: file.name,
             video_file_size_bytes: file.size,
+             audio_extracted: needsAudioExtraction,
+             audio_filename: extractedAudioFilename,
             uploaded_by: userId,
             status: 'PENDING',
             resolution_method: 'manual',

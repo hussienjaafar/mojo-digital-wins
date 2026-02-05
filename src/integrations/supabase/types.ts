@@ -6056,6 +6056,8 @@ export type Database = {
       meta_ad_videos: {
         Row: {
           ad_id: string
+          audio_extracted: boolean | null
+          audio_filename: string | null
           created_at: string | null
           creative_id: string | null
           downloaded_at: string | null
@@ -6078,6 +6080,8 @@ export type Database = {
         }
         Insert: {
           ad_id: string
+          audio_extracted?: boolean | null
+          audio_filename?: string | null
           created_at?: string | null
           creative_id?: string | null
           downloaded_at?: string | null
@@ -6100,6 +6104,8 @@ export type Database = {
         }
         Update: {
           ad_id?: string
+          audio_extracted?: boolean | null
+          audio_filename?: string | null
           created_at?: string | null
           creative_id?: string | null
           downloaded_at?: string | null

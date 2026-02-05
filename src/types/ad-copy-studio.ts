@@ -39,7 +39,7 @@ export interface VideoUpload {
   source: 'uploaded' | 'gdrive';
   filename: string;
   file_size_bytes: number;
-  status: 'pending' | 'uploading' | 'transcribing' | 'analyzing' | 'ready' | 'error';
+   status: 'pending' | 'uploading' | 'extracting' | 'transcribing' | 'analyzing' | 'ready' | 'error';
   progress: number;
   error_message?: string;
   video_id?: string;

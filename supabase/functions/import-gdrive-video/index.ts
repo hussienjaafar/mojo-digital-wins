@@ -218,8 +218,8 @@ serve(async (req) => {
             reader.cancel();
             throw new GDriveError(
               'FILE_TOO_LARGE',
-              `File exceeds ${MAX_CHUNK_SIZE / 1024 / 1024}MB limit for edge function processing`,
-              'Please download the video manually and use the direct upload feature, which supports larger files.'
+               `File exceeds ${MAX_CHUNK_SIZE / 1024 / 1024}MB limit for Google Drive import`,
+               'This file is too large for automated import. Please download it from Google Drive first, then use the "Upload Files" button. Files up to 500MB are supported with local audio extraction.'
             );
           }
         }
