@@ -191,6 +191,9 @@ export function AdCopyWizard({
   // Track failed/cancelled videos to prevent re-polling
   const failedVideosRef = useRef<Set<string>>(new Set());
 
+  // Track if backend status sync has run (prevents infinite loops)
+  const hasSyncedRef = useRef(false);
+
   // =========================================================================
   // Transcription Flow Hook
   // =========================================================================
@@ -238,18 +241,26 @@ export function AdCopyWizard({
     }
   }, [stepData.analyses]);
 
-  // Sync video statuses from backend on load
+  // Sync video statuses from backend on load (ONCE per mount)
   // This ensures UI reflects the true database state after refresh
   useEffect(() => {
+    // Only sync once per session load
+    if (hasSyncedRef.current) return;
+    
     const syncBackendStatuses = async () => {
-      const currentVideos = videos.length > 0 ? videos : (stepData.videos || []);
-      const videoDbIds = currentVideos
+      // Use stepData.videos as the source since that's what persists across refreshes
+      const videosToSync = stepData.videos || [];
+      const videoDbIds = videosToSync
         .filter((v: VideoUpload) => v.video_id)
         .map((v: VideoUpload) => v.video_id);
 
       if (videoDbIds.length === 0) return;
+      
+      // Mark as synced to prevent re-runs
+      hasSyncedRef.current = true;
 
       try {
+        console.log('[AdCopyWizard] Syncing backend statuses for', videoDbIds.length, 'videos');
         const { data, error } = await (supabase as any)
           .from('meta_ad_videos')
           .select('id, status, error_message, updated_at')
@@ -278,13 +289,11 @@ export function AdCopyWizard({
           'TRANSCRIBING': 'transcribing',
         };
 
-        let hasChanges = false;
         data.forEach((dbVideo: any) => {
           const uiStatus = statusMap[dbVideo.status] || 'transcribing';
-          const currentVideo = currentVideos.find((v: VideoUpload) => v.video_id === dbVideo.id);
+          const currentVideo = videosToSync.find((v: VideoUpload) => v.video_id === dbVideo.id);
           
           if (currentVideo && currentVideo.status !== uiStatus) {
-            hasChanges = true;
             console.log(`[AdCopyWizard] Syncing video ${dbVideo.id}: ${currentVideo.status} -> ${uiStatus} (backend: ${dbVideo.status})`);
             
             // Update via hook
@@ -297,9 +306,7 @@ export function AdCopyWizard({
           }
         });
 
-        if (hasChanges) {
-          console.log('[AdCopyWizard] Backend status sync complete');
-        }
+        console.log('[AdCopyWizard] Backend status sync complete');
       } catch (err) {
         console.error('[AdCopyWizard] Error syncing backend statuses:', err);
       }
@@ -308,7 +315,7 @@ export function AdCopyWizard({
     // Run sync after a short delay to allow hydration to complete
     const timer = setTimeout(syncBackendStatuses, 500);
     return () => clearTimeout(timer);
-  }, [videos, stepData.videos, updateVideoStatus]);
+  }, [stepData.videos, updateVideoStatus]);
 
   // Poll for transcription completion and fetch analyses for videos in transcribing state
   useEffect(() => {

@@ -125,7 +125,9 @@ export function useVideoUpload(
           (v.status === 'transcribing' ? (v.backendUpdatedAt ? new Date(v.backendUpdatedAt).getTime() : Date.now()) : undefined),
       }));
       setVideos(hydratedVideos);
-      console.log(`[useVideoUpload] Hydrated ${hydratedVideos.length} videos from session`);
+      console.log(`[useVideoUpload] Hydrated ${hydratedVideos.length} videos from session:`, 
+        hydratedVideos.map(v => ({ id: v.id, video_id: v.video_id, status: v.status }))
+      );
     }
   }, [initialVideos, videos.length]);
   const [isUploading, setIsUploading] = useState(false);
@@ -665,11 +667,17 @@ export function useVideoUpload(
    * Used by AdCopyWizard to sync status from polling
    */
   const updateVideoStatus = useCallback((videoDbId: string, status: VideoUpload['status'], errorMessage?: string) => {
-    setVideos(prev => prev.map(v => 
-      v.video_id === videoDbId 
-        ? { ...v, status, error_message: errorMessage }
-        : v
-    ));
+    console.log(`[useVideoUpload] updateVideoStatus called: videoDbId=${videoDbId}, status=${status}`);
+    setVideos(prev => {
+      const updated = prev.map(v => {
+        if (v.video_id === videoDbId) {
+          console.log(`[useVideoUpload] Found matching video, updating status: ${v.status} -> ${status}`);
+          return { ...v, status, error_message: errorMessage };
+        }
+        return v;
+      });
+      return updated;
+    });
   }, []);
 
   /**
