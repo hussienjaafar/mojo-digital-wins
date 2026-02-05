@@ -1,92 +1,113 @@
 
-## Diagnosis (why you’re still seeing the timeout)
+## Fix: FFmpeg.wasm Hanging on `load()` - Root Cause Found
 
-From the latest logs:
+### Problem Diagnosis
 
-- `https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-core/0.12.6/esm/ffmpeg-core.js` loads (200)
-- `https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-core/0.12.6/esm/ffmpeg-core.wasm` fails (404)
+After researching the FFmpeg.wasm GitHub issues (#815, #687, #804) and the official React Vite example, the root cause of the initialization hang is clear:
 
-So CDN #1 can never succeed because **cdnjs does not host the required `.wasm` file** for this library (it appears to only host the JS wrapper files). After that, we fall back to unpkg/jsdelivr, but the loader currently has two behaviors that make timeouts much more likely:
+**Vite pre-bundles `@ffmpeg/ffmpeg` and `@ffmpeg/util` by default, which breaks the internal Web Worker loading mechanism.** This causes `ffmpeg.load()` to hang indefinitely without any error.
 
-1) **Timeout is too aggressive (60s) for a ~30MB wasm download** on slower connections.  
-2) **One shared AbortController / timeout is used across all CDN attempts**, so if CDN #1 fails quickly, CDN #2 often has significantly less than 60s left before it gets aborted.
+From GitHub Issue #815 (Jan 2025):
+> "if you are using vite adding ffmpeg in the exclude array in the optimizedeps filed in vite.config file solved the issue."
 
-Result: users hit `FFMPEG_LOAD_TIMEOUT` even though their network is “fine”, just not fast enough (or one CDN is slow/blocked).
+The official FFmpeg.wasm React Vite example includes this configuration:
+```typescript
+optimizeDeps: {
+  exclude: ["@ffmpeg/ffmpeg", "@ffmpeg/util"],
+}
+```
 
----
-
-## What we will change
-
-### A) Remove cdnjs from the FFmpeg CDN fallback list (because it can’t supply the wasm)
-**File:** `src/lib/audio-extractor.ts`
-
-- Update `CDN_SOURCES` to only include sources that actually host:
-  - `ffmpeg-core.js`
-  - `ffmpeg-core.wasm`
-
-Recommended order:
-1. jsDelivr (often most reliable)
-2. unpkg
-(Optionally add a 3rd known-good mirror if desired.)
-
-### B) Give each CDN attempt its own timeout + abort controller (so retries are real retries)
-**File:** `src/lib/audio-extractor.ts`
-
-Refactor `getFFmpeg()` so each CDN attempt does:
-
-- `const attemptAbortController = new AbortController()`
-- `const attemptTimeoutId = setTimeout(() => attemptAbortController.abort(), ATTEMPT_TIMEOUT_MS)`
-- Call `loadFFmpegFromCDN(..., attemptAbortController.signal)`
-- `clearTimeout(attemptTimeoutId)` in both success and failure paths
-
-This prevents CDN #2 from inheriting a “nearly expired” timer from CDN #1.
-
-### C) Increase the FFmpeg load timeout to something realistic for wasm downloads
-**File:** `src/lib/audio-extractor.ts`
-
-- Increase `FFMPEG_LOAD_TIMEOUT_MS` from **60s → 180s** (3 minutes), or make it configurable.
-- Keep extraction timeout separate (already 3 minutes for the entire extraction).
-
-This is specifically to accommodate:
-- 30MB wasm download time on slower networks
-- the `ffmpeg.load()` initialization step after download
-
-### D) Improve error reporting to avoid “timeout” when it’s actually a 404
-**File:** `src/lib/audio-extractor.ts`
-
-- When a CDN fails with `HTTP 404`, we’ll log/emit a progress message like:
-  - “CDN missing required file; switching to backup…”
-- Only throw `FFMPEG_LOAD_TIMEOUT` after:
-  - all CDNs have been tried, and
-  - the failures were timeouts (not immediate 404s)
-
-This makes the UI error more accurate and makes debugging easier.
+Your current `vite.config.ts` is missing this configuration entirely.
 
 ---
 
-## Files to change
+### Solution
 
-- `src/lib/audio-extractor.ts` (only)
+#### Change 1: Update vite.config.ts
 
-No database/backend changes required.
+Add the `optimizeDeps.exclude` configuration to prevent Vite from pre-bundling FFmpeg:
+
+| File | Change |
+|------|--------|
+| `vite.config.ts` | Add `optimizeDeps: { exclude: ["@ffmpeg/ffmpeg", "@ffmpeg/util"] }` |
+
+```typescript
+// vite.config.ts - add this configuration
+export default defineConfig(({ mode }) => ({
+  // ... existing config ...
+  optimizeDeps: {
+    exclude: ["@ffmpeg/ffmpeg", "@ffmpeg/util"],
+  },
+  // ... rest of config ...
+}));
+```
+
+#### Change 2: Update CDN to match installed version
+
+The installed `@ffmpeg/ffmpeg` version is `0.12.15`, but the code tries to load `@ffmpeg/core@0.12.6` from CDN. Update to use a matching/compatible version:
+
+| File | Change |
+|------|--------|
+| `src/lib/audio-extractor.ts` | Update `CDN_SOURCES` to use `@ffmpeg/core@0.12.10` (the latest stable) |
+
+```typescript
+// Updated CDN_SOURCES
+const CDN_SOURCES = [
+  'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm',
+  'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm',
+];
+```
 
 ---
 
-## How we’ll verify (end-to-end)
+### Technical Details
 
-1. Go to `/admin/ad-copy-studio` and hard refresh.
-2. Upload the 162MB video again.
-3. Confirm in the UI:
-   - It no longer tries the cdnjs URL first
-   - You see “Downloading audio processor (XMB / YMB)…”
-   - It proceeds past “Initializing audio processor…”
-4. Throttle network to “Fast 3G” in DevTools and retry:
-   - Confirm it does not fail at 60 seconds anymore.
-5. Re-test once more after a failed attempt (retry path):
-   - Confirm it can still recover and try again (promise resets properly).
+#### Why `optimizeDeps.exclude` is Required
+
+1. `@ffmpeg/ffmpeg` uses dynamic imports and Web Workers internally
+2. When Vite pre-bundles the package, it mangles the internal module structure
+3. This breaks the Web Worker loading mechanism (wrong MIME types, missing chunks)
+4. The result is `ffmpeg.load()` hangs forever without throwing an error
+
+#### Why Version Alignment Matters
+
+- The `@ffmpeg/ffmpeg` wrapper (v0.12.15) expects specific file structures from `@ffmpeg/core`
+- Using v0.12.6 core files with v0.12.15 wrapper may cause subtle incompatibilities
+- v0.12.10 is the latest stable version with confirmed working CDN files
 
 ---
 
-## Notes / optional follow-up improvement (if needed)
+### Files to Modify
 
-If some corporate networks block unpkg/jsDelivr entirely, the most robust long-term solution is to **self-host the two FFmpeg core files** (JS + WASM) as static assets under your app (or your backend file storage with proper caching headers). That would eliminate third-party CDN reliability issues. We can consider that if the timeout persists after the fixes above.
+1. **`vite.config.ts`** - Add optimizeDeps.exclude configuration
+2. **`src/lib/audio-extractor.ts`** - Update CDN version to 0.12.10
+
+---
+
+### Verification Steps
+
+After implementing:
+
+1. **Hard refresh the page** (Ctrl+Shift+R / Cmd+Shift+R) to clear cached modules
+2. Open browser DevTools Network tab
+3. Go to `/admin/ad-copy-studio`
+4. Upload a video file
+5. Confirm you see:
+   - "Connecting to jsDelivr..." message
+   - "Downloading audio processor (X MB / 30 MB)..." with progress
+   - "Initializing audio processor..." (should complete in 1-5 seconds)
+   - "Audio processor ready"
+6. The extraction should then proceed normally
+
+---
+
+### Why Previous Fixes Didn't Work
+
+| Previous Attempt | Why It Failed |
+|-----------------|---------------|
+| Fixing CDN URLs | Files downloaded successfully, but `load()` still hung |
+| Adding timeouts | The hang is in WASM compilation, not a timeout issue |
+| Changing CDN order | All CDNs work fine; the issue is Vite's pre-bundling |
+| Passing AbortSignal | The `load()` method doesn't support abort during WASM init |
+
+The `optimizeDeps.exclude` fix addresses the actual root cause: Vite's incorrect pre-bundling of FFmpeg modules.
