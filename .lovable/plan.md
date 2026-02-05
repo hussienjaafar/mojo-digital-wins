@@ -1,160 +1,118 @@
 
-# Fix Audio Extraction Loading State Issue
 
-## Problem Summary
+# Fix FFmpeg Loading Stuck at "Loading audio processor..."
 
-The audio extraction feature gets stuck in a permanent loading state when users upload large video files. The root cause is known issues with FFmpeg.wasm 0.12.x.
+## Problem
+The audio extraction is getting stuck at "Loading audio processor..." because the FFmpeg.wasm core files (~30MB total) are being fetched from unpkg.com using `toBlobURL()` which has no timeout or progress reporting. If the network is slow or the CDN is unresponsive, this fetch hangs indefinitely.
 
-## Root Causes Identified
+## Root Cause Analysis
 
-| Issue | Impact | Evidence |
-|-------|--------|----------|
-| WORKERFS mount fails | Silent failure, falls back to slow path | GitHub issue #757 - "ErrnoError: FS error" |
-| writeFile stalls on large files | Infinite hang during "Preparing file..." | StackOverflow reports of writeFile never completing |
-| No timeout mechanism | Users stuck with spinning loader forever | Code review shows no timeout/abort logic |
-| Single-threaded FFmpeg | 3-5x slower processing | No COOP/COEP headers, no SharedArrayBuffer |
+| Issue | Impact |
+|-------|--------|
+| `toBlobURL` has no timeout | Fetches can hang forever |
+| No progress during 30MB download | Users see 0% with no indication of activity |
+| Single CDN dependency (unpkg.com) | If unpkg is slow, extraction fails |
+| Preload failure is silent | Users don't know until they try to upload |
 
-## Solution Strategy
+## Solution
 
-Since WORKERFS mounting is unreliable in FFmpeg.wasm 0.12.x, we need to:
+### 1. Add timeout to FFmpeg loading
+Wrap the `toBlobURL` calls with a timeout to fail fast if loading takes too long (30 seconds).
 
-1. **Remove WORKERFS entirely** - Go back to writeFile but with safeguards
-2. **Add timeout protection** - Abort extraction if it takes too long
-3. **Use chunked reading** - Read file in chunks to show progress and reduce memory pressure
-4. **Add a fallback option** - Let users skip extraction and upload the full video (for small files)
-5. **Better error recovery** - Show clear error messages with retry/skip options
+### 2. Add real progress during FFmpeg download  
+Use `fetch` with progress tracking instead of `toBlobURL` to show actual download progress during the "Loading audio processor" phase.
 
-## Implementation Plan
+### 3. Add CDN fallback
+Try multiple CDN sources (unpkg, jsdelivr, esm.sh) if the primary fails.
 
-### File 1: `src/lib/audio-extractor.ts`
+### 4. Improve error messaging
+Show clear error when FFmpeg fails to load with retry option.
 
-**Changes:**
+## Implementation Details
 
-1. **Remove WORKERFS mount attempt entirely**
-   - Delete the `mountOrWriteFile` function
-   - Use `fetchFile` + `writeFile` directly with progress simulation
+### File: `src/lib/audio-extractor.ts`
 
-2. **Add extraction timeout**
-   - Set a maximum extraction time (e.g., 5 minutes for re-encoding)
-   - Abort FFmpeg execution if timeout exceeded
+**Replace the `getFFmpeg` function to include:**
 
-3. **Add chunked file reading with progress**
-   - Use FileReader to read file in chunks
-   - Report progress during the "Preparing file" stage
-
-4. **Improve error messages**
-   - Distinguish between timeout, memory, and codec errors
-   - Provide actionable suggestions
-
-### File 2: `src/hooks/useVideoUpload.ts`
-
-**Changes:**
-
-1. **Add extraction timeout handling**
-   - Wrap extraction call with timeout promise
-   - On timeout, set clear error message
-
-2. **Add skip extraction option**
-   - For files 25-50MB, allow direct upload as fallback
-   - Update UI state to reflect this option
-
-3. **Improve error recovery**
-   - Allow retry with different settings
-   - Allow skipping extraction for borderline files
-
-### File 3: `src/components/ad-copy-studio/steps/VideoUploadStep.tsx`
-
-**Changes:**
-
-1. **Add timeout warning**
-   - After 30 seconds, show "This is taking longer than expected"
-   - Offer "Cancel" and "Keep waiting" options
-
-2. **Add extraction error actions**
-   - "Retry extraction" button
-   - "Upload original file instead" button (for 25-50MB files)
-
-3. **Improve progress visibility**
-   - Show file reading progress separately from FFmpeg processing
-   - Display estimated time based on file size
-
-## Technical Details
-
-### Timeout Implementation
-
+1. **Progress-tracked fetch function**
 ```typescript
-const EXTRACTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-
-async function extractAudioWithTimeout(file: File, options: AudioExtractorOptions) {
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('EXTRACTION_TIMEOUT')), EXTRACTION_TIMEOUT_MS);
-  });
+async function fetchWithProgress(
+  url: string,
+  onProgress: (loaded: number, total: number) => void
+): Promise<Blob> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
   
-  return Promise.race([
-    extractAudio(file, options),
-    timeoutPromise
-  ]);
-}
-```
-
-### Chunked File Reading
-
-```typescript
-async function readFileWithProgress(
-  file: File, 
-  onProgress: (percent: number) => void
-): Promise<Uint8Array> {
-  const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
+  const contentLength = response.headers.get('content-length');
+  const total = contentLength ? parseInt(contentLength, 10) : 0;
+  
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('No response body');
+  
   const chunks: Uint8Array[] = [];
-  let offset = 0;
+  let loaded = 0;
   
-  while (offset < file.size) {
-    const chunk = file.slice(offset, offset + CHUNK_SIZE);
-    const buffer = await chunk.arrayBuffer();
-    chunks.push(new Uint8Array(buffer));
-    offset += CHUNK_SIZE;
-    onProgress(Math.min(100, (offset / file.size) * 100));
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.length;
+    onProgress(loaded, total);
   }
   
-  // Combine chunks
-  const combined = new Uint8Array(file.size);
-  let position = 0;
-  for (const chunk of chunks) {
-    combined.set(chunk, position);
-    position += chunk.length;
-  }
-  return combined;
+  return new Blob(chunks);
 }
 ```
 
-### UI Timeout Warning
+2. **CDN fallback list**
+```typescript
+const CDN_SOURCES = [
+  'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm',
+  'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm',
+  'https://esm.sh/@ffmpeg/core@0.12.6/dist/esm',
+];
+```
 
-After 30 seconds in extraction state, show:
-- "Extraction is taking longer than expected"
-- "For large videos, this can take several minutes"
-- Cancel button to abort and try again
+3. **Loading timeout (30 seconds)**
+```typescript
+const FFMPEG_LOAD_TIMEOUT_MS = 30 * 1000;
 
-## Risk Mitigation
+// In getFFmpeg:
+const timeoutPromise = new Promise((_, reject) => {
+  setTimeout(() => reject(new Error('FFMPEG_LOAD_TIMEOUT')), FFMPEG_LOAD_TIMEOUT_MS);
+});
 
-| Risk | Mitigation |
-|------|------------|
-| Chunked reading still slow | Show clear progress so users know it's working |
-| Memory issues persist | Add 100MB soft limit with warning |
-| Timeout too aggressive | Allow "Keep waiting" option |
-| Users confused by options | Clear explanatory text in UI |
+await Promise.race([loadFFmpegWithProgress(), timeoutPromise]);
+```
+
+4. **Progress reporting during download**
+```typescript
+onProgress?.({
+  stage: 'loading',
+  percent: Math.round((loaded / total) * 50), // 0-50% for core.js, 50-100% for wasm
+  message: `Downloading audio processor (${(loaded / 1024 / 1024).toFixed(1)}MB)...`,
+});
+```
+
+### File: `src/components/ad-copy-studio/steps/VideoUploadStep.tsx`
+
+**Add better loading state display:**
+- Show download progress percentage during FFmpeg loading
+- Display estimated time remaining based on download speed
+- Add "Cancel" button to abort loading
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/lib/audio-extractor.ts` | Replace toBlobURL with progress-tracked fetch, add timeout, add CDN fallback |
+| `src/components/ad-copy-studio/steps/VideoUploadStep.tsx` | Show download progress during loading stage |
 
 ## Expected Outcome
 
 After these changes:
-- Users will see clear progress during file preparation
-- Extraction that hangs will timeout with actionable options
-- Users can choose to upload original file if extraction fails
-- Error messages will explain what went wrong and what to do
+- Users will see real download progress (e.g., "Downloading audio processor (5.2MB / 30MB)...")
+- Loading that takes too long will timeout with a clear error
+- CDN failures will automatically try alternative sources
+- Users can cancel if loading is too slow
 
-## Files to Modify
-
-| File | Change Type |
-|------|-------------|
-| `src/lib/audio-extractor.ts` | Remove WORKERFS, add timeout, chunked reading |
-| `src/hooks/useVideoUpload.ts` | Add timeout wrapper, skip option |
-| `src/components/ad-copy-studio/steps/VideoUploadStep.tsx` | Add timeout UI, error actions |
