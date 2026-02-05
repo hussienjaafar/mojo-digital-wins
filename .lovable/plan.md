@@ -1,118 +1,116 @@
 
+## What’s happening (root cause)
 
-# Fix FFmpeg Loading Stuck at "Loading audio processor..."
+From the current code in `src/lib/audio-extractor.ts`, the FFmpeg loader downloads only:
 
-## Problem
-The audio extraction is getting stuck at "Loading audio processor..." because the FFmpeg.wasm core files (~30MB total) are being fetched from unpkg.com using `toBlobURL()` which has no timeout or progress reporting. If the network is slow or the CDN is unresponsive, this fetch hangs indefinitely.
+- `ffmpeg-core.js`
+- `ffmpeg-core.wasm`
 
-## Root Cause Analysis
+…but **does not download/provide `ffmpeg-core.worker.js`** and also **does not pass `workerURL`** into `ffmpeg.load()`.
 
-| Issue | Impact |
-|-------|--------|
-| `toBlobURL` has no timeout | Fetches can hang forever |
-| No progress during 30MB download | Users see 0% with no indication of activity |
-| Single CDN dependency (unpkg.com) | If unpkg is slow, extraction fails |
-| Preload failure is silent | Users don't know until they try to upload |
+With `@ffmpeg/ffmpeg` (0.12.x), the worker script is required. When `coreURL` is a **blob URL** (as we create with `URL.createObjectURL()`), FFmpeg can’t reliably infer the worker script location. This commonly results in **FFmpeg.load() hanging indefinitely**, which matches “Loading audio processor…” with no progress.
 
-## Solution
+A second, separate UX issue: `VideoUploadStep` calls `preloadFFmpeg()` on mount. That can start the load **without any onProgress callback**, and later `extractAudio()` can’t attach progress to an in-flight `ffmpegLoadPromise`. So users can see “Loading…” with no “real progress” even when the download is actually happening.
 
-### 1. Add timeout to FFmpeg loading
-Wrap the `toBlobURL` calls with a timeout to fail fast if loading takes too long (30 seconds).
+## Goals
 
-### 2. Add real progress during FFmpeg download  
-Use `fetch` with progress tracking instead of `toBlobURL` to show actual download progress during the "Loading audio processor" phase.
+1. Make FFmpeg loading reliable (no infinite “Loading audio processor…”).
+2. Ensure progress updates always show up, even if preload started first.
+3. Fail fast with a clear error + retry path if loading stalls.
 
-### 3. Add CDN fallback
-Try multiple CDN sources (unpkg, jsdelivr, esm.sh) if the primary fails.
+---
 
-### 4. Improve error messaging
-Show clear error when FFmpeg fails to load with retry option.
+## Changes to implement
 
-## Implementation Details
+### 1) Fix FFmpeg load by including the worker script (primary fix)
+**File:** `src/lib/audio-extractor.ts`
 
-### File: `src/lib/audio-extractor.ts`
+- Update `loadFFmpegFromCDN()` to fetch **three** assets:
+  - `ffmpeg-core.js` (coreURL)
+  - `ffmpeg-core.wasm` (wasmURL)
+  - `ffmpeg-core.worker.js` (workerURL)
+- Call:
+  - `await ffmpeg.load({ coreURL, wasmURL, workerURL })`
 
-**Replace the `getFFmpeg` function to include:**
+Why: this eliminates the “hang” caused by missing worker resolution when using blob URLs.
 
-1. **Progress-tracked fetch function**
-```typescript
-async function fetchWithProgress(
-  url: string,
-  onProgress: (loaded: number, total: number) => void
-): Promise<Blob> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  
-  const contentLength = response.headers.get('content-length');
-  const total = contentLength ? parseInt(contentLength, 10) : 0;
-  
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('No response body');
-  
-  const chunks: Uint8Array[] = [];
-  let loaded = 0;
-  
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    loaded += value.length;
-    onProgress(loaded, total);
-  }
-  
-  return new Blob(chunks);
-}
-```
+Also:
+- Add a progress message before the `ffmpeg.load()` call like “Initializing audio processor…” so the user sees progress even after downloads complete.
 
-2. **CDN fallback list**
-```typescript
-const CDN_SOURCES = [
-  'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm',
-  'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm',
-  'https://esm.sh/@ffmpeg/core@0.12.6/dist/esm',
-];
-```
+### 2) Add a real “overall load timeout” (covers hangs inside ffmpeg.load)
+**File:** `src/lib/audio-extractor.ts`
 
-3. **Loading timeout (30 seconds)**
-```typescript
-const FFMPEG_LOAD_TIMEOUT_MS = 30 * 1000;
+Right now the 30s timeout aborts the `fetch()` calls, but if downloads finish and `ffmpeg.load()` hangs, it can still stall forever.
 
-// In getFFmpeg:
-const timeoutPromise = new Promise((_, reject) => {
-  setTimeout(() => reject(new Error('FFMPEG_LOAD_TIMEOUT')), FFMPEG_LOAD_TIMEOUT_MS);
-});
+- Wrap the entire CDN attempt (downloads + `ffmpeg.load`) in `Promise.race()` with a timer.
+- If it fires, throw `FFMPEG_LOAD_TIMEOUT`.
+- Ensure we reset `ffmpegLoadPromise = null` so a retry is possible.
 
-await Promise.race([loadFFmpegWithProgress(), timeoutPromise]);
-```
+### 3) Ensure progress works even if preload started first (subscriber model)
+**File:** `src/lib/audio-extractor.ts`
 
-4. **Progress reporting during download**
-```typescript
-onProgress?.({
-  stage: 'loading',
-  percent: Math.round((loaded / total) * 50), // 0-50% for core.js, 50-100% for wasm
-  message: `Downloading audio processor (${(loaded / 1024 / 1024).toFixed(1)}MB)...`,
-});
-```
+Implement a small subscriber system:
 
-### File: `src/components/ad-copy-studio/steps/VideoUploadStep.tsx`
+- Maintain `Set<(p: AudioExtractionProgress) => void>` for “load progress listeners”
+- When `getFFmpeg(onProgress)` is called:
+  - If a load is already in progress (`ffmpegLoadPromise` exists), **register the callback** and return the same promise.
+  - The loader emits progress to **all** subscribers.
+- On completion or failure, clear subscribers.
 
-**Add better loading state display:**
-- Show download progress percentage during FFmpeg loading
-- Display estimated time remaining based on download speed
-- Add "Cancel" button to abort loading
+Result: even if `preloadFFmpeg()` kicked off loading without UI, the moment the user uploads a video, the UI can attach and start receiving progress updates.
 
-## Files to Modify
+### 4) Surface “FFmpeg load timeout” cleanly in the upload flow
+**File:** `src/hooks/useVideoUpload.ts`
 
-| File | Changes |
-|------|---------|
-| `src/lib/audio-extractor.ts` | Replace toBlobURL with progress-tracked fetch, add timeout, add CDN fallback |
-| `src/components/ad-copy-studio/steps/VideoUploadStep.tsx` | Show download progress during loading stage |
+Add explicit handling for `FFMPEG_LOAD_TIMEOUT` (and “failed to load audio processor” errors) to:
 
-## Expected Outcome
+- Set `status: 'error'`
+- Provide a clear message: “Audio processor download/initialization timed out. Please retry.”
+- For smaller files (<= 50MB), continue offering fallback to upload original video (as you already do).
 
-After these changes:
-- Users will see real download progress (e.g., "Downloading audio processor (5.2MB / 30MB)...")
-- Loading that takes too long will timeout with a clear error
-- CDN failures will automatically try alternative sources
-- Users can cancel if loading is too slow
+### 5) Improve the UI message shown during loading (optional but recommended)
+**File:** `src/components/ad-copy-studio/steps/VideoUploadStep.tsx`
+**Types:** `src/types/ad-copy-studio.ts`
 
+Right now the UI only displays a stage label (“Loading audio processor…”). We should display the real download message we already generate (e.g., `Downloading audio processor (5.2MB / 31.2MB)...`).
+
+- Extend `VideoUpload` to include:
+  - `extractionMessage?: string`
+  - (optional) `extractionStagePercent?: number` (raw 0–100 for the stage)
+- In `useVideoUpload` onProgress handler, set:
+  - `extractionMessage = progress.message`
+  - `extractionStagePercent = progress.percent`
+- In `VideoUploadStep`, show `video.extractionMessage ?? getExtractionStageLabel(...)`
+
+This makes “real progress” visible during loading, not just a generic label.
+
+---
+
+## Testing plan (end-to-end)
+
+1. Go to `/admin/ad-copy-studio`.
+2. Hard refresh (to avoid cached old FFmpeg assets) and upload a >25MB video.
+3. Confirm you see:
+   - “Starting audio processor download…”
+   - Then “Downloading audio processor (XMB / YMB)…”
+   - Then “Initializing audio processor…”
+   - Then stage moves to “Reading video file…” etc.
+4. Simulate bad network (Chrome DevTools → Network throttling “Slow 3G”):
+   - Confirm progress still updates
+   - If it stalls, it should error out with a clear timeout message rather than loading forever.
+5. Try a second upload after a timeout:
+   - Confirm it retries successfully (i.e., `ffmpegLoadPromise` resets correctly).
+
+---
+
+## Notes on the manifest.webmanifest CORS error
+
+The `manifest.webmanifest` CORS message you pasted is unrelated to FFmpeg loading and does not explain the “Loading audio processor…” hang. We’ll focus on fixing the FFmpeg loader reliability first.
+
+---
+
+## “Next” improvements (after this is stable)
+
+- Add a visible “Retry” button on the stuck/extracting row when loading fails.
+- Add a “Cancel extraction” button that aborts ongoing extraction via an exposed AbortController.
+- Add a lightweight diagnostics modal showing the last FFmpeg logs for debugging user-specific issues.
