@@ -6067,13 +6067,17 @@ export type Database = {
           id: string
           last_error_at: string | null
           organization_id: string
+          original_filename: string | null
           resolution_method: string | null
           retry_count: number | null
+          source: string | null
           status: string | null
           thumbnail_url: string | null
           transcribed_at: string | null
           updated_at: string | null
+          uploaded_by: string | null
           url_fetched_at: string | null
+          video_file_size_bytes: number | null
           video_id: string
           video_source_expires_at: string | null
           video_source_url: string | null
@@ -6091,13 +6095,17 @@ export type Database = {
           id?: string
           last_error_at?: string | null
           organization_id: string
+          original_filename?: string | null
           resolution_method?: string | null
           retry_count?: number | null
+          source?: string | null
           status?: string | null
           thumbnail_url?: string | null
           transcribed_at?: string | null
           updated_at?: string | null
+          uploaded_by?: string | null
           url_fetched_at?: string | null
+          video_file_size_bytes?: number | null
           video_id: string
           video_source_expires_at?: string | null
           video_source_url?: string | null
@@ -6115,13 +6123,17 @@ export type Database = {
           id?: string
           last_error_at?: string | null
           organization_id?: string
+          original_filename?: string | null
           resolution_method?: string | null
           retry_count?: number | null
+          source?: string | null
           status?: string | null
           thumbnail_url?: string | null
           transcribed_at?: string | null
           updated_at?: string | null
+          uploaded_by?: string | null
           url_fetched_at?: string | null
+          video_file_size_bytes?: number | null
           video_id?: string
           video_source_expires_at?: string | null
           video_source_url?: string | null
