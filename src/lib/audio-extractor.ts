@@ -91,18 +91,21 @@ export interface AudioExtractorOptions {
 // 3 minute timeout for extraction (reasonable for most files)
 const DEFAULT_EXTRACTION_TIMEOUT_MS = 3 * 60 * 1000;
 
-// 60 second timeout for FFmpeg loading (covers downloads + initialization)
-const FFMPEG_LOAD_TIMEOUT_MS = 60 * 1000;
+// 180 second (3 min) timeout for FFmpeg loading - ~30MB wasm download on slow networks
+const FFMPEG_LOAD_TIMEOUT_MS = 180 * 1000;
+
+// 90 second timeout per CDN attempt (gives each CDN a fair chance)
+const PER_CDN_TIMEOUT_MS = 90 * 1000;
 
 // 10MB chunks for reading files
 const FILE_CHUNK_SIZE = 10 * 1024 * 1024;
 
 // CDN sources for FFmpeg core files (fallback order)
-// Note: cdnjs uses a different path structure than npm CDNs
+// IMPORTANT: Only CDNs that host BOTH ffmpeg-core.js AND ffmpeg-core.wasm
+// cdnjs does NOT host the .wasm file, so it's excluded
 const CDN_SOURCES = [
-  'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-core/0.12.6/esm',
-  'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm',
   'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm',
+  'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm',
 ];
 
 // =============================================================================
@@ -269,6 +272,7 @@ async function loadFFmpegFromCDN(
 /**
  * Get or initialize the FFmpeg instance (singleton pattern)
  * Supports late-joining progress callbacks via subscriber model
+ * Each CDN attempt gets its own timeout and abort controller
  */
 async function getFFmpeg(onProgress?: (progress: AudioExtractionProgress) => void): Promise<FFmpeg> {
   if (ffmpegInstance?.loaded) {
@@ -303,33 +307,46 @@ async function getFFmpeg(onProgress?: (progress: AudioExtractionProgress) => voi
       addToLogBuffer(message);
     });
 
-    // Create abort controller for per-CDN fetch timeout
-    const fetchAbortController = new AbortController();
-    const fetchTimeoutId = setTimeout(() => {
-      fetchAbortController.abort();
+    // Global timeout for all CDN attempts combined
+    const globalTimeoutId = setTimeout(() => {
+      console.error('[AudioExtractor] Global timeout reached after all CDN attempts');
     }, FFMPEG_LOAD_TIMEOUT_MS);
 
-    let lastError: Error | null = null;
+    // Track errors from each CDN for better error reporting
+    const errors: { cdn: string; error: string; isTimeout: boolean; is404: boolean }[] = [];
 
-    // Try each CDN source
+    // Try each CDN source with its own abort controller
     for (let i = 0; i < CDN_SOURCES.length; i++) {
       const baseURL = CDN_SOURCES[i];
-      console.log(`[AudioExtractor] Trying CDN ${i + 1}/${CDN_SOURCES.length}: ${baseURL}`);
+      const cdnName = baseURL.includes('jsdelivr') ? 'jsDelivr' : 
+                      baseURL.includes('unpkg') ? 'unpkg' : `CDN ${i + 1}`;
+      
+      console.log(`[AudioExtractor] Trying ${cdnName} (${i + 1}/${CDN_SOURCES.length}): ${baseURL}`);
+      
+      // Create per-CDN abort controller and timeout
+      const attemptAbortController = new AbortController();
+      const attemptTimeoutId = setTimeout(() => {
+        attemptAbortController.abort();
+        console.warn(`[AudioExtractor] ${cdnName} attempt timed out after ${PER_CDN_TIMEOUT_MS / 1000}s`);
+      }, PER_CDN_TIMEOUT_MS);
       
       try {
-        // Wrap the entire load attempt in a race with timeout
-        const loadWithTimeout = Promise.race([
-          loadFFmpegFromCDN(ffmpeg, baseURL, (p) => notifyLoadProgress(p), fetchAbortController.signal),
-          new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('FFMPEG_INIT_TIMEOUT')), FFMPEG_LOAD_TIMEOUT_MS);
-          }),
-        ]);
+        // Notify which CDN we're trying
+        const tryingProgress: AudioExtractionProgress = {
+          stage: 'loading',
+          percent: 2,
+          message: `Connecting to ${cdnName}...`,
+        };
+        notifyLoadProgress(tryingProgress);
         
-        await loadWithTimeout;
+        await loadFFmpegFromCDN(ffmpeg, baseURL, (p) => notifyLoadProgress(p), attemptAbortController.signal);
         
-        clearTimeout(fetchTimeoutId);
+        // Success! Clear all timeouts
+        clearTimeout(attemptTimeoutId);
+        clearTimeout(globalTimeoutId);
+        
         const loadTime = performance.now() - loadStart;
-        console.log(`[AudioExtractor] FFmpeg.wasm loaded in ${loadTime.toFixed(0)}ms from ${baseURL}`);
+        console.log(`[AudioExtractor] FFmpeg.wasm loaded in ${loadTime.toFixed(0)}ms from ${cdnName}`);
         
         const readyProgress: AudioExtractionProgress = {
           stage: 'loading',
@@ -341,28 +358,67 @@ async function getFFmpeg(onProgress?: (progress: AudioExtractionProgress) => voi
         ffmpegInstance = ffmpeg;
         clearLoadProgressSubscribers();
         return ffmpeg;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
         
-        if (fetchAbortController.signal.aborted || lastError.message?.includes('TIMEOUT')) {
-          console.error('[AudioExtractor] FFmpeg load timed out');
-          clearTimeout(fetchTimeoutId);
-          ffmpegLoadPromise = null;
-          clearLoadProgressSubscribers();
-          throw new Error('FFMPEG_LOAD_TIMEOUT');
+      } catch (error) {
+        clearTimeout(attemptTimeoutId);
+        
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isTimeout = attemptAbortController.signal.aborted || errorMessage.includes('aborted');
+        const is404 = errorMessage.includes('404') || errorMessage.includes('Not Found');
+        
+        errors.push({ 
+          cdn: cdnName, 
+          error: errorMessage,
+          isTimeout,
+          is404
+        });
+        
+        // Log and notify about the failure
+        if (is404) {
+          console.warn(`[AudioExtractor] ${cdnName} missing required file (404), trying next...`);
+          notifyLoadProgress({
+            stage: 'loading',
+            percent: 3,
+            message: `${cdnName} unavailable, switching to backup...`,
+          });
+        } else if (isTimeout) {
+          console.warn(`[AudioExtractor] ${cdnName} timed out, trying next...`);
+          notifyLoadProgress({
+            stage: 'loading',
+            percent: 3,
+            message: `${cdnName} slow, trying backup...`,
+          });
+        } else {
+          console.warn(`[AudioExtractor] ${cdnName} failed: ${errorMessage}`);
+          notifyLoadProgress({
+            stage: 'loading',
+            percent: 3,
+            message: `${cdnName} error, trying backup...`,
+          });
         }
         
-        console.warn(`[AudioExtractor] CDN ${i + 1} failed:`, error);
         // Continue to next CDN
       }
     }
 
-    // All CDNs failed
-    clearTimeout(fetchTimeoutId);
+    // All CDNs failed - determine the best error message
+    clearTimeout(globalTimeoutId);
     ffmpegLoadPromise = null;
     clearLoadProgressSubscribers();
-    console.error('[AudioExtractor] All CDNs failed to load FFmpeg.wasm');
-    throw new Error(`Failed to load audio processor: ${lastError?.message || 'Unknown error'}`);
+    
+    const allTimeouts = errors.length > 0 && errors.every(e => e.isTimeout);
+    const all404s = errors.length > 0 && errors.every(e => e.is404);
+    
+    console.error('[AudioExtractor] All CDNs failed to load FFmpeg.wasm:', errors);
+    
+    if (allTimeouts) {
+      throw new Error('FFMPEG_LOAD_TIMEOUT');
+    } else if (all404s) {
+      throw new Error('Audio processor files not found on any CDN. Please try again later.');
+    } else {
+      const lastErrorMsg = errors.length > 0 ? errors[errors.length - 1].error : 'Unknown error';
+      throw new Error(`Failed to load audio processor: ${lastErrorMsg}`);
+    }
   })();
 
   return ffmpegLoadPromise;
