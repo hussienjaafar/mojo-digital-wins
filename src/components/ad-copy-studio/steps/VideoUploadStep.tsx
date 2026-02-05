@@ -79,8 +79,10 @@ function getExtractionStageLabel(stage?: string): string {
   switch (stage) {
     case 'loading':
       return 'Loading audio processor...';
-    case 'mounting':
-      return 'Preparing file...';
+    case 'reading':
+      return 'Reading video file...';
+    case 'writing':
+      return 'Preparing for extraction...';
     case 'copy-attempt':
       return 'Trying fast stream copy...';
     case 'reencode':
