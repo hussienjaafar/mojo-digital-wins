@@ -92,6 +92,12 @@ function getStatusDisplay(status: VideoUpload['status']): {
         color: 'text-blue-400',
         icon: <Loader2 className="h-4 w-4 animate-spin" />,
       };
+     case 'extracting':
+       return {
+         label: 'Extracting audio',
+         color: 'text-[#f59e0b]',
+         icon: <Loader2 className="h-4 w-4 animate-spin" />,
+       };
     case 'transcribing':
       return {
         label: 'Transcribing',
@@ -469,21 +475,33 @@ export function VideoUploadStep({
                       </div>
 
                       {/* Progress bar */}
-                      {isProcessing && (
+                       {(isProcessing || video.status === 'extracting') && (
                         <div className="mt-3">
                           <Progress
                             value={video.progress}
                             className="h-2 bg-[#1e2a45]"
-                            indicatorClassName="bg-blue-500"
+                             indicatorClassName={video.status === 'extracting' ? 'bg-[#f59e0b]' : 'bg-blue-500'}
                           />
+                           {video.status === 'extracting' && (
+                             <p className="mt-1 text-xs text-[#94a3b8]">
+                               Extracting audio locally for faster transcription...
+                             </p>
+                           )}
                         </div>
                       )}
 
                       {/* Error message */}
                       {video.status === 'error' && video.error_message && (
-                        <p className="mt-2 text-xs text-[#ef4444]">
-                          {video.error_message}
-                        </p>
+                         <div className="mt-2">
+                           <p className="text-xs text-[#ef4444]">
+                             {video.error_message}
+                           </p>
+                           {video.error_message?.includes('exceeds') && video.source === 'gdrive' && (
+                             <p className="mt-1 text-xs text-[#94a3b8]">
+                               <strong>Tip:</strong> Download the video from Google Drive, then use the "Upload Files" option instead. Large files will have their audio extracted locally.
+                             </p>
+                           )}
+                         </div>
                       )}
                     </div>
 
