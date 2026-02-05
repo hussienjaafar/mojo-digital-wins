@@ -133,6 +133,9 @@ export function AdCopyWizard({
     importGDriveUrls,
     removeVideo,
     clearError: clearUploadError,
+    updateVideoStatus,
+    cancelVideo,
+    retryTranscription,
   } = useVideoUpload({
     organizationId,
     batchId: session?.batch_id || crypto.randomUUID(),
@@ -181,6 +184,9 @@ export function AdCopyWizard({
   // Track which videos we've already started processing
   const processingVideosRef = useRef<Set<string>>(new Set());
 
+  // Track failed/cancelled videos to prevent re-polling
+  const failedVideosRef = useRef<Set<string>>(new Set());
+
   // =========================================================================
   // Transcription Flow Hook
   // =========================================================================
@@ -188,6 +194,7 @@ export function AdCopyWizard({
   const {
     fetchAnalysis,
     pollForCompletion,
+    cancelPolling,
   } = useVideoTranscriptionFlow({
     organizationId,
     onStatusChange: (videoId, status) => {
@@ -202,6 +209,10 @@ export function AdCopyWizard({
     },
     onError: (videoId, error) => {
       console.error(`[AdCopyWizard] Transcription error for video ${videoId}:`, error);
+      // Add to failed set to prevent re-polling
+      failedVideosRef.current.add(videoId);
+      // Update local video status to error
+      updateVideoStatus(videoId, 'error', error);
     },
   });
 
@@ -232,6 +243,8 @@ export function AdCopyWizard({
       if (!v.video_id) return false;
       if (analyses[v.video_id]) return false; // Already have analysis
       if (processingVideosRef.current.has(v.video_id)) return false; // Already processing
+      if (failedVideosRef.current.has(v.video_id)) return false; // Failed/cancelled - don't re-poll
+      if (v.status === 'error') return false; // Error state - don't poll
       return v.status === 'transcribing' || v.status === 'analyzing' || v.status === 'ready';
     });
 
@@ -266,6 +279,30 @@ export function AdCopyWizard({
       processingVideosRef.current.delete(videoId);
     });
   }, [videos, stepData.videos, analyses, fetchAnalysis, pollForCompletion, updateStepData]);
+
+  // Handle cancel video - also cancels polling
+  const handleCancelVideo = useCallback(async (id: string) => {
+    const video = videos.find(v => v.id === id) || (stepData.videos || []).find((v: VideoUpload) => v.id === id);
+    if (video?.video_id) {
+      // Add to failed set to prevent re-polling
+      failedVideosRef.current.add(video.video_id);
+      // Cancel any active polling
+      cancelPolling(video.video_id);
+    }
+    await cancelVideo(id);
+  }, [videos, stepData.videos, cancelVideo, cancelPolling]);
+
+  // Handle retry transcription - clears failed state
+  const handleRetryTranscription = useCallback(async (id: string) => {
+    const video = videos.find(v => v.id === id) || (stepData.videos || []).find((v: VideoUpload) => v.id === id);
+    if (video?.video_id) {
+      // Remove from failed set to allow polling
+      failedVideosRef.current.delete(video.video_id);
+      // Remove from processing set too
+      processingVideosRef.current.delete(video.video_id);
+    }
+    await retryTranscription(id);
+  }, [videos, stepData.videos, retryTranscription]);
 
   // =========================================================================
   // Handlers
@@ -381,6 +418,8 @@ export function AdCopyWizard({
             onRemoveVideo={removeVideo}
             onClearError={clearUploadError}
             onComplete={handleUploadComplete}
+            onCancelVideo={handleCancelVideo}
+            onRetryTranscription={handleRetryTranscription}
           />
         );
 
