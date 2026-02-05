@@ -3,10 +3,12 @@
  *
  * Allows users to review transcripts and AI analysis for each uploaded video.
  *
- * Displays:
+ * Features:
  * - Tabs for each video
  * - Left panel: Scrollable transcript text with edit capability
  * - Right panel: Analysis cards (Primary Issue, Tone, Targets, Pain Points, Key Phrases)
+ * - Context section for adding refinement notes
+ * - Reanalyze functionality
  * - Progress tracking (Reviewed: X/Y videos)
  */
 
@@ -17,6 +19,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   ArrowRight,
@@ -29,8 +33,15 @@ import {
   Edit3,
   X,
   MessageSquare,
+  ChevronDown,
+  Loader2,
+  RefreshCw,
+  Save,
+  Info,
+  Sparkles,
 } from 'lucide-react';
 import type { VideoUpload, TranscriptAnalysis } from '@/types/ad-copy-studio';
+import type { ReanalyzeOptions, ReanalyzeResult } from '@/hooks/useVideoTranscriptionFlow';
 
 // =============================================================================
 // Types
@@ -39,8 +50,12 @@ import type { VideoUpload, TranscriptAnalysis } from '@/types/ad-copy-studio';
 export interface TranscriptReviewStepProps {
   videos: VideoUpload[];
   analyses: Record<string, TranscriptAnalysis>;
+  transcriptIds: Record<string, string>;
   onBack: () => void;
   onComplete: () => void;
+  onReanalyze?: (options: ReanalyzeOptions) => Promise<ReanalyzeResult | null>;
+  onSaveTranscript?: (transcriptId: string, transcriptText: string) => Promise<boolean>;
+  onAnalysisUpdate?: (videoId: string, analysis: TranscriptAnalysis) => void;
 }
 
 // =============================================================================
@@ -137,6 +152,127 @@ function BulletList({ items }: BulletListProps) {
   );
 }
 
+interface ContextSectionProps {
+  userContextPre?: string;
+  userContextPost?: string;
+  analysisCount?: number;
+  lastAnalyzedAt?: string;
+  onContextChange: (context: string) => void;
+  onReanalyze: () => void;
+  isReanalyzing: boolean;
+  hasChanges: boolean;
+}
+
+function ContextSection({
+  userContextPre,
+  userContextPost,
+  analysisCount,
+  lastAnalyzedAt,
+  onContextChange,
+  onReanalyze,
+  isReanalyzing,
+  hasChanges,
+}: ContextSectionProps) {
+  const [isOpen, setIsOpen] = useState(true);
+  const [localContext, setLocalContext] = useState(userContextPost || '');
+
+  const handleContextChange = (value: string) => {
+    setLocalContext(value);
+    onContextChange(value);
+  };
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div className="rounded-lg border border-[#1e2a45] bg-[#0a0f1a] overflow-hidden">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between px-4 py-3 hover:bg-[#141b2d] transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4 text-blue-400" />
+              <span className="text-xs font-medium uppercase tracking-wider text-[#64748b]">
+                Context & Refinement
+              </span>
+              {analysisCount && analysisCount > 1 && (
+                <span className="inline-flex rounded-full bg-blue-500/20 border border-blue-500/40 px-2 py-0.5 text-xs text-blue-400">
+                  Analysis #{analysisCount}
+                </span>
+              )}
+            </div>
+            <ChevronDown
+              className={cn(
+                'h-4 w-4 text-[#64748b] transition-transform',
+                isOpen && 'rotate-180'
+              )}
+            />
+          </button>
+        </CollapsibleTrigger>
+
+        <CollapsibleContent>
+          <div className="px-4 pb-4 space-y-4">
+            {/* Pre-analysis context (read-only if exists) */}
+            {userContextPre && (
+              <div className="space-y-2">
+                <label className="text-xs text-[#64748b]">Pre-analysis context (read-only)</label>
+                <div className="rounded-md bg-[#141b2d] border border-[#1e2a45] px-3 py-2 text-sm text-[#94a3b8]">
+                  {userContextPre}
+                </div>
+              </div>
+            )}
+
+            {/* Post-analysis refinement context */}
+            <div className="space-y-2">
+              <label className="text-xs text-[#64748b]">
+                Add context to refine the analysis
+              </label>
+              <Textarea
+                value={localContext}
+                onChange={(e) => handleContextChange(e.target.value)}
+                placeholder="e.g., 'The opponent mentioned is Senator John Smith' or 'This is a 30-second ad targeting swing voters'"
+                className="min-h-[80px] bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] text-sm resize-none"
+              />
+              <p className="text-xs text-[#64748b]">
+                Adding context helps the AI understand nuances like names, abbreviations, or local references.
+              </p>
+            </div>
+
+            {/* Reanalyze button */}
+            <div className="flex items-center justify-between pt-2">
+              <div className="text-xs text-[#64748b]">
+                {lastAnalyzedAt && (
+                  <span>
+                    Last analyzed: {new Date(lastAnalyzedAt).toLocaleString()}
+                  </span>
+                )}
+              </div>
+              <Button
+                type="button"
+                onClick={onReanalyze}
+                disabled={isReanalyzing || (!hasChanges && !localContext.trim())}
+                size="sm"
+                className="gap-2 bg-[#a855f7] hover:bg-[#9333ea] text-white"
+              >
+                {isReanalyzing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Reanalyzing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Reanalyze
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
+
 // =============================================================================
 // Component
 // =============================================================================
@@ -144,20 +280,33 @@ function BulletList({ items }: BulletListProps) {
 export function TranscriptReviewStep({
   videos,
   analyses,
+  transcriptIds,
   onBack,
   onComplete,
+  onReanalyze,
+  onSaveTranscript,
+  onAnalysisUpdate,
 }: TranscriptReviewStepProps) {
   // State
   const [activeVideoId, setActiveVideoId] = useState(videos[0]?.id || '');
   const [editingTranscript, setEditingTranscript] = useState(false);
   const [editedTranscript, setEditedTranscript] = useState('');
   const [reviewedVideos, setReviewedVideos] = useState<Set<string>>(new Set());
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [pendingContexts, setPendingContexts] = useState<Record<string, string>>({});
+  const [transcriptChanges, setTranscriptChanges] = useState<Record<string, string>>({});
 
   // Computed
   const activeAnalysis = analyses[activeVideoId];
+  const activeTranscriptId = transcriptIds[activeVideoId];
   const reviewedCount = reviewedVideos.size;
   const totalCount = videos.length;
-  const canProceed = reviewedCount === totalCount;
+
+  // Check if current video has unsaved changes
+  const hasTranscriptChanges = transcriptChanges[activeVideoId] !== undefined;
+  const hasContextChanges = pendingContexts[activeVideoId] !== undefined && 
+    pendingContexts[activeVideoId] !== (activeAnalysis?.user_context_post || '');
 
   // Get video index for tab display
   const getVideoIndex = (videoId: string) => {
@@ -176,28 +325,165 @@ export function TranscriptReviewStep({
       }
       setActiveVideoId(videoId);
       setEditingTranscript(false);
+      setEditedTranscript('');
     },
     [activeVideoId, reviewedVideos]
   );
 
   const handleStartEdit = useCallback(() => {
     if (activeAnalysis) {
-      setEditedTranscript(activeAnalysis.transcript_text);
+      const currentText = transcriptChanges[activeVideoId] || activeAnalysis.transcript_text;
+      setEditedTranscript(currentText);
       setEditingTranscript(true);
     }
-  }, [activeAnalysis]);
+  }, [activeAnalysis, activeVideoId, transcriptChanges]);
 
   const handleCancelEdit = useCallback(() => {
     setEditingTranscript(false);
     setEditedTranscript('');
   }, []);
 
-  const handleSaveEdit = useCallback(() => {
-    // In a real implementation, this would save the edited transcript
-    // For now, just close the editor
-    setEditingTranscript(false);
-    setEditedTranscript('');
-  }, []);
+  const handleSaveEdit = useCallback(async () => {
+    if (!activeTranscriptId || !onSaveTranscript) {
+      // Just track locally if no save handler
+      setTranscriptChanges((prev) => ({ ...prev, [activeVideoId]: editedTranscript }));
+      setEditingTranscript(false);
+      toast.success('Transcript changes saved locally');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const success = await onSaveTranscript(activeTranscriptId, editedTranscript);
+      if (success) {
+        setTranscriptChanges((prev) => ({ ...prev, [activeVideoId]: editedTranscript }));
+        toast.success('Transcript saved successfully');
+        
+        // Update the analysis locally with the new transcript
+        if (onAnalysisUpdate && activeAnalysis) {
+          onAnalysisUpdate(activeVideoId, {
+            ...activeAnalysis,
+            transcript_text: editedTranscript,
+          });
+        }
+      } else {
+        toast.error('Failed to save transcript');
+      }
+    } catch (err) {
+      console.error('Save error:', err);
+      toast.error('Failed to save transcript');
+    } finally {
+      setIsSaving(false);
+      setEditingTranscript(false);
+    }
+  }, [activeTranscriptId, activeVideoId, editedTranscript, onSaveTranscript, onAnalysisUpdate, activeAnalysis]);
+
+  const handleSaveAndReanalyze = useCallback(async () => {
+    if (!activeTranscriptId || !onReanalyze) {
+      toast.error('Reanalyze not available');
+      return;
+    }
+
+    setIsReanalyzing(true);
+    try {
+      const result = await onReanalyze({
+        transcriptId: activeTranscriptId,
+        transcriptText: editedTranscript || undefined,
+        userContextPre: activeAnalysis?.user_context_pre,
+        userContextPost: pendingContexts[activeVideoId] || activeAnalysis?.user_context_post,
+      });
+
+      if (result?.success) {
+        toast.success(`Analysis updated (version ${result.analysisCount})`);
+        
+        // Clear pending changes
+        setTranscriptChanges((prev) => {
+          const next = { ...prev };
+          delete next[activeVideoId];
+          return next;
+        });
+        setPendingContexts((prev) => {
+          const next = { ...prev };
+          delete next[activeVideoId];
+          return next;
+        });
+        
+        // Update local analysis
+        if (onAnalysisUpdate) {
+          onAnalysisUpdate(activeVideoId, {
+            ...result.analysis,
+            transcript_text: editedTranscript || activeAnalysis?.transcript_text || '',
+            analysis_count: result.analysisCount,
+            last_analyzed_at: result.analyzedAt,
+          });
+        }
+        
+        setEditingTranscript(false);
+        setEditedTranscript('');
+      } else {
+        toast.error('Reanalysis failed');
+      }
+    } catch (err) {
+      console.error('Reanalyze error:', err);
+      toast.error('Failed to reanalyze transcript');
+    } finally {
+      setIsReanalyzing(false);
+    }
+  }, [activeTranscriptId, activeVideoId, activeAnalysis, editedTranscript, pendingContexts, onReanalyze, onAnalysisUpdate]);
+
+  const handleContextChange = useCallback((context: string) => {
+    setPendingContexts((prev) => ({ ...prev, [activeVideoId]: context }));
+  }, [activeVideoId]);
+
+  const handleReanalyze = useCallback(async () => {
+    if (!activeTranscriptId || !onReanalyze) {
+      toast.error('Reanalyze not available');
+      return;
+    }
+
+    setIsReanalyzing(true);
+    try {
+      const result = await onReanalyze({
+        transcriptId: activeTranscriptId,
+        transcriptText: transcriptChanges[activeVideoId],
+        userContextPre: activeAnalysis?.user_context_pre,
+        userContextPost: pendingContexts[activeVideoId] || activeAnalysis?.user_context_post,
+      });
+
+      if (result?.success) {
+        toast.success(`Analysis updated (version ${result.analysisCount})`);
+        
+        // Clear pending changes
+        setTranscriptChanges((prev) => {
+          const next = { ...prev };
+          delete next[activeVideoId];
+          return next;
+        });
+        setPendingContexts((prev) => {
+          const next = { ...prev };
+          delete next[activeVideoId];
+          return next;
+        });
+        
+        // Update local analysis
+        if (onAnalysisUpdate) {
+          onAnalysisUpdate(activeVideoId, {
+            ...result.analysis,
+            transcript_text: transcriptChanges[activeVideoId] || activeAnalysis?.transcript_text || '',
+            analysis_count: result.analysisCount,
+            last_analyzed_at: result.analyzedAt,
+          });
+        }
+      } else {
+        toast.error('Reanalysis failed');
+      }
+    } catch (err) {
+      console.error('Reanalyze error:', err);
+      toast.error('Failed to reanalyze transcript');
+    } finally {
+      setIsReanalyzing(false);
+    }
+  }, [activeTranscriptId, activeVideoId, activeAnalysis, transcriptChanges, pendingContexts, onReanalyze, onAnalysisUpdate]);
 
   const handleComplete = useCallback(() => {
     // Mark current video as reviewed before proceeding
@@ -219,7 +505,7 @@ export function TranscriptReviewStep({
           Review Transcripts & Analysis
         </h2>
         <p className="mt-2 text-[#94a3b8]">
-          Review the AI-generated transcripts and analysis for each video
+          Review the AI-generated transcripts and analysis for each video. Add context to refine the analysis.
         </p>
       </div>
 
@@ -253,6 +539,7 @@ export function TranscriptReviewStep({
         {/* Tab Content */}
         {videos.map((video) => {
           const analysis = analyses[video.id];
+          const currentTranscript = transcriptChanges[video.id] || analysis?.transcript_text;
 
           return (
             <TabsContent key={video.id} value={video.id} className="mt-6">
@@ -266,8 +553,13 @@ export function TranscriptReviewStep({
                         <span className="text-xs font-medium uppercase tracking-wider text-[#64748b]">
                           Transcript
                         </span>
+                        {transcriptChanges[video.id] && (
+                          <span className="inline-flex rounded-full bg-[#f97316]/20 border border-[#f97316]/40 px-2 py-0.5 text-xs text-[#f97316]">
+                            Edited
+                          </span>
+                        )}
                       </div>
-                      {!editingTranscript && (
+                      {!editingTranscript && video.id === activeVideoId && (
                         <button
                           type="button"
                           onClick={handleStartEdit}
@@ -280,7 +572,7 @@ export function TranscriptReviewStep({
                     </div>
 
                     <AnimatePresence mode="wait">
-                      {editingTranscript ? (
+                      {editingTranscript && video.id === activeVideoId ? (
                         <motion.div
                           key="editing"
                           initial={{ opacity: 0 }}
@@ -300,6 +592,7 @@ export function TranscriptReviewStep({
                               variant="outline"
                               size="sm"
                               className="bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45]"
+                              disabled={isSaving || isReanalyzing}
                             >
                               <X className="h-4 w-4 mr-1" />
                               Cancel
@@ -308,11 +601,32 @@ export function TranscriptReviewStep({
                               type="button"
                               onClick={handleSaveEdit}
                               size="sm"
-                              className="bg-blue-600 hover:bg-blue-500 text-white"
+                              className="gap-1 bg-blue-600 hover:bg-blue-500 text-white"
+                              disabled={isSaving || isReanalyzing}
                             >
-                              <CheckCircle className="h-4 w-4 mr-1" />
+                              {isSaving ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Save className="h-4 w-4" />
+                              )}
                               Save
                             </Button>
+                            {onReanalyze && (
+                              <Button
+                                type="button"
+                                onClick={handleSaveAndReanalyze}
+                                size="sm"
+                                className="gap-1 bg-[#a855f7] hover:bg-[#9333ea] text-white"
+                                disabled={isSaving || isReanalyzing}
+                              >
+                                {isReanalyzing ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4" />
+                                )}
+                                Save & Reanalyze
+                              </Button>
+                            )}
                           </div>
                         </motion.div>
                       ) : (
@@ -325,7 +639,7 @@ export function TranscriptReviewStep({
                           <ScrollArea className="h-[400px]">
                             <div className="p-4">
                               <p className="text-sm text-[#e2e8f0] leading-relaxed whitespace-pre-wrap">
-                                "{analysis.transcript_text}"
+                                "{currentTranscript}"
                               </p>
                             </div>
                           </ScrollArea>
@@ -335,8 +649,22 @@ export function TranscriptReviewStep({
                   </div>
 
                   {/* Right Panel: Analysis */}
-                  <ScrollArea className="h-[480px]">
+                  <ScrollArea className="h-[520px]">
                     <div className="space-y-4 pr-4">
+                      {/* Context Section */}
+                      {onReanalyze && video.id === activeVideoId && (
+                        <ContextSection
+                          userContextPre={analysis.user_context_pre}
+                          userContextPost={pendingContexts[video.id] ?? analysis.user_context_post}
+                          analysisCount={analysis.analysis_count}
+                          lastAnalyzedAt={analysis.last_analyzed_at}
+                          onContextChange={handleContextChange}
+                          onReanalyze={handleReanalyze}
+                          isReanalyzing={isReanalyzing}
+                          hasChanges={hasTranscriptChanges || hasContextChanges}
+                        />
+                      )}
+
                       {/* Primary Issue */}
                       <AnalysisCard
                         title="Primary Issue"
@@ -423,7 +751,7 @@ export function TranscriptReviewStep({
       <div className="flex items-center justify-center">
         <span className="text-sm text-[#94a3b8]">
           Reviewed:{' '}
-          <span className={cn('font-medium', canProceed ? 'text-[#22c55e]' : 'text-[#e2e8f0]')}>
+          <span className="font-medium text-[#e2e8f0]">
             {reviewedCount}/{totalCount}
           </span>{' '}
           videos
