@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { getCorsHeaders, validateAuth, userBelongsToOrg, checkRateLimit } from "../_shared/security.ts";
+import { callLovableAIWithTools, AIGatewayError } from "../_shared/ai-client.ts";
+import { SMS_CAMPAIGN_SYSTEM_PROMPT, SMS_CAMPAIGN_TOOL } from "../_shared/prompts.ts";
 
 const corsHeaders = getCorsHeaders();
 
@@ -17,7 +19,6 @@ serve(async (req) => {
     // SECURITY: Require authenticated user
     const authResult = await validateAuth(req, supabase);
     if (!authResult) {
-      console.error('[generate-campaign-messages] Unauthorized access attempt');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -52,6 +53,7 @@ serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
     console.log(`Generating campaign messages for ${entity_name} (${organization_id})`);
 
     // Get historical successful messages for this org
@@ -73,7 +75,6 @@ serve(async (req) => {
       .order('correlation_strength', { ascending: false })
       .limit(5);
 
-    // Build context for AI
     const historicalContext = historicalMessages?.map(m => ({
       text: m.sms_text,
       performance: m.performance_metrics
@@ -85,74 +86,33 @@ serve(async (req) => {
       amount: c.amount_raised_48h_after
     })) || [];
 
-    // Call Lovable AI for message generation
-    const aiPrompt = `Generate ${num_variants} SMS campaign message variants (160 chars max each) for a political fundraising campaign.
+    // Build user message with context
+    const userMessage = `Generate ${num_variants} SMS campaign message variants for political fundraising.
 
 Context:
 - Entity: ${entity_name} (${entity_type})
 - Opportunity: ${opportunity_context || 'trending topic with high fundraising potential'}
 
 Historical successful messages from this organization:
-${historicalContext.map(h => `- "${h.text}"`).join('\n')}
+${historicalContext.map(h => `- "${h.text}"`).join('\n') || '- No historical data available'}
 
 Past successful correlations:
-${correlationContext.map(c => `- ${c.entity}: ${c.donations} donations, $${c.amount?.toFixed(0)} raised`).join('\n')}
+${correlationContext.map(c => `- ${c.entity}: ${c.donations} donations, $${c.amount?.toFixed(0)} raised`).join('\n') || '- No correlation data available'}
 
-Requirements:
-- Create urgency without being alarmist
-- Include clear call-to-action
-- Mention the specific entity/topic
-- Keep under 160 characters
-- Variants should test different approaches (emotional, factual, urgent)
+Generate exactly ${num_variants} variants testing different approaches (emotional, factual, urgent, social_proof, identity).`;
 
-Return ONLY a JSON array of ${num_variants} message objects with this structure:
-[
-  {
-    "message": "the SMS text (max 160 chars)",
-    "approach": "emotional|factual|urgent",
-    "predicted_performance": 1-100 score
-  }
-]`;
-
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`,
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'user', content: aiPrompt }
-        ],
-      }),
+    const { result } = await callLovableAIWithTools<{ messages: any[] }>({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        { role: 'system', content: SMS_CAMPAIGN_SYSTEM_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
+      temperature: 0.8,
+      tools: [SMS_CAMPAIGN_TOOL],
+      toolChoice: { type: "function", function: { name: "generate_sms_messages" } },
     });
 
-    if (!aiResponse.ok) {
-      throw new Error(`AI API error: ${aiResponse.statusText}`);
-    }
-
-    const aiData = await aiResponse.json();
-    const content = aiData.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error('No content in AI response');
-    }
-
-    // Parse AI response
-    let generatedMessages;
-    try {
-      // Try to find JSON in the response
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        generatedMessages = JSON.parse(jsonMatch[0]);
-      } else {
-        generatedMessages = JSON.parse(content);
-      }
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', content);
-      throw new Error('Failed to parse AI-generated messages');
-    }
+    const generatedMessages = result.messages || [];
 
     // Store generated messages
     const messagesToStore = generatedMessages.map((msg: any, index: number) => ({
@@ -182,23 +142,23 @@ Return ONLY a JSON array of ${num_variants} message objects with this structure:
     console.log(`Generated ${generatedMessages.length} message variants`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true,
-        messages: generatedMessages,
-      }),
+      JSON.stringify({ success: true, messages: generatedMessages }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
     console.error('Error in generate-campaign-messages:', error);
+
+    if (error instanceof AIGatewayError) {
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        { status: error.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: error.message }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
-
-
