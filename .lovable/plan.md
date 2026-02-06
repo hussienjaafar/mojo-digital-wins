@@ -1,111 +1,125 @@
 
 
-# Ad Copy Prompt Engineering Overhaul
+# Fix: Remove Fabricated Claims from Ad Copy Prompts
 
-## Research Conclusion: Best Model for Ad Copy
+## Problem
 
-After deep research across multiple 2025/2026 benchmarks and reviews:
+The AI prompt explicitly instructs the model to fabricate claims:
+- **Gift matching** ("3X match ends tonight", "MATCH ALERT", "Every dollar = $2") -- there is no match program
+- **Fake donor counts** ("127 donors needed", "2,847 donors joined TODAY", "23,847 grassroots donors") -- made-up numbers
+- **Fake deadlines** ("before midnight", "24 hours left") -- not tied to any real deadline
 
-- **GPT-5** has weaker creative writing than its predecessor -- multiple independent reviews describe its output as "dry," "academic," and "robotic." OpenAI traded literary flair for accuracy.
-- **Claude (Opus 4/Sonnet 4)** is the consensus winner for creative/marketing copy, but is NOT available through the Lovable AI Gateway.
-- **Gemini 2.5 Pro** is the strongest available model -- best reasoning, largest context window, and solid creative capabilities. With proper prompt engineering (few-shot examples, anti-patterns, high temperature), it produces strong results.
+These are in the system prompt's hook patterns, few-shot examples, and the "URGENCY TACTICS" section. The model follows instructions faithfully and reproduces these fabricated claims in output.
 
-**Decision: Use `google/gemini-2.5-pro`** for all ad copy generation (highest quality available), and `google/gemini-3-flash-preview` for analysis/classification tasks (fast, cheap, accurate for structured extraction).
+## Root Cause
 
----
+Three specific sections in `supabase/functions/_shared/prompts.ts`:
 
-## Implementation Plan
+1. **HOOK PATTERNS (lines 157-163):** Template hooks with fake numbers ("127 donors needed", "⏰ 24 hours")
+2. **FEW-SHOT EXAMPLES (lines 166-190):** 3 of 5 examples contain fabricated stats or match claims
+3. **URGENCY TACTICS (lines 193-198):** Explicitly lists "Matching" and "Thresholds" as tactics with fabricated examples
+4. **SMS PROMPT (line 328):** "MATCH ALERT" example
 
-### Phase 1: Create Shared Infrastructure
+## Solution
 
-**New file: `supabase/functions/_shared/prompts.ts`**
-- Unified transcript analysis prompt (used by 3 functions today)
-- Political ad copy system prompt with negative examples and few-shot examples
-- SMS analysis system prompt
+Rewrite all affected sections to use **only truthful urgency techniques** grounded in the actual transcript/video content. The AI should derive urgency from the political stakes described in the video -- not invent numbers or programs.
 
-**New file: `supabase/functions/_shared/ai-client.ts`**
-- `callLovableAI()` helper that wraps the gateway call
-- Handles 429 (rate limit) and 402 (payment required) errors
-- Configurable model, temperature, and tool calling support
-- Logging for model/latency tracking
+### Changes to `supabase/functions/_shared/prompts.ts`
 
-### Phase 2: Overhaul `generate-ad-copy` (Primary Revenue Function)
+**1. Replace ANTI-PATTERNS section** -- add fabrication as explicit anti-patterns:
+```
+## ANTI-PATTERNS -- NEVER produce copy like this:
+- "Dear supporter, we need your help..." -> Too generic, zero hook
+- "Candidate X is running for office..." -> Name-first, no conflict
+- "Please consider making a contribution..." -> Passive, no urgency
+- "We're asking for your support today..." -> Vague, donor not the hero
+- "Help us reach our goal..." -> Begging frame, not empowerment
+- "Click here to donate..." -> Lazy CTA, no emotional trigger
+- "3X match ends tonight!" -> FABRICATED. Never claim matching unless provided in context.
+- "23,847 donors this week" -> FABRICATED. Never invent donor counts or statistics.
+- "Only 127 donors needed!" -> FABRICATED. Never invent thresholds or goals.
+- "24 hours left!" -> FABRICATED. Never claim a deadline unless one is provided in context.
+```
 
-**Changes to `supabase/functions/generate-ad-copy/index.ts`:**
+**2. Replace HOOK PATTERNS** -- remove all fabricated numbers:
+```
+## HOOK PATTERNS (first 125 chars -- stop the scroll):
+- PAIN: "[Opponent] just [harmful action from transcript]. We can't let this stand."
+- STAKES: "If we lose this fight, [specific consequence from transcript]."
+- CURIOSITY: "They spent millions to bury this. Here's what they don't want you to see."
+- IDENTITY: "If you believe in [value from transcript], this is your moment."
+- THREAT: "They're outspending us with corporate PAC money. We fight back with grassroots power."
+- QUESTION: "What happens to [value from transcript] if [opponent] wins?"
+```
 
-1. **Migrate from OpenAI direct to Lovable AI Gateway** (`google/gemini-2.5-pro`)
-2. **Restructure prompt architecture:**
-   - System message: Persona + hard constraints + anti-patterns + few-shot examples
-   - User message: Only variable data (transcript, segment, limits)
-   - Currently both messages duplicate the persona, wasting tokens
-3. **Add negative examples section** to the prompt:
-   ```
-   ANTI-PATTERNS (never produce copy like this):
-   - "Dear supporter, we need your help..." (too generic, no hook)
-   - "Candidate X is running for office..." (name-first, no conflict)
-   - "Please consider making a contribution..." (passive, no urgency)
-   - "We're asking for your support today..." (vague, donor not the hero)
-   ```
-4. **Add 1 few-shot gold-standard example per framework** (PAS, BAB, AIDA, Social Proof, Identity) showing a complete primary_text + headline + description triplet
-5. **Update Meta character limits** for mobile-safe placements:
-   - Headline: 27 chars (mobile safe) instead of 40
-   - Description: 25 chars (mobile safe) instead of 30
-   - Primary text: Keep 125/300 split (correct)
-6. **Increase temperature to 0.95** for maximum creative diversity
-7. **Switch to tool calling** for structured JSON output (eliminates regex parsing failures)
-8. **Update `generation_model` field** in database insert from `gpt-4-turbo-preview` to `google/gemini-2.5-pro`
+**3. Replace FEW-SHOT EXAMPLES** -- remove all fabricated stats/matches:
+```
+**PAS Example:**
+Primary: "MAGA extremists just voted to gut Social Security. 47 million seniors could lose benefits. Your $27 helps us fight back -- chip in now to protect what we've earned."
+Headline: "Protect Social Security"
+Description: "Chip in to fight back"
 
-### Phase 3: Overhaul `generate-campaign-messages` (SMS)
+**BAB Example:**
+Primary: "Right now, families are choosing between medicine and rent. With [Candidate], no one makes that choice. Your donation builds that future -- $5 is all it takes."
+Headline: "Healthcare for everyone"
+Description: "$5 builds our future"
 
-**Changes to `supabase/functions/generate-campaign-messages/index.ts`:**
+**AIDA Example:**
+Primary: "They just banned books in 14 states. Next: your kids' school. [Candidate] is the only one fighting back. This is the moment to stand up -- don't sit this out."
+Headline: "Fight the book bans"
+Description: "Stand up. Chip in."
 
-1. **Add system message** with SMS copywriting persona and hard constraints (160 char limit)
-2. **Switch to tool calling** for structured JSON output
-3. **Set temperature to 0.8** (creative but constrained by 160 chars)
-4. **Add negative examples** for SMS anti-patterns
+**Social Proof Example:**
+Primary: "Zero corporate PAC money. 100% grassroots funded. This is what a people-powered campaign looks like. Chip in $5 to keep the movement growing."
+Headline: "People over PACs"
+Description: "100% grassroots funded"
 
-### Phase 4: Fix `analyze-sms-creatives` (Classification)
+**Identity Example:**
+Primary: "If you believe every kid deserves a great school -- not just rich kids -- this is your fight. Your $10 funds organizers in swing districts. Be the difference."
+Headline: "Education is a right"
+Description: "Fund the fight"
+```
 
-**Changes to `supabase/functions/analyze-sms-creatives/index.ts`:**
+**4. Replace URGENCY TACTICS** -- remove matching and fabricated thresholds:
+```
+URGENCY TACTICS (use ONLY what is truthful):
+- Political stakes ("If we don't act, [real consequence from transcript]")
+- Legislative deadlines (ONLY if mentioned in transcript/context)
+- Opponent actions ("They just [real action]. We must respond.")
+- Momentum framing ("Every dollar strengthens our grassroots campaign")
 
-1. **Switch to tool calling** for structured JSON output
-2. **Set temperature to 0.1** (pure classification -- should be deterministic)
-3. **Replace hardcoded `analysis_confidence: 0.85`** with model-reported confidence or remove it
+NEVER FABRICATE:
+- Dollar matching (no "2X", "3X match" unless explicitly provided in context)
+- Donor counts or statistics (no "X donors this week" unless provided)
+- Arbitrary deadlines (no "midnight tonight" unless a real deadline exists)
+- Fundraising goals or thresholds (no "X donors away from our goal")
+```
 
-### Phase 5: Migrate Transcript Analysis Functions
+**5. Add a top-level TRUTHFULNESS RULE** to the system prompt (new rule #6 in HARD RULES):
+```
+6. NEVER fabricate claims: no fake matching, fake donor counts, fake deadlines,
+   or fake statistics. Urgency must come from REAL political stakes in the
+   transcript. If no deadline exists, do not invent one.
+```
 
-**Changes to `supabase/functions/reanalyze-transcript/index.ts`:**
-1. Migrate from direct OpenAI API to Lovable AI Gateway (`google/gemini-3-flash-preview`)
-2. Import shared prompt from `_shared/prompts.ts`
-3. Set temperature to 0.1 (analysis task)
-4. Switch to tool calling for structured output
+**6. Fix SMS prompt** -- remove the MATCH ALERT example:
+```
+## GOOD SMS PATTERNS:
+- "[Opponent] just [action]. Fight back now: [link]"
+- "If [consequence from context], we lose everything. Chip in $X -> [link]"
+- "[Value] is on the line. Your $X makes the difference -> [link]"
+```
 
-**Changes to `supabase/functions/upload-video-for-transcription/index.ts`:**
-1. Migrate analysis step from direct OpenAI API to Lovable AI Gateway
-2. Import shared prompt from `_shared/prompts.ts`
-3. Note: Whisper transcription step still needs OpenAI API (audio transcription is not available through Lovable AI Gateway)
+### Summary of Changes
 
-### Phase 6: Deploy All Functions
+| Section | Before | After |
+|---------|--------|-------|
+| Hard Rules | 5 rules | 6 rules (added truthfulness rule) |
+| Anti-Patterns | 6 examples | 10 examples (added 4 fabrication anti-patterns) |
+| Hook Patterns | Contain fake numbers | All grounded in transcript content |
+| Few-Shot Examples | 3/5 have fake stats/matches | 0/5 have fabricated claims |
+| Urgency Tactics | Lists matching + thresholds | Lists only truthful tactics + explicit NEVER FABRICATE section |
+| SMS Prompt | "MATCH ALERT" example | Grounded examples only |
 
-Deploy all 6 updated functions:
-- `generate-ad-copy`
-- `generate-campaign-messages`
-- `analyze-sms-creatives`
-- `reanalyze-transcript`
-- `upload-video-for-transcription`
-- `transcribe-meta-ad-video` (if applicable)
-
----
-
-## Files Changed Summary
-
-| File | Change Type | Model |
-|------|------------|-------|
-| `supabase/functions/_shared/prompts.ts` | NEW | -- |
-| `supabase/functions/_shared/ai-client.ts` | NEW | -- |
-| `supabase/functions/generate-ad-copy/index.ts` | MAJOR rewrite | gemini-2.5-pro |
-| `supabase/functions/generate-campaign-messages/index.ts` | Moderate update | gemini-2.5-flash (keep, SMS is simpler) |
-| `supabase/functions/analyze-sms-creatives/index.ts` | Moderate update | gemini-2.5-flash (keep) |
-| `supabase/functions/reanalyze-transcript/index.ts` | API migration | gemini-3-flash-preview |
-| `supabase/functions/upload-video-for-transcription/index.ts` | Partial migration | gemini-3-flash-preview (analysis only) |
+Only one file changes: `supabase/functions/_shared/prompts.ts`
 
