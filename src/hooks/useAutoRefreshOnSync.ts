@@ -16,6 +16,9 @@ const SOURCE_QUERY_KEYS: Record<string, string[][]> = {
     ['creative-intelligence'],
     ['hourly-metrics'],
     ['adPerformance'],
+    ['actblue-metrics'],
+    ['channel-spend'],
+    ['dashboard-sparkline'],
   ],
   actblue_webhook: [
     ['actblue'],
@@ -24,6 +27,9 @@ const SOURCE_QUERY_KEYS: Record<string, string[][]> = {
     ['recurring-health-v2'],
     ['hourly-metrics'],
     ['kpis'],
+    ['actblue-metrics'],
+    ['channel-spend'],
+    ['dashboard-sparkline'],
   ],
   actblue_csv: [
     ['actblue'],
@@ -31,10 +37,15 @@ const SOURCE_QUERY_KEYS: Record<string, string[][]> = {
     ['recurring-health'],
     ['recurring-health-v2'],
     ['kpis'],
+    ['actblue-metrics'],
+    ['dashboard-sparkline'],
   ],
   switchboard: [
     ['sms'],
     ['channels'],
+    ['actblue-metrics'],
+    ['channel-spend'],
+    ['dashboard-sparkline'],
   ],
 };
 
