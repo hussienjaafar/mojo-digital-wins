@@ -1,74 +1,101 @@
 
-# Final Fix: Register tag-trend-geographies Edge Function
+# Fix: Stale Dashboard Data After Meta Sync
 
-## Problem Found
+## Problem
 
-During the deep health check, I discovered **1 remaining edge function** that exists in the filesystem but is not registered in `supabase/config.toml`:
+When Meta Ads data syncs in the background, some parts of the dashboard update while others remain stale until manual refresh. This happens because the cache invalidation logic has gaps -- several critical query keys are not being invalidated when a sync completes.
 
-| Function | Purpose | Status |
-|----------|---------|--------|
-| `tag-trend-geographies` | Tags geographic scope (state/local/national/international) for trend events | **NOT DEPLOYED** |
+## Root Cause
 
-This function is called by the trend analysis pipeline to enrich trend events with geographic context.
+There are three places that handle cache invalidation, and all three are missing key query keys:
 
----
+1. **`useAutoRefreshOnSync`** (realtime listener on `data_freshness` table) -- missing `actblue-metrics`, `channel-spend`, `dashboard-sparkline`
+2. **`useSmartRefresh`** (manual refresh button) -- missing `actblue-metrics`, `channel-spend`, `dashboard-sparkline`, `adPerformance`
+3. Mismatched key prefixes between hooks and invalidation lists
 
-## Overall Health Status: GOOD
+### What each missing key controls:
 
-After the earlier fixes that registered 41+ missing functions, the portal and scheduled jobs are now working well:
+| Query Key | What it powers | Why it's stale |
+|-----------|---------------|----------------|
+| `actblue-metrics` | ROI, attributed revenue, channel breakdown (Hero KPIs) | ROI uses Meta spend in denominator; old spend = wrong ROI |
+| `channel-spend` | Meta/SMS spend totals and daily spend for the performance graph | Direct query to `meta_ad_metrics_daily`, never invalidated |
+| `dashboard-sparkline` | Daily ROI sparklines, MRR trends | ROI sparkline uses spend data, stays stale |
+| `adPerformance` | Ad Performance page metrics | Missing from `useSmartRefresh` |
 
-**Working Components:**
-- Portal (`portal.molitico.com`) - db-proxy responding
-- Health check - database, email, environment all passing
-- 35+ scheduled jobs running successfully
-- Meta CAPI outbox processing
-- SMS sync and analysis
-- Attribution calculations
-- Creative learnings
-- Integration health monitoring
-- Token refresh
+## Solution
 
-**Jobs Previously Failing, Now Working:**
-- `correlate-social-news` - Now returning 200
-- `batch-analyze-content` - Now returning 200  
-- `calculate-creative-learnings` - Now returning 200
-- `sync-sms-insights` - Now returning 200
-- `analyze-sms-campaigns` - Now returning 200
-- `backfill-recent-capi` - Now returning 200
+Update all three invalidation points to include the complete set of query keys.
 
 ---
 
-## Implementation
+## Technical Changes
 
-### Step 1: Add Missing Registration to config.toml
+### File 1: `src/hooks/useAutoRefreshOnSync.ts`
 
-Add the following entry to `supabase/config.toml`:
+Update `SOURCE_QUERY_KEYS` to add the missing keys:
 
-```toml
-# --- TREND ANALYSIS FUNCTIONS (continued) ---
-[functions.tag-trend-geographies]
-verify_jwt = false  # Uses CRON_SECRET auth internally
+```typescript
+const SOURCE_QUERY_KEYS: Record<string, string[][]> = {
+  meta: [
+    ['meta'],
+    ['meta-metrics'],
+    ['single-day-meta'],
+    ['creative-intelligence'],
+    ['hourly-metrics'],
+    ['adPerformance'],
+    ['actblue-metrics'],     // NEW: ROI depends on Meta spend
+    ['channel-spend'],       // NEW: Direct meta_ad_metrics_daily query
+    ['dashboard-sparkline'], // NEW: Sparkline ROI uses spend
+  ],
+  actblue_webhook: [
+    ['actblue'],
+    ['donations'],
+    ['recurring-health'],
+    ['recurring-health-v2'],
+    ['hourly-metrics'],
+    ['kpis'],
+    ['actblue-metrics'],     // NEW: Core ActBlue data
+    ['channel-spend'],       // NEW: Attribution affects channel view
+    ['dashboard-sparkline'], // NEW: Sparkline data from RPC
+  ],
+  actblue_csv: [
+    ['actblue'],
+    ['donations'],
+    ['recurring-health'],
+    ['recurring-health-v2'],
+    ['kpis'],
+    ['actblue-metrics'],     // NEW: Core ActBlue data
+    ['dashboard-sparkline'], // NEW: Sparkline data from RPC
+  ],
+  switchboard: [
+    ['sms'],
+    ['channels'],
+    ['actblue-metrics'],     // NEW: SMS attribution in RPC
+    ['channel-spend'],       // NEW: SMS spend in channel query
+    ['dashboard-sparkline'], // NEW: Sparkline data
+  ],
+};
 ```
 
-### Step 2: Deploy the Function
+### File 2: `src/hooks/useSmartRefresh.ts`
 
-After adding the registration, deploy `tag-trend-geographies` to make it available.
+Add the missing invalidation keys to **both** invalidation blocks (lines ~158-183 and ~230-246):
+
+```typescript
+// Add these to both Promise.all blocks:
+queryClient.invalidateQueries({ queryKey: ['actblue-metrics'] }),
+queryClient.invalidateQueries({ queryKey: ['channel-spend'] }),
+queryClient.invalidateQueries({ queryKey: ['dashboard-sparkline'] }),
+queryClient.invalidateQueries({ queryKey: ['adPerformance'] }),
+```
 
 ---
 
-## Summary
+## Why This Fixes the Issue
 
-| Category | Status |
-|----------|--------|
-| Portal Functions | ✅ All working |
-| Meta CAPI Functions | ✅ All 6 registered and deployed |
-| SMS Functions | ✅ All 5 registered and deployed |
-| Attribution Functions | ✅ All 2 registered and deployed |
-| Donor/LTV Functions | ✅ All 3 registered and deployed |
-| Creative/Ad Functions | ✅ All 5 registered and deployed |
-| Learning/AI Functions | ✅ All 4 registered and deployed |
-| Backfill Functions | ✅ All 3 registered and deployed |
-| Tracking Functions | ✅ All 2 registered and deployed |
-| Trend Analysis Functions | ⚠️ 1 missing (tag-trend-geographies) |
-
-After this final fix, all edge functions will be properly registered and the portal will be fully operational.
+After these changes:
+- When Meta syncs complete, the `channel-spend` query (which reads `meta_ad_metrics_daily` directly) will refetch with fresh spend data
+- The `actblue-metrics` query (which calculates ROI using spend) will recalculate with the new spend figures
+- The `dashboard-sparkline` query will update ROI sparklines
+- All dashboard sections will show consistent, up-to-date numbers without manual refresh
+- The manual refresh button will also invalidate all the same keys for consistency
