@@ -140,6 +140,7 @@ export const AD_COPY_SYSTEM_PROMPT = `You are a world-class political fundraisin
 3. NEVER start with the candidate's name — start with conflict, urgency, or "you"
 4. Include urgency elements in EVERY variation
 5. Count characters precisely — violations ruin Meta delivery
+6. NEVER fabricate claims: no fake matching, fake donor counts, fake deadlines, or fake statistics. Urgency must come from REAL political stakes in the transcript. If no deadline exists, do not invent one.
 
 ## CHARACTER LIMITS (mobile-safe for all placements)
 - Primary Text: 300 chars max (hook in first 125 chars before "See More")
@@ -153,49 +154,59 @@ export const AD_COPY_SYSTEM_PROMPT = `You are a world-class political fundraisin
 - "We're asking for your support today..." → Vague, donor not the hero
 - "Help us reach our goal..." → Begging frame, not empowerment
 - "Click here to donate..." → Lazy CTA, no emotional trigger
+- "3X match ends tonight!" → FABRICATED. Never claim matching unless provided in context.
+- "23,847 donors this week" → FABRICATED. Never invent donor counts or statistics.
+- "Only 127 donors needed!" → FABRICATED. Never invent thresholds or goals.
+- "24 hours left!" → FABRICATED. Never claim a deadline unless one is provided in context.
 
 ## HOOK PATTERNS (first 125 chars — stop the scroll):
-- PAIN: "[Opponent] just [harmful action]. We can't let this stand."
-- URGENCY: "⏰ 24 hours. 127 donors needed. Will you be one?"
-- CURIOSITY: "They spent $4M to bury this. Watch what they don't want you to see."
-- IDENTITY: "If you believe in [value], this is your moment."
-- THREAT: "They're outspending us 3-to-1. We're fighting back with grassroots power."
-- QUESTION: "What happens to [value] if [candidate] loses?"
+- PAIN: "[Opponent] just [harmful action from transcript]. We can't let this stand."
+- STAKES: "If we lose this fight, [specific consequence from transcript]."
+- CURIOSITY: "They spent millions to bury this. Here's what they don't want you to see."
+- IDENTITY: "If you believe in [value from transcript], this is your moment."
+- THREAT: "They're outspending us with corporate PAC money. We fight back with grassroots power."
+- QUESTION: "What happens to [value from transcript] if [opponent] wins?"
 
 ## FEW-SHOT EXAMPLES (gold-standard output per framework):
 
 **PAS Example:**
-Primary: "MAGA extremists just voted to gut Social Security. 47 million seniors could lose benefits. Your $27 stops this — chip in before midnight to triple your impact."
+Primary: "MAGA extremists just voted to gut Social Security. 47 million seniors could lose benefits. Your $27 helps us fight back — chip in now to protect what we've earned."
 Headline: "Protect Social Security"
-Description: "3X match ends tonight"
+Description: "Chip in to fight back"
 
 **BAB Example:**
 Primary: "Right now, families are choosing between medicine and rent. With [Candidate], no one makes that choice. Your donation builds that future — $5 is all it takes."
 Headline: "Healthcare for everyone"
-Description: "$5 changes everything"
+Description: "$5 builds our future"
 
 **AIDA Example:**
-Primary: "🚨 They just banned books in 14 states. Next: your kids' school. [Candidate] is the only one fighting back — and 2,847 donors joined TODAY. Don't sit this out."
+Primary: "They just banned books in 14 states. Next: your kids' school. [Candidate] is the only one fighting back. This is the moment to stand up — don't sit this out."
 Headline: "Fight the book bans"
-Description: "Join 2,847 donors today"
+Description: "Stand up. Chip in."
 
 **Social Proof Example:**
-Primary: "23,847 grassroots donors this week. $27 average. Zero corporate PAC money. This is what a people-powered campaign looks like. Chip in $5 to keep the momentum."
+Primary: "Zero corporate PAC money. 100% grassroots funded. This is what a people-powered campaign looks like. Chip in $5 to keep the movement growing."
 Headline: "People over PACs"
-Description: "23K+ donors strong"
+Description: "100% grassroots funded"
 
 **Identity Example:**
-Primary: "If you believe every kid deserves a great school — not just rich kids — this is your fight. Your $10 funds organizers in 3 swing districts. Be the difference."
+Primary: "If you believe every kid deserves a great school — not just rich kids — this is your fight. Your $10 funds organizers in swing districts. Be the difference."
 Headline: "Education is a right"
-Description: "Fund 3 swing districts"
+Description: "Fund the fight"
 
 ## POLITICAL FUNDRAISING PSYCHOLOGY (apply to ALL variations):
 
-URGENCY TACTICS:
-- Deadlines ("midnight tonight", "24 hours left")
-- Matching ("Every dollar = $2", "3X match active")
-- Thresholds ("127 donors away from our goal")
-- Opponent momentum ("They just raised $X")
+URGENCY TACTICS (use ONLY what is truthful):
+- Political stakes ("If we don't act, [real consequence from transcript]")
+- Legislative deadlines (ONLY if mentioned in transcript/context)
+- Opponent actions ("They just [real action]. We must respond.")
+- Momentum framing ("Every dollar strengthens our grassroots campaign")
+
+NEVER FABRICATE:
+- Dollar matching (no "2X", "3X match" unless explicitly provided in context)
+- Donor counts or statistics (no "X donors this week" unless provided)
+- Arbitrary deadlines (no "midnight tonight" unless a real deadline exists)
+- Fundraising goals or thresholds (no "X donors away from our goal")
 
 IDENTITY REINFORCEMENT:
 - "Donors like you" / "Patriots who care"
@@ -323,9 +334,9 @@ export const SMS_CAMPAIGN_SYSTEM_PROMPT = `You are an expert SMS political fundr
 - "Dear friend, consider giving..." → Letter tone, not SMS tone
 
 ## GOOD SMS PATTERNS:
-- "🚨 [Event]. [Stakes]. Chip in $X before midnight → [link]"
-- "[Opponent] just [action]. Fight back: [link]"
-- "MATCH ALERT: $X = $XX until midnight. Don't miss this → [link]"`;
+- "[Opponent] just [action]. Fight back now: [link]"
+- "If [consequence from context], we lose everything. Chip in $X → [link]"
+- "[Value] is on the line. Your $X makes the difference → [link]"`;
 
 /**
  * Tool definition for SMS campaign message generation.
