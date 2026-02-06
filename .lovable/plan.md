@@ -1,101 +1,111 @@
 
-# Fix: Stale Dashboard Data After Meta Sync
 
-## Problem
+# Ad Copy Prompt Engineering Overhaul
 
-When Meta Ads data syncs in the background, some parts of the dashboard update while others remain stale until manual refresh. This happens because the cache invalidation logic has gaps -- several critical query keys are not being invalidated when a sync completes.
+## Research Conclusion: Best Model for Ad Copy
 
-## Root Cause
+After deep research across multiple 2025/2026 benchmarks and reviews:
 
-There are three places that handle cache invalidation, and all three are missing key query keys:
+- **GPT-5** has weaker creative writing than its predecessor -- multiple independent reviews describe its output as "dry," "academic," and "robotic." OpenAI traded literary flair for accuracy.
+- **Claude (Opus 4/Sonnet 4)** is the consensus winner for creative/marketing copy, but is NOT available through the Lovable AI Gateway.
+- **Gemini 2.5 Pro** is the strongest available model -- best reasoning, largest context window, and solid creative capabilities. With proper prompt engineering (few-shot examples, anti-patterns, high temperature), it produces strong results.
 
-1. **`useAutoRefreshOnSync`** (realtime listener on `data_freshness` table) -- missing `actblue-metrics`, `channel-spend`, `dashboard-sparkline`
-2. **`useSmartRefresh`** (manual refresh button) -- missing `actblue-metrics`, `channel-spend`, `dashboard-sparkline`, `adPerformance`
-3. Mismatched key prefixes between hooks and invalidation lists
-
-### What each missing key controls:
-
-| Query Key | What it powers | Why it's stale |
-|-----------|---------------|----------------|
-| `actblue-metrics` | ROI, attributed revenue, channel breakdown (Hero KPIs) | ROI uses Meta spend in denominator; old spend = wrong ROI |
-| `channel-spend` | Meta/SMS spend totals and daily spend for the performance graph | Direct query to `meta_ad_metrics_daily`, never invalidated |
-| `dashboard-sparkline` | Daily ROI sparklines, MRR trends | ROI sparkline uses spend data, stays stale |
-| `adPerformance` | Ad Performance page metrics | Missing from `useSmartRefresh` |
-
-## Solution
-
-Update all three invalidation points to include the complete set of query keys.
+**Decision: Use `google/gemini-2.5-pro`** for all ad copy generation (highest quality available), and `google/gemini-3-flash-preview` for analysis/classification tasks (fast, cheap, accurate for structured extraction).
 
 ---
 
-## Technical Changes
+## Implementation Plan
 
-### File 1: `src/hooks/useAutoRefreshOnSync.ts`
+### Phase 1: Create Shared Infrastructure
 
-Update `SOURCE_QUERY_KEYS` to add the missing keys:
+**New file: `supabase/functions/_shared/prompts.ts`**
+- Unified transcript analysis prompt (used by 3 functions today)
+- Political ad copy system prompt with negative examples and few-shot examples
+- SMS analysis system prompt
 
-```typescript
-const SOURCE_QUERY_KEYS: Record<string, string[][]> = {
-  meta: [
-    ['meta'],
-    ['meta-metrics'],
-    ['single-day-meta'],
-    ['creative-intelligence'],
-    ['hourly-metrics'],
-    ['adPerformance'],
-    ['actblue-metrics'],     // NEW: ROI depends on Meta spend
-    ['channel-spend'],       // NEW: Direct meta_ad_metrics_daily query
-    ['dashboard-sparkline'], // NEW: Sparkline ROI uses spend
-  ],
-  actblue_webhook: [
-    ['actblue'],
-    ['donations'],
-    ['recurring-health'],
-    ['recurring-health-v2'],
-    ['hourly-metrics'],
-    ['kpis'],
-    ['actblue-metrics'],     // NEW: Core ActBlue data
-    ['channel-spend'],       // NEW: Attribution affects channel view
-    ['dashboard-sparkline'], // NEW: Sparkline data from RPC
-  ],
-  actblue_csv: [
-    ['actblue'],
-    ['donations'],
-    ['recurring-health'],
-    ['recurring-health-v2'],
-    ['kpis'],
-    ['actblue-metrics'],     // NEW: Core ActBlue data
-    ['dashboard-sparkline'], // NEW: Sparkline data from RPC
-  ],
-  switchboard: [
-    ['sms'],
-    ['channels'],
-    ['actblue-metrics'],     // NEW: SMS attribution in RPC
-    ['channel-spend'],       // NEW: SMS spend in channel query
-    ['dashboard-sparkline'], // NEW: Sparkline data
-  ],
-};
-```
+**New file: `supabase/functions/_shared/ai-client.ts`**
+- `callLovableAI()` helper that wraps the gateway call
+- Handles 429 (rate limit) and 402 (payment required) errors
+- Configurable model, temperature, and tool calling support
+- Logging for model/latency tracking
 
-### File 2: `src/hooks/useSmartRefresh.ts`
+### Phase 2: Overhaul `generate-ad-copy` (Primary Revenue Function)
 
-Add the missing invalidation keys to **both** invalidation blocks (lines ~158-183 and ~230-246):
+**Changes to `supabase/functions/generate-ad-copy/index.ts`:**
 
-```typescript
-// Add these to both Promise.all blocks:
-queryClient.invalidateQueries({ queryKey: ['actblue-metrics'] }),
-queryClient.invalidateQueries({ queryKey: ['channel-spend'] }),
-queryClient.invalidateQueries({ queryKey: ['dashboard-sparkline'] }),
-queryClient.invalidateQueries({ queryKey: ['adPerformance'] }),
-```
+1. **Migrate from OpenAI direct to Lovable AI Gateway** (`google/gemini-2.5-pro`)
+2. **Restructure prompt architecture:**
+   - System message: Persona + hard constraints + anti-patterns + few-shot examples
+   - User message: Only variable data (transcript, segment, limits)
+   - Currently both messages duplicate the persona, wasting tokens
+3. **Add negative examples section** to the prompt:
+   ```
+   ANTI-PATTERNS (never produce copy like this):
+   - "Dear supporter, we need your help..." (too generic, no hook)
+   - "Candidate X is running for office..." (name-first, no conflict)
+   - "Please consider making a contribution..." (passive, no urgency)
+   - "We're asking for your support today..." (vague, donor not the hero)
+   ```
+4. **Add 1 few-shot gold-standard example per framework** (PAS, BAB, AIDA, Social Proof, Identity) showing a complete primary_text + headline + description triplet
+5. **Update Meta character limits** for mobile-safe placements:
+   - Headline: 27 chars (mobile safe) instead of 40
+   - Description: 25 chars (mobile safe) instead of 30
+   - Primary text: Keep 125/300 split (correct)
+6. **Increase temperature to 0.95** for maximum creative diversity
+7. **Switch to tool calling** for structured JSON output (eliminates regex parsing failures)
+8. **Update `generation_model` field** in database insert from `gpt-4-turbo-preview` to `google/gemini-2.5-pro`
+
+### Phase 3: Overhaul `generate-campaign-messages` (SMS)
+
+**Changes to `supabase/functions/generate-campaign-messages/index.ts`:**
+
+1. **Add system message** with SMS copywriting persona and hard constraints (160 char limit)
+2. **Switch to tool calling** for structured JSON output
+3. **Set temperature to 0.8** (creative but constrained by 160 chars)
+4. **Add negative examples** for SMS anti-patterns
+
+### Phase 4: Fix `analyze-sms-creatives` (Classification)
+
+**Changes to `supabase/functions/analyze-sms-creatives/index.ts`:**
+
+1. **Switch to tool calling** for structured JSON output
+2. **Set temperature to 0.1** (pure classification -- should be deterministic)
+3. **Replace hardcoded `analysis_confidence: 0.85`** with model-reported confidence or remove it
+
+### Phase 5: Migrate Transcript Analysis Functions
+
+**Changes to `supabase/functions/reanalyze-transcript/index.ts`:**
+1. Migrate from direct OpenAI API to Lovable AI Gateway (`google/gemini-3-flash-preview`)
+2. Import shared prompt from `_shared/prompts.ts`
+3. Set temperature to 0.1 (analysis task)
+4. Switch to tool calling for structured output
+
+**Changes to `supabase/functions/upload-video-for-transcription/index.ts`:**
+1. Migrate analysis step from direct OpenAI API to Lovable AI Gateway
+2. Import shared prompt from `_shared/prompts.ts`
+3. Note: Whisper transcription step still needs OpenAI API (audio transcription is not available through Lovable AI Gateway)
+
+### Phase 6: Deploy All Functions
+
+Deploy all 6 updated functions:
+- `generate-ad-copy`
+- `generate-campaign-messages`
+- `analyze-sms-creatives`
+- `reanalyze-transcript`
+- `upload-video-for-transcription`
+- `transcribe-meta-ad-video` (if applicable)
 
 ---
 
-## Why This Fixes the Issue
+## Files Changed Summary
 
-After these changes:
-- When Meta syncs complete, the `channel-spend` query (which reads `meta_ad_metrics_daily` directly) will refetch with fresh spend data
-- The `actblue-metrics` query (which calculates ROI using spend) will recalculate with the new spend figures
-- The `dashboard-sparkline` query will update ROI sparklines
-- All dashboard sections will show consistent, up-to-date numbers without manual refresh
-- The manual refresh button will also invalidate all the same keys for consistency
+| File | Change Type | Model |
+|------|------------|-------|
+| `supabase/functions/_shared/prompts.ts` | NEW | -- |
+| `supabase/functions/_shared/ai-client.ts` | NEW | -- |
+| `supabase/functions/generate-ad-copy/index.ts` | MAJOR rewrite | gemini-2.5-pro |
+| `supabase/functions/generate-campaign-messages/index.ts` | Moderate update | gemini-2.5-flash (keep, SMS is simpler) |
+| `supabase/functions/analyze-sms-creatives/index.ts` | Moderate update | gemini-2.5-flash (keep) |
+| `supabase/functions/reanalyze-transcript/index.ts` | API migration | gemini-3-flash-preview |
+| `supabase/functions/upload-video-for-transcription/index.ts` | Partial migration | gemini-3-flash-preview (analysis only) |
+
