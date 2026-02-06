@@ -180,6 +180,10 @@ export function useSmartRefresh({
         queryClient.invalidateQueries({ queryKey: ['channels'] }),
         queryClient.invalidateQueries({ queryKey: ['kpis'] }),
         queryClient.invalidateQueries({ queryKey: ['alerts'] }),
+        queryClient.invalidateQueries({ queryKey: ['actblue-metrics'] }),
+        queryClient.invalidateQueries({ queryKey: ['channel-spend'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-sparkline'] }),
+        queryClient.invalidateQueries({ queryKey: ['adPerformance'] }),
       ]);
       
       // Step 2: Check what's stale (unless forcing)
@@ -243,6 +247,10 @@ export function useSmartRefresh({
         queryClient.invalidateQueries({ queryKey: ['channels'] }),
         queryClient.invalidateQueries({ queryKey: ['kpis'] }),
         queryClient.invalidateQueries({ queryKey: ['alerts'] }),
+        queryClient.invalidateQueries({ queryKey: ['actblue-metrics'] }),
+        queryClient.invalidateQueries({ queryKey: ['channel-spend'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-sparkline'] }),
+        queryClient.invalidateQueries({ queryKey: ['adPerformance'] }),
       ]);
       
       toast.success('Smart refresh complete', { id: 'smart-refresh' });
