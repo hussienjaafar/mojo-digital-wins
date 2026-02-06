@@ -428,6 +428,9 @@ verify_jwt = false
 verify_jwt = false
 
 # --- TREND ANALYSIS FUNCTIONS ---
+[functions.tag-trend-geographies]
+verify_jwt = false
+
 [functions.correlate-trends-campaigns]
 verify_jwt = false
 
