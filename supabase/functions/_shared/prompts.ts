@@ -147,6 +147,16 @@ export const AD_COPY_SYSTEM_PROMPT = `You are a world-class political fundraisin
 - Headline: 27 chars max (mobile-safe across Feed, Reels, Stories)
 - Description: 25 chars max (mobile-safe across all placements)
 
+## AD STRUCTURE (every primary_text MUST follow this arc):
+1. HOOK (first 125 chars): Conflict, threat, or identity trigger — stops the scroll
+2. BRIDGE (next ~100 chars): Stakes, evidence, or emotional deepening
+3. CTA (final ~75 chars): Specific dollar amount + action verb + empowerment framing
+
+The CTA must ALWAYS include:
+- A specific dollar amount ($5, $10, $27)
+- An action verb (chip in, fight back, stand up, join)
+- Why it matters to the DONOR (not the campaign)
+
 ## ANTI-PATTERNS — NEVER produce copy like this:
 - "Dear supporter, we need your help..." → Too generic, zero hook
 - "Candidate X is running for office..." → Name-first, no conflict
@@ -169,30 +179,50 @@ export const AD_COPY_SYSTEM_PROMPT = `You are a world-class political fundraisin
 
 ## FEW-SHOT EXAMPLES (gold-standard output per framework):
 
-**PAS Example:**
-Primary: "MAGA extremists just voted to gut Social Security. 47 million seniors could lose benefits. Your $27 helps us fight back — chip in now to protect what we've earned."
-Headline: "Protect Social Security"
-Description: "Chip in to fight back"
+**PAS Example (framework: "PAS", hook_strategy: "pain"):**
+\`\`\`json
+{
+  "primary_text": "MAGA extremists just voted to gut Social Security. 47 million seniors could lose benefits. Your $27 helps us fight back — chip in now to protect what we've earned.",
+  "headline": "Protect Social Security",
+  "description": "Chip in to fight back"
+}
+\`\`\`
 
-**BAB Example:**
-Primary: "Right now, families are choosing between medicine and rent. With [Candidate], no one makes that choice. Your donation builds that future — $5 is all it takes."
-Headline: "Healthcare for everyone"
-Description: "$5 builds our future"
+**BAB Example (framework: "BAB", hook_strategy: "stakes"):**
+\`\`\`json
+{
+  "primary_text": "Right now, families are choosing between medicine and rent. With [Candidate], no one makes that choice. Your donation builds that future — $5 is all it takes.",
+  "headline": "Healthcare for everyone",
+  "description": "$5 builds our future"
+}
+\`\`\`
 
-**AIDA Example:**
-Primary: "They just banned books in 14 states. Next: your kids' school. [Candidate] is the only one fighting back. This is the moment to stand up — don't sit this out."
-Headline: "Fight the book bans"
-Description: "Stand up. Chip in."
+**AIDA Example (framework: "AIDA", hook_strategy: "threat"):**
+\`\`\`json
+{
+  "primary_text": "They just banned books in 14 states. Next: your kids' school. [Candidate] is the only one fighting back. This is the moment to stand up — don't sit this out.",
+  "headline": "Fight the book bans",
+  "description": "Stand up. Chip in."
+}
+\`\`\`
 
-**Social Proof Example:**
-Primary: "Zero corporate PAC money. 100% grassroots funded. This is what a people-powered campaign looks like. Chip in $5 to keep the movement growing."
-Headline: "People over PACs"
-Description: "100% grassroots funded"
+**Social Proof Example (framework: "SOCIAL_PROOF", hook_strategy: "identity"):**
+\`\`\`json
+{
+  "primary_text": "Zero corporate PAC money. 100% grassroots funded. This is what a people-powered campaign looks like. Chip in $5 to keep the movement growing.",
+  "headline": "People over PACs",
+  "description": "100% grassroots funded"
+}
+\`\`\`
 
-**Identity Example:**
-Primary: "If you believe every kid deserves a great school — not just rich kids — this is your fight. Your $10 funds organizers in swing districts. Be the difference."
-Headline: "Education is a right"
-Description: "Fund the fight"
+**Identity Example (framework: "IDENTITY", hook_strategy: "identity"):**
+\`\`\`json
+{
+  "primary_text": "If you believe every kid deserves a great school — not just rich kids — this is your fight. Your $10 funds organizers in swing districts. Be the difference.",
+  "headline": "Education is a right",
+  "description": "Fund the fight"
+}
+\`\`\`
 
 ## POLITICAL FUNDRAISING PSYCHOLOGY (apply to ALL variations):
 
@@ -213,19 +243,23 @@ IDENTITY REINFORCEMENT:
 - Shared values language
 - In-group signaling
 
-ENEMY FRAMING:
-- Clear villain (opponent, special interests, corporate PACs)
-- Contrast (us vs. them, grassroots vs. dark money)
-- Stakes if enemy wins
+ENEMY FRAMING (always comparative — research shows pure attacks suppress progressive donations):
+- Always pair the villain with the hero: "[Opponent] wants X. [Candidate] is fighting for Y."
+- Contrast creates clarity: "They're cutting. We're investing."
+- Never attack without offering the positive alternative
+- The donor's contribution bridges the gap between villain's action and hero's solution
 
 EMPOWERMENT:
 - Specific dollar impact ("Your $27 = [specific outcome]")
 - Donor as hero of the story
 - Agency and control ("YOU decide")
 
-## META ALGORITHM OPTIMIZATION:
-- Emotionally resonant copy → higher quality score → lower CPM
-- Clear benefit in first line → higher CTR
+## META BEST PRACTICES:
+- Use emoji sparingly (1 max per primary_text) — overuse triggers spam filters
+- Avoid ALL CAPS for more than 2 words — Meta quality score penalty
+- No exclamation marks in headlines — reduces trust score
+- Questions in hooks outperform statements by ~15% on CTR
+- Numbers and dollar amounts stop the scroll ("$27", "47 million", "14 states")
 - Authentic, passionate voice > polished marketing speak
 - Copy that drives engagement (likes, shares) costs less to deliver`;
 
@@ -267,49 +301,79 @@ Name: ${params.segmentName}
 Description: ${params.segmentDescription}
 Tone Guidance: ${params.segmentTone}
 
-## GENERATE 5 VARIATIONS
-Use exactly one framework per variation:
+## INSTRUCTIONS
+First, analyze the transcript in the "reasoning" field — identify the core conflict, strongest emotional lever, who the donor becomes, the villain, and what's at stake if the donor does nothing.
+
+Then generate exactly 5 variations, one per framework:
 1. PAS (Problem-Agitate-Solution)
 2. BAB (Before-After-Bridge)
 3. AIDA (Attention-Interest-Desire-Action)
 4. Social Proof + Urgency
-5. Identity + Empowerment`;
+5. Identity + Empowerment
+
+Each variation must follow the Hook-Bridge-CTA arc and respect all character limits.`;
 }
 
 /**
  * Tool definition for ad copy generation (structured output via tool calling).
+ * Uses per-variation objects with framework metadata + a reasoning preamble.
  */
 export const AD_COPY_GENERATION_TOOL = {
   type: "function" as const,
   function: {
     name: "generate_ad_copy",
-    description: "Generate 5 Meta ad copy variations using different copywriting frameworks",
+    description: "Reason about the transcript, then generate 5 Meta ad copy variations using different copywriting frameworks",
     parameters: {
       type: "object",
       properties: {
-        primary_texts: {
-          type: "array",
-          items: { type: "string" },
-          description: "5 primary text variations (max 300 chars each, hook in first 125)",
-          minItems: 5,
-          maxItems: 5,
+        reasoning: {
+          type: "object",
+          description: "Chain-of-thought analysis of the transcript BEFORE writing copy",
+          properties: {
+            core_conflict: { type: "string", description: "The central conflict/threat from the transcript in one sentence" },
+            emotional_lever: { type: "string", description: "The strongest emotional trigger for this audience" },
+            donor_identity: { type: "string", description: "Who the donor becomes by giving (hero framing)" },
+            villain: { type: "string", description: "The clear antagonist or opposing force" },
+            stakes: { type: "string", description: "What happens if the donor does NOT act" },
+          },
+          required: ["core_conflict", "emotional_lever", "donor_identity", "villain", "stakes"],
         },
-        headlines: {
+        variations: {
           type: "array",
-          items: { type: "string" },
-          description: "5 headline variations (max 27 chars each)",
-          minItems: 5,
-          maxItems: 5,
-        },
-        descriptions: {
-          type: "array",
-          items: { type: "string" },
-          description: "5 description variations (max 25 chars each)",
+          description: "Exactly 5 ad copy variations, one per framework",
+          items: {
+            type: "object",
+            properties: {
+              framework: {
+                type: "string",
+                enum: ["PAS", "BAB", "AIDA", "SOCIAL_PROOF", "IDENTITY"],
+                description: "Which copywriting framework this variation uses",
+              },
+              hook_strategy: {
+                type: "string",
+                enum: ["pain", "stakes", "curiosity", "identity", "threat", "question"],
+                description: "Which hook pattern was used",
+              },
+              primary_text: {
+                type: "string",
+                description: "Primary ad text (max 300 chars, hook in first 125)",
+              },
+              headline: {
+                type: "string",
+                description: "Headline text (max 27 chars)",
+              },
+              description: {
+                type: "string",
+                description: "Description text (max 25 chars)",
+              },
+            },
+            required: ["framework", "hook_strategy", "primary_text", "headline", "description"],
+          },
           minItems: 5,
           maxItems: 5,
         },
       },
-      required: ["primary_texts", "headlines", "descriptions"],
+      required: ["reasoning", "variations"],
       additionalProperties: false,
     },
   },
@@ -389,12 +453,13 @@ export const SMS_ANALYSIS_TOOL = {
         topic: { type: "string", description: "Main topic (e.g. healthcare, immigration, voting rights, climate)" },
         tone: { type: "string", description: "Emotional tone (e.g. urgent, emotional, factual, grateful, angry, hopeful)" },
         sentiment_score: { type: "number", description: "From -1.0 (very negative) to 1.0 (very positive)" },
-        sentiment_label: { type: "string", enum: ["positive", "negative", "neutral"] },
-        call_to_action: { type: "string", description: "Main CTA type (e.g. donate, sign petition, share, vote)" },
-        urgency_level: { type: "string", enum: ["low", "medium", "high", "critical"] },
-        key_themes: { type: "array", items: { type: "string" }, description: "2-4 key themes/keywords" },
+        urgency_level: { type: "string", enum: ["low", "medium", "high", "extreme"] },
+        has_donation_ask: { type: "boolean" },
+        donation_amount: { type: ["number", "null"], description: "Specific amount if mentioned" },
+        call_to_action: { type: "string", description: "The CTA text or intent" },
+        key_phrases: { type: "array", items: { type: "string" }, description: "2-3 most impactful phrases" },
       },
-      required: ["topic", "tone", "sentiment_score", "sentiment_label", "call_to_action", "urgency_level", "key_themes"],
+      required: ["topic", "tone", "sentiment_score", "urgency_level", "has_donation_ask", "donation_amount", "call_to_action", "key_phrases"],
       additionalProperties: false,
     },
   },

@@ -1,18 +1,19 @@
 /**
  * =============================================================================
- * GENERATE AD COPY - Edge Function (v3.0)
+ * GENERATE AD COPY - Edge Function (v4.0)
  * =============================================================================
  *
  * Generates Meta ad copy using Lovable AI Gateway (google/gemini-2.5-pro).
  * Creates 5 variations per segment using research-backed copywriting frameworks.
  *
- * v3.0 Changes:
- * - Migrated from OpenAI direct to Lovable AI Gateway
- * - Restructured prompts (system/user separation, no duplication)
- * - Added negative examples and few-shot gold-standard examples
- * - Updated Meta character limits for mobile-safe placements
- * - Switched to tool calling for structured JSON output
- * - Temperature increased to 0.95 for maximum creative diversity
+ * v4.0 Changes:
+ * - Added chain-of-thought reasoning (model analyzes transcript before writing)
+ * - Per-variation metadata (framework, hook_strategy) for A/B testing
+ * - Expanded segment tone guidance with psychological levers
+ * - Comparative framing rule for enemy framing
+ * - Hook-Bridge-CTA structure enforcement
+ * - Temperature lowered to 0.85 for reliability within tight char limits
+ * - JSON-formatted few-shot examples aligned with tool schema
  *
  * =============================================================================
  */
@@ -48,6 +49,28 @@ interface GenerateAdCopyRequest {
   recurring_default?: boolean;
 }
 
+/** The new structured variation returned by the AI tool call */
+interface AIVariation {
+  framework: string;
+  hook_strategy: string;
+  primary_text: string;
+  headline: string;
+  description: string;
+}
+
+/** AI tool call result shape */
+interface AIGenerationResult {
+  reasoning: {
+    core_conflict: string;
+    emotional_lever: string;
+    donor_identity: string;
+    villain: string;
+    stakes: string;
+  };
+  variations: AIVariation[];
+}
+
+/** Flattened segment copy for frontend compatibility */
 interface GeneratedCopySegment {
   primary_texts: string[];
   headlines: string[];
@@ -60,6 +83,8 @@ interface MetaReadyVariation {
   description: string;
   call_to_action_type: string;
   destination_url: string;
+  framework: string;
+  hook_strategy: string;
   char_counts: {
     primary: number;
     headline: number;
@@ -104,8 +129,8 @@ interface TranscriptData {
 const META_COPY_LIMITS = {
   primary_text_visible: 125,
   primary_text_max: 300,
-  headline_max: 27,      // Mobile-safe (was 40)
-  description_max: 25,   // Mobile-safe (was 30)
+  headline_max: 27,
+  description_max: 25,
 };
 
 const DEFAULT_CTA_TYPE = 'DONATE_NOW';
@@ -129,30 +154,68 @@ function buildTrackingUrl(
   return `${baseUrl}?${params.toString()}`;
 }
 
+/**
+ * Expanded segment tone guidance with psychological levers, dollar anchors, and CTA style.
+ */
 function getSegmentTone(segmentDescription: string): string {
   const desc = segmentDescription.toLowerCase();
+
   if (desc.includes('progressive') || desc.includes('activist') || desc.includes('liberal')) {
-    return 'PROGRESSIVE_BASE: Use values-forward, movement language. Emphasize collective action and systemic change.';
+    return `PROGRESSIVE_BASE:
+- Lead with shared values and movement identity
+- Use collective language ("we", "together", "our movement")
+- Frame donation as participation in systemic change
+- Suggest amounts: $27 (Bernie anchor), $10, $5
+- CTA tone: empowerment ("Be part of this", "Join the fight")
+- Psychological lever: collective identity, in-group solidarity`;
   }
+
   if (desc.includes('swing') || desc.includes('persuadable') || desc.includes('independent')) {
-    return 'SWING_VOTERS: Focus on fear of loss and specific tangible impacts. Avoid partisan language. Lead with consequences.';
+    return `SWING_VOTERS:
+- Lead with consequences and tangible impacts, NOT ideology
+- Avoid partisan labels (no "progressive", "liberal", "MAGA")
+- Focus on pocketbook issues and personal safety
+- Use loss aversion: "You could lose X" > "We could gain Y"
+- Suggest amounts: $10, $25 (moderate, not extreme)
+- CTA tone: protective ("Protect your family", "Don't let this happen")
+- Psychological lever: loss aversion, personal threat`;
   }
+
   if (desc.includes('high-dollar') || desc.includes('major donor') || desc.includes('whale')) {
-    return 'HIGH-DOLLAR: Use empowerment and strategic framing. Make them feel like insiders. Emphasize outsized impact.';
+    return `HIGH_DOLLAR:
+- Frame as strategic investment, not emotional plea
+- Insider language: "You understand what's at stake"
+- Emphasize outsized impact and exclusive role
+- Suggest amounts: $100, $250, $500
+- CTA tone: strategic ("Make the decisive investment")
+- Psychological lever: status, strategic impact, exclusivity`;
   }
+
   if (desc.includes('grassroots') || desc.includes('small-dollar') || desc.includes('first-time')) {
-    return 'GRASSROOTS: Maximum urgency, collective action. "$5 is all it takes." Make small feel powerful.';
+    return `GRASSROOTS:
+- Maximum urgency, small amounts feel powerful
+- "Your $5 is the backbone of this campaign"
+- Collective power: "Millions of $5 gifts beat one billionaire"
+- Suggest amounts: $5, $10, $3
+- CTA tone: immediate ("Right now", "This moment")
+- Psychological lever: collective power, every-dollar-counts`;
   }
-  return 'GENERAL: Balance urgency with values. Use "you" language heavily. Create personal stake.';
+
+  return `GENERAL:
+- Balance urgency with values. Use "you" language heavily. Create personal stake.
+- Suggest amounts: $10, $27, $5
+- CTA tone: direct and empowering
+- Psychological lever: personal agency, donor-as-hero`;
 }
 
 /**
  * Generate ad copy for a single segment using Lovable AI with tool calling.
+ * Returns the new variations[] structure mapped back to flat arrays for frontend compat.
  */
 async function generateCopyForSegment(
   transcript: TranscriptData,
   segment: AudienceSegment
-): Promise<GeneratedCopySegment | null> {
+): Promise<{ copy: GeneratedCopySegment; reasoning: AIGenerationResult['reasoning']; rawVariations: AIVariation[] } | null> {
   try {
     const segmentTone = getSegmentTone(segment.description);
     const userMessage = buildAdCopyUserMessage({
@@ -173,28 +236,49 @@ async function generateCopyForSegment(
       segmentTone,
     });
 
-    const { result } = await callLovableAIWithTools<GeneratedCopySegment>({
+    const { result } = await callLovableAIWithTools<AIGenerationResult>({
       model: 'google/gemini-2.5-pro',
       messages: [
         { role: 'system', content: AD_COPY_SYSTEM_PROMPT },
         { role: 'user', content: userMessage },
       ],
-      temperature: 0.95,
+      temperature: 0.85,
       maxTokens: 3000,
       tools: [AD_COPY_GENERATION_TOOL],
       toolChoice: { type: "function", function: { name: "generate_ad_copy" } },
     });
 
-    if (!Array.isArray(result.primary_texts) || !Array.isArray(result.headlines) || !Array.isArray(result.descriptions)) {
-      console.error('[generate-ad-copy] Invalid response structure from AI');
-      return null;
+    // Handle new variations[] structure
+    if (Array.isArray(result.variations) && result.variations.length > 0) {
+      const variations = result.variations.slice(0, 5);
+      return {
+        copy: {
+          primary_texts: variations.map(v => v.primary_text),
+          headlines: variations.map(v => v.headline),
+          descriptions: variations.map(v => v.description),
+        },
+        reasoning: result.reasoning,
+        rawVariations: variations,
+      };
     }
 
-    return {
-      primary_texts: result.primary_texts.slice(0, 5),
-      headlines: result.headlines.slice(0, 5),
-      descriptions: result.descriptions.slice(0, 5),
-    };
+    // Fallback: handle legacy flat array format (in case model returns old format)
+    const legacy = result as any;
+    if (Array.isArray(legacy.primary_texts) && Array.isArray(legacy.headlines) && Array.isArray(legacy.descriptions)) {
+      console.warn('[generate-ad-copy] AI returned legacy flat array format, converting');
+      return {
+        copy: {
+          primary_texts: legacy.primary_texts.slice(0, 5),
+          headlines: legacy.headlines.slice(0, 5),
+          descriptions: legacy.descriptions.slice(0, 5),
+        },
+        reasoning: result.reasoning || { core_conflict: '', emotional_lever: '', donor_identity: '', villain: '', stakes: '' },
+        rawVariations: [],
+      };
+    }
+
+    console.error('[generate-ad-copy] Invalid response structure from AI');
+    return null;
   } catch (err) {
     console.error('[generate-ad-copy] Error generating copy for segment:', err);
     return null;
@@ -207,7 +291,11 @@ function validateAndFormat(text: string, maxLength: number): { text: string; mee
   return { text: trimmed.substring(0, maxLength - 3) + '...', meetsSpec: false };
 }
 
-function createMetaReadyCopy(generatedCopy: GeneratedCopySegment, trackingUrl: string): MetaReadyCopySegment {
+function createMetaReadyCopy(
+  generatedCopy: GeneratedCopySegment,
+  rawVariations: AIVariation[],
+  trackingUrl: string
+): MetaReadyCopySegment {
   const variations: MetaReadyVariation[] = [];
   const numVariations = Math.min(generatedCopy.primary_texts.length, generatedCopy.headlines.length, generatedCopy.descriptions.length, 5);
 
@@ -216,12 +304,16 @@ function createMetaReadyCopy(generatedCopy: GeneratedCopySegment, trackingUrl: s
     const headlineValidated = validateAndFormat(generatedCopy.headlines[i] || '', META_COPY_LIMITS.headline_max);
     const descriptionValidated = validateAndFormat(generatedCopy.descriptions[i] || '', META_COPY_LIMITS.description_max);
 
+    const rawVar = rawVariations[i];
+
     variations.push({
       primary_text: primaryValidated.text,
       headline: headlineValidated.text,
       description: descriptionValidated.text,
       call_to_action_type: DEFAULT_CTA_TYPE,
       destination_url: trackingUrl,
+      framework: rawVar?.framework || 'UNKNOWN',
+      hook_strategy: rawVar?.hook_strategy || 'unknown',
       char_counts: {
         primary: primaryValidated.text.length,
         headline: headlineValidated.text.length,
@@ -285,7 +377,7 @@ serve(async (req) => {
     if (!refcode?.trim()) return new Response(JSON.stringify({ success: false, error: 'refcode is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    console.log(`[generate-ad-copy] Starting v3.0 generation for org ${organization_id}, transcript ${transcript_id}`);
+    console.log(`[generate-ad-copy] Starting v4.0 generation for org ${organization_id}, transcript ${transcript_id}`);
 
     // Fetch transcript
     const { data: transcript, error: transcriptError } = await supabase
@@ -325,17 +417,18 @@ serve(async (req) => {
 
     for (const segment of audience_segments) {
       console.log(`[generate-ad-copy] Generating copy for segment: ${segment.name}`);
-      const segmentCopy = await generateCopyForSegment(transcript as TranscriptData, segment);
+      const result = await generateCopyForSegment(transcript as TranscriptData, segment);
 
-      if (!segmentCopy) {
+      if (!result) {
         generatedCopy[segment.name] = { primary_texts: [], headlines: [], descriptions: [] };
         metaReadyCopy[segment.name] = { variations: [] };
         continue;
       }
 
-      generatedCopy[segment.name] = segmentCopy;
-      metaReadyCopy[segment.name] = createMetaReadyCopy(segmentCopy, trackingUrl);
-      console.log(`[generate-ad-copy] Generated ${metaReadyCopy[segment.name].variations.length} variations for ${segment.name}`);
+      generatedCopy[segment.name] = result.copy;
+      metaReadyCopy[segment.name] = createMetaReadyCopy(result.copy, result.rawVariations, trackingUrl);
+
+      console.log(`[generate-ad-copy] Segment "${segment.name}": ${metaReadyCopy[segment.name].variations.length} variations | Reasoning: ${result.reasoning.core_conflict?.slice(0, 80)}`);
     }
 
     const validationStatus = determineValidationStatus(metaReadyCopy);
@@ -358,7 +451,7 @@ serve(async (req) => {
         tracking_url: trackingUrl,
         copy_validation_status: validationStatus,
         generation_model: 'google/gemini-2.5-pro',
-        generation_prompt_version: '3.0-frameworks-toolcalling',
+        generation_prompt_version: '4.0-reasoning-variations',
         generated_at: generatedAt,
         created_at: generatedAt,
         updated_at: generatedAt,
