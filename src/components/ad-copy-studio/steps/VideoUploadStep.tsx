@@ -53,6 +53,7 @@ export interface VideoUploadStepProps {
   onCancelVideo?: (id: string) => Promise<void>;
   onRetryTranscription?: (id: string) => Promise<void>;
   onBackToAdmin?: () => void;
+  organizationName?: string;
 }
 
 // =============================================================================
@@ -181,6 +182,7 @@ export function VideoUploadStep({
   onCancelVideo,
   onRetryTranscription,
   onBackToAdmin,
+  organizationName,
 }: VideoUploadStepProps) {
   const [gdriveUrl, setGdriveUrl] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -253,7 +255,7 @@ export function VideoUploadStep({
           Upload Your Campaign Videos
         </h2>
         <p className="mt-2 text-[#94a3b8]">
-          Upload up to 5 videos for this campaign
+          Upload up to 5 videos{organizationName ? <> for <span className="text-blue-400 font-medium">{organizationName}</span></> : ' for this campaign'}
         </p>
       </div>
 

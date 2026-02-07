@@ -56,6 +56,7 @@ export interface CopyExportStepProps {
   onStartNew: () => void;
   onRegenerateSegment?: (segmentName: string) => Promise<void>;
   isRegenerating?: boolean;
+  organizationName?: string;
 }
 
 // =============================================================================
@@ -65,9 +66,10 @@ export interface CopyExportStepProps {
 function formatCopyForClipboard(
   generatedCopy: GeneratedCopy,
   audienceSegments: AudienceSegment[],
-  trackingUrl: string
+  trackingUrl: string,
+  organizationName?: string
 ): string {
-  let output = '';
+  let output = organizationName ? `=== ${organizationName.toUpperCase()} - AD COPY ===\n\n` : '';
 
   for (const segment of audienceSegments) {
     const copy = generatedCopy[segment.name];
@@ -456,6 +458,7 @@ export function CopyExportStep({
   onStartNew,
   onRegenerateSegment,
   isRegenerating,
+  organizationName,
 }: CopyExportStepProps) {
   // Issue A5: Use segment.id as tab key
   const [activeSegmentId, setActiveSegmentId] = useState(audienceSegments[0]?.id || ALL_SEGMENTS_KEY);
@@ -488,11 +491,11 @@ export function CopyExportStep({
   }, [trackingUrl]);
 
   const handleCopyAll = useCallback(() => {
-    const formattedCopy = formatCopyForClipboard(generatedCopy, audienceSegments, trackingUrl);
+    const formattedCopy = formatCopyForClipboard(generatedCopy, audienceSegments, trackingUrl, organizationName);
     navigator.clipboard.writeText(formattedCopy);
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 2000);
-  }, [generatedCopy, audienceSegments, trackingUrl]);
+  }, [generatedCopy, audienceSegments, trackingUrl, organizationName]);
 
   const handleCopyVariation = useCallback((text: string, index: number) => {
     navigator.clipboard.writeText(text);
@@ -530,7 +533,7 @@ export function CopyExportStep({
       <div className="text-center">
         <h2 className="text-2xl font-semibold text-[#e2e8f0]">Review & Export Copy</h2>
         <p className="mt-2 text-[#94a3b8]">
-          Review your generated ad copy and export for Meta Ads Manager
+          Review your generated ad copy{organizationName ? <> for <span className="text-blue-400 font-medium">{organizationName}</span></> : ''} and export for Meta Ads Manager
         </p>
       </div>
 

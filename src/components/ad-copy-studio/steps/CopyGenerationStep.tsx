@@ -34,6 +34,7 @@ export interface CopyGenerationStepProps {
   error: string | null;
   onGenerate: () => Promise<void>;
   onBack: () => void;
+  organizationName?: string;
 }
 
 // =============================================================================
@@ -85,6 +86,7 @@ export function CopyGenerationStep({
   error,
   onGenerate,
   onBack,
+  organizationName,
 }: CopyGenerationStepProps) {
   const segmentCount = config.audience_segments.length;
   const totalVariations = segmentCount * VARIATIONS_PER_ELEMENT;
@@ -95,7 +97,7 @@ export function CopyGenerationStep({
       <div className="text-center">
         <h2 className="text-2xl font-semibold text-[#e2e8f0]">Generate Ad Copy</h2>
         <p className="mt-2 text-[#94a3b8]">
-          Review your settings and generate personalized ad copy
+          Review your settings and generate personalized ad copy{organizationName ? <> for <span className="text-blue-400 font-medium">{organizationName}</span></> : ''}
         </p>
       </div>
 

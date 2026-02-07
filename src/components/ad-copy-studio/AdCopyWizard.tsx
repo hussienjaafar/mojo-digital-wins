@@ -66,6 +66,36 @@ export interface AdCopyWizardProps {
   onBackToAdmin: () => void;
 }
 
+// Helper to get step data summary for completed steps
+function getStepSummary(step: number, stepData: Record<string, any>, videos: any[]): string | null {
+  const currentVideos = videos.length > 0 ? videos : (stepData.videos || []);
+  switch (step) {
+    case 1: {
+      const count = currentVideos.length;
+      return count > 0 ? `${count} video${count !== 1 ? 's' : ''}` : null;
+    }
+    case 2: {
+      const analyses = stepData.analyses || {};
+      const count = Object.keys(analyses).length;
+      return count > 0 ? `${count} reviewed` : null;
+    }
+    case 3: {
+      const config = stepData.config;
+      const count = config?.audience_segments?.length || 0;
+      return count > 0 ? `${count} segment${count !== 1 ? 's' : ''}` : null;
+    }
+    case 4: {
+      const copy = stepData.generated_copy as Record<string, { primary_texts?: string[] }> | undefined;
+      if (!copy) return null;
+      const total = Object.values(copy).reduce((sum: number, seg) => 
+        sum + (seg?.primary_texts?.length || 0), 0);
+      return total > 0 ? `${total} variations` : null;
+    }
+    default:
+      return null;
+  }
+}
+
 // =============================================================================
 // Constants
 // =============================================================================
@@ -552,6 +582,18 @@ export function AdCopyWizard({
   // Organization picker dialog state
   const [showOrgPicker, setShowOrgPicker] = useState(false);
 
+  // Cmd+K shortcut to open org picker
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowOrgPicker(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleResetSession = useCallback(() => {
     setShowResetDialog(true);
   }, []);
@@ -618,6 +660,7 @@ export function AdCopyWizard({
             onCancelVideo={handleCancelVideo}
             onRetryTranscription={handleRetryTranscription}
             onBackToAdmin={onBackToAdmin}
+            organizationName={selectedOrg?.name}
           />
         );
 
@@ -682,6 +725,7 @@ export function AdCopyWizard({
             error={generationError}
             onGenerate={handleGenerate}
             onBack={() => handleGoBack(3)}
+            organizationName={selectedOrg?.name}
           />
         );
 
@@ -701,6 +745,7 @@ export function AdCopyWizard({
             onStartNew={handleStartNewWithConfirm}
             onRegenerateSegment={handleRegenerateSegment}
             isRegenerating={isGenerating}
+            organizationName={selectedOrg?.name}
           />
         );
 
@@ -733,77 +778,78 @@ export function AdCopyWizard({
 
   return (
     <div className="flex flex-col gap-6 p-6 min-h-screen bg-[#0a0f1a]">
-      {/* Issue E2: Merged single sticky header with Back to Admin */}
+      {/* Redesigned header: breadcrumb + org identity as primary element */}
       <header className="sticky top-0 z-30 -mx-6 -mt-6 px-6 py-4 bg-[#0a0f1a]/95 backdrop-blur-md border-b border-[#1e2a45]">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            {/* Issue E2 + A9/19: Back to Admin always visible in header */}
-            <Button
-              variant="ghost"
-              size="sm"
+          {/* Left: Breadcrumb with org identity */}
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Breadcrumb: Admin / Ad Copy Studio / Org Name */}
+            <button
               onClick={onBackToAdmin}
-              className="text-[#64748b] hover:text-[#e2e8f0] hover:bg-[#1e2a45] rounded-lg -ml-2"
+              className="text-sm text-[#64748b] hover:text-[#94a3b8] transition-colors shrink-0"
             >
-              <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Exit
-            </Button>
-            <div className="h-6 w-px bg-[#1e2a45]" />
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-[#a855f7]">
-              <Sparkles className="h-4 w-4 text-white" aria-hidden="true" />
+              Admin
+            </button>
+            <span className="text-[#64748b] text-sm shrink-0">/</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-[#a855f7]">
+                <Sparkles className="h-3.5 w-3.5 text-white" aria-hidden="true" />
+              </div>
+              <span className="text-sm font-medium text-[#e2e8f0]">Ad Copy Studio</span>
             </div>
-            <div>
-              <h1 className="text-lg font-semibold text-[#e2e8f0]">Ad Copy Studio</h1>
-              {selectedOrg && (
-                <p className="text-xs text-[#64748b]">Creating ads for <span className="text-blue-400 font-medium">{selectedOrg.name}</span></p>
+            <span className="text-[#64748b] text-sm shrink-0">/</span>
+
+            {/* Org identity - clickable to switch */}
+            <button
+              onClick={() => setShowOrgPicker(true)}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-[#1e2a45] transition-colors min-w-0 max-w-[260px] group"
+              aria-label="Switch organization"
+            >
+              {selectedOrg?.logo_url ? (
+                <img src={selectedOrg.logo_url} alt="" className="h-6 w-6 rounded-md object-contain shrink-0 bg-[#0a0f1a]" />
+              ) : (
+                <div className="h-6 w-6 rounded-md bg-[#0a0f1a] flex items-center justify-center text-[9px] font-medium text-[#94a3b8] shrink-0">
+                  {selectedOrg?.name.substring(0, 2).toUpperCase()}
+                </div>
               )}
-            </div>
+              <span className="text-sm font-medium text-blue-400 truncate">{selectedOrg?.name}</span>
+              <ChevronDown className="h-3 w-3 text-[#64748b] shrink-0 group-hover:text-[#94a3b8]" />
+            </button>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Organization Picker Button */}
-            {organizations.length > 1 && (
-              <button
-                onClick={() => setShowOrgPicker(true)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#1e2a45] bg-[#141b2d] hover:bg-[#1e2a45] transition-colors max-w-[240px]"
-                aria-label="Switch organization"
-              >
-                {selectedOrg?.logo_url ? (
-                  <img src={selectedOrg.logo_url} alt="" className="h-6 w-6 rounded-md object-contain shrink-0 bg-[#0a0f1a]" />
-                ) : (
-                  <div className="h-6 w-6 rounded-md bg-[#0a0f1a] flex items-center justify-center text-[9px] font-medium text-[#94a3b8] shrink-0">
-                    {selectedOrg?.name.substring(0, 2).toUpperCase()}
-                  </div>
-                )}
-                <span className="text-sm text-[#e2e8f0] truncate">{selectedOrg?.name}</span>
-                <ChevronDown className="h-3.5 w-3.5 text-[#64748b] shrink-0" />
-              </button>
-            )}
-
-            {/* Reset Session Button */}
+          {/* Right: Cmd+K hint + Reset */}
+          <div className="flex items-center gap-2">
+            <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-[10px] text-[#64748b] bg-[#0a0f1a] border border-[#1e2a45] rounded font-mono">
+              ⌘K
+            </kbd>
             <Button
-              variant="outline"
-              size="sm"
+              variant="ghost"
+              size="icon"
               onClick={handleResetSession}
               disabled={isSaving}
-              className="border-[#1e2a45] bg-transparent text-[#94a3b8] hover:bg-[#141b2d] hover:text-[#e2e8f0]"
-              aria-label="Reset Ad Copy Studio session"
+              className="text-[#64748b] hover:text-[#e2e8f0] hover:bg-[#1e2a45] h-8 w-8"
+              aria-label="Reset session"
+              title="Reset session"
             >
-              <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
-              Reset
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
         </div>
       </header>
 
-      {/* Step Indicator */}
+      {/* Step Indicator with data summaries */}
       <div className="rounded-xl border border-[#1e2a45] bg-[#141b2d] p-4">
         <WizardStepIndicator
           currentStep={currentStep}
           completedSteps={completedSteps}
           onStepClick={goToStep}
           canNavigateToStep={canNavigateToStep}
+          stepSummaries={{
+            1: getStepSummary(1, stepData, videos),
+            2: getStepSummary(2, stepData, videos),
+            3: getStepSummary(3, stepData, videos),
+            4: getStepSummary(4, stepData, videos),
+          }}
         />
       </div>
 
