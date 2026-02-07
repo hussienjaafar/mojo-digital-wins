@@ -245,7 +245,7 @@ async function generateCopyForSegment(
       temperature: 0.85,
       maxTokens: 3000,
       tools: [AD_COPY_GENERATION_TOOL],
-      toolChoice: { type: "function", function: { name: "generate_ad_copy" } },
+      toolChoice: "required",
     });
 
     // Handle new variations[] structure
@@ -429,6 +429,18 @@ serve(async (req) => {
       metaReadyCopy[segment.name] = createMetaReadyCopy(result.copy, result.rawVariations, trackingUrl);
 
       console.log(`[generate-ad-copy] Segment "${segment.name}": ${metaReadyCopy[segment.name].variations.length} variations | Reasoning: ${result.reasoning.core_conflict?.slice(0, 80)}`);
+    }
+
+    // Check if ALL segments produced empty results
+    const totalVariations = Object.values(metaReadyCopy)
+      .reduce((sum, seg) => sum + seg.variations.length, 0);
+
+    if (totalVariations === 0) {
+      console.error('[generate-ad-copy] All segments failed to generate copy');
+      return new Response(
+        JSON.stringify({ success: false, error: 'AI generation failed for all segments. Please try again.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const validationStatus = determineValidationStatus(metaReadyCopy);

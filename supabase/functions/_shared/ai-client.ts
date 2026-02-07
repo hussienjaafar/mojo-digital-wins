@@ -99,10 +99,16 @@ export async function callLovableAIWithTools<T>(
   const aiResult = await callLovableAI(options);
 
   if (!aiResult.toolCalls || aiResult.toolCalls.length === 0) {
+    console.warn(`[AI] No tool calls returned. Content length: ${aiResult.content?.length || 0}`);
+    console.warn(`[AI] Content preview: ${aiResult.content?.substring(0, 500) || 'empty'}`);
+
     // Fallback: try parsing content as JSON if no tool calls returned
     if (aiResult.content) {
       try {
-        const jsonMatch = aiResult.content.match(/[\[{][\s\S]*[\]}]/);
+        // Strip markdown code fences (```json ... ``` or ``` ... ```)
+        let cleaned = aiResult.content;
+        cleaned = cleaned.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '');
+        const jsonMatch = cleaned.match(/[\[{][\s\S]*[\]}]/);
         if (jsonMatch) {
           return {
             result: JSON.parse(jsonMatch[0]) as T,
