@@ -94,9 +94,9 @@ export function CopyGenerationStep({
   onGenerate,
   onBack,
 }: CopyGenerationStepProps) {
-  // Computed values
+  // Computed values (Issue #11: fix total outputs math)
   const segmentCount = config.audience_segments.length;
-  const totalOutputs = segmentCount * VARIATIONS_PER_ELEMENT * ELEMENTS.length;
+  const totalVariations = segmentCount * VARIATIONS_PER_ELEMENT;
 
   // Auto-advance is handled by parent component when generation completes
 
@@ -137,18 +137,18 @@ export function CopyGenerationStep({
           />
           <SummaryItem
             icon={<Layers className="h-4 w-4" />}
-            label="Variations"
-            value={`${VARIATIONS_PER_ELEMENT} per element`}
+            label="Variations per segment"
+            value={`${VARIATIONS_PER_ELEMENT} complete ad sets`}
           />
           <SummaryItem
             icon={<FileText className="h-4 w-4" />}
-            label="Elements"
-            value={ELEMENTS.join(', ')}
+            label="Each variation includes"
+            value={ELEMENTS.join(' + ')}
           />
           <SummaryItem
             icon={<Hash className="h-4 w-4" />}
-            label="Total outputs"
-            value={`${totalOutputs} copy variations`}
+            label="Total variations"
+            value={`${totalVariations} ad sets`}
             highlight
           />
         </div>
@@ -221,6 +221,10 @@ export function CopyGenerationStep({
                   indicatorClassName="bg-blue-500 transition-all duration-500"
                 />
                 <p className="mt-2 text-center text-sm text-[#64748b]">{progress}%</p>
+                {/* Issue #12: Estimated time */}
+                <p className="mt-1 text-center text-xs text-[#64748b]">
+                  Estimated time: ~{segmentCount * 30} seconds ({segmentCount} segment{segmentCount !== 1 ? 's' : ''} × ~30s each)
+                </p>
               </div>
             </div>
           </motion.div>

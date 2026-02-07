@@ -155,10 +155,10 @@ export function WizardStepIndicator({
                   )}
                 </div>
 
-                {/* Step label */}
+                {/* Step label - hidden on small screens (Issue #15) */}
                 <span
                   className={cn(
-                    'text-xs font-medium transition-colors',
+                    'text-xs font-medium transition-colors hidden sm:inline',
                     status === 'completed' && 'text-[#22c55e]',
                     status === 'current' && 'text-[#e2e8f0]',
                     status === 'upcoming' && 'text-[#64748b]',
