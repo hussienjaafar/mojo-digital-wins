@@ -1,112 +1,212 @@
 
 
-# Deep Audit: Organization Selection in Ad Copy Studio
+# Deep UX/UI Audit: Organization Context and Overall Flow (Pass 3)
 
-## Current State
-
-The Ad Copy Studio (`AdminAdCopyStudio.tsx`) fetches ALL active organizations on mount using a flat query (`SELECT id, name FROM client_organizations WHERE is_active = true ORDER BY name`). Currently 12 orgs exist, but the system needs to scale to hundreds.
-
-The org picker is a basic Radix `<Select>` dropdown embedded in the wizard header (lines 771-793 of `AdCopyWizard.tsx`). It renders every org as a `<SelectItem>` in a flat list with no search, no grouping, no logos, and no recent-org tracking.
-
-Meanwhile, the client portal already has a sophisticated `OrganizationPicker` component (`src/components/client/OrganizationPicker.tsx`) that uses a `CommandDialog` with:
-- Full-text search
-- Recent orgs (localStorage-backed)
-- Org logos/initials
-- Keyboard navigation hints
-- Scales to any number of orgs
-
-This component is NOT used in the Ad Copy Studio -- the wizard rolls its own basic `<Select>`.
+This audit examines the Ad Copy Studio from the user's perspective, focusing on how organizational context is communicated, the first-impression experience, information hierarchy, and micro-interaction gaps across all 5 steps.
 
 ---
 
-## Recommendation: Keep It In the Existing Page, Replace the Picker
+## SECTION 1: ORGANIZATION SELECTION -- THE CRITICAL FIRST MOMENT
 
-Moving Ad Copy Studio into the Organization Detail page (`/admin/organizations/:orgId`) would eliminate the need for an org picker entirely (you'd navigate to an org first, then launch the studio). However, this creates friction: users would need to navigate away from the studio, find the org, go into its detail page, and then find an "Ad Copy Studio" tab. It also makes the studio feel like a subordinate feature rather than a standalone tool.
+### Issue 1.1: CRITICAL -- No "Step 0" Organization Selection Gate
 
-The better approach is to **keep the studio as a standalone page** but replace the basic `<Select>` with the existing `OrganizationPicker` component (or an adapted version of it), and add persistent org context so the user always knows which org they're working with.
+Currently, the page loads and silently selects the first org alphabetically (`orgs[0].id` at `AdminAdCopyStudio.tsx` line 79). The user lands directly on Step 1 (Upload Videos) with no deliberate choice of which organization they're working on. The org name appears as tiny subtitle text ("Creating ads for Org Name") in the header, which is easy to miss.
+
+For a tool where every uploaded video, generated transcript, and AI output is tied to an organization, accidentally working in the wrong org is a catastrophic error. The current design treats org selection as a secondary header action, but it should be the **primary gate** before any work begins.
+
+**Fix:** Add a "Step 0" organization selection screen that appears when:
+- No org is currently selected (first visit)
+- The user has multiple organizations available
+
+This screen should be a full-page card showing:
+- "Select an Organization" heading
+- Search input (reusing AdminOrganizationPicker logic but inline, not a dialog)
+- Recent orgs section
+- Full org list with logos
+- Only after selection does the wizard render
+
+If an org is already selected (from localStorage/session), skip Step 0 and show the wizard with a prominent org badge that can be clicked to return to selection.
+
+### Issue 1.2: HIGH -- Org Picker Button Is Visually Subordinate to Reset
+
+In the header (line 764-796), the org picker button and Reset button are side-by-side in the same visual weight. The Reset button even has a label ("Reset") while the org picker just shows the org name + chevron. Users scanning right-to-left in the header hit Reset before the org context. The org identity should be the most prominent element in the header, not co-equal with a destructive action.
+
+**Fix:** 
+- Move the org identity to the LEFT side of the header, immediately after "Ad Copy Studio" title
+- Make it larger and more prominent (current name text + logo)
+- Move Reset to a secondary position (perhaps an icon-only button with tooltip)
+- The org identity doubles as the picker trigger
+
+### Issue 1.3: HIGH -- No Org Context on Individual Step Content
+
+Each step (Upload, Review, Configure, Generate, Export) has its own header area with a title like "Upload Your Campaign Videos" -- but none of them mention the organization. If the sticky header scrolls out of view or the user is focused on the step content, they lose all org context.
+
+**Fix:** Add a subtle, persistent org context line below each step's `<h2>` title:
+- Step 1: "Upload Your Campaign Videos **for [Org Name]**"
+- Step 4: "Generate Ad Copy **for [Org Name]**"
+- Step 5: Export header showing org name
+
+This is lightweight (just appending to existing text) but ensures the org context is always visible in the user's focal area.
+
+### Issue 1.4: MEDIUM -- localStorage "selectedOrganizationId" Is Not Used for Persistence
+
+`AdminAdCopyStudio.tsx` always defaults to `orgs[0].id` on mount (line 79). It doesn't check localStorage for a previously selected org. If the user was working on Org X, navigated away, and returned, they'd be dumped into Org A (alphabetically first) instead of Org X.
+
+**Fix:** On mount, check `localStorage.getItem('selectedOrganizationId')` and use it if the org exists in the fetched list. Fall back to `orgs[0].id` only if no match.
+
+### Issue 1.5: MEDIUM -- Org Picker Dialog Has No Keyboard Shortcut Registered
+
+The `AdminOrganizationPicker` supports keyboard navigation inside the dialog, but there's no global `Cmd+K` or `Ctrl+K` shortcut to OPEN it. The plan mentioned a keyboard shortcut hint but it was never wired up.
+
+**Fix:** Add a `useEffect` in `AdCopyWizard` that listens for `Cmd+K` / `Ctrl+K` and calls `setShowOrgPicker(true)`. Show the shortcut hint on the org picker button.
 
 ---
 
-## Issues Found
+## SECTION 2: INFORMATION HIERARCHY AND VISUAL WEIGHT
 
-### Issue 1: CRITICAL -- Basic Select Dropdown Won't Scale Past ~20 Orgs
+### Issue 2.1: HIGH -- Step Indicator Takes Up Premium Space But Lacks Context
 
-The current `<Select>` renders all orgs in a flat scrollable list. At 100+ orgs, this becomes unusable -- no search, no way to quickly find an org. The `OrganizationPicker` component already solves this with search + recents but isn't used here.
+The `WizardStepIndicator` occupies a bordered card (`rounded-xl border border-[#1e2a45] bg-[#141b2d] p-4`) with significant vertical space. It shows step circles and labels but no indication of what data has been collected. A user on Step 4 has no way to see "3 videos uploaded, 2 segments configured" without going back.
 
-**Fix:** Replace the `<Select>` in `AdCopyWizard.tsx` header with a button that opens the existing `OrganizationPicker` (or a dark-themed variant). Pass `organizations` with `logo_url` included (currently only `id` and `name` are fetched).
+**Fix:** Add a compact data summary below each completed step's label:
+- Step 1 (completed): "3 videos"
+- Step 2 (completed): "3 reviewed"  
+- Step 3 (completed): "2 segments"
+- Step 4 (completed): "10 variations"
+This gives at-a-glance progress without clicking back.
 
-### Issue 2: HIGH -- No Logo or Visual Identifier for Selected Org
+### Issue 2.2: MEDIUM -- No Breadcrumb or Context Path
 
-The header shows `Creating ads for <org name>` in small text, but with hundreds of similarly-named orgs (e.g., "Smith for Senate", "Smith for Congress"), names alone are insufficient. Logos provide instant visual confirmation.
+The header shows "Exit" and "Ad Copy Studio" but there's no breadcrumb showing the full path: `Admin > Ad Copy Studio > [Org Name] > Step X`. Users who arrive via deep links or bookmarks have no spatial awareness.
 
-**Fix:** Fetch `logo_url` alongside `id, name` in `AdminAdCopyStudio.tsx`. Display the org logo (or initials fallback) next to the org name in the header.
+**Fix:** Replace the simple "Exit" button + title with a minimal breadcrumb:
+`Admin / Ad Copy Studio / [Org Name]` where "Admin" is clickable (= Exit), and "[Org Name]" is clickable (= org picker).
 
-### Issue 3: HIGH -- No Recent/Pinned Orgs for Power Users
+### Issue 2.3: MEDIUM -- Step Content Area Has No Visual Distinction from Step Indicator
 
-Admins managing hundreds of orgs will repeatedly work with a small subset. The `OrganizationPicker` already has localStorage-backed "Recent" tracking, but the current `<Select>` has none.
+Both the step indicator and the step content use `rounded-xl bg-[#141b2d]`. They look like two cards of equal importance stacked vertically. The step content should feel like the primary workspace while the indicator is secondary navigation.
 
-**Fix:** Solved automatically by adopting the `OrganizationPicker` component.
-
-### Issue 4: MEDIUM -- Org Data Fetch Loads All Orgs Without Pagination
-
-`AdminAdCopyStudio.tsx` line 65-68 fetches all active orgs in one query. At 500+ orgs, this will hit the Supabase 1000-row default limit and slow page load.
-
-**Fix:** The `OrganizationPicker` already does client-side filtering, which works fine up to ~1000 orgs. For true scale, add server-side search via an RPC function. For now, ensure the query explicitly sets a high limit or uses pagination.
-
-### Issue 5: MEDIUM -- Selected Org Has No Persistent Visual Anchor
-
-Once the user is deep in steps 3-5, the org context is only visible in the sticky header's small subtitle text. If a user scrolls or the header is partially obscured, they lose context.
-
-**Fix:** Add a persistent "org badge" in the step indicator area or as a fixed pill, showing logo + name. This stays visible regardless of scroll position.
-
-### Issue 6: MEDIUM -- Org Switch Doesn't Use the Confirmation Dialog Consistently
-
-The current `handleOrgChange` triggers the `AlertDialog` for session reset, which is correct. But the dialog text is generic ("reset your current session"). It should explicitly say which org you're switching FROM and TO.
-
-**Fix:** Include both org names in the confirmation dialog: "Switch from **Org A** to **Org B**? This will reset your current session."
-
-### Issue 7: LOW -- OrganizationPicker Uses Portal Theme CSS Variables
-
-The existing `OrganizationPicker` uses `hsl(var(--portal-*))` CSS variables which are defined in the client portal theme. The Ad Copy Studio uses hardcoded dark colors (`#0a0f1a`, `#141b2d`, etc.). Dropping `OrganizationPicker` directly into the studio would have mismatched styling.
-
-**Fix:** Create an `AdminOrganizationPicker` wrapper that either (a) provides the portal CSS variables in a scoped container, or (b) adapts the picker to accept a `theme` prop with the admin color tokens.
+**Fix:** 
+- Keep step indicator as a compact bar (remove the card treatment, just a row of circles)
+- Give step content a slightly different background or no border (it IS the page content, not a card within a card)
+- Or: merge step indicator INTO the header as a horizontal bar, freeing up vertical space
 
 ---
 
-## Implementation Plan
+## SECTION 3: STEP-SPECIFIC UX ISSUES
 
-### Step 1: Extend org data to include logo_url
+### Issue 3.1: HIGH -- Step 1 Has No Organization-Specific Context
 
-In `AdminAdCopyStudio.tsx`, change the org query from `.select('id, name')` to `.select('id, name, logo_url')` and update the `Organization` interface.
+The upload step shows "Upload Your Campaign Videos" with "Upload up to 5 videos for this campaign." There's no mention of WHICH organization. A user managing 10 orgs could easily upload to the wrong one. The header subtitle is the only clue, and it's far from the action area.
 
-### Step 2: Create AdminOrganizationPicker
+**Fix:** Change the subtitle to: "Upload up to 5 videos for **[Org Name]**'s campaign" with the org name styled in the blue accent color.
 
-Create `src/components/ad-copy-studio/AdminOrganizationPicker.tsx` -- a thin wrapper around the `OrganizationPicker` pattern but styled with the admin dark theme colors instead of portal CSS variables. Features:
-- CommandDialog with search input
-- Recent orgs section (localStorage)
-- Org logos/initials
-- Count badge showing total orgs
-- Keyboard shortcut (Cmd+K)
+### Issue 3.2: MEDIUM -- Step 4 "Generation Summary" Doesn't Show the Organization
 
-### Step 3: Replace Select in wizard header
+The summary card shows audiences, variations, and elements but not which organization's transcript and ActBlue form are being used. This is the last checkpoint before expensive AI generation.
 
-In `AdCopyWizard.tsx`, replace the `<Select>` dropdown (lines 768-793) with a button showing the current org logo + name that opens the new `AdminOrganizationPicker`. The button should show:
-- Org logo (or initials)
-- Org name (truncated)
-- ChevronDown icon
-- Cmd+K hint
+**Fix:** Add an org identity row at the top of the summary card:
+- Organization: [Logo] [Name]
+- ActBlue Form: [form name]
+- Transcript: [video name]
 
-### Step 4: Add org context badge to step area
+### Issue 3.3: MEDIUM -- Export Step Has No Org Branding
 
-Below the step indicator, add a subtle persistent badge: `[logo] Org Name | X videos | Step Y of 5`. This ensures the user never loses context about which org they're working on.
+Step 5 is where users copy content to paste into Meta Ads Manager. The exported text has no org reference. If a user exports copy for multiple orgs in the same session (switch org, generate, export), the clipboard content is indistinguishable.
 
-### Step 5: Improve confirmation dialog with org names
+**Fix:** Include the org name in the clipboard format header:
+```
+=== [ORG NAME] - AD COPY ===
+=== PROGRESSIVE BASE ===
+...
+```
 
-Update the org-switch `AlertDialog` to show: "Switch from **Current Org** to **New Org**? This will reset your current session including uploaded videos and generated copy."
+### Issue 3.4: LOW -- No Session Timestamp or "Last Saved" Indicator
 
-### Step 6: Update AdCopyWizardProps
+The saving indicator appears briefly but there's no persistent "Last saved at 2:34 PM" indicator. Users can't tell if their session data is current.
 
-Update the `organizations` prop type from `Array<{ id: string; name: string }>` to `Array<{ id: string; name: string; logo_url: string | null }>` to pass through logo data.
+**Fix:** Show a small "Saved X min ago" text near the bottom or in the header.
+
+---
+
+## SECTION 4: ORG PICKER COMPONENT IMPROVEMENTS
+
+### Issue 4.1: MEDIUM -- CommandDialog Styling May Not Override Default Theme
+
+The `AdminOrganizationPicker` uses a `CommandDialog` from the UI library but applies dark colors via className. The `CommandDialog` component's own styles (including the overlay and content background) may bleed through, causing inconsistent appearance.
+
+**Fix:** Verify the CommandDialog content wrapper receives `bg-[#141b2d]` and the overlay is properly dark. Add explicit `className` overrides to the `CommandDialog` root if needed.
+
+### Issue 4.2: MEDIUM -- "All Organizations" List Renders Every Org at Once
+
+With 500+ orgs, rendering all items simultaneously will cause layout jank. The current implementation maps all `filteredOrgs` into DOM elements (line 204-211).
+
+**Fix:** Add virtualization using `react-window` (already installed) for the "All Organizations" list. Only render visible items. Keep the "Recent" section non-virtualized since it's max 5 items.
+
+### Issue 4.3: LOW -- No "No Recent Organizations" Empty State
+
+When `recentOrgs` is empty and search is empty, the user only sees "All Organizations." There's no indication that recent tracking exists. After they use it once, they'll see the Recent section appear, which could be confusing.
+
+**Fix:** Show a subtle hint: "Your recent organizations will appear here" when `recentOrgs.length === 0` and there's no search.
+
+### Issue 4.4: LOW -- Search Doesn't Highlight Matching Text
+
+When searching, org names show plain text. Highlighting the matched substring (e.g., bold or underline) would help users visually confirm their search matched correctly.
+
+**Fix:** Wrap matching text segments in `<mark>` or `<strong>` tags during rendering.
+
+---
+
+## SECTION 5: CROSS-CUTTING CONCERNS
+
+### Issue 5.1: HIGH -- Org Switch Loses URL State
+
+When switching organizations, the URL stays at `/admin/ad-copy-studio` with no query parameter indicating the active org. If the user shares the URL or bookmarks it, the recipient gets the default org, not the intended one. Deep-linking to a specific org context is impossible.
+
+**Fix:** Add `?org=<orgId>` to the URL when an org is selected. On mount, check for this query param before localStorage or default.
+
+### Issue 5.2: MEDIUM -- No Loading Skeleton for Org Data
+
+When `isLoadingOrgs` is true, the page shows a full-screen centered spinner. This is jarring. A skeleton of the expected layout (header + step indicator + empty content area) would feel faster.
+
+**Fix:** Replace the loading spinner with a skeleton layout that mirrors the wizard structure.
+
+### Issue 5.3: LOW -- Mobile Responsiveness of Org Picker Button
+
+The org picker button has `max-w-[240px]` which truncates long org names. On smaller screens, the header layout may break when the org name, Reset button, and Exit button compete for space.
+
+**Fix:** On small screens (`sm:`), collapse the org picker to just the logo/initials with a tooltip showing the full name. Or stack the header into two rows.
+
+---
+
+## Implementation Priority
+
+### Critical
+1. **1.1** -- "Step 0" organization selection gate
+
+### High  
+2. **1.2** -- Make org identity the primary header element
+3. **1.3** -- Add org name to each step's heading
+4. **2.1** -- Data summaries in step indicator
+5. **3.1** -- Org name in Step 1 context
+6. **5.1** -- URL-based org state (`?org=orgId`)
+
+### Medium
+7. **1.4** -- localStorage org persistence
+8. **1.5** -- Cmd+K keyboard shortcut
+9. **2.2** -- Breadcrumb navigation
+10. **2.3** -- Visual hierarchy between indicator and content
+11. **3.2** -- Org context in generation summary
+12. **3.3** -- Org name in clipboard export
+13. **4.1** -- CommandDialog style overrides
+14. **4.2** -- Virtualized org list
+15. **5.2** -- Loading skeleton
+
+### Low
+16. **3.4** -- "Last saved" timestamp
+17. **4.3** -- Recent orgs empty state
+18. **4.4** -- Search highlight
+19. **5.3** -- Mobile org picker
 
 ---
 
@@ -114,15 +214,30 @@ Update the `organizations` prop type from `Array<{ id: string; name: string }>` 
 
 ### Files to Change
 
-| File | Change |
+| File | Issues |
 |------|--------|
-| `src/pages/AdminAdCopyStudio.tsx` | Add `logo_url` to org query and interface |
-| `src/components/ad-copy-studio/AdCopyWizard.tsx` | Replace Select with picker button, add org badge, update props type, improve confirmation dialog |
-| **New:** `src/components/ad-copy-studio/AdminOrganizationPicker.tsx` | Dark-themed command palette org picker with search, recents, logos |
+| `AdminAdCopyStudio.tsx` | 1.1, 1.4, 5.1, 5.2 |
+| `AdCopyWizard.tsx` | 1.2, 1.3, 1.5, 2.1, 2.2, 2.3, 3.4 |
+| `AdminOrganizationPicker.tsx` | 4.1, 4.2, 4.3, 4.4 |
+| `VideoUploadStep.tsx` | 3.1 |
+| `CopyGenerationStep.tsx` | 3.2 |
+| `CopyExportStep.tsx` | 3.3 |
+| `WizardStepIndicator.tsx` | 2.1, 2.3 |
 
-### Scalability Notes
+### New Components
 
-- Client-side search in the CommandDialog handles up to ~1000 orgs efficiently
-- The "Recent" localStorage pattern ensures power users always have quick access to their top 5 orgs
-- If orgs exceed 1000, a future enhancement would add server-side search via an RPC function -- but this is not needed now with 12 orgs and is easy to add later
+| Component | Purpose |
+|-----------|---------|
+| `OrganizationSelectionGate.tsx` | Full-page "Step 0" org selection with inline search and recent orgs |
+
+### Architecture for "Step 0"
+
+The gate component renders INSTEAD of the wizard when no org is deliberately chosen. It reuses the `AdminOrganizationPicker` search/filter logic but presents it inline (not in a dialog). Once an org is selected:
+1. Save to localStorage + URL query param
+2. Render the `AdCopyWizard` component
+3. The user can always click the org badge in the header to return to selection (or use Cmd+K for the quick-switch dialog)
+
+This creates two interaction patterns:
+- **First use / deliberate switch**: Full-page org selection (Step 0 gate)
+- **Quick switch mid-session**: Command palette dialog (Cmd+K or header click)
 
