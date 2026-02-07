@@ -39,6 +39,13 @@ import {
   Save,
   Info,
   Sparkles,
+  ThumbsUp,
+  Flame,
+  BarChart3,
+  Shield,
+  Megaphone,
+  Tag,
+  Gauge,
 } from 'lucide-react';
 import type { VideoUpload, TranscriptAnalysis } from '@/types/ad-copy-studio';
 import type { ReanalyzeOptions, ReanalyzeResult } from '@/hooks/useVideoTranscriptionFlow';
@@ -706,6 +713,17 @@ export function TranscriptReviewStep({
                         <BulletList items={analysis.targets_attacked} />
                       </AnalysisCard>
 
+                      {/* Targets Supported (Issue #7) */}
+                      {analysis.targets_supported && analysis.targets_supported.length > 0 && (
+                        <AnalysisCard
+                          title="Targets Supported"
+                          icon={<ThumbsUp className="h-4 w-4" />}
+                          accentColor="green"
+                        >
+                          <BulletList items={analysis.targets_supported} />
+                        </AnalysisCard>
+                      )}
+
                       {/* Pain Points */}
                       <AnalysisCard
                         title="Donor Pain Points"
@@ -714,6 +732,107 @@ export function TranscriptReviewStep({
                       >
                         <BulletList items={analysis.donor_pain_points} />
                       </AnalysisCard>
+
+                      {/* Values Appealed (Issue #7) */}
+                      {analysis.values_appealed && analysis.values_appealed.length > 0 && (
+                        <AnalysisCard
+                          title="Values Appealed"
+                          icon={<Shield className="h-4 w-4" />}
+                          accentColor="blue"
+                        >
+                          <TagList items={analysis.values_appealed} accentColor="blue" />
+                        </AnalysisCard>
+                      )}
+
+                      {/* Urgency Drivers (Issue #7) */}
+                      {analysis.urgency_drivers && analysis.urgency_drivers.length > 0 && (
+                        <AnalysisCard
+                          title="Urgency Drivers"
+                          icon={<Flame className="h-4 w-4" />}
+                          accentColor="orange"
+                        >
+                          <BulletList items={analysis.urgency_drivers} />
+                        </AnalysisCard>
+                      )}
+
+                      {/* Topic & Sentiment Row (Issue #7) */}
+                      <div className="grid grid-cols-2 gap-4">
+                        {analysis.topic_primary && (
+                          <AnalysisCard
+                            title="Topic"
+                            icon={<Tag className="h-4 w-4" />}
+                            accentColor="purple"
+                          >
+                            <span className="inline-flex rounded-full bg-[#a855f7]/20 border border-[#a855f7]/40 px-3 py-1 text-sm font-medium text-[#a855f7]">
+                              {analysis.topic_primary}
+                            </span>
+                            {analysis.topic_tags && analysis.topic_tags.length > 0 && (
+                              <div className="mt-2">
+                                <TagList items={analysis.topic_tags} accentColor="purple" />
+                              </div>
+                            )}
+                          </AnalysisCard>
+                        )}
+                        {analysis.urgency_level && (
+                          <AnalysisCard
+                            title="Urgency Level"
+                            icon={<Gauge className="h-4 w-4" />}
+                            accentColor="orange"
+                          >
+                            <span className={cn(
+                              'inline-flex rounded-full px-3 py-1 text-sm font-medium border',
+                              analysis.urgency_level === 'high' ? 'bg-[#ef4444]/20 border-[#ef4444]/40 text-[#ef4444]' :
+                              analysis.urgency_level === 'medium' ? 'bg-[#f97316]/20 border-[#f97316]/40 text-[#f97316]' :
+                              'bg-[#22c55e]/20 border-[#22c55e]/40 text-[#22c55e]'
+                            )}>
+                              {analysis.urgency_level.charAt(0).toUpperCase() + analysis.urgency_level.slice(1)}
+                            </span>
+                          </AnalysisCard>
+                        )}
+                      </div>
+
+                      {/* Sentiment Score (Issue #7) */}
+                      {analysis.sentiment_score !== undefined && analysis.sentiment_score !== null && (
+                        <AnalysisCard
+                          title="Sentiment Score"
+                          icon={<BarChart3 className="h-4 w-4" />}
+                          accentColor="blue"
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1 h-2 rounded-full bg-[#1e2a45] overflow-hidden">
+                                <div
+                                  className={cn(
+                                    'h-full rounded-full transition-all',
+                                    analysis.sentiment_score > 0 ? 'bg-[#22c55e]' :
+                                    analysis.sentiment_score < 0 ? 'bg-[#ef4444]' : 'bg-[#64748b]'
+                                  )}
+                                  style={{ width: `${Math.abs(analysis.sentiment_score) * 50 + 50}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-medium text-[#e2e8f0] tabular-nums">
+                                {analysis.sentiment_score.toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-xs text-[#64748b]">
+                              <span>Negative</span>
+                              <span>Neutral</span>
+                              <span>Positive</span>
+                            </div>
+                          </div>
+                        </AnalysisCard>
+                      )}
+
+                      {/* CTA Text (Issue #7) */}
+                      {analysis.cta_text && (
+                        <AnalysisCard
+                          title="Call to Action"
+                          icon={<Megaphone className="h-4 w-4" />}
+                          accentColor="green"
+                        >
+                          <p className="text-sm text-[#e2e8f0] font-medium">"{analysis.cta_text}"</p>
+                        </AnalysisCard>
+                      )}
 
                       {/* Key Phrases */}
                       <AnalysisCard
@@ -738,8 +857,27 @@ export function TranscriptReviewStep({
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <FileText className="h-12 w-12 text-[#64748b] mb-4" />
-                  <p className="text-[#94a3b8]">No analysis available for this video</p>
+                  {/* Issue #5: Show loading state if video is still processing */}
+                  {(video.status === 'transcribing' || video.status === 'analyzing' || video.status === 'extracting') ? (
+                    <>
+                      <Loader2 className="h-12 w-12 text-blue-400 mb-4 animate-spin" />
+                      <p className="text-[#e2e8f0] font-medium">Analysis in progress...</p>
+                      <p className="text-sm text-[#94a3b8] mt-1">
+                        {video.status === 'transcribing' ? 'Transcribing audio...' :
+                         video.status === 'analyzing' ? 'Analyzing content...' :
+                         'Extracting audio...'}
+                      </p>
+                      <p className="text-xs text-[#64748b] mt-3">This usually takes 30-60 seconds</p>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-12 w-12 text-[#64748b] mb-4" />
+                      <p className="text-[#94a3b8]">No analysis available for this video</p>
+                      {video.status === 'error' && video.error_message && (
+                        <p className="text-xs text-[#ef4444] mt-2">{video.error_message}</p>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </TabsContent>
@@ -747,16 +885,7 @@ export function TranscriptReviewStep({
         })}
       </Tabs>
 
-      {/* Progress Indicator */}
-      <div className="flex items-center justify-center">
-        <span className="text-sm text-[#94a3b8]">
-          Reviewed:{' '}
-          <span className="font-medium text-[#e2e8f0]">
-            {reviewedCount}/{totalCount}
-          </span>{' '}
-          videos
-        </span>
-      </div>
+      {/* Progress Indicator (Issue #6: removed misleading counter) */}
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-4 border-t border-[#1e2a45]">

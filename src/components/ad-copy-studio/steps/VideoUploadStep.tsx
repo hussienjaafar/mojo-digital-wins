@@ -337,60 +337,7 @@ export function VideoUploadStep({
         )}
       </AnimatePresence>
 
-      {/* Google Drive Import Section */}
-      <div
-        className="rounded-xl border border-[#1e2a45] bg-[#141b2d] p-6"
-        role="group"
-        aria-labelledby="gdrive-import-label"
-      >
-        <div className="flex items-center gap-2 mb-4">
-          <Link className="h-5 w-5 text-[#94a3b8]" aria-hidden="true" />
-          <span
-            id="gdrive-import-label"
-            className="text-xs font-medium uppercase tracking-wider text-[#64748b]"
-          >
-            Import from Google Drive
-          </span>
-        </div>
-
-        <div className="flex gap-3">
-          <Input
-            type="text"
-            placeholder="Paste Google Drive link(s) here..."
-            value={gdriveUrl}
-            onChange={(e) => setGdriveUrl(e.target.value)}
-            onKeyDown={handleGDriveKeyDown}
-            disabled={isUploading || isMaxVideos}
-            className="flex-1 bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#64748b] focus-visible:ring-blue-500"
-            aria-label="Google Drive URL input"
-          />
-          <Button
-            type="button"
-            onClick={handleGDriveImport}
-            disabled={!gdriveUrl.trim() || isUploading || isMaxVideos}
-            className="bg-blue-600 hover:bg-blue-500 text-white"
-          >
-            {isUploading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              'Import'
-            )}
-          </Button>
-        </div>
-
-        <p className="mt-3 text-xs text-[#64748b]">
-          Files must be shared as &quot;Anyone with link&quot;
-        </p>
-      </div>
-
-      {/* Divider */}
-      <div className="flex items-center gap-4">
-        <div className="h-px flex-1 bg-[#1e2a45]" />
-        <span className="text-xs text-[#64748b]">or</span>
-        <div className="h-px flex-1 bg-[#1e2a45]" />
-      </div>
-
-      {/* File Upload Drop Zone */}
+      {/* File Upload Drop Zone (Primary - Issue #4) */}
       <div
         className={cn(
           'relative rounded-xl border-2 border-dashed transition-all duration-200',
@@ -453,6 +400,59 @@ export function VideoUploadStep({
             MP4, MOV, WebM &bull; Max 500MB &bull; Up to 5 videos
           </p>
         </div>
+      </div>
+
+      {/* Divider */}
+      <div className="flex items-center gap-4">
+        <div className="h-px flex-1 bg-[#1e2a45]" />
+        <span className="text-xs text-[#64748b]">or</span>
+        <div className="h-px flex-1 bg-[#1e2a45]" />
+      </div>
+
+      {/* Google Drive Import Section (Secondary) */}
+      <div
+        className="rounded-xl border border-[#1e2a45] bg-[#141b2d] p-6"
+        role="group"
+        aria-labelledby="gdrive-import-label"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Link className="h-5 w-5 text-[#94a3b8]" aria-hidden="true" />
+          <span
+            id="gdrive-import-label"
+            className="text-xs font-medium uppercase tracking-wider text-[#64748b]"
+          >
+            Import from Google Drive
+          </span>
+        </div>
+
+        <div className="flex gap-3">
+          <Input
+            type="text"
+            placeholder="Paste Google Drive link(s) here..."
+            value={gdriveUrl}
+            onChange={(e) => setGdriveUrl(e.target.value)}
+            onKeyDown={handleGDriveKeyDown}
+            disabled={isUploading || isMaxVideos}
+            className="flex-1 bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#64748b] focus-visible:ring-blue-500"
+            aria-label="Google Drive URL input"
+          />
+          <Button
+            type="button"
+            onClick={handleGDriveImport}
+            disabled={!gdriveUrl.trim() || isUploading || isMaxVideos}
+            className="bg-blue-600 hover:bg-blue-500 text-white"
+          >
+            {isUploading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              'Import'
+            )}
+          </Button>
+        </div>
+
+        <p className="mt-3 text-xs text-[#64748b]">
+          Files must be shared as &quot;Anyone with link&quot;
+        </p>
       </div>
 
       {/* Video List */}
@@ -573,33 +573,7 @@ export function VideoUploadStep({
                         </div>
                       )}
 
-                      {/* Extraction mode badge (after ready) */}
-                      {video.status === 'ready' && video.extractionMode && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <span className={cn(
-                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs',
-                            video.extractionMode === 'copy' 
-                              ? 'bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/30'
-                              : 'bg-[#f59e0b]/10 text-[#f59e0b] border border-[#f59e0b]/30'
-                          )}>
-                            {video.extractionMode === 'copy' ? '⚡ Stream copy' : '🔄 Re-encoded'}
-                          </span>
-                          {video.extractionDiagnostics && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const report = formatDiagnosticsReport(video.extractionDiagnostics);
-                                navigator.clipboard.writeText(report);
-                                // Could add toast here
-                                console.log('Diagnostics copied to clipboard');
-                              }}
-                              className="text-xs text-blue-400 hover:text-blue-300 hover:underline"
-                            >
-                              Copy diagnostics
-                            </button>
-                          )}
-                        </div>
-                      )}
+                      {/* Extraction mode badge removed (Issue #17) - debug info kept in console only */}
 
                       {/* Error message */}
                       {video.status === 'error' && video.error_message && (

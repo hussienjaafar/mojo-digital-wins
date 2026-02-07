@@ -28,7 +28,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, RotateCcw, Sparkles } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Loader2, RotateCcw, Sparkles, X } from 'lucide-react';
 
 // Hooks
 import { useAdCopyStudio } from '@/hooks/useAdCopyStudio';
@@ -489,11 +499,35 @@ export function AdCopyWizard({
     setAnalyses({});
   }, [clearGeneration, resetSession]);
 
-  const handleResetSession = useCallback(async () => {
-    if (window.confirm('Are you sure you want to reset the session? All progress will be lost.')) {
-      await handleStartNew();
-    }
+  // Styled reset/org-switch confirmation dialogs
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [pendingOrgSwitch, setPendingOrgSwitch] = useState<string | null>(null);
+
+  const handleResetSession = useCallback(() => {
+    setShowResetDialog(true);
+  }, []);
+
+  const confirmReset = useCallback(async () => {
+    setShowResetDialog(false);
+    await handleStartNew();
   }, [handleStartNew]);
+
+  const handleOrgChange = useCallback((orgId: string) => {
+    // If we have any progress (past step 1 or have videos), confirm
+    if (currentStep > 1 || videos.length > 0 || (stepData.videos || []).length > 0) {
+      setPendingOrgSwitch(orgId);
+    } else {
+      onOrganizationChange(orgId);
+    }
+  }, [currentStep, videos, stepData.videos, onOrganizationChange]);
+
+  const confirmOrgSwitch = useCallback(async () => {
+    if (pendingOrgSwitch) {
+      await handleStartNew();
+      onOrganizationChange(pendingOrgSwitch);
+      setPendingOrgSwitch(null);
+    }
+  }, [pendingOrgSwitch, handleStartNew, onOrganizationChange]);
 
   // =========================================================================
   // Render Helpers
@@ -622,59 +656,69 @@ export function AdCopyWizard({
   // Render
   // =========================================================================
 
+  // Get selected org name for display
+  const selectedOrgName = organizations.find(o => o.id === organizationId)?.name;
+
   return (
     <div className="flex flex-col gap-6 p-6 min-h-screen bg-[#0a0f1a]">
-      {/* Header */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-[#a855f7]">
-            <Sparkles className="h-5 w-5 text-white" aria-hidden="true" />
+      {/* Sticky Header */}
+      <header className="sticky top-0 z-30 -mx-6 -mt-6 px-6 py-4 bg-[#0a0f1a]/95 backdrop-blur-md border-b border-[#1e2a45]">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-[#a855f7]">
+              <Sparkles className="h-5 w-5 text-white" aria-hidden="true" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-[#e2e8f0]">Ad Copy Studio</h1>
+              {selectedOrgName && (
+                <p className="text-sm text-[#64748b]">Creating ads for <span className="text-blue-400 font-medium">{selectedOrgName}</span></p>
+              )}
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-semibold text-[#e2e8f0]">Ad Copy Studio</h1>
-            <p className="text-sm text-[#64748b]">Generate Meta ad copy from video content</p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-3">
-          {/* Organization Picker */}
-          {organizations.length > 1 && (
-            <Select
-              value={organizationId}
-              onValueChange={onOrganizationChange}
-            >
-              <SelectTrigger
-                className="w-[200px] border-[#1e2a45] bg-[#141b2d] text-[#e2e8f0]"
-                aria-label="Select organization"
-              >
-                <SelectValue placeholder="Select organization" />
-              </SelectTrigger>
-              <SelectContent className="border-[#1e2a45] bg-[#141b2d]">
-                {organizations.map((org) => (
-                  <SelectItem
-                    key={org.id}
-                    value={org.id}
-                    className="text-[#e2e8f0] focus:bg-[#1e2a45] focus:text-[#e2e8f0]"
+          <div className="flex items-center gap-3">
+            {/* Organization Picker with label */}
+            {organizations.length > 1 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[#64748b] hidden sm:inline">Organization:</span>
+                <Select
+                  value={organizationId}
+                  onValueChange={handleOrgChange}
+                >
+                  <SelectTrigger
+                    className="w-[200px] border-[#1e2a45] bg-[#141b2d] text-[#e2e8f0]"
+                    aria-label="Select organization"
                   >
-                    {org.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+                    <SelectValue placeholder="Select organization" />
+                  </SelectTrigger>
+                  <SelectContent className="border-[#1e2a45] bg-[#141b2d]">
+                    {organizations.map((org) => (
+                      <SelectItem
+                        key={org.id}
+                        value={org.id}
+                        className="text-[#e2e8f0] focus:bg-[#1e2a45] focus:text-[#e2e8f0]"
+                      >
+                        {org.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-          {/* Reset Session Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleResetSession}
-            disabled={isSaving}
-            className="border-[#1e2a45] bg-transparent text-[#94a3b8] hover:bg-[#141b2d] hover:text-[#e2e8f0]"
-            aria-label="Reset Ad Copy Studio session"
-          >
-            <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
-            Reset
-          </Button>
+            {/* Reset Session Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetSession}
+              disabled={isSaving}
+              className="border-[#1e2a45] bg-transparent text-[#94a3b8] hover:bg-[#141b2d] hover:text-[#e2e8f0]"
+              aria-label="Reset Ad Copy Studio session"
+            >
+              <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
+              Reset
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -707,7 +751,7 @@ export function AdCopyWizard({
             initial="initial"
             animate="animate"
             exit="exit"
-            className="rounded-lg border border-[#1e2a45] bg-[#141b2d]"
+            className="rounded-lg border border-[#1e2a45] bg-[#141b2d] p-6"
           >
             {renderStepContent()}
           </motion.div>
@@ -725,6 +769,52 @@ export function AdCopyWizard({
           <span className="text-sm text-[#94a3b8]">Saving...</span>
         </div>
       )}
+
+      {/* Reset Confirmation Dialog (Issue #16) */}
+      <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <AlertDialogContent className="bg-[#141b2d] border-[#1e2a45]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#e2e8f0]">Reset Session?</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#94a3b8]">
+              This will clear all progress including uploaded videos, transcripts, and generated copy. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45]">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmReset}
+              className="bg-[#ef4444] hover:bg-[#ef4444]/80 text-white"
+            >
+              Reset Session
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Org Switch Confirmation Dialog (Issue #3) */}
+      <AlertDialog open={!!pendingOrgSwitch} onOpenChange={(open) => !open && setPendingOrgSwitch(null)}>
+        <AlertDialogContent className="bg-[#141b2d] border-[#1e2a45]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#e2e8f0]">Switch Organization?</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#94a3b8]">
+              Switching organizations will reset your current session. All uploaded videos, transcripts, and generated copy will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45]">
+              Stay
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmOrgSwitch}
+              className="bg-blue-600 hover:bg-blue-500 text-white"
+            >
+              Switch & Reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

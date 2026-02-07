@@ -8,7 +8,7 @@
  * - Target audience segments management
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -190,6 +190,22 @@ export function CampaignConfigStep({
   const [newSegmentName, setNewSegmentName] = useState('');
   const [newSegmentDescription, setNewSegmentDescription] = useState('');
 
+  // Issue #8: Auto-generate refcode on mount if empty
+  useEffect(() => {
+    if (!config.refcode) {
+      const date = new Date();
+      const dateStr = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+      const shortId = Math.random().toString(36).substring(2, 6);
+      const newRefcode = `campaign-${dateStr}-${shortId}`;
+      onConfigChange({
+        ...config,
+        refcode: newRefcode,
+        refcode_auto_generated: true,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount
+  }, []);
+
   // Computed
   const canProceed =
     config.actblue_form_name &&
@@ -338,11 +354,18 @@ export function CampaignConfigStep({
               <SelectValue placeholder="Select an ActBlue form" />
             </SelectTrigger>
             <SelectContent>
-              {actblueForms.map((form) => (
-                <SelectItem key={form} value={form}>
-                  {form}
-                </SelectItem>
-              ))}
+              {actblueForms.length > 0 ? (
+                actblueForms.map((form) => (
+                  <SelectItem key={form} value={form}>
+                    {form}
+                  </SelectItem>
+                ))
+              ) : (
+                <div className="px-3 py-4 text-center">
+                  <p className="text-sm text-[#94a3b8]">No ActBlue forms found</p>
+                  <p className="text-xs text-[#64748b] mt-1">Forms appear after transaction data is imported.</p>
+                </div>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -441,6 +464,36 @@ export function CampaignConfigStep({
               Add Segment
             </Button>
           </div>
+
+          {/* Issue #9: Preset Audience Segment Templates */}
+          {config.audience_segments.length === 0 && !isAddingSegment && (
+            <div className="space-y-2">
+              <span className="text-xs text-[#64748b]">Quick add common segments:</span>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { name: 'Progressive Base', description: 'Core progressive supporters who regularly engage with liberal causes and candidates.' },
+                  { name: 'Grassroots Donors', description: 'Small-dollar donors motivated by urgency and emotional appeals. Responsive to $5-$27 asks.' },
+                  { name: 'High-Dollar Donors', description: 'Donors capable of larger contributions, motivated by impact and policy outcomes.' },
+                  { name: 'Swing Voters', description: 'Persuadable moderates who respond to issue-based messaging rather than partisan appeals.' },
+                ].map((preset) => (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    onClick={() => {
+                      onConfigChange({
+                        ...config,
+                        audience_segments: [...config.audience_segments, { id: generateId(), ...preset }],
+                      });
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#1e2a45] bg-[#0a0f1a] px-3 py-1.5 text-xs text-[#94a3b8] hover:border-blue-500/50 hover:text-blue-400 transition-colors"
+                  >
+                    <Plus className="h-3 w-3" />
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Segment List */}
           <div className="space-y-3">
