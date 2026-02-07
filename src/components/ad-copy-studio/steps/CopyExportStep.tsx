@@ -626,8 +626,8 @@ export function CopyExportStep({
       </div>
 
       {/* Content */}
-      <ScrollArea className="max-h-[calc(100vh-420px)] min-h-[300px]">
-        <div className="pr-4">
+      <div className="overflow-y-auto max-h-[calc(100vh-420px)] min-h-[300px] pr-1 scrollbar-thin scrollbar-thumb-[#1e2a45] scrollbar-track-transparent">
+        <div>
           {activeSegmentId === ALL_SEGMENTS_KEY ? (
             // Issue F3: All segments stacked
             <div className="space-y-8">
@@ -671,7 +671,7 @@ export function CopyExportStep({
             />
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Tracking URL */}
       <div className="rounded-xl border border-[#1e2a45] bg-[#0a0f1a] p-4">
