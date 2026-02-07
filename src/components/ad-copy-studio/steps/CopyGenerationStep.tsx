@@ -2,14 +2,6 @@
  * CopyGenerationStep - Step 4 of the Ad Copy Studio wizard
  *
  * Displays generation summary and triggers AI copy generation.
- *
- * Features:
- * - Summary card with audience, variation, and output counts
- * - Generate Copy button with loading state
- * - Progress bar during generation
- * - Current segment indicator
- * - Error display with retry capability
- * - Auto-advance when complete
  */
 
 import { useEffect } from 'react';
@@ -94,15 +86,8 @@ export function CopyGenerationStep({
   onGenerate,
   onBack,
 }: CopyGenerationStepProps) {
-  // Computed values (Issue #11: fix total outputs math)
   const segmentCount = config.audience_segments.length;
   const totalVariations = segmentCount * VARIATIONS_PER_ELEMENT;
-
-  // Auto-advance is handled by parent component when generation completes
-
-  // =========================================================================
-  // Render
-  // =========================================================================
 
   return (
     <div className="flex flex-col gap-6">
@@ -221,7 +206,6 @@ export function CopyGenerationStep({
                   indicatorClassName="bg-blue-500 transition-all duration-500"
                 />
                 <p className="mt-2 text-center text-sm text-[#64748b]">{progress}%</p>
-                {/* Issue #12: Estimated time */}
                 <p className="mt-1 text-center text-xs text-[#64748b]">
                   Estimated time: ~{segmentCount * 30} seconds ({segmentCount} segment{segmentCount !== 1 ? 's' : ''} × ~30s each)
                 </p>
@@ -260,13 +244,14 @@ export function CopyGenerationStep({
             exit={{ opacity: 0, scale: 0.95 }}
             className="flex justify-center py-8"
           >
+            {/* Issue E3: Proportional button sizing */}
             <Button
               type="button"
               onClick={onGenerate}
               disabled={segmentCount === 0}
               size="lg"
               className={cn(
-                'gap-3 px-8 py-6 text-lg font-medium transition-all',
+                'gap-3 px-6 py-3 text-base font-medium transition-all',
                 segmentCount > 0
                   ? 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40'
                   : 'bg-[#1e2a45] text-[#64748b] cursor-not-allowed'

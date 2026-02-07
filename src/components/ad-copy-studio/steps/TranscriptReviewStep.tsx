@@ -2,17 +2,14 @@
  * TranscriptReviewStep - Step 2 of the Ad Copy Studio wizard
  *
  * Allows users to review transcripts and AI analysis for each uploaded video.
- *
- * Features:
- * - Tabs for each video
- * - Left panel: Scrollable transcript text with edit capability
- * - Right panel: Analysis cards (Primary Issue, Tone, Targets, Pain Points, Key Phrases)
- * - Context section for adding refinement notes
- * - Reanalyze functionality
- * - Progress tracking (Reviewed: X/Y videos)
+ * 
+ * Issue A2: Removed misleading review counter
+ * Issue C1: Uses shared analysis primitives
+ * Issue D2: Responsive scroll area height
+ * Issue D4: Character count on transcript edit
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -49,6 +46,7 @@ import {
 } from 'lucide-react';
 import type { VideoUpload, TranscriptAnalysis } from '@/types/ad-copy-studio';
 import type { ReanalyzeOptions, ReanalyzeResult } from '@/hooks/useVideoTranscriptionFlow';
+import { AnalysisCard, TagList, BulletList } from '@/components/ad-copy-studio/components/analysis-primitives';
 
 // =============================================================================
 // Types
@@ -68,96 +66,6 @@ export interface TranscriptReviewStepProps {
 // =============================================================================
 // Helper Components
 // =============================================================================
-
-interface AnalysisCardProps {
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  accentColor?: string;
-}
-
-function AnalysisCard({ title, icon, children, accentColor = 'blue' }: AnalysisCardProps) {
-  const colorMap: Record<string, string> = {
-    blue: 'border-blue-500/30 bg-blue-500/5',
-    purple: 'border-[#a855f7]/30 bg-[#a855f7]/5',
-    orange: 'border-[#f97316]/30 bg-[#f97316]/5',
-    red: 'border-[#ef4444]/30 bg-[#ef4444]/5',
-    green: 'border-[#22c55e]/30 bg-[#22c55e]/5',
-  };
-
-  const iconColorMap: Record<string, string> = {
-    blue: 'text-blue-400',
-    purple: 'text-[#a855f7]',
-    orange: 'text-[#f97316]',
-    red: 'text-[#ef4444]',
-    green: 'text-[#22c55e]',
-  };
-
-  return (
-    <div className={cn('rounded-lg border p-4', colorMap[accentColor])}>
-      <div className="flex items-center gap-2 mb-3">
-        <span className={iconColorMap[accentColor]}>{icon}</span>
-        <span className="text-xs font-medium uppercase tracking-wider text-[#64748b]">
-          {title}
-        </span>
-      </div>
-      <div>{children}</div>
-    </div>
-  );
-}
-
-interface TagListProps {
-  items: string[];
-  accentColor?: string;
-}
-
-function TagList({ items, accentColor = 'blue' }: TagListProps) {
-  const colorMap: Record<string, string> = {
-    blue: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
-    purple: 'bg-[#a855f7]/10 border-[#a855f7]/30 text-[#a855f7]',
-    orange: 'bg-[#f97316]/10 border-[#f97316]/30 text-[#f97316]',
-    red: 'bg-[#ef4444]/10 border-[#ef4444]/30 text-[#ef4444]',
-    green: 'bg-[#22c55e]/10 border-[#22c55e]/30 text-[#22c55e]',
-  };
-
-  if (items.length === 0) {
-    return <span className="text-sm text-[#64748b] italic">None detected</span>;
-  }
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {items.map((item, idx) => (
-        <span
-          key={idx}
-          className={cn('inline-flex rounded-full border px-2.5 py-0.5 text-xs', colorMap[accentColor])}
-        >
-          {item}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-interface BulletListProps {
-  items: string[];
-}
-
-function BulletList({ items }: BulletListProps) {
-  if (items.length === 0) {
-    return <span className="text-sm text-[#64748b] italic">None detected</span>;
-  }
-
-  return (
-    <ul className="space-y-1.5">
-      {items.map((item, idx) => (
-        <li key={idx} className="flex items-start gap-2 text-sm text-[#e2e8f0]">
-          <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#64748b]" />
-          {item}
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 interface ContextSectionProps {
   userContextPre?: string;
@@ -190,7 +98,7 @@ function ContextSection({
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-lg border border-[#1e2a45] bg-[#0a0f1a] overflow-hidden">
+      <div className="rounded-xl border border-[#1e2a45] bg-[#0a0f1a] overflow-hidden">
         <CollapsibleTrigger asChild>
           <button
             type="button"
@@ -218,7 +126,6 @@ function ContextSection({
 
         <CollapsibleContent>
           <div className="px-4 pb-4 space-y-4">
-            {/* Pre-analysis context (read-only if exists) */}
             {userContextPre && (
               <div className="space-y-2">
                 <label className="text-xs text-[#64748b]">Pre-analysis context (read-only)</label>
@@ -228,7 +135,6 @@ function ContextSection({
               </div>
             )}
 
-            {/* Post-analysis refinement context */}
             <div className="space-y-2">
               <label className="text-xs text-[#64748b]">
                 Add context to refine the analysis
@@ -244,7 +150,6 @@ function ContextSection({
               </p>
             </div>
 
-            {/* Reanalyze button */}
             <div className="flex items-center justify-between pt-2">
               <div className="text-xs text-[#64748b]">
                 {lastAnalyzedAt && (
@@ -261,15 +166,9 @@ function ContextSection({
                 className="gap-2 bg-[#a855f7] hover:bg-[#9333ea] text-white"
               >
                 {isReanalyzing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Reanalyzing...
-                  </>
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Reanalyzing...</>
                 ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    Reanalyze
-                  </>
+                  <><Sparkles className="h-4 w-4" /> Reanalyze</>
                 )}
               </Button>
             </div>
@@ -298,24 +197,22 @@ export function TranscriptReviewStep({
   const [activeVideoId, setActiveVideoId] = useState(videos[0]?.id || '');
   const [editingTranscript, setEditingTranscript] = useState(false);
   const [editedTranscript, setEditedTranscript] = useState('');
-  const [reviewedVideos, setReviewedVideos] = useState<Set<string>>(new Set());
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingContexts, setPendingContexts] = useState<Record<string, string>>({});
   const [transcriptChanges, setTranscriptChanges] = useState<Record<string, string>>({});
 
+  // Issue D3: Focus management ref
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+
   // Computed
   const activeAnalysis = analyses[activeVideoId];
   const activeTranscriptId = transcriptIds[activeVideoId];
-  const reviewedCount = reviewedVideos.size;
-  const totalCount = videos.length;
 
-  // Check if current video has unsaved changes
   const hasTranscriptChanges = transcriptChanges[activeVideoId] !== undefined;
   const hasContextChanges = pendingContexts[activeVideoId] !== undefined && 
     pendingContexts[activeVideoId] !== (activeAnalysis?.user_context_post || '');
 
-  // Get video index for tab display
   const getVideoIndex = (videoId: string) => {
     return videos.findIndex((v) => v.id === videoId) + 1;
   };
@@ -324,17 +221,14 @@ export function TranscriptReviewStep({
   // Handlers
   // =========================================================================
 
+  // Issue A2: Simple tab change without misleading review tracking
   const handleTabChange = useCallback(
     (videoId: string) => {
-      // Mark previous video as reviewed when switching
-      if (activeVideoId && !reviewedVideos.has(activeVideoId)) {
-        setReviewedVideos((prev) => new Set([...prev, activeVideoId]));
-      }
       setActiveVideoId(videoId);
       setEditingTranscript(false);
       setEditedTranscript('');
     },
-    [activeVideoId, reviewedVideos]
+    []
   );
 
   const handleStartEdit = useCallback(() => {
@@ -352,7 +246,6 @@ export function TranscriptReviewStep({
 
   const handleSaveEdit = useCallback(async () => {
     if (!activeTranscriptId || !onSaveTranscript) {
-      // Just track locally if no save handler
       setTranscriptChanges((prev) => ({ ...prev, [activeVideoId]: editedTranscript }));
       setEditingTranscript(false);
       toast.success('Transcript changes saved locally');
@@ -366,7 +259,6 @@ export function TranscriptReviewStep({
         setTranscriptChanges((prev) => ({ ...prev, [activeVideoId]: editedTranscript }));
         toast.success('Transcript saved successfully');
         
-        // Update the analysis locally with the new transcript
         if (onAnalysisUpdate && activeAnalysis) {
           onAnalysisUpdate(activeVideoId, {
             ...activeAnalysis,
@@ -403,7 +295,6 @@ export function TranscriptReviewStep({
       if (result?.success) {
         toast.success(`Analysis updated (version ${result.analysisCount})`);
         
-        // Clear pending changes
         setTranscriptChanges((prev) => {
           const next = { ...prev };
           delete next[activeVideoId];
@@ -415,7 +306,6 @@ export function TranscriptReviewStep({
           return next;
         });
         
-        // Update local analysis
         if (onAnalysisUpdate) {
           onAnalysisUpdate(activeVideoId, {
             ...result.analysis,
@@ -460,7 +350,6 @@ export function TranscriptReviewStep({
       if (result?.success) {
         toast.success(`Analysis updated (version ${result.analysisCount})`);
         
-        // Clear pending changes
         setTranscriptChanges((prev) => {
           const next = { ...prev };
           delete next[activeVideoId];
@@ -472,7 +361,6 @@ export function TranscriptReviewStep({
           return next;
         });
         
-        // Update local analysis
         if (onAnalysisUpdate) {
           onAnalysisUpdate(activeVideoId, {
             ...result.analysis,
@@ -492,14 +380,6 @@ export function TranscriptReviewStep({
     }
   }, [activeTranscriptId, activeVideoId, activeAnalysis, transcriptChanges, pendingContexts, onReanalyze, onAnalysisUpdate]);
 
-  const handleComplete = useCallback(() => {
-    // Mark current video as reviewed before proceeding
-    if (activeVideoId && !reviewedVideos.has(activeVideoId)) {
-      setReviewedVideos((prev) => new Set([...prev, activeVideoId]));
-    }
-    onComplete();
-  }, [activeVideoId, reviewedVideos, onComplete]);
-
   // =========================================================================
   // Render
   // =========================================================================
@@ -508,34 +388,34 @@ export function TranscriptReviewStep({
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="text-center">
-        <h2 className="text-2xl font-semibold text-[#e2e8f0]">
+        <h2 ref={stepHeadingRef} tabIndex={-1} className="text-2xl font-semibold text-[#e2e8f0] outline-none">
           Review Transcripts & Analysis
         </h2>
         <p className="mt-2 text-[#94a3b8]">
-          Review the AI-generated transcripts and analysis for each video. Add context to refine the analysis.
+          {videos.length} video{videos.length !== 1 ? 's' : ''} available for review. Add context to refine the analysis.
         </p>
       </div>
 
       {/* Video Tabs */}
       <Tabs value={activeVideoId} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="w-full justify-start gap-1 bg-[#141b2d] border border-[#1e2a45] p-1.5 rounded-lg h-auto flex-wrap">
+        <TabsList className="w-full justify-start gap-1 bg-[#141b2d] border border-[#1e2a45] p-1.5 rounded-xl h-auto flex-wrap">
           {videos.map((video) => {
             const index = getVideoIndex(video.id);
-            const isReviewed = reviewedVideos.has(video.id);
+            const hasAnalysis = !!analyses[video.id];
 
             return (
               <TabsTrigger
                 key={video.id}
                 value={video.id}
                 className={cn(
-                  'relative gap-2 px-4 py-2 rounded-md transition-colors',
+                  'relative gap-2 px-4 py-2 rounded-lg transition-colors',
                   'data-[state=active]:bg-blue-600 data-[state=active]:text-white',
                   'data-[state=inactive]:bg-transparent data-[state=inactive]:text-[#94a3b8]',
                   'data-[state=inactive]:hover:bg-[#1e2a45] data-[state=inactive]:hover:text-[#e2e8f0]'
                 )}
               >
-                {isReviewed && (
-                  <CheckCircle className="h-4 w-4 text-[#22c55e]" />
+                {hasAnalysis && (
+                  <CheckCircle className="h-3.5 w-3.5 text-[#22c55e]" />
                 )}
                 <span>Video {index}</span>
               </TabsTrigger>
@@ -592,6 +472,11 @@ export function TranscriptReviewStep({
                             onChange={(e) => setEditedTranscript(e.target.value)}
                             className="min-h-[300px] bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] text-sm leading-relaxed resize-none"
                           />
+                          {/* Issue D4: Character/word count */}
+                          <div className="flex items-center justify-between mt-2 text-xs text-[#64748b]">
+                            <span>{editedTranscript.split(/\s+/).filter(Boolean).length} words</span>
+                            <span>{editedTranscript.length} characters</span>
+                          </div>
                           <div className="flex justify-end gap-2 mt-4">
                             <Button
                               type="button"
@@ -655,8 +540,8 @@ export function TranscriptReviewStep({
                     </AnimatePresence>
                   </div>
 
-                  {/* Right Panel: Analysis */}
-                  <ScrollArea className="h-[520px]">
+                  {/* Right Panel: Analysis - Issue D2: Responsive height */}
+                  <ScrollArea className="max-h-[calc(100vh-340px)] min-h-[400px]">
                     <div className="space-y-4 pr-4">
                       {/* Context Section */}
                       {onReanalyze && video.id === activeVideoId && (
@@ -713,7 +598,7 @@ export function TranscriptReviewStep({
                         <BulletList items={analysis.targets_attacked} />
                       </AnalysisCard>
 
-                      {/* Targets Supported (Issue #7) */}
+                      {/* Targets Supported */}
                       {analysis.targets_supported && analysis.targets_supported.length > 0 && (
                         <AnalysisCard
                           title="Targets Supported"
@@ -733,7 +618,7 @@ export function TranscriptReviewStep({
                         <BulletList items={analysis.donor_pain_points} />
                       </AnalysisCard>
 
-                      {/* Values Appealed (Issue #7) */}
+                      {/* Values Appealed */}
                       {analysis.values_appealed && analysis.values_appealed.length > 0 && (
                         <AnalysisCard
                           title="Values Appealed"
@@ -744,7 +629,7 @@ export function TranscriptReviewStep({
                         </AnalysisCard>
                       )}
 
-                      {/* Urgency Drivers (Issue #7) */}
+                      {/* Urgency Drivers */}
                       {analysis.urgency_drivers && analysis.urgency_drivers.length > 0 && (
                         <AnalysisCard
                           title="Urgency Drivers"
@@ -755,7 +640,7 @@ export function TranscriptReviewStep({
                         </AnalysisCard>
                       )}
 
-                      {/* Topic & Sentiment Row (Issue #7) */}
+                      {/* Topic & Urgency Level Row */}
                       <div className="grid grid-cols-2 gap-4">
                         {analysis.topic_primary && (
                           <AnalysisCard
@@ -791,7 +676,7 @@ export function TranscriptReviewStep({
                         )}
                       </div>
 
-                      {/* Sentiment Score (Issue #7) */}
+                      {/* Sentiment Score */}
                       {analysis.sentiment_score !== undefined && analysis.sentiment_score !== null && (
                         <AnalysisCard
                           title="Sentiment Score"
@@ -823,7 +708,7 @@ export function TranscriptReviewStep({
                         </AnalysisCard>
                       )}
 
-                      {/* CTA Text (Issue #7) */}
+                      {/* CTA Text */}
                       {analysis.cta_text && (
                         <AnalysisCard
                           title="Call to Action"
@@ -857,7 +742,6 @@ export function TranscriptReviewStep({
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
-                  {/* Issue #5: Show loading state if video is still processing */}
                   {(video.status === 'transcribing' || video.status === 'analyzing' || video.status === 'extracting') ? (
                     <>
                       <Loader2 className="h-12 w-12 text-blue-400 mb-4 animate-spin" />
@@ -885,8 +769,6 @@ export function TranscriptReviewStep({
         })}
       </Tabs>
 
-      {/* Progress Indicator (Issue #6: removed misleading counter) */}
-
       {/* Footer */}
       <div className="flex items-center justify-between pt-4 border-t border-[#1e2a45]">
         <Button
@@ -901,7 +783,7 @@ export function TranscriptReviewStep({
 
         <Button
           type="button"
-          onClick={handleComplete}
+          onClick={onComplete}
           className={cn(
             'gap-2',
             'bg-blue-600 hover:bg-blue-500 text-white'

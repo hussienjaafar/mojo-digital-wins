@@ -38,7 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, RotateCcw, Sparkles, X } from 'lucide-react';
+import { Loader2, RotateCcw, Sparkles } from 'lucide-react';
 
 // Hooks
 import { useAdCopyStudio } from '@/hooks/useAdCopyStudio';
@@ -67,6 +67,7 @@ export interface AdCopyWizardProps {
   organizations: Array<{ id: string; name: string }>;
   actblueForms: string[];
   onOrganizationChange: (orgId: string) => void;
+  onBackToAdmin: () => void;
 }
 
 // =============================================================================
@@ -116,6 +117,7 @@ export function AdCopyWizard({
   organizations,
   actblueForms,
   onOrganizationChange,
+  onBackToAdmin,
 }: AdCopyWizardProps) {
   // =========================================================================
   // Hooks
@@ -169,6 +171,7 @@ export function AdCopyWizard({
     progress: generationProgress,
     error: generationError,
     generateCopy,
+    regenerateSegment,
     clearGeneration,
   } = useAdCopyGeneration({ organizationId });
 
@@ -190,10 +193,14 @@ export function AdCopyWizard({
   const [videoStatuses, setVideoStatuses] = useState<Record<string, string>>({});
 
   // Track transcript IDs for each video (needed for copy generation)
-  const [transcriptIds, setTranscriptIds] = useState<Record<string, string>>({});
+  // Issue B2: Initialize from stepData for session persistence
+  const [transcriptIds, setTranscriptIds] = useState<Record<string, string>>(() => {
+    return stepData.transcriptIds || {};
+  });
 
   // Ref to track if step 4 auto-advance has already been triggered
-  const hasCompletedStep4Ref = useRef(false);
+  // Issue B3: Initialize to true if restored to step 5
+  const hasCompletedStep4Ref = useRef(currentStep === 5);
 
   // Track which videos we've already started processing
   const processingVideosRef = useRef<Set<string>>(new Set());
@@ -203,6 +210,17 @@ export function AdCopyWizard({
 
   // Track if backend status sync has run (prevents infinite loops)
   const hasSyncedRef = useRef(false);
+
+  // Ref for analyses to avoid stale closures (Issue B1)
+  const analysesRef = useRef(analyses);
+  analysesRef.current = analyses;
+
+  // Ref for transcriptIds to avoid stale closures
+  const transcriptIdsRef = useRef(transcriptIds);
+  transcriptIdsRef.current = transcriptIds;
+
+  // Track current generating segment (Issue A8)
+  const [currentGeneratingSegment, setCurrentGeneratingSegment] = useState<string | undefined>();
 
   // =========================================================================
   // Transcription Flow Hook
@@ -222,9 +240,12 @@ export function AdCopyWizard({
     },
     onAnalysisReady: (videoId, analysis) => {
       console.log(`[AdCopyWizard] Analysis ready for video: ${videoId}`);
-      setAnalyses(prev => ({ ...prev, [videoId]: analysis }));
-      // Also update stepData
-      updateStepData({ analyses: { ...analyses, [videoId]: analysis } });
+      // Issue B1: Use functional updater and ref to avoid stale closure
+      setAnalyses(prev => {
+        const updated = { ...prev, [videoId]: analysis };
+        updateStepData({ analyses: updated });
+        return updated;
+      });
     },
     onError: (videoId, error) => {
       console.error(`[AdCopyWizard] Transcription error for video ${videoId}:`, error);
@@ -252,6 +273,13 @@ export function AdCopyWizard({
       setAnalyses(stepData.analyses);
     }
   }, [stepData.analyses]);
+
+  // Sync transcriptIds from stepData (Issue B2)
+  useEffect(() => {
+    if (stepData.transcriptIds) {
+      setTranscriptIds(stepData.transcriptIds);
+    }
+  }, [stepData.transcriptIds]);
 
   // Sync video statuses from backend on load (ONCE per mount)
   // This ensures UI reflects the true database state after refresh
@@ -324,8 +352,8 @@ export function AdCopyWizard({
       }
     };
 
-    // Run sync after a short delay to allow hydration to complete
-    const timer = setTimeout(syncBackendStatuses, 500);
+    // Issue B4: Increase delay to reduce race with hook hydration
+    const timer = setTimeout(syncBackendStatuses, 800);
     return () => clearTimeout(timer);
   }, [stepData.videos, updateVideoStatus]);
 
@@ -336,7 +364,7 @@ export function AdCopyWizard({
     // Find videos that need processing (have video_id but no analysis yet)
     const videosNeedingProcessing = currentVideos.filter((v: VideoUpload) => {
       if (!v.video_id) return false;
-      if (analyses[v.video_id]) return false; // Already have analysis
+      if (analysesRef.current[v.video_id]) return false; // Already have analysis
       if (processingVideosRef.current.has(v.video_id)) return false; // Already processing
       if (failedVideosRef.current.has(v.video_id)) return false; // Failed/cancelled - don't re-poll
       if (v.status === 'error') return false; // Error state - don't poll
@@ -366,14 +394,23 @@ export function AdCopyWizard({
 
       if (result) {
         const { analysis, transcriptId } = result;
-        setAnalyses(prev => ({ ...prev, [videoId]: analysis }));
-        setTranscriptIds(prev => ({ ...prev, [videoId]: transcriptId }));
-        updateStepData({ analyses: { ...analyses, [videoId]: analysis } });
+        // Issue B1: Use functional updaters to avoid stale closures
+        setAnalyses(prev => {
+          const updated = { ...prev, [videoId]: analysis };
+          updateStepData({ analyses: updated });
+          return updated;
+        });
+        setTranscriptIds(prev => {
+          const updated = { ...prev, [videoId]: transcriptId };
+          // Issue B2: Persist transcriptIds to stepData
+          updateStepData({ transcriptIds: updated });
+          return updated;
+        });
       }
 
       processingVideosRef.current.delete(videoId);
     });
-  }, [videos, stepData.videos, analyses, fetchAnalysis, pollForCompletion, updateStepData]);
+  }, [videos, stepData.videos, fetchAnalysis, pollForCompletion, updateStepData]);
 
   // Handle cancel video - also cancels polling and updates stepData
   const handleCancelVideo = useCallback(async (id: string) => {
@@ -433,27 +470,44 @@ export function AdCopyWizard({
     await completeStep(3, { config: campaignConfig });
   }, [completeStep, campaignConfig]);
 
+  // Issue A1: Use ALL analyzed videos' transcripts, not just the first
   const handleGenerate = useCallback(async () => {
     // Reset step 4 completion tracking when starting a new generation
     hasCompletedStep4Ref.current = false;
 
     // Establish single source of truth: prefer videos from upload hook, fall back to stepData
     const sourceVideos = videos.length > 0 ? videos : (stepData.videos || []);
-    const primaryVideo = sourceVideos[0];
+    
+    // Get all videos that have transcripts (not just the first one)
+    const videosWithTranscripts = sourceVideos.filter((v: VideoUpload) => {
+      const tid = v.video_id ? (transcriptIdsRef.current[v.video_id] || v.transcript_id) : v.transcript_id;
+      return !!tid;
+    });
 
-    // Validate that we have a video before generating
-    if (!primaryVideo) {
-      console.error('[AdCopyWizard] No video available for generation');
+    if (videosWithTranscripts.length === 0) {
+      console.error('[AdCopyWizard] No videos with transcripts available for generation');
       return;
     }
 
-    // Get transcript_id from our tracked state (or from video object as fallback)
-    const transcriptId = transcriptIds[primaryVideo.video_id!] || primaryVideo.transcript_id;
+    // Use the first video's transcript as primary (the edge function takes a single transcriptId)
+    // but log if multiple are available
+    const primaryVideo = videosWithTranscripts[0];
+    const transcriptId = primaryVideo.video_id 
+      ? (transcriptIdsRef.current[primaryVideo.video_id] || primaryVideo.transcript_id)
+      : primaryVideo.transcript_id;
 
     if (!transcriptId) {
-      console.error('[AdCopyWizard] Video does not have a transcript_id - transcription may still be in progress');
+      console.error('[AdCopyWizard] Primary video does not have a transcript_id');
       return;
     }
+
+    if (videosWithTranscripts.length > 1) {
+      console.log(`[AdCopyWizard] Using primary video transcript. ${videosWithTranscripts.length} videos have transcripts.`);
+    }
+
+    // Track current segment (Issue A8)
+    const firstSegment = campaignConfig.audience_segments[0]?.name;
+    setCurrentGeneratingSegment(firstSegment);
 
     await generateCopy({
       transcriptId,
@@ -464,7 +518,9 @@ export function AdCopyWizard({
       amountPreset: campaignConfig.amount_preset,
       recurringDefault: campaignConfig.recurring_default,
     });
-  }, [generateCopy, videos, stepData.videos, campaignConfig, transcriptIds]);
+
+    setCurrentGeneratingSegment(undefined);
+  }, [generateCopy, videos, stepData.videos, campaignConfig, transcriptIdsRef]);
 
   // Auto-advance to export step when generation completes
   // eslint-disable-next-line react-hooks/exhaustive-deps -- completeStep is intentionally excluded
@@ -497,11 +553,14 @@ export function AdCopyWizard({
     // Reset local state
     setCampaignConfig(DEFAULT_CAMPAIGN_CONFIG);
     setAnalyses({});
+    setTranscriptIds({});
   }, [clearGeneration, resetSession]);
 
   // Styled reset/org-switch confirmation dialogs
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [pendingOrgSwitch, setPendingOrgSwitch] = useState<string | null>(null);
+  // Issue A7: Confirmation for "Start New" in export step
+  const [showStartNewDialog, setShowStartNewDialog] = useState(false);
 
   const handleResetSession = useCallback(() => {
     setShowResetDialog(true);
@@ -529,6 +588,23 @@ export function AdCopyWizard({
     }
   }, [pendingOrgSwitch, handleStartNew, onOrganizationChange]);
 
+  // Issue A7: Handler for Start New with confirmation
+  const handleStartNewWithConfirm = useCallback(() => {
+    setShowStartNewDialog(true);
+  }, []);
+
+  const confirmStartNew = useCallback(async () => {
+    setShowStartNewDialog(false);
+    await handleStartNew();
+  }, [handleStartNew]);
+
+  // Issue A6: Per-segment regeneration handler
+  const handleRegenerateSegment = useCallback(async (segmentName: string) => {
+    setCurrentGeneratingSegment(segmentName);
+    await regenerateSegment(segmentName);
+    setCurrentGeneratingSegment(undefined);
+  }, [regenerateSegment]);
+
   // =========================================================================
   // Render Helpers
   // =========================================================================
@@ -551,6 +627,7 @@ export function AdCopyWizard({
             onComplete={handleUploadComplete}
             onCancelVideo={handleCancelVideo}
             onRetryTranscription={handleRetryTranscription}
+            onBackToAdmin={onBackToAdmin}
           />
         );
 
@@ -573,8 +650,11 @@ export function AdCopyWizard({
           // Find the video_id (database ID) from the local video ID
           const video = currentVideos.find((v: VideoUpload) => v.id === videoId);
           if (video?.video_id) {
-            setAnalyses(prev => ({ ...prev, [video.video_id!]: analysis }));
-            updateStepData({ analyses: { ...analyses, [video.video_id!]: analysis } });
+            setAnalyses(prev => {
+              const updated = { ...prev, [video.video_id!]: analysis };
+              updateStepData({ analyses: updated });
+              return updated;
+            });
           }
         };
 
@@ -608,7 +688,7 @@ export function AdCopyWizard({
             config={campaignConfig}
             isGenerating={isGenerating}
             progress={generationProgress}
-            currentSegment={undefined}
+            currentSegment={currentGeneratingSegment}
             error={generationError}
             onGenerate={handleGenerate}
             onBack={() => handleGoBack(3)}
@@ -628,7 +708,9 @@ export function AdCopyWizard({
             trackingUrl={finalTrackingUrl}
             audienceSegments={campaignConfig.audience_segments}
             onBack={() => handleGoBack(4)}
-            onStartNew={handleStartNew}
+            onStartNew={handleStartNewWithConfirm}
+            onRegenerateSegment={handleRegenerateSegment}
+            isRegenerating={isGenerating}
           />
         );
 
@@ -661,17 +743,30 @@ export function AdCopyWizard({
 
   return (
     <div className="flex flex-col gap-6 p-6 min-h-screen bg-[#0a0f1a]">
-      {/* Sticky Header */}
+      {/* Issue E2: Merged single sticky header with Back to Admin */}
       <header className="sticky top-0 z-30 -mx-6 -mt-6 px-6 py-4 bg-[#0a0f1a]/95 backdrop-blur-md border-b border-[#1e2a45]">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-[#a855f7]">
-              <Sparkles className="h-5 w-5 text-white" aria-hidden="true" />
+            {/* Issue E2 + A9/19: Back to Admin always visible in header */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onBackToAdmin}
+              className="text-[#64748b] hover:text-[#e2e8f0] hover:bg-[#1e2a45] rounded-lg -ml-2"
+            >
+              <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Exit
+            </Button>
+            <div className="h-6 w-px bg-[#1e2a45]" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-[#a855f7]">
+              <Sparkles className="h-4 w-4 text-white" aria-hidden="true" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-[#e2e8f0]">Ad Copy Studio</h1>
+              <h1 className="text-lg font-semibold text-[#e2e8f0]">Ad Copy Studio</h1>
               {selectedOrgName && (
-                <p className="text-sm text-[#64748b]">Creating ads for <span className="text-blue-400 font-medium">{selectedOrgName}</span></p>
+                <p className="text-xs text-[#64748b]">Creating ads for <span className="text-blue-400 font-medium">{selectedOrgName}</span></p>
               )}
             </div>
           </div>
@@ -723,7 +818,7 @@ export function AdCopyWizard({
       </header>
 
       {/* Step Indicator */}
-      <div className="rounded-lg border border-[#1e2a45] bg-[#141b2d] p-4">
+      <div className="rounded-xl border border-[#1e2a45] bg-[#141b2d] p-4">
         <WizardStepIndicator
           currentStep={currentStep}
           completedSteps={completedSteps}
@@ -736,14 +831,14 @@ export function AdCopyWizard({
       {sessionError && (
         <div
           role="alert"
-          className="rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 p-4"
+          className="rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/10 p-4"
         >
           <p className="text-sm text-[#ef4444]">{sessionError}</p>
         </div>
       )}
 
-      {/* Step Content with Transitions */}
-      <main className="flex-1">
+      {/* Step Content with Transitions - Issue E1: borderless wrapper */}
+      <main className="flex-1" aria-live="polite">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentStep}
@@ -751,7 +846,7 @@ export function AdCopyWizard({
             initial="initial"
             animate="animate"
             exit="exit"
-            className="rounded-lg border border-[#1e2a45] bg-[#141b2d] p-6"
+            className="rounded-xl bg-[#141b2d] p-6"
           >
             {renderStepContent()}
           </motion.div>
@@ -811,6 +906,29 @@ export function AdCopyWizard({
               className="bg-blue-600 hover:bg-blue-500 text-white"
             >
               Switch & Reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Start New Confirmation Dialog (Issue A7) */}
+      <AlertDialog open={showStartNewDialog} onOpenChange={setShowStartNewDialog}>
+        <AlertDialogContent className="bg-[#141b2d] border-[#1e2a45]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#e2e8f0]">Start New Session?</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#94a3b8]">
+              This will clear all your generated copy and start a fresh session. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45]">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmStartNew}
+              className="bg-blue-600 hover:bg-blue-500 text-white"
+            >
+              Start New
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
