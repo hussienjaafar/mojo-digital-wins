@@ -73,42 +73,63 @@ const OrgListItem = ({
   isSelected,
   showClockIcon,
   onSelect,
+  searchQuery,
 }: {
   org: AdminOrganization;
   isSelected: boolean;
   showClockIcon?: boolean;
   onSelect: () => void;
-}) => (
-  <button
-    onClick={onSelect}
-    className={cn(
-      "flex items-center gap-3 w-full px-3 py-2.5 text-left rounded-md transition-colors duration-150",
-      "hover:bg-[#1e2a45] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset",
-      isSelected && "bg-[#1e2a45]/60 border-l-2 border-blue-500 -ml-[2px] pl-[14px]"
-    )}
-  >
-    {showClockIcon && (
-      <Clock className="h-3.5 w-3.5 text-[#64748b] shrink-0" />
-    )}
-    {org.logo_url ? (
-      <img
-        src={org.logo_url}
-        alt=""
-        className="h-7 w-7 rounded-md object-contain shrink-0 bg-[#0a0f1a]"
-      />
-    ) : (
-      <div className="h-7 w-7 rounded-md bg-[#0a0f1a] flex items-center justify-center text-[10px] font-medium text-[#94a3b8] shrink-0">
-        {org.name.substring(0, 2).toUpperCase()}
-      </div>
-    )}
-    <span className="flex-1 truncate text-sm text-[#e2e8f0]">
-      {org.name}
-    </span>
-    {isSelected && (
-      <Check className="h-4 w-4 text-blue-400 shrink-0" />
-    )}
-  </button>
-);
+  searchQuery?: string;
+}) => {
+  // Highlight matching text in org name
+  const renderName = () => {
+    if (!searchQuery?.trim()) {
+      return <span>{org.name}</span>;
+    }
+    const q = searchQuery.toLowerCase();
+    const idx = org.name.toLowerCase().indexOf(q);
+    if (idx === -1) return <span>{org.name}</span>;
+    return (
+      <span>
+        {org.name.slice(0, idx)}
+        <mark className="bg-blue-500/30 text-[#e2e8f0] rounded-sm px-0.5">{org.name.slice(idx, idx + searchQuery.length)}</mark>
+        {org.name.slice(idx + searchQuery.length)}
+      </span>
+    );
+  };
+
+  return (
+    <button
+      onClick={onSelect}
+      className={cn(
+        "flex items-center gap-3 w-full px-3 py-2.5 text-left rounded-md transition-colors duration-150",
+        "hover:bg-[#1e2a45] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset",
+        isSelected && "bg-[#1e2a45]/60 border-l-2 border-blue-500 -ml-[2px] pl-[14px]"
+      )}
+    >
+      {showClockIcon && (
+        <Clock className="h-3.5 w-3.5 text-[#64748b] shrink-0" />
+      )}
+      {org.logo_url ? (
+        <img
+          src={org.logo_url}
+          alt=""
+          className="h-7 w-7 rounded-md object-contain shrink-0 bg-[#0a0f1a]"
+        />
+      ) : (
+        <div className="h-7 w-7 rounded-md bg-[#0a0f1a] flex items-center justify-center text-[10px] font-medium text-[#94a3b8] shrink-0">
+          {org.name.substring(0, 2).toUpperCase()}
+        </div>
+      )}
+      <span className="flex-1 truncate text-sm text-[#e2e8f0]">
+        {renderName()}
+      </span>
+      {isSelected && (
+        <Check className="h-4 w-4 text-blue-400 shrink-0" />
+      )}
+    </button>
+  );
+};
 
 // =============================================================================
 // AdminOrganizationPicker
@@ -174,23 +195,29 @@ export function AdminOrganizationPicker({
         </CommandEmpty>
 
         {/* Recent Organizations (only when not searching) */}
-        {!search.trim() && recentOrgs.length > 0 && (
+        {!search.trim() && (
           <>
             <CommandGroup className="px-2 py-2">
               <p className="px-2 py-1.5 text-xs font-medium text-[#64748b] uppercase tracking-wider">
                 Recent
               </p>
-              <div className="space-y-0.5">
-                {recentOrgs.map((org) => (
-                  <OrgListItem
-                    key={`recent-${org.id}`}
-                    org={org}
-                    isSelected={selectedId === org.id}
-                    showClockIcon
-                    onSelect={() => handleSelect(org.id)}
-                  />
-                ))}
-              </div>
+              {recentOrgs.length > 0 ? (
+                <div className="space-y-0.5">
+                  {recentOrgs.map((org) => (
+                    <OrgListItem
+                      key={`recent-${org.id}`}
+                      org={org}
+                      isSelected={selectedId === org.id}
+                      showClockIcon
+                      onSelect={() => handleSelect(org.id)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="px-2 py-2 text-xs text-[#64748b] italic">
+                  Your recent organizations will appear here
+                </p>
+              )}
             </CommandGroup>
             <CommandSeparator className="bg-[#1e2a45]" />
           </>
@@ -208,6 +235,7 @@ export function AdminOrganizationPicker({
                 org={org}
                 isSelected={selectedId === org.id}
                 onSelect={() => handleSelect(org.id)}
+                searchQuery={search}
               />
             ))}
           </div>

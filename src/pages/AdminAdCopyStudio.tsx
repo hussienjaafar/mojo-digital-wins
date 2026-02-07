@@ -11,12 +11,13 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { AdCopyWizard } from '@/components/ad-copy-studio/AdCopyWizard';
+import { OrganizationSelectionGate } from '@/components/ad-copy-studio/OrganizationSelectionGate';
 
 // =============================================================================
 // Types
@@ -32,14 +33,18 @@ interface Organization {
 // Component
 // =============================================================================
 
+const SELECTED_ORG_KEY = 'adminAdCopyStudioSelectedOrgId';
+
 export default function AdminAdCopyStudio() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
 
   // State
   const [userId, setUserId] = useState<string | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string>('');
+  const [hasDeliberatelyChosen, setHasDeliberatelyChosen] = useState(false);
   const [actblueForms, setActblueForms] = useState<string[]>([]);
   const [formsError, setFormsError] = useState<string | null>(null);
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(true);
@@ -76,7 +81,22 @@ export default function AdminAdCopyStudio() {
 
         if (orgs && orgs.length > 0 && isMounted) {
           setOrganizations(orgs);
-          setSelectedOrgId(orgs[0].id);
+          
+          // Priority: URL param > localStorage > show gate
+          const urlOrgId = searchParams.get('org');
+          const storedOrgId = localStorage.getItem(SELECTED_ORG_KEY);
+          
+          const matchedId = urlOrgId && orgs.find(o => o.id === urlOrgId)
+            ? urlOrgId
+            : storedOrgId && orgs.find(o => o.id === storedOrgId)
+              ? storedOrgId
+              : '';
+
+          if (matchedId) {
+            setSelectedOrgId(matchedId);
+            setHasDeliberatelyChosen(true);
+          }
+          // else: leave selectedOrgId empty, gate will show
         }
       } catch (error) {
         console.error('Error in fetchUserAndOrganizations:', error);
@@ -164,7 +184,10 @@ export default function AdminAdCopyStudio() {
 
   const handleOrganizationChange = useCallback((orgId: string) => {
     setSelectedOrgId(orgId);
-  }, []);
+    setHasDeliberatelyChosen(true);
+    localStorage.setItem(SELECTED_ORG_KEY, orgId);
+    setSearchParams({ org: orgId }, { replace: true });
+  }, [setSearchParams]);
 
   const handleBackToAdmin = useCallback(() => {
     navigate('/admin?tab=analytics');
@@ -214,18 +237,35 @@ export default function AdminAdCopyStudio() {
   }
 
   // =========================================================================
-  // Loading Organizations
+  // Loading Organizations (Skeleton)
   // =========================================================================
 
   if (isLoadingOrgs) {
     return (
-      <div className="h-screen bg-[#0a0f1a] flex items-center justify-center">
-        <div className="text-center" role="status" aria-live="polite">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center">
-            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+      <div className="min-h-screen bg-[#0a0f1a] p-6">
+        <div className="sticky top-0 z-30 -mx-6 -mt-6 px-6 py-4 bg-[#0a0f1a]/95 backdrop-blur-md border-b border-[#1e2a45] mb-6">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-[#1e2a45] animate-pulse" />
+            <div className="space-y-2">
+              <div className="h-5 w-32 bg-[#1e2a45] rounded animate-pulse" />
+              <div className="h-3 w-48 bg-[#1e2a45] rounded animate-pulse" />
+            </div>
           </div>
-          <p className="text-[#e2e8f0] font-medium">Loading organizations...</p>
-          <p className="text-[#64748b] text-sm mt-1">Please wait</p>
+        </div>
+        <div className="rounded-xl border border-[#1e2a45] bg-[#141b2d] p-4 mb-6">
+          <div className="flex items-center justify-between">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="flex flex-col items-center gap-2">
+                <div className="h-10 w-10 rounded-full bg-[#1e2a45] animate-pulse" />
+                <div className="h-3 w-12 bg-[#1e2a45] rounded animate-pulse hidden sm:block" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-xl bg-[#141b2d] p-6 space-y-4">
+          <div className="h-6 w-64 bg-[#1e2a45] rounded animate-pulse mx-auto" />
+          <div className="h-4 w-48 bg-[#1e2a45] rounded animate-pulse mx-auto" />
+          <div className="h-40 bg-[#1e2a45] rounded-xl animate-pulse" />
         </div>
       </div>
     );
@@ -258,7 +298,21 @@ export default function AdminAdCopyStudio() {
   }
 
   // =========================================================================
-  // Main Content - Issue E2: No separate page header, wizard has everything
+  // Step 0: Organization Selection Gate
+  // =========================================================================
+
+  if (!hasDeliberatelyChosen || !selectedOrgId) {
+    return (
+      <OrganizationSelectionGate
+        organizations={organizations}
+        onSelect={handleOrganizationChange}
+        onBackToAdmin={handleBackToAdmin}
+      />
+    );
+  }
+
+  // =========================================================================
+  // Main Content
   // =========================================================================
 
   return (

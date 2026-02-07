@@ -33,6 +33,8 @@ interface WizardStepIndicatorProps {
   completedSteps: AdCopyStudioStep[];
   onStepClick?: (step: AdCopyStudioStep) => void;
   canNavigateToStep?: (step: AdCopyStudioStep) => boolean;
+  /** Optional data summaries keyed by step number, e.g. { 1: "3 videos", 2: "3 reviewed" } */
+  stepSummaries?: Record<number, string | null>;
 }
 
 type StepStatus = 'completed' | 'current' | 'upcoming';
@@ -42,6 +44,7 @@ export function WizardStepIndicator({
   completedSteps,
   onStepClick,
   canNavigateToStep,
+  stepSummaries,
 }: WizardStepIndicatorProps) {
   const tabListRef = useRef<HTMLDivElement>(null);
 
@@ -172,6 +175,13 @@ export function WizardStepIndicator({
                 >
                   {stepConfig.title}
                 </span>
+
+                {/* Data summary for completed steps */}
+                {status === 'completed' && stepSummaries?.[stepConfig.step] && (
+                  <span className="text-[10px] text-[#64748b] hidden sm:inline">
+                    {stepSummaries[stepConfig.step]}
+                  </span>
+                )}
               </motion.button>
 
               {/* Connector line */}
