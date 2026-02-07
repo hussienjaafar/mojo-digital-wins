@@ -203,6 +203,7 @@ export interface AdCopyStudioSession {
 export interface SessionStepData {
   videos?: VideoUpload[];
   analyses?: Record<string, TranscriptAnalysis>;
+  transcriptIds?: Record<string, string>;
   config?: CampaignConfig;
   generated_copy?: GeneratedCopy;
   generation_id?: string;
