@@ -1,108 +1,210 @@
 
+# UX/UI Audit: Ad Copy Studio
 
-# Fix: Ad Copy Generation Returning Empty Results
+## Executive Summary
 
-## What Happened
+After a deep review of all 5 wizard steps, the page wrapper, and the live UI, I've identified **19 issues** across navigation, information architecture, clarity, and visual design. The core problems center around: (1) users not knowing what's expected of them at each step, (2) important information buried or missing, (3) the org selector being confusing, and (4) the export step being hard to use for the actual workflow of pasting into Meta Ads Manager.
 
-The edge function logs show the exact failure chain:
+---
 
-1. The AI call to `google/gemini-2.5-pro` completed (20s latency) but **did not return tool calls** -- it returned the content as plain text instead
-2. The fallback JSON parser in `callLovableAIWithTools` tried to extract JSON via regex but failed (likely markdown code fences wrapping the JSON)
-3. The error `"AI did not return structured tool call output"` was thrown
-4. `generateCopyForSegment` caught the error and returned `null`
-5. The main handler treated `null` as empty arrays and returned a **200 success** with zero copy -- silently failing
+## Issue 1: HIGH -- No Padding Inside Step Content Area
 
-## Root Causes
+The step content renders inside a `rounded-lg border` container but the individual steps (`VideoUploadStep`, etc.) don't have consistent inner padding. `VideoUploadStep` has `flex flex-col gap-6` with no padding, causing content to touch the card edges. Some steps have internal padding on sub-elements but not on the wrapper, creating inconsistent spacing.
 
-**Cause 1: Fragile fallback JSON parsing.** The regex `[\[{][\s\S]*[\]}]` doesn't handle markdown-fenced responses like:
-```
-```json
-{ "reasoning": {...}, "variations": [...] }
-```                                             <-- This backtick breaks the regex
-```
+**Fix:** Add `p-6` to the motion.div wrapper in `AdCopyWizard.tsx` (line 710) or ensure each step component has consistent `p-6` padding.
 
-**Cause 2: Silent failure.** When all segments fail to generate, the function returns `200 OK` with empty arrays instead of an error. The frontend sees "success" and moves to step 5 with nothing to show.
+---
 
-**Cause 3: `toolChoice` format may not be fully supported.** The current format `{ type: "function", function: { name: "generate_ad_copy" } }` is the OpenAI format. The Lovable AI Gateway proxying to Gemini may not translate this correctly, causing Gemini to ignore the tool and respond with plain text.
+## Issue 2: HIGH -- Organization Picker Has No Context
 
-## Fix Plan
+The org selector in the header shows a dropdown but provides no label. A user seeing "Select organization" doesn't understand *why* they need to pick one or what it affects. There's also no indication of which org is currently selected in the header bar (the page-level header in `AdminAdCopyStudio.tsx` shows nothing about the org).
 
-### 1. Improve fallback JSON parsing in `ai-client.ts`
+**Fix:** Add a label like "Creating ads for:" before the org picker. Show the selected org name prominently in the page header.
 
-Strip markdown code fences before attempting JSON extraction:
+---
 
-```typescript
-if (aiResult.content) {
-  try {
-    // Strip markdown code fences (```json ... ``` or ``` ... ```)
-    let cleaned = aiResult.content;
-    cleaned = cleaned.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '');
-    const jsonMatch = cleaned.match(/[\[{][\s\S]*[\]}]/);
-    if (jsonMatch) {
-      return {
-        result: JSON.parse(jsonMatch[0]) as T,
-        model: aiResult.model,
-        latencyMs: aiResult.latencyMs,
-      };
-    }
-  } catch {
-    // Fall through to error
-  }
-}
-```
+## Issue 3: HIGH -- Switching Orgs Mid-Session Silently Breaks State
 
-### 2. Add logging of raw AI content on fallback failure in `ai-client.ts`
+When a user switches organizations mid-wizard, the session is tied to the original org. Videos, transcripts, and ActBlue forms belong to the original org. There's no warning, no session reset, and no confirmation dialog. The user could generate copy using Org A's transcript but Org B's ActBlue forms.
 
-When tool calls are missing, log what the model actually returned so we can debug:
+**Fix:** When org changes, show a confirmation dialog: "Switching organizations will reset your current session. Continue?" Then call `resetSession()` if confirmed.
 
-```typescript
-if (!aiResult.toolCalls || aiResult.toolCalls.length === 0) {
-  console.warn(`[AI] No tool calls returned. Content length: ${aiResult.content?.length || 0}`);
-  console.warn(`[AI] Content preview: ${aiResult.content?.substring(0, 500) || 'empty'}`);
-  // ... existing fallback logic
-}
-```
+---
 
-### 3. Return error when all segments produce empty results in `generate-ad-copy/index.ts`
+## Issue 4: HIGH -- Step 1 Upload: Google Drive Section Appears First
 
-After the generation loop, check if ALL segments returned empty and return an error instead of silent success:
+The Google Drive import is positioned *above* the direct file upload drop zone. For most users, drag-and-drop is the primary action. Google Drive import is a secondary/advanced option. This inverted hierarchy makes the primary action less discoverable.
 
-```typescript
-// After building generatedCopy and metaReadyCopy...
-const totalVariations = Object.values(metaReadyCopy)
-  .reduce((sum, seg) => sum + seg.variations.length, 0);
+**Fix:** Swap the order -- put the drag-and-drop zone first (primary action), then the "or" divider, then Google Drive import below.
 
-if (totalVariations === 0) {
-  return new Response(
-    JSON.stringify({ success: false, error: 'AI generation failed for all segments. Please try again.' }),
-    { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
-}
-```
+---
 
-### 4. Simplify `toolChoice` format for broader gateway compatibility
+## Issue 5: HIGH -- Step 2 Review: No Loading State When Analysis Isn't Ready
 
-Change from the explicit function-forcing format to the simpler `"auto"` or `"required"` format:
+If the user advances to Step 2 before transcription completes (which is possible since `canProceed` only requires one "ready" video), they see "No analysis available for this video" with a generic icon. There's no indication that the analysis is still processing, no spinner, no ETA.
 
-```typescript
-// Before
-toolChoice: { type: "function", function: { name: "generate_ad_copy" } }
+**Fix:** Check the video status. If it's `transcribing` or `analyzing`, show a loading spinner with "Analysis in progress..." instead of the empty state. Only show "No analysis available" for videos in `error` or truly missing states.
 
-// After
-toolChoice: "required"
-```
+---
 
-`"required"` tells the model it MUST use a tool call but doesn't force a specific function name -- this has broader compatibility across gateways.
+## Issue 6: MEDIUM -- Step 2 Review: "Reviewed X/Y videos" Tracker Is Misleading
 
-## Files Changed
+The review counter auto-increments when you switch tabs, not when you actually review content. Simply clicking through tabs marks videos as "reviewed" even if the user spent 0 seconds on them. This gives false confidence.
 
-| File | Changes |
-|------|---------|
-| `supabase/functions/_shared/ai-client.ts` | Better fallback parsing (strip markdown fences), debug logging |
-| `supabase/functions/generate-ad-copy/index.ts` | Error on empty results, simplify toolChoice |
+**Fix:** Either remove the counter (it doesn't gate progression anyway -- there's no requirement to review all videos), or make it meaningful by requiring the user to click a "Mark as reviewed" button on each video.
 
-## Technical Details
+---
 
-- Only 2 files change, both are edge functions
-- No database or frontend changes needed
-- The frontend already handles error responses (shows retry button)
+## Issue 7: MEDIUM -- Step 2 Review: Analysis Cards Missing Key Data
+
+The analysis panel shows Primary Issue, Tone, Targets Attacked, Pain Points, and Key Phrases, but omits several fields from `TranscriptAnalysis`:
+- `targets_supported` (who the candidate supports)
+- `political_stances`
+- `values_appealed`
+- `urgency_drivers`
+- `urgency_level`
+- `sentiment_score`
+- `cta_text`
+- `topic_primary` / `topic_tags`
+
+These are all generated by the AI but hidden from the user. The user can't validate or correct them, and they directly influence the ad copy output.
+
+**Fix:** Add cards for the missing fields, especially `targets_supported`, `values_appealed`, `urgency_drivers`, and `sentiment_score` (as a visual gauge). Group related fields logically.
+
+---
+
+## Issue 8: MEDIUM -- Step 3 Configure: No Refcode Auto-Generation on Mount
+
+The refcode field starts empty. The "Regenerate" button exists but doesn't auto-fire. Users must either type a refcode manually or know to click "Regenerate." This creates an unnecessary friction point since most users want an auto-generated refcode.
+
+**Fix:** Auto-generate a refcode on mount if the field is empty. The `refcode_auto_generated` flag already exists in the config.
+
+---
+
+## Issue 9: MEDIUM -- Step 3 Configure: No Preset Audience Segment Templates
+
+Users must manually create every audience segment from scratch. For political fundraising, common segments are predictable (e.g., "Progressive Base," "Swing Voters," "High-Dollar Donors," "Grassroots"). Requiring manual entry every time is tedious and error-prone.
+
+**Fix:** Add a "Quick Add" section with pre-built segment templates that users can add with one click, then customize. Show them as chips/buttons above the segment list.
+
+---
+
+## Issue 10: MEDIUM -- Step 3 Configure: ActBlue Form Dropdown Empty State Is Confusing
+
+If no ActBlue forms are found for the selected org, the dropdown simply has no options. There's no explanation of why it's empty or what to do. The user might not even realize the dropdown is supposed to have options.
+
+**Fix:** Show an inline message when `actblueForms.length === 0`: "No ActBlue forms found for this organization. Forms appear after transaction data is imported."
+
+---
+
+## Issue 11: MEDIUM -- Step 4 Generate: "Total outputs" Math Is Wrong
+
+The summary shows `segmentCount * 5 * 3` outputs. But the actual generation produces 5 *variations* per segment (each variation is a primary_text + headline + description tuple). So 2 segments = 10 variations, not 30 "copy variations." This inflated number sets incorrect expectations.
+
+**Fix:** Show "5 variations per segment" and "10 total variations" (for 2 segments), not "30 copy variations."
+
+---
+
+## Issue 12: MEDIUM -- Step 4 Generate: No Estimated Time
+
+Generation can take 20-60+ seconds per segment. There's a progress bar but no time estimate. Users don't know if they should wait 10 seconds or 5 minutes.
+
+**Fix:** Add an estimated time based on segment count: "Estimated time: ~30 seconds per audience segment."
+
+---
+
+## Issue 13: MEDIUM -- Step 5 Export: Copy Variations Lack Framework Labels
+
+Each variation was generated using a specific framework (PAS, BAB, AIDA, etc.) but this metadata isn't shown. Users can't understand *why* each variation sounds different or make informed choices about which to use.
+
+**Fix:** Show the framework name as a small badge on each variation card (e.g., "PAS" or "AIDA"). This helps users learn which frameworks resonate with their audience.
+
+---
+
+## Issue 14: MEDIUM -- Step 5 Export: No Side-by-Side View for Meta Ads Manager
+
+Users need to copy primary_text + headline + description as a *set* (one variation). But the export step separates them into three independent lists. To assemble a complete ad, users must manually match variation #1 across all three sections. This is the most confusing part of the export flow.
+
+**Fix:** Add a "Variation View" toggle that shows each variation as a complete card (primary_text + headline + description together), in addition to the current "Element View." The variation view should be the default.
+
+---
+
+## Issue 15: LOW -- Step Indicator Is Not Responsive
+
+On narrow screens, the 5-step indicator with icons + labels + connector lines wraps awkwardly. Labels overlap or get truncated.
+
+**Fix:** On mobile, collapse to numbered circles only (no labels) or use a compact horizontal scrollable strip.
+
+---
+
+## Issue 16: LOW -- No Confirmation Before Reset
+
+The "Reset" button in the header uses `window.confirm()` which is a jarring browser-native dialog that doesn't match the dark theme. It's also easy to accidentally click.
+
+**Fix:** Replace with a styled confirmation dialog (using the existing Radix AlertDialog component).
+
+---
+
+## Issue 17: LOW -- Step 1: "Copy diagnostics" Button Is User-Facing Debug Info
+
+After extraction, videos in "ready" state show "Stream copy" or "Re-encoded" badges and a "Copy diagnostics" button. This is developer/debug information that confuses end users.
+
+**Fix:** Remove the extraction mode badge and diagnostics button from the user-facing UI. Keep them in console logs for debugging.
+
+---
+
+## Issue 18: LOW -- Step 5 Export: Tracking URL May Be Empty
+
+If generation failed partially or the tracking URL wasn't generated, the Tracking URL section shows an empty `<code>` block. No indication that something is missing.
+
+**Fix:** Show a fallback message: "No tracking URL generated" when `trackingUrl` is empty.
+
+---
+
+## Issue 19: LOW -- No "Back to Admin" in Wizard Steps
+
+The "Back to Admin" button is in the page header, but during deep wizard steps (3, 4, 5), the header is scrolled out of view. Users feel trapped in the wizard with no way to exit.
+
+**Fix:** Add a persistent exit affordance -- either a fixed header or a small "X" / "Exit" button visible at all times.
+
+---
+
+## Implementation Priority
+
+### Phase 1: Critical Flow Fixes
+1. Issue 3: Org switch session reset confirmation
+2. Issue 5: Loading state for pending analyses in Step 2
+3. Issue 14: Variation view in Step 5 export
+4. Issue 11: Fix total outputs math in Step 4
+
+### Phase 2: Information Architecture
+5. Issue 4: Swap upload zone order in Step 1
+6. Issue 7: Show missing analysis fields in Step 2
+7. Issue 9: Preset audience segment templates in Step 3
+8. Issue 13: Framework labels on export variations
+
+### Phase 3: Polish
+9. Issue 1: Consistent padding
+10. Issue 2: Org picker label
+11. Issue 8: Auto-generate refcode
+12. Issue 10: ActBlue empty state message
+13. Issue 12: Generation time estimate
+14. Issue 15: Responsive step indicator
+15. Issue 16: Styled reset dialog
+16. Issue 17: Remove debug info
+17. Issue 18: Empty tracking URL fallback
+18. Issue 19: Persistent exit affordance
+19. Issue 6: Fix misleading review counter
+
+### Files to Change
+
+| File | Issues Addressed |
+|------|-----------------|
+| `src/pages/AdminAdCopyStudio.tsx` | #2, #3, #19 |
+| `src/components/ad-copy-studio/AdCopyWizard.tsx` | #1, #2, #3, #16 |
+| `src/components/ad-copy-studio/WizardStepIndicator.tsx` | #15 |
+| `src/components/ad-copy-studio/steps/VideoUploadStep.tsx` | #4, #17 |
+| `src/components/ad-copy-studio/steps/TranscriptReviewStep.tsx` | #5, #6, #7 |
+| `src/components/ad-copy-studio/steps/CampaignConfigStep.tsx` | #8, #9, #10 |
+| `src/components/ad-copy-studio/steps/CopyGenerationStep.tsx` | #11, #12 |
+| `src/components/ad-copy-studio/steps/CopyExportStep.tsx` | #13, #14, #18 |
