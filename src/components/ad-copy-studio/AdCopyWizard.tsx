@@ -22,13 +22,6 @@ import { motion, AnimatePresence, type Easing } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -38,7 +31,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, RotateCcw, Sparkles } from 'lucide-react';
+import { Loader2, RotateCcw, Sparkles, ChevronDown } from 'lucide-react';
+
+// Picker
+import { AdminOrganizationPicker } from './AdminOrganizationPicker';
 
 // Hooks
 import { useAdCopyStudio } from '@/hooks/useAdCopyStudio';
@@ -64,7 +60,7 @@ import type { CampaignConfig, AudienceSegment, TranscriptAnalysis, VideoUpload }
 export interface AdCopyWizardProps {
   organizationId: string;
   userId: string;
-  organizations: Array<{ id: string; name: string }>;
+  organizations: Array<{ id: string; name: string; logo_url: string | null }>;
   actblueForms: string[];
   onOrganizationChange: (orgId: string) => void;
   onBackToAdmin: () => void;
@@ -553,6 +549,8 @@ export function AdCopyWizard({
   const [pendingOrgSwitch, setPendingOrgSwitch] = useState<string | null>(null);
   // Issue A7: Confirmation for "Start New" in export step
   const [showStartNewDialog, setShowStartNewDialog] = useState(false);
+  // Organization picker dialog state
+  const [showOrgPicker, setShowOrgPicker] = useState(false);
 
   const handleResetSession = useCallback(() => {
     setShowResetDialog(true);
@@ -730,8 +728,8 @@ export function AdCopyWizard({
   // Render
   // =========================================================================
 
-  // Get selected org name for display
-  const selectedOrgName = organizations.find(o => o.id === organizationId)?.name;
+  // Get selected org for display
+  const selectedOrg = organizations.find(o => o.id === organizationId);
 
   return (
     <div className="flex flex-col gap-6 p-6 min-h-screen bg-[#0a0f1a]">
@@ -757,40 +755,30 @@ export function AdCopyWizard({
             </div>
             <div>
               <h1 className="text-lg font-semibold text-[#e2e8f0]">Ad Copy Studio</h1>
-              {selectedOrgName && (
-                <p className="text-xs text-[#64748b]">Creating ads for <span className="text-blue-400 font-medium">{selectedOrgName}</span></p>
+              {selectedOrg && (
+                <p className="text-xs text-[#64748b]">Creating ads for <span className="text-blue-400 font-medium">{selectedOrg.name}</span></p>
               )}
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Organization Picker with label */}
+            {/* Organization Picker Button */}
             {organizations.length > 1 && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-[#64748b] hidden sm:inline">Organization:</span>
-                <Select
-                  value={organizationId}
-                  onValueChange={handleOrgChange}
-                >
-                  <SelectTrigger
-                    className="w-[200px] border-[#1e2a45] bg-[#141b2d] text-[#e2e8f0]"
-                    aria-label="Select organization"
-                  >
-                    <SelectValue placeholder="Select organization" />
-                  </SelectTrigger>
-                  <SelectContent className="border-[#1e2a45] bg-[#141b2d]">
-                    {organizations.map((org) => (
-                      <SelectItem
-                        key={org.id}
-                        value={org.id}
-                        className="text-[#e2e8f0] focus:bg-[#1e2a45] focus:text-[#e2e8f0]"
-                      >
-                        {org.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <button
+                onClick={() => setShowOrgPicker(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#1e2a45] bg-[#141b2d] hover:bg-[#1e2a45] transition-colors max-w-[240px]"
+                aria-label="Switch organization"
+              >
+                {selectedOrg?.logo_url ? (
+                  <img src={selectedOrg.logo_url} alt="" className="h-6 w-6 rounded-md object-contain shrink-0 bg-[#0a0f1a]" />
+                ) : (
+                  <div className="h-6 w-6 rounded-md bg-[#0a0f1a] flex items-center justify-center text-[9px] font-medium text-[#94a3b8] shrink-0">
+                    {selectedOrg?.name.substring(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <span className="text-sm text-[#e2e8f0] truncate">{selectedOrg?.name}</span>
+                <ChevronDown className="h-3.5 w-3.5 text-[#64748b] shrink-0" />
+              </button>
             )}
 
             {/* Reset Session Button */}
@@ -889,13 +877,13 @@ export function AdCopyWizard({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Org Switch Confirmation Dialog (Issue #3) */}
+      {/* Org Switch Confirmation Dialog */}
       <AlertDialog open={!!pendingOrgSwitch} onOpenChange={(open) => !open && setPendingOrgSwitch(null)}>
         <AlertDialogContent className="bg-[#141b2d] border-[#1e2a45]">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[#e2e8f0]">Switch Organization?</AlertDialogTitle>
             <AlertDialogDescription className="text-[#94a3b8]">
-              Switching organizations will reset your current session. All uploaded videos, transcripts, and generated copy will be lost.
+              Switch from <strong className="text-[#e2e8f0]">{selectedOrg?.name}</strong> to <strong className="text-[#e2e8f0]">{organizations.find(o => o.id === pendingOrgSwitch)?.name}</strong>? This will reset your current session including uploaded videos, transcripts, and generated copy.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -911,6 +899,15 @@ export function AdCopyWizard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Organization Picker Dialog */}
+      <AdminOrganizationPicker
+        open={showOrgPicker}
+        onOpenChange={setShowOrgPicker}
+        organizations={organizations}
+        selectedId={organizationId}
+        onSelect={handleOrgChange}
+      />
 
       {/* Start New Confirmation Dialog (Issue A7) */}
       <AlertDialog open={showStartNewDialog} onOpenChange={setShowStartNewDialog}>
