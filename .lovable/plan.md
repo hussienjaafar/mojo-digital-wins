@@ -1,210 +1,337 @@
 
-# UX/UI Audit: Ad Copy Studio
+# Deep UX/UI Audit: Ad Copy Studio (Pass 2)
 
-## Executive Summary
-
-After a deep review of all 5 wizard steps, the page wrapper, and the live UI, I've identified **19 issues** across navigation, information architecture, clarity, and visual design. The core problems center around: (1) users not knowing what's expected of them at each step, (2) important information buried or missing, (3) the org selector being confusing, and (4) the export step being hard to use for the actual workflow of pasting into Meta Ads Manager.
+This second-pass audit goes deeper than the first, examining interaction micro-patterns, data flow integrity, accessibility gaps, error recovery paths, component duplication, and visual consistency issues that compound into a degraded user experience.
 
 ---
 
-## Issue 1: HIGH -- No Padding Inside Step Content Area
+## SECTION A: INTERACTION & FLOW ISSUES
 
-The step content renders inside a `rounded-lg border` container but the individual steps (`VideoUploadStep`, etc.) don't have consistent inner padding. `VideoUploadStep` has `flex flex-col gap-6` with no padding, causing content to touch the card edges. Some steps have internal padding on sub-elements but not on the wrapper, creating inconsistent spacing.
+### Issue A1: CRITICAL -- Multi-Video Generation Uses Only First Video's Transcript
 
-**Fix:** Add `p-6` to the motion.div wrapper in `AdCopyWizard.tsx` (line 710) or ensure each step component has consistent `p-6` padding.
+**File:** `AdCopyWizard.tsx` lines 440-467
 
----
+The system supports uploading up to 5 videos, but `handleGenerate` only passes `primaryVideo = sourceVideos[0]` and its single `transcriptId` to the generation function. Videos 2-5 are uploaded, transcribed, and analyzed -- but their content is completely ignored during copy generation. The user spent time uploading and reviewing multiple videos under the impression they all contribute to the output. This is the most misleading part of the entire flow.
 
-## Issue 2: HIGH -- Organization Picker Has No Context
-
-The org selector in the header shows a dropdown but provides no label. A user seeing "Select organization" doesn't understand *why* they need to pick one or what it affects. There's also no indication of which org is currently selected in the header bar (the page-level header in `AdminAdCopyStudio.tsx` shows nothing about the org).
-
-**Fix:** Add a label like "Creating ads for:" before the org picker. Show the selected org name prominently in the page header.
+**Fix:** Either (a) combine transcripts from all analyzed videos into a single context blob sent to the AI, or (b) clearly communicate in the UI that only one video's transcript is used and let the user select which one, or (c) generate copy per-video and let users pick favorites.
 
 ---
 
-## Issue 3: HIGH -- Switching Orgs Mid-Session Silently Breaks State
+### Issue A2: HIGH -- Step 2 "Reviewed X/Y" Counter Persists as a Misleading Metric
 
-When a user switches organizations mid-wizard, the session is tied to the original org. Videos, transcripts, and ActBlue forms belong to the original org. There's no warning, no session reset, and no confirmation dialog. The user could generate copy using Org A's transcript but Org B's ActBlue forms.
+The previous audit flagged this (Issue #6) but the implementation still auto-marks videos as "reviewed" on tab switch (`handleTabChange` at line 327). The counter now shows in the header but still doesn't gate anything and still gives false confidence. No "Mark as reviewed" button was added.
 
-**Fix:** When org changes, show a confirmation dialog: "Switching organizations will reset your current session. Continue?" Then call `resetSession()` if confirmed.
-
----
-
-## Issue 4: HIGH -- Step 1 Upload: Google Drive Section Appears First
-
-The Google Drive import is positioned *above* the direct file upload drop zone. For most users, drag-and-drop is the primary action. Google Drive import is a secondary/advanced option. This inverted hierarchy makes the primary action less discoverable.
-
-**Fix:** Swap the order -- put the drag-and-drop zone first (primary action), then the "or" divider, then Google Drive import below.
+**Fix:** Remove the reviewed counter entirely since it doesn't gate progression. Replace with a simple "X videos available" indicator. The step should rely on the "Continue" button alone.
 
 ---
 
-## Issue 5: HIGH -- Step 2 Review: No Loading State When Analysis Isn't Ready
+### Issue A3: HIGH -- Preset Segment Templates Only Show When List is Empty
 
-If the user advances to Step 2 before transcription completes (which is possible since `canProceed` only requires one "ready" video), they see "No analysis available for this video" with a generic icon. There's no indication that the analysis is still processing, no spinner, no ETA.
+**File:** `CampaignConfigStep.tsx` line 469
 
-**Fix:** Check the video status. If it's `transcribing` or `analyzing`, show a loading spinner with "Analysis in progress..." instead of the empty state. Only show "No analysis available" for videos in `error` or truly missing states.
+The "Quick add common segments" chips only render when `config.audience_segments.length === 0 && !isAddingSegment`. Once a user adds their first segment (even via the presets), the remaining presets disappear forever. A user wanting "Progressive Base" AND "Grassroots Donors" must click one, then manually create the second.
 
----
-
-## Issue 6: MEDIUM -- Step 2 Review: "Reviewed X/Y videos" Tracker Is Misleading
-
-The review counter auto-increments when you switch tabs, not when you actually review content. Simply clicking through tabs marks videos as "reviewed" even if the user spent 0 seconds on them. This gives false confidence.
-
-**Fix:** Either remove the counter (it doesn't gate progression anyway -- there's no requirement to review all videos), or make it meaningful by requiring the user to click a "Mark as reviewed" button on each video.
+**Fix:** Show the preset chips whenever there are unused presets remaining. Filter out presets whose names already exist in `config.audience_segments`.
 
 ---
 
-## Issue 7: MEDIUM -- Step 2 Review: Analysis Cards Missing Key Data
+### Issue A4: HIGH -- No Validation That Segment Names Are Unique
 
-The analysis panel shows Primary Issue, Tone, Targets Attacked, Pain Points, and Key Phrases, but omits several fields from `TranscriptAnalysis`:
-- `targets_supported` (who the candidate supports)
-- `political_stances`
-- `values_appealed`
-- `urgency_drivers`
-- `urgency_level`
-- `sentiment_score`
-- `cta_text`
-- `topic_primary` / `topic_tags`
+**File:** `CampaignConfigStep.tsx` lines 315-329
 
-These are all generated by the AI but hidden from the user. The user can't validate or correct them, and they directly influence the ad copy output.
+Users can create two segments with the same name (e.g., two "Progressive Base" entries). Since `generatedCopy` is keyed by segment NAME (`GeneratedCopy = { [segmentName: string]: SegmentCopy }`), duplicate names will cause the second segment's copy to overwrite the first. The user loses half their generated output with no warning.
 
-**Fix:** Add cards for the missing fields, especially `targets_supported`, `values_appealed`, `urgency_drivers`, and `sentiment_score` (as a visual gauge). Group related fields logically.
+**Fix:** Add uniqueness validation in `handleSaveNewSegment` and `handleSaveEditSegment`. Disable the Save button and show an inline error if the name conflicts with an existing segment.
 
 ---
 
-## Issue 8: MEDIUM -- Step 3 Configure: No Refcode Auto-Generation on Mount
+### Issue A5: HIGH -- Segment Tab in Export Uses segment.name as Key, Not segment.id
 
-The refcode field starts empty. The "Regenerate" button exists but doesn't auto-fire. Users must either type a refcode manually or know to click "Regenerate." This creates an unnecessary friction point since most users want an auto-generated refcode.
+**File:** `CopyExportStep.tsx` lines 263, 332-348
 
-**Fix:** Auto-generate a refcode on mount if the field is empty. The `refcode_auto_generated` flag already exists in the config.
+`activeSegment` state is set to `audienceSegments[0]?.name` and `TabsTrigger value={segment.name}`. If two segments had the same name (Issue A4), tabs would collide. Even without duplicates, using names as keys is fragile -- if the user renamed a segment after generation, the tab mapping would break.
 
----
-
-## Issue 9: MEDIUM -- Step 3 Configure: No Preset Audience Segment Templates
-
-Users must manually create every audience segment from scratch. For political fundraising, common segments are predictable (e.g., "Progressive Base," "Swing Voters," "High-Dollar Donors," "Grassroots"). Requiring manual entry every time is tedious and error-prone.
-
-**Fix:** Add a "Quick Add" section with pre-built segment templates that users can add with one click, then customize. Show them as chips/buttons above the segment list.
+**Fix:** Use `segment.id` as the tab value and key. Map back to `segment.name` only when looking up `generatedCopy[segment.name]`.
 
 ---
 
-## Issue 10: MEDIUM -- Step 3 Configure: ActBlue Form Dropdown Empty State Is Confusing
+### Issue A6: MEDIUM -- No Way to Regenerate a Single Segment's Copy
 
-If no ActBlue forms are found for the selected org, the dropdown simply has no options. There's no explanation of why it's empty or what to do. The user might not even realize the dropdown is supposed to have options.
+The export step shows copy per-segment but provides no "Regenerate this segment" button. If one segment's output is poor, the user must go back to Step 4 and regenerate ALL segments, wasting time and API calls on the segments that were already good.
 
-**Fix:** Show an inline message when `actblueForms.length === 0`: "No ActBlue forms found for this organization. Forms appear after transaction data is imported."
-
----
-
-## Issue 11: MEDIUM -- Step 4 Generate: "Total outputs" Math Is Wrong
-
-The summary shows `segmentCount * 5 * 3` outputs. But the actual generation produces 5 *variations* per segment (each variation is a primary_text + headline + description tuple). So 2 segments = 10 variations, not 30 "copy variations." This inflated number sets incorrect expectations.
-
-**Fix:** Show "5 variations per segment" and "10 total variations" (for 2 segments), not "30 copy variations."
+**Fix:** Add a "Regenerate" button per segment tab in CopyExportStep. The `useAdCopyGeneration` hook already has a `regenerateSegment` method.
 
 ---
 
-## Issue 12: MEDIUM -- Step 4 Generate: No Estimated Time
+### Issue A7: MEDIUM -- "Start New" Button in Export Doesn't Confirm
 
-Generation can take 20-60+ seconds per segment. There's a progress bar but no time estimate. Users don't know if they should wait 10 seconds or 5 minutes.
+**File:** `CopyExportStep.tsx` line 627
 
-**Fix:** Add an estimated time based on segment count: "Estimated time: ~30 seconds per audience segment."
+The "Start New" button at the bottom of Step 5 calls `onStartNew` directly with no confirmation dialog. After spending potentially 10+ minutes uploading, reviewing, configuring, and generating, a misclick wipes everything. The Reset button in the header correctly shows a confirmation, but this one does not.
 
----
-
-## Issue 13: MEDIUM -- Step 5 Export: Copy Variations Lack Framework Labels
-
-Each variation was generated using a specific framework (PAS, BAB, AIDA, etc.) but this metadata isn't shown. Users can't understand *why* each variation sounds different or make informed choices about which to use.
-
-**Fix:** Show the framework name as a small badge on each variation card (e.g., "PAS" or "AIDA"). This helps users learn which frameworks resonate with their audience.
+**Fix:** Wire `onStartNew` through the same AlertDialog confirmation used for Reset.
 
 ---
 
-## Issue 14: MEDIUM -- Step 5 Export: No Side-by-Side View for Meta Ads Manager
+### Issue A8: MEDIUM -- Copy Generation Doesn't Show Which Segment Is Currently Being Generated
 
-Users need to copy primary_text + headline + description as a *set* (one variation). But the export step separates them into three independent lists. To assemble a complete ad, users must manually match variation #1 across all three sections. This is the most confusing part of the export flow.
+**File:** `CopyGenerationStep.tsx` lines 209-212 and `AdCopyWizard.tsx` line 612
 
-**Fix:** Add a "Variation View" toggle that shows each variation as a complete card (primary_text + headline + description together), in addition to the current "Element View." The variation view should be the default.
+The `currentSegment` prop is always `undefined` because `AdCopyWizard` passes `currentSegment={undefined}` on line 612. The generation step has UI for displaying the current segment name but it never shows because the data isn't piped through.
 
----
-
-## Issue 15: LOW -- Step Indicator Is Not Responsive
-
-On narrow screens, the 5-step indicator with icons + labels + connector lines wraps awkwardly. Labels overlap or get truncated.
-
-**Fix:** On mobile, collapse to numbered circles only (no labels) or use a compact horizontal scrollable strip.
+**Fix:** Track `currentSegment` in `useAdCopyGeneration` and pass it to `CopyGenerationStep`. The edge function processes segments sequentially, so the hook should expose which segment is currently being processed.
 
 ---
 
-## Issue 16: LOW -- No Confirmation Before Reset
+### Issue A9: MEDIUM -- Step 1 Footer Has No "Back" Button
 
-The "Reset" button in the header uses `window.confirm()` which is a jarring browser-native dialog that doesn't match the dark theme. It's also easy to accidentally click.
+**File:** `VideoUploadStep.tsx` line 673-689
 
-**Fix:** Replace with a styled confirmation dialog (using the existing Radix AlertDialog component).
+Every other step has a "Back" button in the footer, but Step 1 only has "Next: Review Transcripts" aligned to the right. While there's a "Back to Admin" in the header, the inconsistency breaks the visual pattern. Users expect a Back button in the footer on every step.
 
----
-
-## Issue 17: LOW -- Step 1: "Copy diagnostics" Button Is User-Facing Debug Info
-
-After extraction, videos in "ready" state show "Stream copy" or "Re-encoded" badges and a "Copy diagnostics" button. This is developer/debug information that confuses end users.
-
-**Fix:** Remove the extraction mode badge and diagnostics button from the user-facing UI. Keep them in console logs for debugging.
+**Fix:** Add a "Back to Admin" or "Exit" ghost button on the left side of the footer, matching the pattern of other steps.
 
 ---
 
-## Issue 18: LOW -- Step 5 Export: Tracking URL May Be Empty
+## SECTION B: DATA INTEGRITY & STATE MANAGEMENT
 
-If generation failed partially or the tracking URL wasn't generated, the Tracking URL section shows an empty `<code>` block. No indication that something is missing.
+### Issue B1: HIGH -- Analyses Object Uses Stale Closure in updateStepData
 
-**Fix:** Show a fallback message: "No tracking URL generated" when `trackingUrl` is empty.
+**File:** `AdCopyWizard.tsx` line 371
+
+Inside the `useEffect` polling loop, `updateStepData({ analyses: { ...analyses, [videoId]: analysis } })` captures the `analyses` variable from the closure. When multiple videos complete near-simultaneously, each callback reads the same stale `analyses` object, potentially overwriting each other. Only the last-completing video's analysis survives.
+
+**Fix:** Use the functional updater pattern or use a ref for analyses. Alternatively, use `setAnalyses` with a callback and derive `stepData.analyses` from the state rather than spreading.
 
 ---
 
-## Issue 19: LOW -- No "Back to Admin" in Wizard Steps
+### Issue B2: HIGH -- Session Persistence Doesn't Include transcriptIds
 
-The "Back to Admin" button is in the page header, but during deep wizard steps (3, 4, 5), the header is scrolled out of view. Users feel trapped in the wizard with no way to exit.
+**File:** `AdCopyWizard.tsx` line 193
 
-**Fix:** Add a persistent exit affordance -- either a fixed header or a small "X" / "Exit" button visible at all times.
+`transcriptIds` is local state (`useState<Record<string, string>>({})`). It's never persisted to `stepData` or the session. On page refresh, `transcriptIds` is empty, which means `handleGenerate` at line 451 falls through to `primaryVideo.transcript_id` (which may also be undefined if the video was uploaded before that field was added to VideoUpload).
+
+**Fix:** Persist `transcriptIds` in `stepData` alongside `analyses`. Hydrate from `stepData` on mount.
+
+---
+
+### Issue B3: MEDIUM -- hasCompletedStep4Ref Not Reset on Session Restore
+
+**File:** `AdCopyWizard.tsx` line 196
+
+`hasCompletedStep4Ref` is initialized to `false` and set to `true` after auto-advancing from Step 4 to 5. But if the user refreshes on Step 5 and then navigates back to Step 4 to regenerate, the ref is still `false` (correct). However, if the session is restored directly to Step 5 (with `generatedCopy` in stepData), the auto-advance effect at line 472 could re-trigger and call `completeStep(4)` redundantly.
+
+**Fix:** Initialize `hasCompletedStep4Ref` to `true` if `currentStep === 5` on mount.
+
+---
+
+### Issue B4: MEDIUM -- Video Status Sync Runs Before Hook Hydration
+
+**File:** `AdCopyWizard.tsx` lines 258-330
+
+The `syncBackendStatuses` effect runs on a 500ms delay after mount. But `useVideoUpload` also has hydration logic that reads `initialVideos` from `stepData.videos`. These two can race, causing the UI to flash between states. The `hasSyncedRef` guard prevents re-runs but doesn't prevent the initial race.
+
+**Fix:** Make the sync effect depend on a "hydration complete" signal from `useVideoUpload`, or increase the delay, or merge the sync logic into the hook itself.
+
+---
+
+## SECTION C: COMPONENT ARCHITECTURE & DUPLICATION
+
+### Issue C1: MEDIUM -- Duplicate AnalysisCard/TagList/BulletList Components
+
+Three places define identical (or near-identical) helper components:
+1. `TranscriptReviewStep.tsx` lines 72-160 -- `AnalysisCard`, `TagList`, `BulletList`
+2. `TranscriptAnalysisPanel.tsx` lines 41-132 -- `AnalysisCard`, `TagList`, `BulletList`
+3. `CopyExportStep.tsx` lines 58-62 -- `getCharCountColor` (duplicated from `CopyVariationCard.tsx`)
+
+These are functionally identical but independently maintained. Changes to one won't propagate.
+
+**Fix:** Extract shared primitives (`AnalysisCard`, `TagList`, `BulletList`, `PrimaryBadge`) into `src/components/ad-copy-studio/components/analysis-primitives.tsx` and import everywhere.
+
+---
+
+### Issue C2: MEDIUM -- AudienceSegmentEditor Component Is Unused
+
+**File:** `src/components/ad-copy-studio/components/AudienceSegmentEditor.tsx`
+
+A fully-built `AudienceSegmentEditor` component exists (340 lines) with the same exact functionality that's duplicated inline in `CampaignConfigStep.tsx`. The component is never imported anywhere.
+
+**Fix:** Replace the inline segment management in `CampaignConfigStep` with the extracted `AudienceSegmentEditor` component, or delete the unused component.
+
+---
+
+### Issue C3: LOW -- GDriveLinkInput and RefcodeGenerator Components Are Unused
+
+Both `GDriveLinkInput.tsx` and `RefcodeGenerator.tsx` in the components folder are fully-built extraction-ready components, but the actual steps use inline implementations. These files add bundle weight and maintenance confusion.
+
+**Fix:** Either integrate them into their respective steps or remove them.
+
+---
+
+## SECTION D: ACCESSIBILITY & USABILITY
+
+### Issue D1: HIGH -- No Keyboard Navigation Between Steps
+
+**File:** `WizardStepIndicator.tsx`
+
+Steps are interactive buttons but there's no arrow-key navigation between them. The ARIA pattern for a wizard should use `role="tablist"` with `role="tab"` for each step, supporting left/right arrow keys. Currently it uses `role="navigation"` with `<ol>`, which is semantically incorrect for a wizard stepper.
+
+**Fix:** Change to `role="tablist"` / `role="tab"` pattern with arrow-key handling, or keep as `nav` but add `aria-describedby` linking each step to its description.
+
+---
+
+### Issue D2: MEDIUM -- ScrollArea in Step 2 Has Fixed Height Cutting Off Content
+
+**File:** `TranscriptReviewStep.tsx` line 659
+
+The right panel analysis cards are in `ScrollArea className="h-[520px]"`. With all the new fields added (targets_supported, values_appealed, urgency_drivers, sentiment_score, CTA, topic), the scroll area is now very crowded. On smaller laptop screens (1366x768), the analysis panel is taller than the viewport but constrained to 520px, creating scroll-within-scroll which is disorienting.
+
+**Fix:** Use `max-h-[calc(100vh-300px)]` or `flex-1 overflow-auto` to make the panel responsive to viewport height rather than fixed.
+
+---
+
+### Issue D3: MEDIUM -- No Focus Management After Step Transitions
+
+When transitioning between steps (framer-motion `AnimatePresence`), focus stays on the previous step's button or is lost entirely. Screen reader users have no indication that content has changed.
+
+**Fix:** After step transition completes, programmatically focus the new step's heading (`h2`) or first interactive element. Add `aria-live="polite"` to the step content container.
+
+---
+
+### Issue D4: LOW -- Transcript Edit Textarea Has No Character Count
+
+**File:** `TranscriptReviewStep.tsx` line 590
+
+The transcript text can be very long and users can edit it, but there's no indication of length. While there's no strict limit, showing a character/word count helps users understand the scope of what they're editing.
+
+**Fix:** Add a small word/character count footer below the textarea.
+
+---
+
+### Issue D5: LOW -- Color-Only Status Indicators
+
+Video status indicators (pending=gray, uploading=blue, extracting=amber, transcribing=purple, ready=green, error=red) rely solely on color differentiation. Users with color blindness cannot distinguish between states.
+
+**Fix:** Ensure each status has a unique icon shape in addition to color (already partially done -- spinner vs checkmark vs alert). Verify the full set covers all states with distinct shapes.
+
+---
+
+## SECTION E: VISUAL & LAYOUT ISSUES
+
+### Issue E1: MEDIUM -- Double Border on Step Content
+
+**File:** `AdCopyWizard.tsx` line 754
+
+The step content wrapper has `rounded-lg border border-[#1e2a45] bg-[#141b2d]`. But inside, some steps have their own borders (e.g., the upload drop zone has `rounded-xl border-2 border-dashed`). The result is nested containers with visible borders that create visual heaviness.
+
+**Fix:** Remove the outer content border or make the step wrapper borderless with only a subtle background difference. Let the step contents provide their own visual boundaries.
+
+---
+
+### Issue E2: MEDIUM -- Header Has Two Layers (Page + Wizard)
+
+**File:** `AdminAdCopyStudio.tsx` line 296 + `AdCopyWizard.tsx` line 665
+
+There are two stacked headers: the page header (with "Back to Admin" and forms loading indicator) and the wizard header (with org picker, title, and Reset). This wastes 100+ pixels of vertical space and creates confusion about which header does what. The "forms loading" indicator in the page header is disconnected from the wizard context.
+
+**Fix:** Merge into a single sticky header. Move "Back to Admin" into the wizard header's left side. Move the forms loading indicator into the wizard or remove it (it's brief and low-value).
+
+---
+
+### Issue E3: LOW -- Step 4 Generate Button Is Excessively Large
+
+**File:** `CopyGenerationStep.tsx` line 263-277
+
+The "Generate Copy" button uses `size="lg"` with additional `px-8 py-6 text-lg` -- making it disproportionately large compared to every other button in the app. While it's the primary CTA, the oversized treatment looks unpolished.
+
+**Fix:** Use `size="lg"` with `px-6 py-3` to keep it prominent but proportional.
+
+---
+
+### Issue E4: LOW -- Inconsistent Card Border Radius
+
+Some cards use `rounded-lg` (8px), others `rounded-xl` (12px). The upload zone is `rounded-xl`, video list items are `rounded-lg`, the GDrive section is `rounded-xl`, summary card in Step 4 is `rounded-xl`, variation cards in Step 5 are `rounded-xl` in variation view but `rounded-lg` in element view.
+
+**Fix:** Standardize on `rounded-xl` for primary content cards, `rounded-lg` for nested sub-cards.
+
+---
+
+## SECTION F: MISSING FEATURES
+
+### Issue F1: MEDIUM -- No Undo After Deleting a Segment
+
+Deleting an audience segment is immediate with no undo. If a user accidentally deletes a segment with a carefully written description, they must recreate it from scratch.
+
+**Fix:** Add a toast with an "Undo" action that restores the deleted segment for 5 seconds.
+
+---
+
+### Issue F2: MEDIUM -- No Copy-Individual-Element Buttons in Variation View
+
+**File:** `CopyExportStep.tsx` lines 396-486
+
+In "Variation View," users can copy the entire variation (all 3 elements combined). But they can't copy just the headline or just the primary text individually. When pasting into Meta Ads Manager, users need to paste each element separately into different fields. The "Copy All" button formats as `PRIMARY TEXT:\n...\nHEADLINE:\n...\nDESCRIPTION:\n...` which isn't directly pasteable.
+
+**Fix:** Add small individual copy buttons next to each element within the variation card. Keep the "Copy All" for full-set clipboard.
+
+---
+
+### Issue F3: LOW -- No "Select All Segments" Quick Action in Export
+
+If a user has 3-4 segments, they must switch tabs to review each one. There's no way to see all segments' output at once for comparison.
+
+**Fix:** Add an "All Segments" tab option that renders all segments in a vertically stacked layout.
 
 ---
 
 ## Implementation Priority
 
-### Phase 1: Critical Flow Fixes
-1. Issue 3: Org switch session reset confirmation
-2. Issue 5: Loading state for pending analyses in Step 2
-3. Issue 14: Variation view in Step 5 export
-4. Issue 11: Fix total outputs math in Step 4
+### Critical (Do First)
+1. **A1** -- Multi-video transcript usage (most misleading issue)
+2. **A4** -- Segment name uniqueness validation
+3. **B1** -- Stale closure in analyses update
+4. **B2** -- Persist transcriptIds to session
 
-### Phase 2: Information Architecture
-5. Issue 4: Swap upload zone order in Step 1
-6. Issue 7: Show missing analysis fields in Step 2
-7. Issue 9: Preset audience segment templates in Step 3
-8. Issue 13: Framework labels on export variations
+### High
+5. **A3** -- Preset templates available after first add
+6. **A5** -- Use segment.id as tab key
+7. **E2** -- Merge double headers
+8. **D1** -- Wizard step ARIA pattern
 
-### Phase 3: Polish
-9. Issue 1: Consistent padding
-10. Issue 2: Org picker label
-11. Issue 8: Auto-generate refcode
-12. Issue 10: ActBlue empty state message
-13. Issue 12: Generation time estimate
-14. Issue 15: Responsive step indicator
-15. Issue 16: Styled reset dialog
-16. Issue 17: Remove debug info
-17. Issue 18: Empty tracking URL fallback
-18. Issue 19: Persistent exit affordance
-19. Issue 6: Fix misleading review counter
+### Medium
+9. **C1** -- Extract shared analysis primitives
+10. **C2** -- Use or delete AudienceSegmentEditor
+11. **A6** -- Per-segment regeneration in export
+12. **A7** -- Confirm before "Start New"
+13. **A8** -- Pipe currentSegment through to generation UI
+14. **D2** -- Responsive ScrollArea height
+15. **F2** -- Individual copy buttons in variation view
 
-### Files to Change
+### Low
+16. **A2** -- Remove misleading review counter
+17. **A9** -- Back button consistency in Step 1
+18. **B3** -- Initialize hasCompletedStep4Ref on restore
+19. **C3** -- Remove unused components
+20. **D3** -- Focus management after transitions
+21. **D4** -- Transcript edit character count
+22. **D5** -- Color-blind friendly status icons
+23. **E1** -- Double border cleanup
+24. **E3** -- Generate button sizing
+25. **E4** -- Consistent border radius
+26. **F1** -- Undo segment deletion
+27. **F3** -- All-segments view in export
 
-| File | Issues Addressed |
-|------|-----------------|
-| `src/pages/AdminAdCopyStudio.tsx` | #2, #3, #19 |
-| `src/components/ad-copy-studio/AdCopyWizard.tsx` | #1, #2, #3, #16 |
-| `src/components/ad-copy-studio/WizardStepIndicator.tsx` | #15 |
-| `src/components/ad-copy-studio/steps/VideoUploadStep.tsx` | #4, #17 |
-| `src/components/ad-copy-studio/steps/TranscriptReviewStep.tsx` | #5, #6, #7 |
-| `src/components/ad-copy-studio/steps/CampaignConfigStep.tsx` | #8, #9, #10 |
-| `src/components/ad-copy-studio/steps/CopyGenerationStep.tsx` | #11, #12 |
-| `src/components/ad-copy-studio/steps/CopyExportStep.tsx` | #13, #14, #18 |
+### Files Changed
+
+| File | Issues |
+|------|--------|
+| `AdCopyWizard.tsx` | A1, A7, A8, B1, B2, B3, B4, E2 |
+| `TranscriptReviewStep.tsx` | A2, C1, D2, D3, D4 |
+| `CampaignConfigStep.tsx` | A3, A4, C2, F1 |
+| `CopyGenerationStep.tsx` | A8, E3 |
+| `CopyExportStep.tsx` | A5, A6, A7, F2, F3, E4 |
+| `VideoUploadStep.tsx` | A9, D5 |
+| `WizardStepIndicator.tsx` | D1 |
+| `AdminAdCopyStudio.tsx` | E2 |
+| New: `components/analysis-primitives.tsx` | C1 |
+| Delete or integrate: `AudienceSegmentEditor.tsx`, `GDriveLinkInput.tsx`, `RefcodeGenerator.tsx` | C2, C3 |
