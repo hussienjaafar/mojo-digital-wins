@@ -281,14 +281,14 @@ export function AdCopyWizard({
     }
   }, [stepData.transcriptIds]);
 
-  // Sync video statuses from backend on load (ONCE per mount)
-  // This ensures UI reflects the true database state after refresh
+  // Issue B4: Sync video statuses from backend on load (ONCE per mount)
+  // Delay ensures useVideoUpload hydration completes first
   useEffect(() => {
-    // Only sync once per session load
     if (hasSyncedRef.current) return;
     
-    const syncBackendStatuses = async () => {
-      // Use stepData.videos as the source since that's what persists across refreshes
+    const timer = setTimeout(async () => {
+      if (hasSyncedRef.current) return;
+
       const videosToSync = stepData.videos || [];
       const videoDbIds = videosToSync
         .filter((v: VideoUpload) => v.video_id)
@@ -296,7 +296,6 @@ export function AdCopyWizard({
 
       if (videoDbIds.length === 0) return;
       
-      // Mark as synced to prevent re-runs
       hasSyncedRef.current = true;
 
       try {
@@ -311,7 +310,6 @@ export function AdCopyWizard({
           return;
         }
 
-        // Map backend status to UI status
         const statusMap: Record<string, VideoUpload['status']> = {
           'CANCELLED': 'error',
           'ERROR': 'error',
@@ -335,11 +333,7 @@ export function AdCopyWizard({
           
           if (currentVideo && currentVideo.status !== uiStatus) {
             console.log(`[AdCopyWizard] Syncing video ${dbVideo.id}: ${currentVideo.status} -> ${uiStatus} (backend: ${dbVideo.status})`);
-            
-            // Update via hook
             updateVideoStatus(dbVideo.id, uiStatus, dbVideo.error_message);
-            
-            // Add to failed set if terminal failure
             if (uiStatus === 'error') {
               failedVideosRef.current.add(dbVideo.id);
             }
@@ -350,10 +344,8 @@ export function AdCopyWizard({
       } catch (err) {
         console.error('[AdCopyWizard] Error syncing backend statuses:', err);
       }
-    };
+    }, 800);
 
-    // Issue B4: Increase delay to reduce race with hook hydration
-    const timer = setTimeout(syncBackendStatuses, 800);
     return () => clearTimeout(timer);
   }, [stepData.videos, updateVideoStatus]);
 
@@ -847,6 +839,15 @@ export function AdCopyWizard({
             animate="animate"
             exit="exit"
             className="rounded-xl bg-[#141b2d] p-6"
+            onAnimationComplete={() => {
+              // Issue D3: Focus management after step transitions
+              const heading = document.querySelector<HTMLElement>('[data-step-content] h2');
+              if (heading) {
+                heading.setAttribute('tabindex', '-1');
+                heading.focus({ preventScroll: true });
+              }
+            }}
+            data-step-content
           >
             {renderStepContent()}
           </motion.div>
