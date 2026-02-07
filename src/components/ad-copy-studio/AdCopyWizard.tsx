@@ -728,7 +728,9 @@ export function AdCopyWizard({
             error={generationError}
             onGenerate={handleGenerate}
             onBack={() => handleGoBack(3)}
+            organizationId={organizationId}
             organizationName={selectedOrg?.name}
+            organizations={organizations}
           />
         );
 
@@ -891,6 +893,7 @@ export function AdCopyWizard({
               <GenerationHistoryPanel
                 organizationId={organizationId}
                 organizationName={selectedOrg?.name}
+                organizations={organizations}
                 onClose={() => setShowHistory(false)}
               />
             </motion.div>

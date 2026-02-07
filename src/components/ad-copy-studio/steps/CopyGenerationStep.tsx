@@ -4,8 +4,9 @@
  * Displays generation summary and triggers AI copy generation.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -19,7 +20,18 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { CampaignConfig } from '@/types/ad-copy-studio';
 
 // =============================================================================
@@ -34,7 +46,9 @@ export interface CopyGenerationStepProps {
   error: string | null;
   onGenerate: () => Promise<void>;
   onBack: () => void;
+  organizationId: string;
   organizationName?: string;
+  organizations: Array<{ id: string; name: string; logo_url: string | null }>;
 }
 
 // =============================================================================
@@ -86,10 +100,59 @@ export function CopyGenerationStep({
   error,
   onGenerate,
   onBack,
+  organizationId,
   organizationName,
+  organizations,
 }: CopyGenerationStepProps) {
   const segmentCount = config.audience_segments.length;
   const totalVariations = segmentCount * VARIATIONS_PER_ELEMENT;
+
+  // Mismatch detection state
+  const [mismatchOrgName, setMismatchOrgName] = useState<string | null>(null);
+  const [showMismatchConfirm, setShowMismatchConfirm] = useState(false);
+
+  // Check if this ActBlue form was used by a different org
+  useEffect(() => {
+    if (!config.actblue_form_name || !organizationId) {
+      setMismatchOrgName(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await (supabase as any)
+          .from('ad_copy_generations')
+          .select('organization_id')
+          .eq('actblue_form_name', config.actblue_form_name)
+          .neq('organization_id', organizationId)
+          .limit(1);
+
+        if (cancelled || !data || data.length === 0) {
+          if (!cancelled) setMismatchOrgName(null);
+          return;
+        }
+
+        const otherOrgId = data[0].organization_id;
+        const otherOrg = organizations.find(o => o.id === otherOrgId);
+        if (!cancelled) {
+          setMismatchOrgName(otherOrg?.name || 'another organization');
+        }
+      } catch {
+        // Silently ignore - safeguard is best-effort
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [config.actblue_form_name, organizationId, organizations]);
+
+  const handleGenerateClick = useCallback(() => {
+    if (mismatchOrgName) {
+      setShowMismatchConfirm(true);
+    } else {
+      onGenerate();
+    }
+  }, [mismatchOrgName, onGenerate]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -100,6 +163,24 @@ export function CopyGenerationStep({
           Review your settings and generate personalized ad copy{organizationName ? <> for <span className="text-blue-400 font-medium">{organizationName}</span></> : ''}
         </p>
       </div>
+
+      {/* Mismatch Warning */}
+      {mismatchOrgName && !isGenerating && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-start gap-3 rounded-xl border border-[#eab308]/30 bg-[#eab308]/10 p-4"
+        >
+          <AlertTriangle className="h-5 w-5 text-[#eab308] shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-[#eab308]">Form previously used elsewhere</p>
+            <p className="text-xs text-[#eab308]/80 mt-1">
+              The form "<strong>{config.actblue_form_name}</strong>" was previously used with <strong>{mismatchOrgName}</strong>. You're currently generating for <strong>{organizationName}</strong>.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
 
       {/* Summary Card */}
       <motion.div
@@ -249,7 +330,7 @@ export function CopyGenerationStep({
             {/* Issue E3: Proportional button sizing */}
             <Button
               type="button"
-              onClick={onGenerate}
+              onClick={handleGenerateClick}
               disabled={segmentCount === 0}
               size="lg"
               className={cn(
@@ -282,6 +363,29 @@ export function CopyGenerationStep({
           Back
         </Button>
       </div>
+
+      {/* Mismatch Confirmation Dialog */}
+      <AlertDialog open={showMismatchConfirm} onOpenChange={setShowMismatchConfirm}>
+        <AlertDialogContent className="bg-[#141b2d] border-[#1e2a45]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#e2e8f0]">Confirm Organization</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#94a3b8]">
+              The form "<strong className="text-[#e2e8f0]">{config.actblue_form_name}</strong>" was previously used with <strong className="text-[#e2e8f0]">{mismatchOrgName}</strong>. You're generating for <strong className="text-[#e2e8f0]">{organizationName}</strong>. Are you sure this is correct?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45]">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { setShowMismatchConfirm(false); onGenerate(); }}
+              className="bg-blue-600 hover:bg-blue-500 text-white"
+            >
+              Generate Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
