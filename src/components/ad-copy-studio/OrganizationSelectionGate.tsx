@@ -8,6 +8,7 @@
 import { useState, useMemo } from "react";
 import { Building2, Search, Clock, ArrowRight, Sparkles } from "lucide-react";
 import type { AdminOrganization } from "./AdminOrganizationPicker";
+import { useGenerationCounts } from "@/hooks/useGenerationHistory";
 
 const RECENT_ORGS_KEY = "adminRecentOrganizationIds";
 const MAX_RECENT = 5;
@@ -29,6 +30,8 @@ function getRecentOrgIds(): string[] {
 
 export function OrganizationSelectionGate({ organizations, onSelect, onBackToAdmin }: Props) {
   const [search, setSearch] = useState("");
+  const orgIds = useMemo(() => organizations.map(o => o.id), [organizations]);
+  const { counts: generationCounts } = useGenerationCounts(orgIds);
 
   const recentOrgs = useMemo(() => {
     const recentIds = getRecentOrgIds();
@@ -89,7 +92,7 @@ export function OrganizationSelectionGate({ organizations, onSelect, onBackToAdm
                 </p>
                 <div className="space-y-0.5">
                   {recentOrgs.map((org) => (
-                    <OrgRow key={`recent-${org.id}`} org={org} onSelect={() => handleSelect(org.id)} />
+                    <OrgRow key={`recent-${org.id}`} org={org} onSelect={() => handleSelect(org.id)} genCount={generationCounts[org.id] || 0} />
                   ))}
                 </div>
                 <div className="h-px bg-[#1e2a45] mx-2 mt-2" />
@@ -109,7 +112,7 @@ export function OrganizationSelectionGate({ organizations, onSelect, onBackToAdm
                   </div>
                 ) : (
                   filteredOrgs.map((org) => (
-                    <OrgRow key={org.id} org={org} onSelect={() => handleSelect(org.id)} />
+                    <OrgRow key={org.id} org={org} onSelect={() => handleSelect(org.id)} genCount={generationCounts[org.id] || 0} />
                   ))
                 )}
               </div>
@@ -131,7 +134,7 @@ export function OrganizationSelectionGate({ organizations, onSelect, onBackToAdm
   );
 }
 
-function OrgRow({ org, onSelect }: { org: AdminOrganization; onSelect: () => void }) {
+function OrgRow({ org, onSelect, genCount }: { org: AdminOrganization; onSelect: () => void; genCount: number }) {
   return (
     <button
       onClick={onSelect}
@@ -151,6 +154,11 @@ function OrgRow({ org, onSelect }: { org: AdminOrganization; onSelect: () => voi
       <span className="flex-1 truncate text-sm text-[#e2e8f0] font-medium">
         {org.name}
       </span>
+      {genCount > 0 && (
+        <span className="text-[11px] text-[#64748b] bg-[#1e2a45] px-2 py-0.5 rounded-full shrink-0">
+          {genCount} gen{genCount !== 1 ? 's' : ''}
+        </span>
+      )}
       <ArrowRight className="h-4 w-4 text-[#64748b] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
     </button>
   );

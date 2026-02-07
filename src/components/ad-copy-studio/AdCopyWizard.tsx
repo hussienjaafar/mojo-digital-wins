@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, RotateCcw, Sparkles, ChevronDown } from 'lucide-react';
+import { Loader2, RotateCcw, Sparkles, ChevronDown, Clock } from 'lucide-react';
 
 // Picker
 import { AdminOrganizationPicker } from './AdminOrganizationPicker';
@@ -49,6 +49,7 @@ import { TranscriptReviewStep } from './steps/TranscriptReviewStep';
 import { CampaignConfigStep } from './steps/CampaignConfigStep';
 import { CopyGenerationStep } from './steps/CopyGenerationStep';
 import { CopyExportStep } from './steps/CopyExportStep';
+import { GenerationHistoryPanel } from './GenerationHistoryPanel';
 
 // Types
 import type { CampaignConfig, AudienceSegment, TranscriptAnalysis, VideoUpload } from '@/types/ad-copy-studio';
@@ -581,6 +582,8 @@ export function AdCopyWizard({
   const [showStartNewDialog, setShowStartNewDialog] = useState(false);
   // Organization picker dialog state
   const [showOrgPicker, setShowOrgPicker] = useState(false);
+  // History panel state
+  const [showHistory, setShowHistory] = useState(false);
 
   // Cmd+K shortcut to open org picker
   useEffect(() => {
@@ -817,8 +820,18 @@ export function AdCopyWizard({
             </button>
           </div>
 
-          {/* Right: Cmd+K hint + Reset */}
+          {/* Right: History + Cmd+K hint + Reset */}
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowHistory(true)}
+              className="text-[#64748b] hover:text-[#e2e8f0] hover:bg-[#1e2a45] h-8 w-8"
+              aria-label="Generation history"
+              title="Generation history"
+            >
+              <Clock className="h-4 w-4" aria-hidden="true" />
+            </Button>
             <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-[10px] text-[#64748b] bg-[#0a0f1a] border border-[#1e2a45] rounded font-mono">
               ⌘K
             </kbd>
@@ -866,25 +879,42 @@ export function AdCopyWizard({
       {/* Step Content with Transitions - Issue E1: borderless wrapper */}
       <main className="flex-1" aria-live="polite">
         <AnimatePresence mode="wait">
-          <motion.div
-            key={currentStep}
-            variants={stepVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="rounded-xl bg-[#141b2d] p-6"
-            onAnimationComplete={() => {
-              // Issue D3: Focus management after step transitions
-              const heading = document.querySelector<HTMLElement>('[data-step-content] h2');
-              if (heading) {
-                heading.setAttribute('tabindex', '-1');
-                heading.focus({ preventScroll: true });
-              }
-            }}
-            data-step-content
-          >
-            {renderStepContent()}
-          </motion.div>
+          {showHistory ? (
+            <motion.div
+              key="history"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 50 }}
+              transition={{ duration: 0.25 }}
+              className="rounded-xl bg-[#141b2d] p-6"
+            >
+              <GenerationHistoryPanel
+                organizationId={organizationId}
+                organizationName={selectedOrg?.name}
+                onClose={() => setShowHistory(false)}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key={currentStep}
+              variants={stepVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="rounded-xl bg-[#141b2d] p-6"
+              onAnimationComplete={() => {
+                // Issue D3: Focus management after step transitions
+                const heading = document.querySelector<HTMLElement>('[data-step-content] h2');
+                if (heading) {
+                  heading.setAttribute('tabindex', '-1');
+                  heading.focus({ preventScroll: true });
+                }
+              }}
+              data-step-content
+            >
+              {renderStepContent()}
+            </motion.div>
+          )}
         </AnimatePresence>
       </main>
 
