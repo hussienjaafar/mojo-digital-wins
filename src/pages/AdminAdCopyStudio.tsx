@@ -25,6 +25,7 @@ import { AdCopyWizard } from '@/components/ad-copy-studio/AdCopyWizard';
 interface Organization {
   id: string;
   name: string;
+  logo_url: string | null;
 }
 
 // =============================================================================
@@ -64,7 +65,7 @@ export default function AdminAdCopyStudio() {
         // For admin users, fetch all organizations they have access to
         const { data: orgs, error } = await supabase
           .from('client_organizations')
-          .select('id, name')
+          .select('id, name, logo_url')
           .eq('is_active', true)
           .order('name');
 
