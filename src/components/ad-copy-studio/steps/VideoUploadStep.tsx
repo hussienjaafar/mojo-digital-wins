@@ -2,14 +2,11 @@
  * VideoUploadStep - Step 1 of the Ad Copy Studio wizard
  *
  * Handles video upload through:
- * - Direct file upload with drag-and-drop support
- * - Google Drive import via URL paste
+ * - Direct file upload with drag-and-drop support (primary)
+ * - Google Drive import via URL paste (secondary)
  *
- * Displays:
- * - Upload progress per video
- * - Video metadata and status
- * - Meta spec validation badges
- * - Error handling with dismiss capability
+ * Issue A9: Added "Exit" back button for footer consistency
+ * Issue D5: Status icons use distinct shapes (not just color)
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
@@ -29,10 +26,13 @@ import {
   Loader2,
   Trash2,
   ArrowRight,
+  ArrowLeft,
   HardDrive,
   RotateCcw,
   XCircle,
   Clock,
+  Circle,
+  Eye,
 } from 'lucide-react';
 import type { VideoUpload } from '@/types/ad-copy-studio';
 import { preloadFFmpeg, isFFmpegSupported, formatDiagnosticsReport } from '@/lib/audio-extractor';
@@ -52,6 +52,7 @@ export interface VideoUploadStepProps {
   onComplete: () => void;
   onCancelVideo?: (id: string) => Promise<void>;
   onRetryTranscription?: (id: string) => Promise<void>;
+  onBackToAdmin?: () => void;
 }
 
 // =============================================================================
@@ -59,17 +60,14 @@ export interface VideoUploadStepProps {
 // =============================================================================
 
 const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/webm'];
-const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024; // 500MB
+const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024;
 const MAX_VIDEOS = 5;
-const STUCK_THRESHOLD_MS = 60 * 1000; // 1 minute
+const STUCK_THRESHOLD_MS = 60 * 1000;
 
 // =============================================================================
 // Helper Functions
 // =============================================================================
 
-/**
- * Format file size for display
- */
 function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 B';
   const k = 1024;
@@ -78,31 +76,18 @@ function formatFileSize(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-/**
- * Get human-readable label for extraction stage
- */
 function getExtractionStageLabel(stage?: string): string {
   switch (stage) {
-    case 'loading':
-      return 'Loading audio processor...';
-    case 'reading':
-      return 'Reading video file...';
-    case 'writing':
-      return 'Preparing for extraction...';
-    case 'copy-attempt':
-      return 'Trying fast stream copy...';
-    case 'reencode':
-      return 'Converting audio...';
-    case 'finalizing':
-      return 'Finalizing...';
-    default:
-      return 'Extracting audio...';
+    case 'loading': return 'Loading audio processor...';
+    case 'reading': return 'Reading video file...';
+    case 'writing': return 'Preparing for extraction...';
+    case 'copy-attempt': return 'Trying fast stream copy...';
+    case 'reencode': return 'Converting audio...';
+    case 'finalizing': return 'Finalizing...';
+    default: return 'Extracting audio...';
   }
 }
 
-/**
- * Timer component that shows elapsed time
- */
 function ExtractionTimer({ startTime }: { startTime: number }) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -122,9 +107,7 @@ function ExtractionTimer({ startTime }: { startTime: number }) {
   return <span className="tabular-nums">{display}</span>;
 }
 
-/**
- * Get status indicator props
- */
+// Issue D5: Status indicators with distinct icon shapes
 function getStatusDisplay(status: VideoUpload['status']): {
   label: string;
   color: string;
@@ -135,13 +118,13 @@ function getStatusDisplay(status: VideoUpload['status']): {
       return {
         label: 'Pending',
         color: 'text-[#64748b]',
-        icon: <Loader2 className="h-4 w-4 animate-spin" />,
+        icon: <Circle className="h-4 w-4" />,
       };
     case 'uploading':
       return {
         label: 'Uploading',
         color: 'text-blue-400',
-        icon: <Loader2 className="h-4 w-4 animate-spin" />,
+        icon: <Upload className="h-4 w-4 animate-pulse" />,
       };
      case 'extracting':
        return {
@@ -159,7 +142,7 @@ function getStatusDisplay(status: VideoUpload['status']): {
       return {
         label: 'Analyzing',
         color: 'text-[#f97316]',
-        icon: <Loader2 className="h-4 w-4 animate-spin" />,
+        icon: <Eye className="h-4 w-4 animate-pulse" />,
       };
     case 'ready':
       return {
@@ -197,72 +180,50 @@ export function VideoUploadStep({
   onComplete,
   onCancelVideo,
   onRetryTranscription,
+  onBackToAdmin,
 }: VideoUploadStepProps) {
-  // State
   const [gdriveUrl, setGdriveUrl] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Preload FFmpeg.wasm when component mounts (reduces wait time during upload)
   useEffect(() => {
     if (isFFmpegSupported()) {
-      // Delay preload slightly to not block initial render
-      const timer = setTimeout(() => {
-        preloadFFmpeg();
-      }, 1000);
+      const timer = setTimeout(() => { preloadFFmpeg(); }, 1000);
       return () => clearTimeout(timer);
     }
   }, []);
 
-  // Computed
   const hasReadyVideos = videos.some((v) => v.status === 'ready');
   const canProceed = hasReadyVideos && !isUploading;
   const remainingSlots = MAX_VIDEOS - videos.length;
   const isMaxVideos = remainingSlots <= 0;
-
-  // =========================================================================
-  // Handlers
-  // =========================================================================
 
   const handleFileDrop = useCallback(
     async (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       e.stopPropagation();
       setIsDragging(false);
-
       const files = Array.from(e.dataTransfer.files).filter((file) =>
         ACCEPTED_VIDEO_TYPES.includes(file.type)
       );
-
-      if (files.length > 0) {
-        await onUploadFiles(files);
-      }
+      if (files.length > 0) await onUploadFiles(files);
     },
     [onUploadFiles]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
+    e.preventDefault(); e.stopPropagation(); setIsDragging(true);
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
+    e.preventDefault(); e.stopPropagation(); setIsDragging(false);
   }, []);
 
   const handleFileSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(e.target.files || []);
-      if (files.length > 0) {
-        await onUploadFiles(files);
-      }
-      // Reset input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (files.length > 0) await onUploadFiles(files);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     },
     [onUploadFiles]
   );
@@ -273,32 +234,16 @@ export function VideoUploadStep({
 
   const handleGDriveImport = useCallback(async () => {
     if (!gdriveUrl.trim()) return;
-
-    // Split by newlines or commas to support multiple URLs
-    const urls = gdriveUrl
-      .split(/[\n,]+/)
-      .map((url) => url.trim())
-      .filter((url) => url.length > 0);
-
-    if (urls.length > 0) {
-      await onImportGDrive(urls);
-      setGdriveUrl('');
-    }
+    const urls = gdriveUrl.split(/[\n,]+/).map((url) => url.trim()).filter((url) => url.length > 0);
+    if (urls.length > 0) { await onImportGDrive(urls); setGdriveUrl(''); }
   }, [gdriveUrl, onImportGDrive]);
 
   const handleGDriveKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        handleGDriveImport();
-      }
+      if (e.key === 'Enter') { e.preventDefault(); handleGDriveImport(); }
     },
     [handleGDriveImport]
   );
-
-  // =========================================================================
-  // Render
-  // =========================================================================
 
   return (
     <div className="flex flex-col gap-6">
@@ -319,7 +264,7 @@ export function VideoUploadStep({
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="flex items-center gap-3 rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 p-4"
+            className="flex items-center gap-3 rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/10 p-4"
             role="alert"
             aria-live="polite"
           >
@@ -337,13 +282,13 @@ export function VideoUploadStep({
         )}
       </AnimatePresence>
 
-      {/* File Upload Drop Zone (Primary - Issue #4) */}
+      {/* File Upload Drop Zone */}
       <div
         className={cn(
           'relative rounded-xl border-2 border-dashed transition-all duration-200',
           isDragging
             ? 'border-blue-500 bg-blue-500/10'
-            : 'border-[#1e2a45] bg-[#141b2d] hover:border-[#3b82f6]/50',
+            : 'border-[#1e2a45] bg-[#0a0f1a] hover:border-[#3b82f6]/50',
           isMaxVideos && 'opacity-50 cursor-not-allowed'
         )}
         onDrop={handleFileDrop}
@@ -366,22 +311,16 @@ export function VideoUploadStep({
         />
 
         <div className="flex flex-col items-center justify-center gap-4 py-12 px-6 text-center">
-          <div
-            className={cn(
-              'flex h-16 w-16 items-center justify-center rounded-full transition-colors',
-              isDragging
-                ? 'bg-blue-500/20 text-blue-400'
-                : 'bg-[#1e2a45] text-[#94a3b8]'
-            )}
-          >
+          <div className={cn(
+            'flex h-16 w-16 items-center justify-center rounded-full transition-colors',
+            isDragging ? 'bg-blue-500/20 text-blue-400' : 'bg-[#1e2a45] text-[#94a3b8]'
+          )}>
             <Video className="h-8 w-8" aria-hidden="true" />
           </div>
 
           <div>
             <p className="text-lg font-medium text-[#e2e8f0]">
-              {isDragging
-                ? 'Drop your videos here'
-                : 'Drag and drop videos here'}
+              {isDragging ? 'Drop your videos here' : 'Drag and drop videos here'}
             </p>
             <p className="mt-1 text-[#94a3b8]">
               or{' '}
@@ -409,18 +348,11 @@ export function VideoUploadStep({
         <div className="h-px flex-1 bg-[#1e2a45]" />
       </div>
 
-      {/* Google Drive Import Section (Secondary) */}
-      <div
-        className="rounded-xl border border-[#1e2a45] bg-[#141b2d] p-6"
-        role="group"
-        aria-labelledby="gdrive-import-label"
-      >
+      {/* Google Drive Import */}
+      <div className="rounded-xl border border-[#1e2a45] bg-[#0a0f1a] p-6" role="group" aria-labelledby="gdrive-import-label">
         <div className="flex items-center gap-2 mb-4">
           <Link className="h-5 w-5 text-[#94a3b8]" aria-hidden="true" />
-          <span
-            id="gdrive-import-label"
-            className="text-xs font-medium uppercase tracking-wider text-[#64748b]"
-          >
+          <span id="gdrive-import-label" className="text-xs font-medium uppercase tracking-wider text-[#64748b]">
             Import from Google Drive
           </span>
         </div>
@@ -433,7 +365,7 @@ export function VideoUploadStep({
             onChange={(e) => setGdriveUrl(e.target.value)}
             onKeyDown={handleGDriveKeyDown}
             disabled={isUploading || isMaxVideos}
-            className="flex-1 bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#64748b] focus-visible:ring-blue-500"
+            className="flex-1 bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#64748b] focus-visible:ring-blue-500"
             aria-label="Google Drive URL input"
           />
           <Button
@@ -442,11 +374,7 @@ export function VideoUploadStep({
             disabled={!gdriveUrl.trim() || isUploading || isMaxVideos}
             className="bg-blue-600 hover:bg-blue-500 text-white"
           >
-            {isUploading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              'Import'
-            )}
+            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Import'}
           </Button>
         </div>
 
@@ -477,20 +405,10 @@ export function VideoUploadStep({
 
             {videos.map((video, index) => {
               const statusDisplay = getStatusDisplay(video.status);
-              const isProcessing = ['uploading', 'transcribing', 'analyzing', 'extracting'].includes(
-                video.status
-              );
-              
-              // Check if video is stuck (transcribing for more than 1 minute)
-              // Use transcriptionStartTime first (preferred), fallback to extractionStartTime
+              const isProcessing = ['uploading', 'transcribing', 'analyzing', 'extracting'].includes(video.status);
               const startTime = video.transcriptionStartTime || video.extractionStartTime;
-              const isStuck = video.status === 'transcribing' && 
-                startTime && 
-                (Date.now() - startTime) > STUCK_THRESHOLD_MS;
-              
+              const isStuck = video.status === 'transcribing' && startTime && (Date.now() - startTime) > STUCK_THRESHOLD_MS;
               const isError = video.status === 'error';
-              // Show cancel button while processing (not just when stuck)
-              // Show retry button when in error state
               const showCancel = isProcessing && onCancelVideo;
               const showRetry = isError && onRetryTranscription;
 
@@ -501,95 +419,65 @@ export function VideoUploadStep({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ delay: index * 0.05 }}
-                  className="rounded-lg border border-[#1e2a45] bg-[#0a0f1a] p-4"
+                  className="rounded-xl border border-[#1e2a45] bg-[#0a0f1a] p-4"
                 >
                   <div className="flex items-start gap-4">
-                    {/* Video icon */}
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-[#141b2d]">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#141b2d]">
                       <Video className="h-5 w-5 text-[#94a3b8]" aria-hidden="true" />
                     </div>
 
-                    {/* Video info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="truncate font-medium text-[#e2e8f0]">
-                          {video.filename}
-                        </p>
-                        {/* Source badge */}
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs',
-                            video.source === 'gdrive'
-                              ? 'bg-[#a855f7]/10 text-[#a855f7] border border-[#a855f7]/30'
-                              : 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
-                          )}
-                        >
+                        <p className="truncate font-medium text-[#e2e8f0]">{video.filename}</p>
+                        <span className={cn(
+                          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs',
+                          video.source === 'gdrive'
+                            ? 'bg-[#a855f7]/10 text-[#a855f7] border border-[#a855f7]/30'
+                            : 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
+                        )}>
                           {video.source === 'gdrive' ? (
-                            <>
-                              <Cloud className="h-3 w-3" />
-                              Google Drive
-                            </>
+                            <><Cloud className="h-3 w-3" /> Google Drive</>
                           ) : (
-                            <>
-                              <HardDrive className="h-3 w-3" />
-                              Uploaded
-                            </>
+                            <><HardDrive className="h-3 w-3" /> Uploaded</>
                           )}
                         </span>
                       </div>
 
                       <div className="mt-1 flex items-center gap-3 text-xs text-[#94a3b8]">
-                        {video.file_size_bytes > 0 && (
-                          <span>{formatFileSize(video.file_size_bytes)}</span>
-                        )}
+                        {video.file_size_bytes > 0 && <span>{formatFileSize(video.file_size_bytes)}</span>}
                         {video.duration_sec && (
-                          <span>
-                            {Math.floor(video.duration_sec / 60)}:
-                            {String(Math.floor(video.duration_sec % 60)).padStart(2, '0')}
-                          </span>
+                          <span>{Math.floor(video.duration_sec / 60)}:{String(Math.floor(video.duration_sec % 60)).padStart(2, '0')}</span>
                         )}
                         {video.aspect_ratio && <span>{video.aspect_ratio}</span>}
                       </div>
 
-                      {/* Progress bar */}
-                       {(isProcessing || video.status === 'extracting') && (
+                      {(isProcessing || video.status === 'extracting') && (
                         <div className="mt-3">
                           <Progress
                             value={video.progress}
                             className="h-2 bg-[#1e2a45]"
-                             indicatorClassName={video.status === 'extracting' ? 'bg-[#f59e0b]' : 'bg-blue-500'}
+                            indicatorClassName={video.status === 'extracting' ? 'bg-[#f59e0b]' : 'bg-blue-500'}
                           />
-                           {video.status === 'extracting' && (
-                             <div className="mt-1 flex items-center justify-between text-xs text-[#94a3b8]">
-                               <span>
-                                 {/* Show real extraction message if available, fallback to stage label */}
-                                 {video.extractionMessage || getExtractionStageLabel(video.extractionStage)}
-                               </span>
-                               {video.extractionStartTime && (
-                                 <ExtractionTimer startTime={video.extractionStartTime} />
-                               )}
-                             </div>
-                           )}
+                          {video.status === 'extracting' && (
+                            <div className="mt-1 flex items-center justify-between text-xs text-[#94a3b8]">
+                              <span>{video.extractionMessage || getExtractionStageLabel(video.extractionStage)}</span>
+                              {video.extractionStartTime && <ExtractionTimer startTime={video.extractionStartTime} />}
+                            </div>
+                          )}
                         </div>
                       )}
 
-                      {/* Extraction mode badge removed (Issue #17) - debug info kept in console only */}
-
-                      {/* Error message */}
                       {video.status === 'error' && video.error_message && (
-                         <div className="mt-2">
-                           <p className="text-xs text-[#ef4444]">
-                             {video.error_message}
-                           </p>
-                           {video.error_message?.includes('exceeds') && video.source === 'gdrive' && (
-                             <p className="mt-1 text-xs text-[#94a3b8]">
-                               <strong>Tip:</strong> Download the video from Google Drive, then use the "Upload Files" option instead. Large files will have their audio extracted locally.
-                             </p>
-                           )}
-                         </div>
+                        <div className="mt-2">
+                          <p className="text-xs text-[#ef4444]">{video.error_message}</p>
+                          {video.error_message?.includes('exceeds') && video.source === 'gdrive' && (
+                            <p className="mt-1 text-xs text-[#94a3b8]">
+                              <strong>Tip:</strong> Download the video from Google Drive, then use the "Upload Files" option instead.
+                            </p>
+                          )}
+                        </div>
                       )}
 
-                      {/* Stuck warning */}
                       {isStuck && (
                         <div className="mt-2 flex items-center gap-2 text-[#f59e0b]">
                           <Clock className="h-4 w-4" />
@@ -597,56 +485,34 @@ export function VideoUploadStep({
                         </div>
                       )}
 
-                      {/* Cancel/Retry buttons - Cancel available while processing, Retry when error */}
                       {(showCancel || showRetry) && (
                         <div className="mt-3 flex items-center gap-2">
                           {showCancel && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onCancelVideo!(video.id)}
-                              className="gap-1.5 border-[#ef4444]/30 bg-transparent text-[#ef4444] hover:bg-[#ef4444]/10"
-                            >
-                              <XCircle className="h-3.5 w-3.5" />
-                              Cancel
+                            <Button type="button" variant="outline" size="sm" onClick={() => onCancelVideo!(video.id)}
+                              className="gap-1.5 border-[#ef4444]/30 bg-transparent text-[#ef4444] hover:bg-[#ef4444]/10">
+                              <XCircle className="h-3.5 w-3.5" /> Cancel
                             </Button>
                           )}
                           {showRetry && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onRetryTranscription!(video.id)}
-                              className="gap-1.5 border-blue-500/30 bg-transparent text-blue-400 hover:bg-blue-500/10"
-                            >
-                              <RotateCcw className="h-3.5 w-3.5" />
-                              Retry
+                            <Button type="button" variant="outline" size="sm" onClick={() => onRetryTranscription!(video.id)}
+                              className="gap-1.5 border-blue-500/30 bg-transparent text-blue-400 hover:bg-blue-500/10">
+                              <RotateCcw className="h-3.5 w-3.5" /> Retry
                             </Button>
                           )}
                         </div>
                       )}
                     </div>
 
-                    {/* Right side: status + remove */}
                     <div className="flex flex-shrink-0 items-center gap-3">
-                      {/* Meta spec badge */}
                       {video.status === 'ready' && video.meets_meta_specs && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-[#22c55e]/10 border border-[#22c55e]/30 px-2 py-0.5 text-xs text-[#22c55e]">
-                          <CheckCircle className="h-3 w-3" />
-                          Meta specs
+                          <CheckCircle className="h-3 w-3" /> Meta specs
                         </span>
                       )}
-
-                      {/* Status indicator */}
                       <div className={cn('flex items-center gap-1.5', statusDisplay.color)}>
                         {statusDisplay.icon}
-                        <span className="text-xs font-medium">
-                          {statusDisplay.label}
-                        </span>
+                        <span className="text-xs font-medium">{statusDisplay.label}</span>
                       </div>
-
-                      {/* Remove button */}
                       <button
                         type="button"
                         onClick={() => onRemoveVideo(video.id)}
@@ -670,8 +536,21 @@ export function VideoUploadStep({
         )}
       </AnimatePresence>
 
-      {/* Footer */}
-      <div className="flex items-center justify-end pt-4 border-t border-[#1e2a45]">
+      {/* Issue A9: Footer with Back button for consistency */}
+      <div className="flex items-center justify-between pt-4 border-t border-[#1e2a45]">
+        {onBackToAdmin ? (
+          <Button
+            type="button"
+            onClick={onBackToAdmin}
+            variant="outline"
+            className="gap-2 bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Exit
+          </Button>
+        ) : (
+          <div />
+        )}
         <Button
           type="button"
           onClick={onComplete}

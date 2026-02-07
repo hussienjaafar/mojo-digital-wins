@@ -4,11 +4,13 @@
  * Final step to review and export generated ad copy.
  *
  * Features:
- * - Tabs for each audience segment
- * - Copy sections: Primary Text, Headlines, Descriptions
- * - Each variation shows text, character count, copy button
- * - Tracking URL with copy button
- * - Export options: Copy All, Download CSV, Start New
+ * - Tabs for each audience segment (keyed by id, Issue A5)
+ * - Variation view (default) and Element view toggle
+ * - Per-element copy buttons in variation view (Issue F2)
+ * - Per-segment regeneration (Issue A6)
+ * - All Segments tab (Issue F3)
+ * - Tracking URL with empty state (Issue #18)
+ * - Start New with confirmation (Issue A7 - handled by parent)
  */
 
 import { useState, useCallback } from 'react';
@@ -30,6 +32,8 @@ import {
   LayoutGrid,
   List,
   AlertCircle,
+  Loader2,
+  Layers,
 } from 'lucide-react';
 import type {
   GeneratedCopy,
@@ -37,6 +41,7 @@ import type {
   AudienceSegment,
 } from '@/types/ad-copy-studio';
 import { META_COPY_LIMITS } from '@/types/ad-copy-studio';
+import { getCharCountColor } from '@/components/ad-copy-studio/components/analysis-primitives';
 
 // =============================================================================
 // Types
@@ -49,17 +54,13 @@ export interface CopyExportStepProps {
   audienceSegments: AudienceSegment[];
   onBack: () => void;
   onStartNew: () => void;
+  onRegenerateSegment?: (segmentName: string) => Promise<void>;
+  isRegenerating?: boolean;
 }
 
 // =============================================================================
 // Helper Functions
 // =============================================================================
-
-function getCharCountColor(count: number, maxRecommended: number, maxAllowed: number): string {
-  if (count <= maxRecommended) return 'text-[#22c55e]';
-  if (count <= maxAllowed) return 'text-[#f97316]';
-  return 'text-[#ef4444]';
-}
 
 function formatCopyForClipboard(
   generatedCopy: GeneratedCopy,
@@ -157,7 +158,7 @@ function CopyVariation({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
-      className="rounded-lg border border-[#1e2a45] bg-[#141b2d] p-4"
+      className="rounded-xl border border-[#1e2a45] bg-[#141b2d] p-4"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -184,15 +185,9 @@ function CopyVariation({
             )}
           >
             {copied ? (
-              <>
-                <CheckCircle className="h-3.5 w-3.5" />
-                Copied
-              </>
+              <><CheckCircle className="h-3.5 w-3.5" /> Copied</>
             ) : (
-              <>
-                <Copy className="h-3.5 w-3.5" />
-                Copy
-              </>
+              <><Copy className="h-3.5 w-3.5" /> Copy</>
             )}
           </button>
         </div>
@@ -247,9 +242,210 @@ function CopySection({
   );
 }
 
+// Issue F2: Small inline copy button for individual elements in variation view
+function InlineCopyButton({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [text]);
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className={cn(
+        'ml-auto flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] transition-colors',
+        copied
+          ? 'bg-[#22c55e]/20 text-[#22c55e]'
+          : 'bg-[#1e2a45] text-[#64748b] hover:text-[#94a3b8]'
+      )}
+      aria-label={`Copy ${label}`}
+    >
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  );
+}
+
+// =============================================================================
+// Segment Content Renderer (used for both single and all-segments views)
+// =============================================================================
+
+interface SegmentContentProps {
+  segmentCopy: GeneratedCopy[string];
+  segmentName: string;
+  viewMode: 'variation' | 'element';
+  copiedVariationIndex: number | null;
+  copiedPrimaryIndex: number | null;
+  copiedHeadlineIndex: number | null;
+  copiedDescriptionIndex: number | null;
+  onCopyVariation: (text: string, index: number) => void;
+  onCopyText: (text: string, setStateFn: (val: number | null) => void, index: number) => void;
+  setCopiedPrimaryIndex: (val: number | null) => void;
+  setCopiedHeadlineIndex: (val: number | null) => void;
+  setCopiedDescriptionIndex: (val: number | null) => void;
+}
+
+function SegmentContent({
+  segmentCopy,
+  segmentName,
+  viewMode,
+  copiedVariationIndex,
+  copiedPrimaryIndex,
+  copiedHeadlineIndex,
+  copiedDescriptionIndex,
+  onCopyVariation,
+  onCopyText,
+  setCopiedPrimaryIndex,
+  setCopiedHeadlineIndex,
+  setCopiedDescriptionIndex,
+}: SegmentContentProps) {
+  if (!segmentCopy) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <FileText className="h-12 w-12 text-[#64748b] mb-4" />
+        <p className="text-[#94a3b8]">No copy generated for this segment</p>
+      </div>
+    );
+  }
+
+  if (viewMode === 'variation') {
+    const variationCount = Math.max(
+      segmentCopy.primary_texts.length,
+      segmentCopy.headlines.length,
+      segmentCopy.descriptions.length
+    );
+
+    return (
+      <div className="space-y-4">
+        {Array.from({ length: variationCount }, (_, i) => {
+          const primary = segmentCopy.primary_texts[i] || '';
+          const headline = segmentCopy.headlines[i] || '';
+          const description = segmentCopy.descriptions[i] || '';
+          const fullVariation = `PRIMARY TEXT:\n${primary}\n\nHEADLINE:\n${headline}\n\nDESCRIPTION:\n${description}`;
+          const isCopied = copiedVariationIndex === i;
+
+          return (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="rounded-xl border border-[#1e2a45] bg-[#0a0f1a] overflow-hidden"
+            >
+              {/* Variation Header */}
+              <div className="flex items-center justify-between border-b border-[#1e2a45] px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-medium text-white">
+                    {i + 1}
+                  </span>
+                  <span className="text-sm font-medium text-[#e2e8f0]">Variation {i + 1}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onCopyVariation(fullVariation, i)}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors',
+                    isCopied
+                      ? 'bg-[#22c55e]/20 text-[#22c55e]'
+                      : 'bg-[#1e2a45] text-[#94a3b8] hover:bg-[#2d3b55] hover:text-[#e2e8f0]'
+                  )}
+                >
+                  {isCopied ? (
+                    <><CheckCircle className="h-3.5 w-3.5" /> Copied</>
+                  ) : (
+                    <><Copy className="h-3.5 w-3.5" /> Copy All</>
+                  )}
+                </button>
+              </div>
+
+              <div className="p-4 space-y-4">
+                {/* Primary Text */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <AlignLeft className="h-3.5 w-3.5 text-[#94a3b8]" />
+                    <span className="text-xs font-medium uppercase tracking-wider text-[#64748b]">Primary Text</span>
+                    <span className={cn('text-xs tabular-nums', getCharCountColor(primary.length, META_COPY_LIMITS.primary_text_visible, META_COPY_LIMITS.primary_text_max))}>
+                      {primary.length} chars
+                    </span>
+                    <InlineCopyButton text={primary} label="primary text" />
+                  </div>
+                  <p className="text-sm text-[#e2e8f0] leading-relaxed whitespace-pre-wrap">{primary}</p>
+                </div>
+
+                {/* Headline */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Type className="h-3.5 w-3.5 text-[#94a3b8]" />
+                    <span className="text-xs font-medium uppercase tracking-wider text-[#64748b]">Headline</span>
+                    <span className={cn('text-xs tabular-nums', getCharCountColor(headline.length, META_COPY_LIMITS.headline_recommended, META_COPY_LIMITS.headline_max))}>
+                      {headline.length} chars
+                    </span>
+                    <InlineCopyButton text={headline} label="headline" />
+                  </div>
+                  <p className="text-sm text-[#e2e8f0] font-medium">{headline}</p>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <FileText className="h-3.5 w-3.5 text-[#94a3b8]" />
+                    <span className="text-xs font-medium uppercase tracking-wider text-[#64748b]">Description</span>
+                    <span className={cn('text-xs tabular-nums', getCharCountColor(description.length, META_COPY_LIMITS.description_recommended, META_COPY_LIMITS.description_max))}>
+                      {description.length} chars
+                    </span>
+                    <InlineCopyButton text={description} label="description" />
+                  </div>
+                  <p className="text-sm text-[#e2e8f0]">{description}</p>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Element View
+  return (
+    <div className="space-y-8">
+      <CopySection
+        title="Primary Text"
+        icon={<AlignLeft className="h-4 w-4" />}
+        maxRecommended={META_COPY_LIMITS.primary_text_visible}
+        maxAllowed={META_COPY_LIMITS.primary_text_max}
+        copies={segmentCopy.primary_texts}
+        copiedIndex={copiedPrimaryIndex}
+        onCopy={(i) => onCopyText(segmentCopy.primary_texts[i], setCopiedPrimaryIndex, i)}
+      />
+      <CopySection
+        title="Headlines"
+        icon={<Type className="h-4 w-4" />}
+        maxRecommended={META_COPY_LIMITS.headline_recommended}
+        maxAllowed={META_COPY_LIMITS.headline_max}
+        copies={segmentCopy.headlines}
+        copiedIndex={copiedHeadlineIndex}
+        onCopy={(i) => onCopyText(segmentCopy.headlines[i], setCopiedHeadlineIndex, i)}
+      />
+      <CopySection
+        title="Descriptions"
+        icon={<FileText className="h-4 w-4" />}
+        maxRecommended={META_COPY_LIMITS.description_recommended}
+        maxAllowed={META_COPY_LIMITS.description_max}
+        copies={segmentCopy.descriptions}
+        copiedIndex={copiedDescriptionIndex}
+        onCopy={(i) => onCopyText(segmentCopy.descriptions[i], setCopiedDescriptionIndex, i)}
+      />
+    </div>
+  );
+}
+
 // =============================================================================
 // Component
 // =============================================================================
+
+const ALL_SEGMENTS_KEY = '__all__';
 
 export function CopyExportStep({
   generatedCopy,
@@ -258,9 +454,11 @@ export function CopyExportStep({
   audienceSegments,
   onBack,
   onStartNew,
+  onRegenerateSegment,
+  isRegenerating,
 }: CopyExportStepProps) {
-  // State
-  const [activeSegment, setActiveSegment] = useState(audienceSegments[0]?.name || '');
+  // Issue A5: Use segment.id as tab key
+  const [activeSegmentId, setActiveSegmentId] = useState(audienceSegments[0]?.id || ALL_SEGMENTS_KEY);
   const [copiedPrimaryIndex, setCopiedPrimaryIndex] = useState<number | null>(null);
   const [copiedHeadlineIndex, setCopiedHeadlineIndex] = useState<number | null>(null);
   const [copiedDescriptionIndex, setCopiedDescriptionIndex] = useState<number | null>(null);
@@ -269,8 +467,9 @@ export function CopyExportStep({
   const [viewMode, setViewMode] = useState<'variation' | 'element'>('variation');
   const [copiedVariationIndex, setCopiedVariationIndex] = useState<number | null>(null);
 
-  // Get current segment copy
-  const currentCopy = generatedCopy[activeSegment];
+  // Issue A5: Map active segment id back to name for generatedCopy lookup
+  const activeSegment = audienceSegments.find(s => s.id === activeSegmentId);
+  const activeSegmentName = activeSegment?.name || '';
 
   // =========================================================================
   // Handlers
@@ -294,6 +493,7 @@ export function CopyExportStep({
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 2000);
   }, [generatedCopy, audienceSegments, trackingUrl]);
+
   const handleCopyVariation = useCallback((text: string, index: number) => {
     navigator.clipboard.writeText(text);
     setCopiedVariationIndex(index);
@@ -313,6 +513,13 @@ export function CopyExportStep({
     document.body.removeChild(link);
   }, [generatedCopy, audienceSegments, trackingUrl]);
 
+  // Issue A6: Per-segment regeneration
+  const handleRegenerate = useCallback(async () => {
+    if (onRegenerateSegment && activeSegmentName) {
+      await onRegenerateSegment(activeSegmentName);
+    }
+  }, [onRegenerateSegment, activeSegmentName]);
+
   // =========================================================================
   // Render
   // =========================================================================
@@ -328,15 +535,30 @@ export function CopyExportStep({
       </div>
 
       {/* Audience Tabs + View Toggle */}
-      <div className="flex items-center justify-between gap-4">
-        <Tabs value={activeSegment} onValueChange={setActiveSegment} className="flex-1">
-          <TabsList className="w-full justify-start gap-1 bg-[#141b2d] border border-[#1e2a45] p-1.5 rounded-lg h-auto flex-wrap">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <Tabs value={activeSegmentId} onValueChange={setActiveSegmentId} className="flex-1 min-w-0">
+          <TabsList className="w-full justify-start gap-1 bg-[#141b2d] border border-[#1e2a45] p-1.5 rounded-xl h-auto flex-wrap">
+            {/* Issue F3: All Segments tab */}
+            {audienceSegments.length > 1 && (
+              <TabsTrigger
+                value={ALL_SEGMENTS_KEY}
+                className={cn(
+                  'px-4 py-2 rounded-lg transition-colors',
+                  'data-[state=active]:bg-[#a855f7] data-[state=active]:text-white',
+                  'data-[state=inactive]:bg-transparent data-[state=inactive]:text-[#94a3b8]',
+                  'data-[state=inactive]:hover:bg-[#1e2a45] data-[state=inactive]:hover:text-[#e2e8f0]'
+                )}
+              >
+                <Layers className="h-3.5 w-3.5 mr-1.5" />
+                All
+              </TabsTrigger>
+            )}
             {audienceSegments.map((segment) => (
               <TabsTrigger
                 key={segment.id}
-                value={segment.name}
+                value={segment.id}
                 className={cn(
-                  'px-4 py-2 rounded-md transition-colors',
+                  'px-4 py-2 rounded-lg transition-colors',
                   'data-[state=active]:bg-blue-600 data-[state=active]:text-white',
                   'data-[state=inactive]:bg-transparent data-[state=inactive]:text-[#94a3b8]',
                   'data-[state=inactive]:hover:bg-[#1e2a45] data-[state=inactive]:hover:text-[#e2e8f0]'
@@ -348,190 +570,107 @@ export function CopyExportStep({
           </TabsList>
         </Tabs>
         
-        {/* View Mode Toggle (Issue #14) */}
-        <div className="flex items-center gap-1 rounded-lg border border-[#1e2a45] bg-[#0a0f1a] p-1">
-          <button
-            type="button"
-            onClick={() => setViewMode('variation')}
-            className={cn(
-              'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors',
-              viewMode === 'variation'
-                ? 'bg-blue-600 text-white'
-                : 'text-[#94a3b8] hover:text-[#e2e8f0]'
-            )}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            Variation
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('element')}
-            className={cn(
-              'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors',
-              viewMode === 'element'
-                ? 'bg-blue-600 text-white'
-                : 'text-[#94a3b8] hover:text-[#e2e8f0]'
-            )}
-          >
-            <List className="h-3.5 w-3.5" />
-            Element
-          </button>
+        <div className="flex items-center gap-2">
+          {/* Issue A6: Per-segment regeneration */}
+          {onRegenerateSegment && activeSegmentId !== ALL_SEGMENTS_KEY && (
+            <Button
+              type="button"
+              onClick={handleRegenerate}
+              disabled={isRegenerating}
+              variant="outline"
+              size="sm"
+              className="gap-1.5 border-[#1e2a45] bg-[#0a0f1a] text-[#94a3b8] hover:bg-[#1e2a45] hover:text-[#e2e8f0]"
+            >
+              {isRegenerating ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              Regenerate
+            </Button>
+          )}
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center gap-1 rounded-xl border border-[#1e2a45] bg-[#0a0f1a] p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode('variation')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors',
+                viewMode === 'variation'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-[#94a3b8] hover:text-[#e2e8f0]'
+              )}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Variation
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('element')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors',
+                viewMode === 'element'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-[#94a3b8] hover:text-[#e2e8f0]'
+              )}
+            >
+              <List className="h-3.5 w-3.5" />
+              Element
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Tab Content */}
-      {(() => {
-        const segmentCopy = generatedCopy[activeSegment];
-
-        if (!segmentCopy) {
-          return (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <FileText className="h-12 w-12 text-[#64748b] mb-4" />
-              <p className="text-[#94a3b8]">No copy generated for this segment</p>
+      {/* Content */}
+      <ScrollArea className="max-h-[calc(100vh-420px)] min-h-[300px]">
+        <div className="pr-4">
+          {activeSegmentId === ALL_SEGMENTS_KEY ? (
+            // Issue F3: All segments stacked
+            <div className="space-y-8">
+              {audienceSegments.map((segment) => (
+                <div key={segment.id}>
+                  <h3 className="text-lg font-semibold text-[#e2e8f0] mb-4 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-blue-500" />
+                    {segment.name}
+                  </h3>
+                  <SegmentContent
+                    segmentCopy={generatedCopy[segment.name]}
+                    segmentName={segment.name}
+                    viewMode={viewMode}
+                    copiedVariationIndex={copiedVariationIndex}
+                    copiedPrimaryIndex={copiedPrimaryIndex}
+                    copiedHeadlineIndex={copiedHeadlineIndex}
+                    copiedDescriptionIndex={copiedDescriptionIndex}
+                    onCopyVariation={handleCopyVariation}
+                    onCopyText={handleCopyText}
+                    setCopiedPrimaryIndex={setCopiedPrimaryIndex}
+                    setCopiedHeadlineIndex={setCopiedHeadlineIndex}
+                    setCopiedDescriptionIndex={setCopiedDescriptionIndex}
+                  />
+                </div>
+              ))}
             </div>
-          );
-        }
+          ) : (
+            <SegmentContent
+              segmentCopy={generatedCopy[activeSegmentName]}
+              segmentName={activeSegmentName}
+              viewMode={viewMode}
+              copiedVariationIndex={copiedVariationIndex}
+              copiedPrimaryIndex={copiedPrimaryIndex}
+              copiedHeadlineIndex={copiedHeadlineIndex}
+              copiedDescriptionIndex={copiedDescriptionIndex}
+              onCopyVariation={handleCopyVariation}
+              onCopyText={handleCopyText}
+              setCopiedPrimaryIndex={setCopiedPrimaryIndex}
+              setCopiedHeadlineIndex={setCopiedHeadlineIndex}
+              setCopiedDescriptionIndex={setCopiedDescriptionIndex}
+            />
+          )}
+        </div>
+      </ScrollArea>
 
-        if (viewMode === 'variation') {
-          // Issue #14: Variation View - group as complete ad sets
-          const variationCount = Math.max(
-            segmentCopy.primary_texts.length,
-            segmentCopy.headlines.length,
-            segmentCopy.descriptions.length
-          );
-
-          return (
-            <ScrollArea className="h-[500px]">
-              <div className="space-y-4 pr-4">
-                {Array.from({ length: variationCount }, (_, i) => {
-                  const primary = segmentCopy.primary_texts[i] || '';
-                  const headline = segmentCopy.headlines[i] || '';
-                  const description = segmentCopy.descriptions[i] || '';
-                  const fullVariation = `PRIMARY TEXT:\n${primary}\n\nHEADLINE:\n${headline}\n\nDESCRIPTION:\n${description}`;
-                  const isCopied = copiedVariationIndex === i;
-
-                  return (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="rounded-xl border border-[#1e2a45] bg-[#0a0f1a] overflow-hidden"
-                    >
-                      {/* Variation Header */}
-                      <div className="flex items-center justify-between border-b border-[#1e2a45] px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-medium text-white">
-                            {i + 1}
-                          </span>
-                          <span className="text-sm font-medium text-[#e2e8f0]">Variation {i + 1}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyVariation(fullVariation, i)}
-                          className={cn(
-                            'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors',
-                            isCopied
-                              ? 'bg-[#22c55e]/20 text-[#22c55e]'
-                              : 'bg-[#1e2a45] text-[#94a3b8] hover:bg-[#2d3b55] hover:text-[#e2e8f0]'
-                          )}
-                        >
-                          {isCopied ? (
-                            <><CheckCircle className="h-3.5 w-3.5" /> Copied</>
-                          ) : (
-                            <><Copy className="h-3.5 w-3.5" /> Copy All</>
-                          )}
-                        </button>
-                      </div>
-
-                      <div className="p-4 space-y-4">
-                        {/* Primary Text */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <AlignLeft className="h-3.5 w-3.5 text-[#94a3b8]" />
-                            <span className="text-xs font-medium uppercase tracking-wider text-[#64748b]">Primary Text</span>
-                            <span className={cn('text-xs tabular-nums', getCharCountColor(primary.length, META_COPY_LIMITS.primary_text_visible, META_COPY_LIMITS.primary_text_max))}>
-                              {primary.length} chars
-                            </span>
-                          </div>
-                          <p className="text-sm text-[#e2e8f0] leading-relaxed whitespace-pre-wrap">{primary}</p>
-                        </div>
-
-                        {/* Headline */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <Type className="h-3.5 w-3.5 text-[#94a3b8]" />
-                            <span className="text-xs font-medium uppercase tracking-wider text-[#64748b]">Headline</span>
-                            <span className={cn('text-xs tabular-nums', getCharCountColor(headline.length, META_COPY_LIMITS.headline_recommended, META_COPY_LIMITS.headline_max))}>
-                              {headline.length} chars
-                            </span>
-                          </div>
-                          <p className="text-sm text-[#e2e8f0] font-medium">{headline}</p>
-                        </div>
-
-                        {/* Description */}
-                        <div>
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <FileText className="h-3.5 w-3.5 text-[#94a3b8]" />
-                            <span className="text-xs font-medium uppercase tracking-wider text-[#64748b]">Description</span>
-                            <span className={cn('text-xs tabular-nums', getCharCountColor(description.length, META_COPY_LIMITS.description_recommended, META_COPY_LIMITS.description_max))}>
-                              {description.length} chars
-                            </span>
-                          </div>
-                          <p className="text-sm text-[#e2e8f0]">{description}</p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-          );
-        }
-
-        // Element View (original layout)
-        return (
-          <ScrollArea className="h-[500px]">
-            <div className="space-y-8 pr-4">
-              <CopySection
-                title="Primary Text"
-                icon={<AlignLeft className="h-4 w-4" />}
-                maxRecommended={META_COPY_LIMITS.primary_text_visible}
-                maxAllowed={META_COPY_LIMITS.primary_text_max}
-                copies={segmentCopy.primary_texts}
-                copiedIndex={copiedPrimaryIndex}
-                onCopy={(i) =>
-                  handleCopyText(segmentCopy.primary_texts[i], setCopiedPrimaryIndex, i)
-                }
-              />
-              <CopySection
-                title="Headlines"
-                icon={<Type className="h-4 w-4" />}
-                maxRecommended={META_COPY_LIMITS.headline_recommended}
-                maxAllowed={META_COPY_LIMITS.headline_max}
-                copies={segmentCopy.headlines}
-                copiedIndex={copiedHeadlineIndex}
-                onCopy={(i) =>
-                  handleCopyText(segmentCopy.headlines[i], setCopiedHeadlineIndex, i)
-                }
-              />
-              <CopySection
-                title="Descriptions"
-                icon={<FileText className="h-4 w-4" />}
-                maxRecommended={META_COPY_LIMITS.description_recommended}
-                maxAllowed={META_COPY_LIMITS.description_max}
-                copies={segmentCopy.descriptions}
-                copiedIndex={copiedDescriptionIndex}
-                onCopy={(i) =>
-                  handleCopyText(segmentCopy.descriptions[i], setCopiedDescriptionIndex, i)
-                }
-              />
-            </div>
-          </ScrollArea>
-        );
-      })()}
-
-      {/* Tracking URL (Issue #18: handle empty) */}
+      {/* Tracking URL */}
       <div className="rounded-xl border border-[#1e2a45] bg-[#0a0f1a] p-4">
         <div className="flex items-center gap-2 mb-3">
           <Link className="h-4 w-4 text-[#94a3b8]" />
@@ -541,7 +680,7 @@ export function CopyExportStep({
         </div>
         {trackingUrl ? (
           <div className="flex items-center gap-3">
-            <code className="flex-1 rounded-lg bg-[#141b2d] border border-[#1e2a45] px-4 py-3 text-sm text-[#e2e8f0] font-mono overflow-x-auto">
+            <code className="flex-1 rounded-xl bg-[#141b2d] border border-[#1e2a45] px-4 py-3 text-sm text-[#e2e8f0] font-mono overflow-x-auto">
               {trackingUrl}
             </code>
             <Button
@@ -556,15 +695,9 @@ export function CopyExportStep({
               )}
             >
               {copiedUrl ? (
-                <>
-                  <CheckCircle className="h-4 w-4" />
-                  Copied
-                </>
+                <><CheckCircle className="h-4 w-4" /> Copied</>
               ) : (
-                <>
-                  <Copy className="h-4 w-4" />
-                  Copy
-                </>
+                <><Copy className="h-4 w-4" /> Copy</>
               )}
             </Button>
           </div>
@@ -601,15 +734,9 @@ export function CopyExportStep({
             )}
           >
             {copiedAll ? (
-              <>
-                <CheckCircle className="h-4 w-4" />
-                Copied All
-              </>
+              <><CheckCircle className="h-4 w-4" /> Copied All</>
             ) : (
-              <>
-                <Copy className="h-4 w-4" />
-                Copy All
-              </>
+              <><Copy className="h-4 w-4" /> Copy All</>
             )}
           </Button>
 

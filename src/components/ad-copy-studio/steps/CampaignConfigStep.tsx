@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   ArrowRight,
@@ -33,6 +34,7 @@ import {
   Users,
   X,
   Check,
+  Undo2,
 } from 'lucide-react';
 import type { CampaignConfig, AudienceSegment } from '@/types/ad-copy-studio';
 
@@ -47,6 +49,17 @@ export interface CampaignConfigStepProps {
   onBack: () => void;
   onComplete: () => void;
 }
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const PRESET_SEGMENTS = [
+  { name: 'Progressive Base', description: 'Core progressive supporters who regularly engage with liberal causes and candidates.' },
+  { name: 'Grassroots Donors', description: 'Small-dollar donors motivated by urgency and emotional appeals. Responsive to $5-$27 asks.' },
+  { name: 'High-Dollar Donors', description: 'Donors capable of larger contributions, motivated by impact and policy outcomes.' },
+  { name: 'Swing Voters', description: 'Persuadable moderates who respond to issue-based messaging rather than partisan appeals.' },
+];
 
 // =============================================================================
 // Helper Functions
@@ -65,6 +78,7 @@ interface AudienceSegmentCardProps {
   isEditing: boolean;
   editName: string;
   editDescription: string;
+  nameError: string | null;
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onSaveEdit: () => void;
@@ -78,6 +92,7 @@ function AudienceSegmentCard({
   isEditing,
   editName,
   editDescription,
+  nameError,
   onStartEdit,
   onCancelEdit,
   onSaveEdit,
@@ -91,17 +106,25 @@ function AudienceSegmentCard({
         layout
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="rounded-lg border border-blue-500/30 bg-[#0a0f1a] p-4"
+        className="rounded-xl border border-blue-500/30 bg-[#0a0f1a] p-4"
       >
         <div className="space-y-3">
-          <Input
-            type="text"
-            value={editName}
-            onChange={(e) => onNameChange(e.target.value)}
-            placeholder="Segment name"
-            className="bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#64748b]"
-            autoFocus
-          />
+          <div>
+            <Input
+              type="text"
+              value={editName}
+              onChange={(e) => onNameChange(e.target.value)}
+              placeholder="Segment name"
+              className={cn(
+                "bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#64748b]",
+                nameError && "border-[#ef4444]"
+              )}
+              autoFocus
+            />
+            {nameError && (
+              <p className="text-xs text-[#ef4444] mt-1">{nameError}</p>
+            )}
+          </div>
           <Textarea
             value={editDescription}
             onChange={(e) => onDescriptionChange(e.target.value)}
@@ -123,7 +146,7 @@ function AudienceSegmentCard({
               type="button"
               onClick={onSaveEdit}
               size="sm"
-              disabled={!editName.trim()}
+              disabled={!editName.trim() || !!nameError}
               className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50"
             >
               <Check className="h-4 w-4 mr-1" />
@@ -141,7 +164,7 @@ function AudienceSegmentCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="rounded-lg border border-[#1e2a45] bg-[#0a0f1a] p-4"
+      className="rounded-xl border border-[#1e2a45] bg-[#0a0f1a] p-4"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -189,6 +212,8 @@ export function CampaignConfigStep({
   const [isAddingSegment, setIsAddingSegment] = useState(false);
   const [newSegmentName, setNewSegmentName] = useState('');
   const [newSegmentDescription, setNewSegmentDescription] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [editNameError, setEditNameError] = useState<string | null>(null);
 
   // Issue #8: Auto-generate refcode on mount if empty
   useEffect(() => {
@@ -203,7 +228,7 @@ export function CampaignConfigStep({
         refcode_auto_generated: true,
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Computed
@@ -211,6 +236,20 @@ export function CampaignConfigStep({
     config.actblue_form_name &&
     config.refcode &&
     config.audience_segments.length > 0;
+
+  // Issue A4: Check name uniqueness
+  const isNameTaken = useCallback((name: string, excludeId?: string) => {
+    return config.audience_segments.some(
+      seg => seg.name.toLowerCase() === name.trim().toLowerCase() && seg.id !== excludeId
+    );
+  }, [config.audience_segments]);
+
+  // Issue A3: Filter presets to show only unused ones
+  const availablePresets = PRESET_SEGMENTS.filter(
+    preset => !config.audience_segments.some(
+      seg => seg.name.toLowerCase() === preset.name.toLowerCase()
+    )
+  );
 
   // =========================================================================
   // Handlers
@@ -235,7 +274,6 @@ export function CampaignConfigStep({
   );
 
   const handleRegenerateRefcode = useCallback(() => {
-    // Generate a new refcode based on current date
     const date = new Date();
     const dateStr = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
     const shortId = Math.random().toString(36).substring(2, 6);
@@ -270,16 +308,28 @@ export function CampaignConfigStep({
     setEditingSegmentId(segment.id);
     setEditName(segment.name);
     setEditDescription(segment.description);
+    setEditNameError(null);
   }, []);
 
   const handleCancelEditSegment = useCallback(() => {
     setEditingSegmentId(null);
     setEditName('');
     setEditDescription('');
+    setEditNameError(null);
   }, []);
 
+  // Issue A4: Validate name uniqueness on edit
+  const handleEditNameChange = useCallback((value: string) => {
+    setEditName(value);
+    if (isNameTaken(value, editingSegmentId || undefined)) {
+      setEditNameError('A segment with this name already exists');
+    } else {
+      setEditNameError(null);
+    }
+  }, [isNameTaken, editingSegmentId]);
+
   const handleSaveEditSegment = useCallback(() => {
-    if (!editingSegmentId || !editName.trim()) return;
+    if (!editingSegmentId || !editName.trim() || editNameError) return;
 
     const updatedSegments = config.audience_segments.map((seg) =>
       seg.id === editingSegmentId
@@ -289,12 +339,29 @@ export function CampaignConfigStep({
 
     onConfigChange({ ...config, audience_segments: updatedSegments });
     handleCancelEditSegment();
-  }, [config, onConfigChange, editingSegmentId, editName, editDescription, handleCancelEditSegment]);
+  }, [config, onConfigChange, editingSegmentId, editName, editDescription, editNameError, handleCancelEditSegment]);
 
+  // Issue F1: Undo delete segment
   const handleDeleteSegment = useCallback(
     (segmentId: string) => {
+      const deletedSegment = config.audience_segments.find(seg => seg.id === segmentId);
       const updatedSegments = config.audience_segments.filter((seg) => seg.id !== segmentId);
       onConfigChange({ ...config, audience_segments: updatedSegments });
+
+      if (deletedSegment) {
+        toast(`Deleted "${deletedSegment.name}"`, {
+          action: {
+            label: 'Undo',
+            onClick: () => {
+              onConfigChange({
+                ...config,
+                audience_segments: [...config.audience_segments],
+              });
+            },
+          },
+          duration: 5000,
+        });
+      }
     },
     [config, onConfigChange]
   );
@@ -304,16 +371,28 @@ export function CampaignConfigStep({
     setIsAddingSegment(true);
     setNewSegmentName('');
     setNewSegmentDescription('');
+    setNameError(null);
   }, []);
 
   const handleCancelAddSegment = useCallback(() => {
     setIsAddingSegment(false);
     setNewSegmentName('');
     setNewSegmentDescription('');
+    setNameError(null);
   }, []);
 
+  // Issue A4: Validate name uniqueness on new segment
+  const handleNewNameChange = useCallback((value: string) => {
+    setNewSegmentName(value);
+    if (isNameTaken(value)) {
+      setNameError('A segment with this name already exists');
+    } else {
+      setNameError(null);
+    }
+  }, [isNameTaken]);
+
   const handleSaveNewSegment = useCallback(() => {
-    if (!newSegmentName.trim()) return;
+    if (!newSegmentName.trim() || nameError) return;
 
     const newSegment: AudienceSegment = {
       id: generateId(),
@@ -326,7 +405,7 @@ export function CampaignConfigStep({
       audience_segments: [...config.audience_segments, newSegment],
     });
     handleCancelAddSegment();
-  }, [config, onConfigChange, newSegmentName, newSegmentDescription, handleCancelAddSegment]);
+  }, [config, onConfigChange, newSegmentName, newSegmentDescription, nameError, handleCancelAddSegment]);
 
   // =========================================================================
   // Render
@@ -401,7 +480,6 @@ export function CampaignConfigStep({
 
         {/* Amount & Recurring Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Amount Preset */}
           <div className="space-y-2">
             <Label className="text-xs font-medium uppercase tracking-wider text-[#64748b]">
               Amount Preset (optional)
@@ -419,7 +497,6 @@ export function CampaignConfigStep({
             </div>
           </div>
 
-          {/* Recurring Default */}
           <div className="space-y-2">
             <Label className="text-xs font-medium uppercase tracking-wider text-[#64748b]">
               Recurring Default
@@ -465,17 +542,12 @@ export function CampaignConfigStep({
             </Button>
           </div>
 
-          {/* Issue #9: Preset Audience Segment Templates */}
-          {config.audience_segments.length === 0 && !isAddingSegment && (
+          {/* Issue A3: Preset templates shown whenever unused presets remain */}
+          {availablePresets.length > 0 && !isAddingSegment && (
             <div className="space-y-2">
               <span className="text-xs text-[#64748b]">Quick add common segments:</span>
               <div className="flex flex-wrap gap-2">
-                {[
-                  { name: 'Progressive Base', description: 'Core progressive supporters who regularly engage with liberal causes and candidates.' },
-                  { name: 'Grassroots Donors', description: 'Small-dollar donors motivated by urgency and emotional appeals. Responsive to $5-$27 asks.' },
-                  { name: 'High-Dollar Donors', description: 'Donors capable of larger contributions, motivated by impact and policy outcomes.' },
-                  { name: 'Swing Voters', description: 'Persuadable moderates who respond to issue-based messaging rather than partisan appeals.' },
-                ].map((preset) => (
+                {availablePresets.map((preset) => (
                   <button
                     key={preset.name}
                     type="button"
@@ -505,17 +577,25 @@ export function CampaignConfigStep({
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="rounded-lg border border-blue-500/30 bg-[#0a0f1a] p-4"
+                  className="rounded-xl border border-blue-500/30 bg-[#0a0f1a] p-4"
                 >
                   <div className="space-y-3">
-                    <Input
-                      type="text"
-                      value={newSegmentName}
-                      onChange={(e) => setNewSegmentName(e.target.value)}
-                      placeholder="Segment name (e.g., First-Time Donors)"
-                      className="bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#64748b]"
-                      autoFocus
-                    />
+                    <div>
+                      <Input
+                        type="text"
+                        value={newSegmentName}
+                        onChange={(e) => handleNewNameChange(e.target.value)}
+                        placeholder="Segment name (e.g., First-Time Donors)"
+                        className={cn(
+                          "bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#64748b]",
+                          nameError && "border-[#ef4444]"
+                        )}
+                        autoFocus
+                      />
+                      {nameError && (
+                        <p className="text-xs text-[#ef4444] mt-1">{nameError}</p>
+                      )}
+                    </div>
                     <Textarea
                       value={newSegmentDescription}
                       onChange={(e) => setNewSegmentDescription(e.target.value)}
@@ -537,7 +617,7 @@ export function CampaignConfigStep({
                         type="button"
                         onClick={handleSaveNewSegment}
                         size="sm"
-                        disabled={!newSegmentName.trim()}
+                        disabled={!newSegmentName.trim() || !!nameError}
                         className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50"
                       >
                         <Check className="h-4 w-4 mr-1" />
@@ -556,11 +636,12 @@ export function CampaignConfigStep({
                   isEditing={editingSegmentId === segment.id}
                   editName={editName}
                   editDescription={editDescription}
+                  nameError={editingSegmentId === segment.id ? editNameError : null}
                   onStartEdit={() => handleStartEditSegment(segment)}
                   onCancelEdit={handleCancelEditSegment}
                   onSaveEdit={handleSaveEditSegment}
                   onDelete={() => handleDeleteSegment(segment.id)}
-                  onNameChange={setEditName}
+                  onNameChange={handleEditNameChange}
                   onDescriptionChange={setEditDescription}
                 />
               ))}
@@ -568,7 +649,7 @@ export function CampaignConfigStep({
 
             {/* Empty State */}
             {config.audience_segments.length === 0 && !isAddingSegment && (
-              <div className="rounded-lg border border-dashed border-[#1e2a45] bg-[#0a0f1a]/50 p-8 text-center">
+              <div className="rounded-xl border border-dashed border-[#1e2a45] bg-[#0a0f1a]/50 p-8 text-center">
                 <Users className="h-10 w-10 text-[#64748b] mx-auto mb-3" />
                 <p className="text-sm text-[#94a3b8]">
                   No audience segments defined yet.

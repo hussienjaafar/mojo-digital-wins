@@ -1,14 +1,11 @@
 /**
  * WizardStepIndicator - Progress indicator for the Ad Copy Studio wizard
  *
- * Displays a horizontal step indicator showing progress through the 5-step workflow:
- * 1. Upload - Upload campaign videos
- * 2. Review - Review transcripts & analysis
- * 3. Configure - Configure campaign settings
- * 4. Generate - Generate ad copy
- * 5. Export - Review & export copy
+ * Issue D1: Uses role="tablist" / role="tab" with arrow key navigation
+ * Issue E4: Consistent rounded-xl border radius
  */
 
+import { useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import {
@@ -23,7 +20,6 @@ import {
 import type { AdCopyStudioStep, WizardStepConfig } from '@/types/ad-copy-studio';
 import { WIZARD_STEPS } from '@/types/ad-copy-studio';
 
-// Map icon names from WIZARD_STEPS to actual Lucide components
 const STEP_ICONS: Record<string, LucideIcon> = {
   Upload,
   FileText,
@@ -47,6 +43,8 @@ export function WizardStepIndicator({
   onStepClick,
   canNavigateToStep,
 }: WizardStepIndicatorProps) {
+  const tabListRef = useRef<HTMLDivElement>(null);
+
   const getStepStatus = (step: AdCopyStudioStep): StepStatus => {
     if (completedSteps.includes(step)) return 'completed';
     if (step === currentStep) return 'current';
@@ -59,23 +57,41 @@ export function WizardStepIndicator({
     }
   };
 
-  const handleKeyDown = (
+  // Issue D1: Arrow key navigation
+  const handleKeyDown = useCallback((
     event: React.KeyboardEvent,
-    step: AdCopyStudioStep
+    step: AdCopyStudioStep,
+    index: number
   ) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       handleStepClick(step);
+      return;
     }
-  };
+
+    let targetIndex: number | null = null;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      targetIndex = index < WIZARD_STEPS.length - 1 ? index + 1 : 0;
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      targetIndex = index > 0 ? index - 1 : WIZARD_STEPS.length - 1;
+    }
+
+    if (targetIndex !== null && tabListRef.current) {
+      const buttons = tabListRef.current.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+      buttons[targetIndex]?.focus();
+    }
+  }, [onStepClick, canNavigateToStep]);
 
   return (
-    <nav
+    <div
+      ref={tabListRef}
       className="w-full"
-      role="navigation"
+      role="tablist"
       aria-label="Wizard progress"
     >
-      <ol className="flex items-center justify-between">
+      <div className="flex items-center justify-between">
         {WIZARD_STEPS.map((stepConfig, index) => {
           const status = getStepStatus(stepConfig.step);
           const isClickable = canNavigateToStep?.(stepConfig.step) ?? false;
@@ -83,28 +99,29 @@ export function WizardStepIndicator({
           const isLastStep = index === WIZARD_STEPS.length - 1;
 
           return (
-            <li
+            <div
               key={stepConfig.step}
               className={cn(
                 'flex items-center',
                 !isLastStep && 'flex-1'
               )}
             >
-              {/* Step button/indicator */}
               <motion.button
                 type="button"
+                role="tab"
                 onClick={() => handleStepClick(stepConfig.step)}
-                onKeyDown={(e) => handleKeyDown(e, stepConfig.step)}
+                onKeyDown={(e) => handleKeyDown(e, stepConfig.step, index)}
+                tabIndex={status === 'current' ? 0 : -1}
                 disabled={!isClickable && status !== 'current'}
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                aria-current={status === 'current' ? 'step' : undefined}
+                aria-selected={status === 'current'}
                 aria-label={`Step ${stepConfig.step}: ${stepConfig.title}${
                   status === 'completed' ? ' (completed)' : ''
                 }${status === 'current' ? ' (current)' : ''}`}
                 className={cn(
-                  'group flex flex-col items-center gap-2 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0f1a] rounded-lg p-2',
+                  'group flex flex-col items-center gap-2 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#141b2d] rounded-xl p-2',
                   isClickable && 'cursor-pointer',
                   !isClickable && status !== 'current' && 'cursor-not-allowed'
                 )}
@@ -113,22 +130,11 @@ export function WizardStepIndicator({
                 <div
                   className={cn(
                     'relative flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all',
-                    // Completed: green accent with checkmark
-                    status === 'completed' &&
-                      'border-[#22c55e] bg-[#22c55e] text-white',
-                    // Current: blue accent with icon
-                    status === 'current' &&
-                      'border-blue-500 bg-blue-500 text-white',
-                    // Upcoming: outline circle, muted
-                    status === 'upcoming' &&
-                      'border-[#1e2a45] bg-transparent text-[#64748b]',
-                    // Hover states for clickable steps
-                    isClickable &&
-                      status === 'completed' &&
-                      'group-hover:bg-[#22c55e]/80',
-                    isClickable &&
-                      status === 'upcoming' &&
-                      'group-hover:border-[#64748b] group-hover:text-[#94a3b8]'
+                    status === 'completed' && 'border-[#22c55e] bg-[#22c55e] text-white',
+                    status === 'current' && 'border-blue-500 bg-blue-500 text-white',
+                    status === 'upcoming' && 'border-[#1e2a45] bg-transparent text-[#64748b]',
+                    isClickable && status === 'completed' && 'group-hover:bg-[#22c55e]/80',
+                    isClickable && status === 'upcoming' && 'group-hover:border-[#64748b] group-hover:text-[#94a3b8]'
                   )}
                 >
                   {status === 'completed' ? (
@@ -137,7 +143,6 @@ export function WizardStepIndicator({
                     <Icon className="h-5 w-5" aria-hidden="true" />
                   )}
 
-                  {/* Pulsing indicator for current step */}
                   {status === 'current' && (
                     <motion.div
                       className="absolute inset-0 rounded-full border-2 border-blue-500"
@@ -155,23 +160,21 @@ export function WizardStepIndicator({
                   )}
                 </div>
 
-                {/* Step label - hidden on small screens (Issue #15) */}
+                {/* Step label - hidden on small screens */}
                 <span
                   className={cn(
                     'text-xs font-medium transition-colors hidden sm:inline',
                     status === 'completed' && 'text-[#22c55e]',
                     status === 'current' && 'text-[#e2e8f0]',
                     status === 'upcoming' && 'text-[#64748b]',
-                    isClickable &&
-                      status !== 'current' &&
-                      'group-hover:text-[#94a3b8]'
+                    isClickable && status !== 'current' && 'group-hover:text-[#94a3b8]'
                   )}
                 >
                   {stepConfig.title}
                 </span>
               </motion.button>
 
-              {/* Connector line to next step */}
+              {/* Connector line */}
               {!isLastStep && (
                 <div className="mx-2 h-0.5 flex-1" aria-hidden="true">
                   {status === 'completed' ? (
@@ -194,11 +197,11 @@ export function WizardStepIndicator({
                   )}
                 </div>
               )}
-            </li>
+            </div>
           );
         })}
-      </ol>
-    </nav>
+      </div>
+    </div>
   );
 }
 
