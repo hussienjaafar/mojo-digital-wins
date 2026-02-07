@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 export interface GenerationHistoryItem {
   id: string;
@@ -86,7 +87,35 @@ export function useGenerationHistory(organizationId: string | null) {
     fetchGenerations();
   }, [fetchGenerations]);
 
-  return { generations, isLoading, error, refetch: fetchGenerations };
+  const moveGeneration = useCallback(async (generationId: string, newOrgId: string, newOrgName: string) => {
+    try {
+      const { error: updateError } = await (supabase as any)
+        .from('ad_copy_generations')
+        .update({ organization_id: newOrgId })
+        .eq('id', generationId);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: 'Generation moved',
+        description: `Moved to ${newOrgName}`,
+      });
+
+      // Refetch to update the list (the moved item will disappear from current org)
+      await fetchGenerations();
+      return true;
+    } catch (err: any) {
+      console.error('[useGenerationHistory] Move failed:', err);
+      toast({
+        title: 'Failed to move generation',
+        description: err.message,
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [fetchGenerations]);
+
+  return { generations, isLoading, error, refetch: fetchGenerations, moveGeneration };
 }
 
 export function useGenerationCounts(organizationIds: string[]) {

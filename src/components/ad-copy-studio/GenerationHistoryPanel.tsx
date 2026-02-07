@@ -27,8 +27,21 @@ import {
   X,
   Link,
   Settings2,
+  ArrowRightLeft,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useGenerationHistory, type GenerationHistoryItem } from '@/hooks/useGenerationHistory';
 import { META_COPY_LIMITS } from '@/types/ad-copy-studio';
@@ -41,6 +54,7 @@ import { getCharCountColor } from '@/components/ad-copy-studio/components/analys
 interface GenerationHistoryPanelProps {
   organizationId: string;
   organizationName?: string;
+  organizations: Array<{ id: string; name: string; logo_url: string | null }>;
   onClose: () => void;
 }
 
@@ -168,13 +182,41 @@ function GenerationCard({
 function GenerationDetail({
   item,
   organizationName,
+  organizations,
+  currentOrgId,
   onBack,
+  onMoved,
 }: {
   item: GenerationHistoryItem;
   organizationName?: string;
+  organizations: Array<{ id: string; name: string; logo_url: string | null }>;
+  currentOrgId: string;
   onBack: () => void;
+  onMoved: (generationId: string, newOrgId: string, newOrgName: string) => Promise<boolean>;
 }) {
   const [copiedAll, setCopiedAll] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<{ id: string; name: string } | null>(null);
+  const [moveSearch, setMoveSearch] = useState('');
+  const [isMoving, setIsMoving] = useState(false);
+
+  const filteredOrgs = useMemo(() => {
+    const q = moveSearch.toLowerCase();
+    return organizations
+      .filter(o => o.id !== currentOrgId)
+      .filter(o => !q || o.name.toLowerCase().includes(q));
+  }, [organizations, currentOrgId, moveSearch]);
+
+  const handleConfirmMove = useCallback(async () => {
+    if (!moveTarget) return;
+    setIsMoving(true);
+    const success = await onMoved(item.id, moveTarget.id, moveTarget.name);
+    setIsMoving(false);
+    if (success) {
+      setMoveTarget(null);
+      onBack();
+    }
+  }, [moveTarget, item.id, onMoved, onBack]);
 
   const handleCopyAll = useCallback(() => {
     if (!item.generated_copy) return;
@@ -255,6 +297,52 @@ function GenerationDetail({
             <InlineCopyButton text={item.tracking_url} label="tracking URL" />
           </div>
         )}
+
+        {/* Move to Organization */}
+        <div className="flex items-center gap-2 pt-2 border-t border-[#1e2a45]">
+          <Popover open={moveOpen} onOpenChange={setMoveOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-xs text-[#94a3b8] hover:text-[#e2e8f0] gap-1.5"
+              >
+                <ArrowRightLeft className="h-3 w-3" />
+                Move to...
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-2" align="start">
+              <div className="relative mb-2">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#64748b]" />
+                <input
+                  type="text"
+                  value={moveSearch}
+                  onChange={e => setMoveSearch(e.target.value)}
+                  placeholder="Search organizations..."
+                  className="w-full pl-7 pr-2 py-1.5 text-xs rounded-md bg-[#0a0f1a] border border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#64748b] focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="max-h-40 overflow-y-auto space-y-0.5">
+                {filteredOrgs.length === 0 ? (
+                  <p className="text-xs text-[#64748b] text-center py-2">No other organizations</p>
+                ) : (
+                  filteredOrgs.map(org => (
+                    <button
+                      key={org.id}
+                      onClick={() => {
+                        setMoveTarget({ id: org.id, name: org.name });
+                        setMoveOpen(false);
+                      }}
+                      className="w-full text-left px-2 py-1.5 text-xs rounded-md text-[#e2e8f0] hover:bg-[#1e2a45] transition-colors truncate"
+                    >
+                      {org.name}
+                    </button>
+                  ))
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       {/* Segments + Copy */}
@@ -343,6 +431,31 @@ function GenerationDetail({
           </div>
         ))}
       </div>
+
+      {/* Move Confirmation Dialog */}
+      <AlertDialog open={!!moveTarget} onOpenChange={(open) => !open && setMoveTarget(null)}>
+        <AlertDialogContent className="bg-[#141b2d] border-[#1e2a45]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#e2e8f0]">Move Generation?</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#94a3b8]">
+              Move this generation from <strong className="text-[#e2e8f0]">{organizationName}</strong> to <strong className="text-[#e2e8f0]">{moveTarget?.name}</strong>? It will no longer appear in this organization's history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] hover:bg-[#1e2a45]">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmMove}
+              disabled={isMoving}
+              className="bg-blue-600 hover:bg-blue-500 text-white"
+            >
+              {isMoving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <ArrowRightLeft className="h-4 w-4 mr-1.5" />}
+              Move
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -354,9 +467,10 @@ function GenerationDetail({
 export function GenerationHistoryPanel({
   organizationId,
   organizationName,
+  organizations,
   onClose,
 }: GenerationHistoryPanelProps) {
-  const { generations, isLoading, error } = useGenerationHistory(organizationId);
+  const { generations, isLoading, error, moveGeneration } = useGenerationHistory(organizationId);
   const [selectedItem, setSelectedItem] = useState<GenerationHistoryItem | null>(null);
 
   return (
@@ -398,7 +512,10 @@ export function GenerationHistoryPanel({
               <GenerationDetail
                 item={selectedItem}
                 organizationName={organizationName}
+                organizations={organizations}
+                currentOrgId={organizationId}
                 onBack={() => setSelectedItem(null)}
+                onMoved={moveGeneration}
               />
             </motion.div>
           ) : (
