@@ -826,6 +826,7 @@ export function AdCopyWizard({
             actblueForms={actblueForms}
             videos={currentVideos}
             organizationName={selectedOrg?.name}
+            analyses={analyses}
             onBack={() => handleGoBack(2)}
             onComplete={handleCampaignConfigComplete}
           />

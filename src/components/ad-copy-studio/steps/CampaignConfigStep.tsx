@@ -36,30 +36,33 @@ import {
   Check,
   Undo2,
 } from 'lucide-react';
-import type { CampaignConfig, AudienceSegment, VideoUpload } from '@/types/ad-copy-studio';
+import type { CampaignConfig, AudienceSegment, VideoUpload, TranscriptAnalysis } from '@/types/ad-copy-studio';
 
 // =============================================================================
 // Helpers
 // =============================================================================
 
-function generateRefcode(orgName: string | undefined, filename: string): string {
+function generateRefcode(orgName: string | undefined, filename: string, analysis?: TranscriptAnalysis): string {
   const orgSlug = (orgName || 'org')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '')
     .substring(0, 10);
 
-  const fileSlug = filename
-    .replace(/\.[^.]+$/, '')       // remove extension
+  // Prefer AI-extracted topic, fall back to filename
+  const topicSource = analysis?.issue_primary
+    || analysis?.topic_primary
+    || filename.replace(/\.[^.]+$/, '');
+
+  const topicSlug = topicSource
     .toLowerCase()
-    .replace(/[^a-z0-9_-]/g, '_') // normalize
-    .replace(/_+/g, '_')          // collapse underscores
-    .substring(0, 15);
+    .replace(/[^a-z0-9]/g, '')
+    .substring(0, 12);
 
   const date = new Date();
   const dateStr = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
   const shortId = Math.random().toString(36).substring(2, 6);
 
-  return `${orgSlug}-${fileSlug}-${dateStr}-${shortId}`;
+  return `${orgSlug}-${topicSlug}-${dateStr}-${shortId}`;
 }
 
 // =============================================================================
@@ -72,6 +75,7 @@ export interface CampaignConfigStepProps {
   actblueForms: string[];
   videos: VideoUpload[];
   organizationName?: string;
+  analyses?: Record<string, TranscriptAnalysis>;
   onBack: () => void;
   onComplete: () => void;
 }
@@ -230,6 +234,7 @@ export function CampaignConfigStep({
   actblueForms,
   videos,
   organizationName,
+  analyses,
   onBack,
   onComplete,
 }: CampaignConfigStepProps) {
@@ -255,7 +260,7 @@ export function CampaignConfigStep({
       const newRefcodes = { ...existingRefcodes };
       videosWithIds.forEach((v) => {
         if (!newRefcodes[v.video_id!]) {
-          newRefcodes[v.video_id!] = generateRefcode(organizationName, v.filename);
+          newRefcodes[v.video_id!] = generateRefcode(organizationName, v.filename, analyses?.[v.video_id!]);
         }
       });
       const firstVideoId = videosWithIds[0]?.video_id;
@@ -267,7 +272,7 @@ export function CampaignConfigStep({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videos]);
+  }, [videos, analyses]);
 
   // Computed: require at least one refcode to be set
   const videosWithIds = videos.filter(v => v.video_id);
@@ -317,14 +322,16 @@ export function CampaignConfigStep({
   );
 
   const handleRegenerateRefcode = useCallback(() => {
-    const firstFilename = videos[0]?.filename || 'campaign';
-    const newRefcode = generateRefcode(organizationName, firstFilename);
+    const firstVideo = videos[0];
+    const firstFilename = firstVideo?.filename || 'campaign';
+    const firstAnalysis = firstVideo?.video_id ? analyses?.[firstVideo.video_id] : undefined;
+    const newRefcode = generateRefcode(organizationName, firstFilename, firstAnalysis);
     onConfigChange({
       ...config,
       refcode: newRefcode,
       refcode_auto_generated: true,
     });
-  }, [config, onConfigChange, organizationName, videos]);
+  }, [config, onConfigChange, organizationName, videos, analyses]);
 
   const handleAmountChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -529,7 +536,7 @@ export function CampaignConfigStep({
                       <button
                         type="button"
                       onClick={() => {
-                          const newRefcode = generateRefcode(organizationName, video.filename);
+                          const newRefcode = generateRefcode(organizationName, video.filename, analyses?.[videoId]);
                           const newRefcodes = { ...config.refcodes, [videoId]: newRefcode };
                           onConfigChange({
                             ...config,
