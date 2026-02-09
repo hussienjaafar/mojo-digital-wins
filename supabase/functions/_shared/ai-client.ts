@@ -94,18 +94,32 @@ export async function callLovableAI(options: AICallOptions): Promise<AICallResul
  * Returns the parsed arguments from the first tool call.
  */
 export async function callLovableAIWithTools<T>(
-  options: AICallOptions & { tools: any[]; toolChoice: any }
+  options: AICallOptions & { tools: any[]; toolChoice: any },
+  maxRetries = 3
 ): Promise<{ result: T; model: string; latencyMs: number }> {
-  const aiResult = await callLovableAI(options);
+  let totalLatencyMs = 0;
 
-  if (!aiResult.toolCalls || aiResult.toolCalls.length === 0) {
-    console.warn(`[AI] No tool calls returned. Content length: ${aiResult.content?.length || 0}`);
-    console.warn(`[AI] Content preview: ${aiResult.content?.substring(0, 500) || 'empty'}`);
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const aiResult = await callLovableAI(options);
+    totalLatencyMs += aiResult.latencyMs;
+
+    // Success path: tool calls returned
+    if (aiResult.toolCalls && aiResult.toolCalls.length > 0) {
+      const toolCall = aiResult.toolCalls[0];
+      const args = typeof toolCall.function.arguments === 'string'
+        ? JSON.parse(toolCall.function.arguments)
+        : toolCall.function.arguments;
+
+      return {
+        result: args as T,
+        model: aiResult.model,
+        latencyMs: totalLatencyMs,
+      };
+    }
 
     // Fallback: try parsing content as JSON if no tool calls returned
     if (aiResult.content) {
       try {
-        // Strip markdown code fences (```json ... ``` or ``` ... ```)
         let cleaned = aiResult.content;
         cleaned = cleaned.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '');
         const jsonMatch = cleaned.match(/[\[{][\s\S]*[\]}]/);
@@ -113,26 +127,24 @@ export async function callLovableAIWithTools<T>(
           return {
             result: JSON.parse(jsonMatch[0]) as T,
             model: aiResult.model,
-            latencyMs: aiResult.latencyMs,
+            latencyMs: totalLatencyMs,
           };
         }
       } catch {
-        // Fall through to error
+        // Fall through to retry
       }
     }
-    throw new Error('AI did not return structured tool call output');
+
+    // Empty response — retry if we have attempts left
+    if (attempt < maxRetries) {
+      console.warn(`[AI] Attempt ${attempt}/${maxRetries}: Empty response (no tool calls, content length: ${aiResult.content?.length || 0}). Retrying in 1s...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } else {
+      console.error(`[AI] All ${maxRetries} attempts returned empty responses. Model: ${aiResult.model}`);
+    }
   }
 
-  const toolCall = aiResult.toolCalls[0];
-  const args = typeof toolCall.function.arguments === 'string'
-    ? JSON.parse(toolCall.function.arguments)
-    : toolCall.function.arguments;
-
-  return {
-    result: args as T,
-    model: aiResult.model,
-    latencyMs: aiResult.latencyMs,
-  };
+  throw new Error('AI did not return structured tool call output after ' + maxRetries + ' attempts');
 }
 
 export class AIGatewayError extends Error {
