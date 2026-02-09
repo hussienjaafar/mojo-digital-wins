@@ -541,3 +541,7 @@ verify_jwt = false
 # --- HEALTH/MONITORING FUNCTIONS ---
 [functions.check-integration-health]
 verify_jwt = false
+
+# --- VARIATION FEEDBACK/REGENERATION ---
+[functions.regenerate-variation]
+verify_jwt = true
