@@ -86,10 +86,11 @@ function getStepSummary(step: number, stepData: Record<string, any>, videos: any
       return count > 0 ? `${count} segment${count !== 1 ? 's' : ''}` : null;
     }
     case 4: {
-      const copy = stepData.generated_copy as Record<string, { primary_texts?: string[] }> | undefined;
-      if (!copy) return null;
-      const total = Object.values(copy).reduce((sum: number, seg) => 
-        sum + (seg?.primary_texts?.length || 0), 0);
+      const perVideo = stepData.per_video_generated_copy as Record<string, Record<string, { primary_texts?: string[] }>> | undefined;
+      if (!perVideo) return null;
+      const total = Object.values(perVideo).reduce((videoSum: number, videoCopy) => 
+        videoSum + Object.values(videoCopy).reduce((segSum: number, seg) => 
+          segSum + (seg?.primary_texts?.length || 0), 0), 0);
       return total > 0 ? `${total} variations` : null;
     }
     default:
@@ -195,6 +196,9 @@ export function AdCopyWizard({
     generatedCopy,
     metaReadyCopy,
     trackingUrl,
+    perVideoGeneratedCopy,
+    perVideoMetaReadyCopy,
+    perVideoTrackingUrls,
     isGenerating,
     progress: generationProgress,
     error: generationError,
@@ -549,7 +553,7 @@ export function AdCopyWizard({
     await completeStep(3, { config: campaignConfig });
   }, [completeStep, campaignConfig]);
 
-  // Issue A1: Use ALL analyzed videos' transcripts, not just the first
+  // Generate unique ad copy per video
   const handleGenerate = useCallback(async () => {
     // Reset step 4 completion tracking when starting a new generation
     hasCompletedStep4Ref.current = false;
@@ -557,43 +561,33 @@ export function AdCopyWizard({
     // Establish single source of truth: prefer videos from upload hook, fall back to stepData
     const sourceVideos = videos.length > 0 ? videos : (stepData.videos || []);
     
-    // Get all videos that have transcripts (not just the first one)
-    const videosWithTranscripts = sourceVideos.filter((v: VideoUpload) => {
-      const tid = v.video_id ? (transcriptIdsRef.current[v.video_id] || v.transcript_id) : v.transcript_id;
-      return !!tid;
-    });
+    // Build per-video params for all videos that have transcripts
+    const videoParams = sourceVideos
+      .filter((v: VideoUpload) => {
+        const tid = v.video_id ? (transcriptIdsRef.current[v.video_id] || v.transcript_id) : v.transcript_id;
+        return !!v.video_id && !!tid;
+      })
+      .map((v: VideoUpload) => ({
+        videoId: v.video_id!,
+        transcriptId: (transcriptIdsRef.current[v.video_id!] || v.transcript_id)!,
+        refcode: campaignConfig.refcodes[v.video_id!] || campaignConfig.refcode || '',
+      }));
 
-    if (videosWithTranscripts.length === 0) {
+    if (videoParams.length === 0) {
       console.error('[AdCopyWizard] No videos with transcripts available for generation');
       return;
     }
 
-    // Use the first video's transcript as primary (the edge function takes a single transcriptId)
-    // but log if multiple are available
-    const primaryVideo = videosWithTranscripts[0];
-    const transcriptId = primaryVideo.video_id 
-      ? (transcriptIdsRef.current[primaryVideo.video_id] || primaryVideo.transcript_id)
-      : primaryVideo.transcript_id;
-
-    if (!transcriptId) {
-      console.error('[AdCopyWizard] Primary video does not have a transcript_id');
-      return;
-    }
-
-    if (videosWithTranscripts.length > 1) {
-      console.log(`[AdCopyWizard] Using primary video transcript. ${videosWithTranscripts.length} videos have transcripts.`);
-    }
+    console.log(`[AdCopyWizard] Generating copy for ${videoParams.length} video(s)`);
 
     // Track current segment (Issue A8)
     const firstSegment = campaignConfig.audience_segments[0]?.name;
     setCurrentGeneratingSegment(firstSegment);
 
     await generateCopy({
-      transcriptId,
-      videoId: primaryVideo.video_id,
+      videos: videoParams,
       audienceSegments: campaignConfig.audience_segments,
       actblueFormName: campaignConfig.actblue_form_name,
-      refcode: campaignConfig.refcode,
       amountPreset: campaignConfig.amount_preset,
       recurringDefault: campaignConfig.recurring_default,
     });
@@ -605,20 +599,21 @@ export function AdCopyWizard({
   // eslint-disable-next-line react-hooks/exhaustive-deps -- completeStep is intentionally excluded
   // to prevent race conditions. The ref guards against multiple completions.
   useEffect(() => {
+    const hasResults = Object.keys(perVideoGeneratedCopy).length > 0;
     if (
-      generatedCopy &&
-      metaReadyCopy &&
-      trackingUrl &&
+      hasResults &&
       currentStep === 4 &&
+      !isGenerating &&
       !hasCompletedStep4Ref.current
     ) {
       hasCompletedStep4Ref.current = true;
       completeStep(4, {
-        generated_copy: generatedCopy,
-        tracking_url: trackingUrl,
+        per_video_generated_copy: perVideoGeneratedCopy,
+        per_video_meta_ready_copy: perVideoMetaReadyCopy,
+        per_video_tracking_urls: perVideoTrackingUrls,
       });
     }
-  }, [generatedCopy, metaReadyCopy, trackingUrl, currentStep]);
+  }, [perVideoGeneratedCopy, perVideoMetaReadyCopy, perVideoTrackingUrls, currentStep, isGenerating]);
 
   const handleGoBack = useCallback((toStep: number) => {
     goToStep(toStep as 1 | 2 | 3 | 4 | 5);
@@ -693,12 +688,16 @@ export function AdCopyWizard({
     await handleStartNew();
   }, [handleStartNew]);
 
-  // Issue A6: Per-segment regeneration handler
-  const handleRegenerateSegment = useCallback(async (segmentName: string) => {
+  // Issue A6: Per-segment regeneration handler (now needs videoId)
+  const handleRegenerateSegment = useCallback(async (segmentName: string, videoId?: string) => {
     setCurrentGeneratingSegment(segmentName);
-    await regenerateSegment(segmentName);
+    // Use provided videoId or fall back to first video with generated copy
+    const targetVideoId = videoId || Object.keys(perVideoGeneratedCopy)[0];
+    if (targetVideoId) {
+      await regenerateSegment(targetVideoId, segmentName);
+    }
     setCurrentGeneratingSegment(undefined);
-  }, [regenerateSegment]);
+  }, [regenerateSegment, perVideoGeneratedCopy]);
 
   // =========================================================================
   // Render Helpers
@@ -857,16 +856,22 @@ export function AdCopyWizard({
         );
 
       case 5:
-        // Ensure we have generation data
-        const finalGeneratedCopy = generatedCopy || stepData.generated_copy || {};
-        const finalMetaReadyCopy = metaReadyCopy || {};
-        const finalTrackingUrl = trackingUrl || stepData.tracking_url || '';
+        // Build per-video data, falling back to stepData for session recovery
+        const finalPerVideoCopy = Object.keys(perVideoGeneratedCopy).length > 0
+          ? perVideoGeneratedCopy
+          : (stepData.per_video_generated_copy || {});
+        const finalPerVideoMeta = Object.keys(perVideoMetaReadyCopy).length > 0
+          ? perVideoMetaReadyCopy
+          : (stepData.per_video_meta_ready_copy || {});
+        const finalPerVideoUrls = Object.keys(perVideoTrackingUrls).length > 0
+          ? perVideoTrackingUrls
+          : (stepData.per_video_tracking_urls || {});
 
         return (
           <CopyExportStep
-            generatedCopy={finalGeneratedCopy}
-            metaReadyCopy={finalMetaReadyCopy}
-            trackingUrl={finalTrackingUrl}
+            perVideoGeneratedCopy={finalPerVideoCopy}
+            perVideoMetaReadyCopy={finalPerVideoMeta}
+            perVideoTrackingUrls={finalPerVideoUrls}
             audienceSegments={campaignConfig.audience_segments}
             onBack={() => handleGoBack(4)}
             onStartNew={handleStartNewWithConfirm}

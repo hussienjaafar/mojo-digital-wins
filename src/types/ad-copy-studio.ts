@@ -204,14 +204,21 @@ export interface AdCopyStudioSession {
   updated_at: string;
 }
 
+// Per-video generation results (keyed by video_id)
+export type PerVideoGeneratedCopy = Record<string, GeneratedCopy>;
+export type PerVideoMetaReadyCopy = Record<string, MetaReadyCopy>;
+
 export interface SessionStepData {
   videos?: VideoUpload[];
   analyses?: Record<string, TranscriptAnalysis>;
   transcriptIds?: Record<string, string>;
   config?: CampaignConfig;
   generated_copy?: GeneratedCopy;
+  per_video_generated_copy?: PerVideoGeneratedCopy;
+  per_video_meta_ready_copy?: PerVideoMetaReadyCopy;
   generation_id?: string;
   tracking_url?: string;
+  per_video_tracking_urls?: Record<string, string>;
 }
 
 // ============================================================================
