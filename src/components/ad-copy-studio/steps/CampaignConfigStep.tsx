@@ -59,7 +59,7 @@ function generateRefcode(orgName: string | undefined, filename: string, analysis
     // Try issue_primary first, extracting meaningful words
     const issueWords = (analysis.issue_primary || '')
       .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/[^a-z0-9]/g, ' ')
       .split(/\s+/)
       .filter(w => w.length > 1 && !skipWords.has(w));
 
