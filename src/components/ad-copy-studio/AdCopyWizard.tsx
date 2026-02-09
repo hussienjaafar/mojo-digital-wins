@@ -487,6 +487,41 @@ export function AdCopyWizard({
   // Handlers
   // =========================================================================
 
+  // Wrapped removeVideo that also cleans up analyses, transcriptIds, and stepData
+  const handleRemoveVideo = useCallback(async (id: string) => {
+    const video = videos.find(v => v.id === id) || (stepData.videos || []).find((v: VideoUpload) => v.id === id);
+    const dbId = video?.video_id;
+
+    // Do the full DB + storage + local state cleanup
+    await removeVideo(id);
+
+    // Clean up analysis and transcript state if we have a DB ID
+    if (dbId) {
+      // Cancel any active polling
+      cancelPolling(dbId);
+      // Remove from processing/failed tracking
+      processingVideosRef.current.delete(dbId);
+      failedVideosRef.current.delete(dbId);
+
+      setAnalyses(prev => {
+        const updated = { ...prev };
+        delete updated[dbId];
+        updateStepData({ analyses: updated });
+        return updated;
+      });
+      setTranscriptIds(prev => {
+        const updated = { ...prev };
+        delete updated[dbId];
+        updateStepData({ transcriptIds: updated });
+        return updated;
+      });
+    }
+
+    // Update persisted video list in stepData
+    const updatedVideos = (stepData.videos || []).filter((v: VideoUpload) => v.id !== id);
+    updateStepData({ videos: updatedVideos });
+  }, [videos, stepData.videos, removeVideo, cancelPolling, updateStepData]);
+
   const handleUploadComplete = useCallback(async () => {
     await completeStep(1, { videos });
   }, [completeStep, videos]);
@@ -673,7 +708,7 @@ export function AdCopyWizard({
             error={uploadError}
             onUploadFiles={uploadFiles}
             onImportGDrive={importGDriveUrls}
-            onRemoveVideo={removeVideo}
+            onRemoveVideo={handleRemoveVideo}
             onClearError={clearUploadError}
             onComplete={handleUploadComplete}
             onCancelVideo={handleCancelVideo}

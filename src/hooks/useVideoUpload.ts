@@ -39,7 +39,7 @@ export interface UseVideoUploadReturn {
   error: string | null;
   uploadFiles: (files: File[]) => Promise<void>;
   importGDriveUrls: (urls: string[]) => Promise<void>;
-  removeVideo: (id: string) => void;
+  removeVideo: (id: string) => Promise<void>;
   clearError: () => void;
   updateVideoStatus: (videoDbId: string, status: VideoUpload['status'], errorMessage?: string) => void;
   cancelVideo: (id: string) => Promise<void>;
@@ -669,11 +669,86 @@ export function useVideoUpload(
   // =========================================================================
 
   /**
-   * Remove a video from the list
+   * Remove a video from the list AND clean up DB records + storage files
    */
-  const removeVideo = useCallback((id: string) => {
+  const removeVideo = useCallback(async (id: string) => {
+    const video = videos.find(v => v.id === id);
+    
+    // If video has a DB record, clean up backend data
+    if (video?.video_id) {
+      const dbId = video.video_id;
+      console.log(`[useVideoUpload] Cleaning up DB records and storage for video: ${dbId}`);
+      
+      try {
+        // 1. Delete associated transcript(s)
+        const { error: transcriptDeleteError } = await (supabase as any)
+          .from('meta_ad_transcripts')
+          .delete()
+          .eq('video_ref', dbId);
+        if (transcriptDeleteError) {
+          console.warn('[useVideoUpload] Failed to delete transcript:', transcriptDeleteError.message);
+        }
+
+        // 2. Get the video record to find storage paths before deleting
+        const { data: videoRecord } = await (supabase as any)
+          .from('meta_ad_videos')
+          .select('video_id, video_source_url, video_storage_path, audio_filename, organization_id')
+          .eq('id', dbId)
+          .single();
+
+        // 3. Delete the meta_ad_videos record
+        const { error: videoDeleteError } = await (supabase as any)
+          .from('meta_ad_videos')
+          .delete()
+          .eq('id', dbId);
+        if (videoDeleteError) {
+          console.warn('[useVideoUpload] Failed to delete video record:', videoDeleteError.message);
+        }
+
+        // 4. Clean up storage files (best effort)
+        if (videoRecord) {
+          // Try to extract storage path from the source URL or construct it
+          const videoIdCol = videoRecord.video_id; // e.g. upload_xxx
+          const orgId = videoRecord.organization_id || organizationId;
+
+          // Delete audio file from meta-ad-audio bucket
+          if (videoRecord.audio_filename || videoIdCol) {
+            try {
+              // List files matching the video ID prefix in the audio bucket
+              const { data: audioFiles } = await supabase.storage
+                .from('meta-ad-audio')
+                .list(`${orgId}/${batchId}`, { search: videoIdCol });
+              if (audioFiles && audioFiles.length > 0) {
+                const pathsToDelete = audioFiles.map(f => `${orgId}/${batchId}/${f.name}`);
+                await supabase.storage.from('meta-ad-audio').remove(pathsToDelete);
+                console.log(`[useVideoUpload] Deleted ${pathsToDelete.length} audio file(s)`);
+              }
+            } catch (e) {
+              console.warn('[useVideoUpload] Audio cleanup error:', e);
+            }
+          }
+
+          // Delete original video from meta-ad-videos bucket
+          if (videoRecord.video_storage_path) {
+            try {
+              await supabase.storage.from('meta-ad-videos').remove([videoRecord.video_storage_path]);
+              console.log(`[useVideoUpload] Deleted original video: ${videoRecord.video_storage_path}`);
+            } catch (e) {
+              console.warn('[useVideoUpload] Video storage cleanup error:', e);
+            }
+          }
+        }
+
+        console.log(`[useVideoUpload] Cleanup complete for video: ${dbId}`);
+      } catch (err) {
+        console.error('[useVideoUpload] Error during video cleanup:', err);
+        // Continue with local removal even if backend cleanup fails
+      }
+    }
+
+    // Remove from local state
     setVideos(prev => prev.filter(v => v.id !== id));
-  }, []);
+  }, [videos, organizationId, batchId]);
 
   /**
    * Clear error state
