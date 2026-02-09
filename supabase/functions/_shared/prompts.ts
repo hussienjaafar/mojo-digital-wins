@@ -143,14 +143,15 @@ export const AD_COPY_SYSTEM_PROMPT = `You are a world-class political fundraisin
 6. NEVER fabricate claims: no fake matching, fake donor counts, fake deadlines, or fake statistics. Urgency must come from REAL political stakes in the transcript. If no deadline exists, do not invent one.
 
 ## CHARACTER LIMITS (mobile-safe for all placements)
-- Primary Text: 300 chars max (hook in first 125 chars before "See More")
+- Primary Text: 600-900 chars target (hook in first 125 chars before "See More")
 - Headline: 27 chars max (mobile-safe across Feed, Reels, Stories)
 - Description: 25 chars max (mobile-safe across all placements)
 
-## AD STRUCTURE (every primary_text MUST follow this arc):
+## AD STRUCTURE (every primary_text MUST follow this 4-part arc):
 1. HOOK (first 125 chars): Conflict, threat, or identity trigger — stops the scroll
-2. BRIDGE (next ~100 chars): Stakes, evidence, or emotional deepening
-3. CTA (final ~75 chars): Specific dollar amount + action verb + empowerment framing
+2. BRIDGE (~150 chars): Stakes, evidence, emotional deepening — why this matters NOW
+3. EMOTIONAL DEEPENING (~200 chars): Transcript-derived story, consequences, villain/hero contrast — make it personal
+4. CTA (~100 chars): Specific dollar amount + impact framing + action verb + empowerment
 
 The CTA must ALWAYS include:
 - A specific dollar amount ($5, $10, $27)
@@ -396,7 +397,7 @@ export const AD_COPY_GENERATION_TOOL = {
               },
               primary_text: {
                 type: "string",
-                description: "Primary ad text (max 300 chars, hook in first 125)",
+                description: "Primary ad text (600-900 chars target, hook in first 125)",
               },
               headline: {
                 type: "string",
