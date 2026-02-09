@@ -176,7 +176,7 @@ serve(async (req) => {
     let videosToProcess: any[] = [];
 
     if (mode === 'single' && video_id) {
-      const { data, error } = await supabase.from('meta_ad_videos').select('*').eq('organization_id', organization_id).eq('video_id', video_id).single();
+      const { data, error } = await supabase.from('meta_ad_videos').select('*').eq('organization_id', organization_id).eq('id', video_id).single();
       if (error || !data) return new Response(JSON.stringify({ error: 'Video not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       if (data.status === 'CANCELLED') return new Response(JSON.stringify({ success: true, message: 'Video was cancelled', results: [{ video_id, status: 'cancelled' }] }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       videosToProcess = [data];
