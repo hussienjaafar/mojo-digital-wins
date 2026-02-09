@@ -47,7 +47,7 @@ export interface VideoUploadStepProps {
   error: string | null;
   onUploadFiles: (files: File[]) => Promise<void>;
   onImportGDrive: (urls: string[]) => Promise<void>;
-  onRemoveVideo: (id: string) => void;
+  onRemoveVideo: (id: string) => Promise<void>;
   onClearError: () => void;
   onComplete: () => void;
   onCancelVideo?: (id: string) => Promise<void>;

@@ -113,6 +113,8 @@ export function useVideoTranscriptionFlow(
 
     const startTime = Date.now();
     let lastStatus = '';
+    let pendingSince: number | null = null;
+    let hasRetriggered = false;
 
     try {
       while (!abortController.signal.aborted) {
@@ -145,6 +147,31 @@ export function useVideoTranscriptionFlow(
           onStatusChange?.(videoId, currentStatus);
         }
 
+        // Stuck detection: if PENDING for >30s, re-trigger the edge function
+        if (currentStatus === 'PENDING') {
+          if (!pendingSince) {
+            pendingSince = Date.now();
+          } else if (!hasRetriggered && Date.now() - pendingSince > 30_000) {
+            console.warn(`[useVideoTranscriptionFlow] Video ${videoId} stuck in PENDING for >30s, re-triggering transcription`);
+            hasRetriggered = true;
+            try {
+              await supabase.functions.invoke('transcribe-meta-ad-video', {
+                body: {
+                  organization_id: organizationId,
+                  video_id: videoId,
+                  mode: 'single',
+                },
+              });
+              console.log(`[useVideoTranscriptionFlow] Re-triggered transcription for stuck video: ${videoId}`);
+            } catch (retriggerErr) {
+              console.error('[useVideoTranscriptionFlow] Failed to re-trigger transcription:', retriggerErr);
+            }
+          }
+        } else {
+          // Reset pending tracker if status moved past PENDING
+          pendingSince = null;
+        }
+
         // Check for terminal status
         if (TERMINAL_STATUSES.includes(currentStatus)) {
           // Handle all failure/cancelled statuses
@@ -165,7 +192,7 @@ export function useVideoTranscriptionFlow(
     } finally {
       pollingAbortControllers.current.delete(videoId);
     }
-  }, [onStatusChange, onError]);
+  }, [organizationId, onStatusChange, onError]);
 
   /**
    * Fetch transcript analysis from meta_ad_transcripts
