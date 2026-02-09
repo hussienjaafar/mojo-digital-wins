@@ -431,7 +431,23 @@ export function TranscriptReviewStep({
           return (
             <TabsContent key={video.id} value={video.id} className="mt-6">
               {analysis ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  {/* Hallucination Warning Banner */}
+                  {(analysis.hallucination_risk != null && analysis.hallucination_risk > 0.5) && (
+                    <div className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+                      <AlertTriangle className="h-5 w-5 text-amber-400 mt-0.5 shrink-0" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-amber-300">
+                          Low-confidence transcript
+                        </p>
+                        <p className="text-xs text-amber-400/80">
+                          This transcript may be inaccurate. The audio may contain mostly music or background noise.
+                          You can edit the transcript manually below or re-upload the video with clearer audio.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Left Panel: Transcript */}
                   <div className="rounded-xl border border-[#1e2a45] bg-[#0a0f1a] overflow-hidden">
                     <div className="flex items-center justify-between border-b border-[#1e2a45] px-4 py-3">
@@ -739,6 +755,7 @@ export function TranscriptReviewStep({
                       </AnalysisCard>
                     </div>
                   </ScrollArea>
+                </div>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-center">

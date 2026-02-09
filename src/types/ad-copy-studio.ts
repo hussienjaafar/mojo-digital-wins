@@ -110,6 +110,9 @@ export interface TranscriptAnalysis {
   user_context_post?: string;
   analysis_count?: number;
   last_analyzed_at?: string;
+  // Hallucination detection
+  hallucination_risk?: number;
+  transcription_confidence?: number;
 }
 
 // ============================================================================
