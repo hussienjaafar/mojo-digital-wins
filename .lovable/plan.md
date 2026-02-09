@@ -1,101 +1,83 @@
 
 
-# Fix Video Deletion Cleanup and Stuck Transcription
+# Per-Video Refcodes and Ad Identifiers
 
-## Problem 1: Old Video 2 Data Persists After Deletion
+## What Changes
 
-When a user removes a video from the upload step, `removeVideo()` only removes it from local React state. It does not:
-- Delete the `meta_ad_videos` database record
-- Delete the associated `meta_ad_transcripts` record
-- Clean up the analysis from `stepData.analyses`
-- Remove related storage files
+### 1. Per-Video Refcodes in Campaign Config (Step 3)
 
-This means the old hallucinated transcript and analysis for Video 2 (DB ID `86d560c8`) still exist in the database and in the persisted session data.
+Currently there's a single refcode for the entire campaign. This will change so each video gets its own refcode, auto-generated from the video name/number.
 
-## Problem 2: Re-uploaded Video (Video 6) Stuck at PENDING
+**Type changes** (`src/types/ad-copy-studio.ts`):
+- Add `refcodes: Record<string, string>` to `CampaignConfig` (keyed by video_id)
+- Keep the existing `refcode` field for backward compatibility but deprecate it
 
-The re-uploaded video (`27f89e0f`) was inserted and the edge function was invoked, but the OLD code (before the ID fix deployment) was still running. It passed the `video_id` column value (`upload_xxx`) instead of the UUID primary key, causing a postgres UUID parse error. The function returned 404 and exited.
+**CampaignConfigStep changes** (`src/components/ad-copy-studio/steps/CampaignConfigStep.tsx`):
+- Replace the single refcode input with a list showing each video and its own refcode field
+- Each video displays its name/number (e.g., "Video 1 - filename.mp4") with an editable refcode
+- Auto-generate refcodes per video on mount (e.g., `ad1-0209-x4f2`, `ad2-0209-k8m1`)
+- Each has its own "Regenerate" button
 
-After the code fix was deployed, the function was never re-invoked. The poller sees `PENDING` in the DB forever, but `PENDING` is not a terminal status, so it just keeps polling without ever re-triggering the transcription.
+### 2. Video Identifier in Export Step (Step 5)
 
-## Solution
+**CopyExportStep changes** (`src/components/ad-copy-studio/steps/CopyExportStep.tsx`):
+- Add a video selector/indicator at the top showing which video's ad copy is being displayed
+- Display the video name and its associated refcode prominently (e.g., "Ad 1: campaign_video1.mp4 | Refcode: ad1-0209-x4f2")
+- Include the refcode in the variation card headers and clipboard copy output
+- The tracking URL section shows the specific refcode for the currently viewed ad
 
-### 1. Make `removeVideo` a full cleanup operation
+### 3. Generation Updates
 
-**File:** `src/hooks/useVideoUpload.ts`
+**AdCopyWizard changes** (`src/components/ad-copy-studio/AdCopyWizard.tsx`):
+- Pass the per-video refcode (from `campaignConfig.refcodes[videoId]`) when calling `generateCopy`
+- Pass video info to CopyExportStep so it can display the video identifier
 
-Update `removeVideo` to:
-- Delete the `meta_ad_videos` record from the database (if it has a `video_id`)
-- Delete the associated `meta_ad_transcripts` record
-- Delete associated audio/video files from storage buckets
-- Remove from local state (as it does now)
-
-### 2. Clean up analyses in AdCopyWizard when video is removed
-
-**File:** `src/components/ad-copy-studio/AdCopyWizard.tsx`
-
-Wrap the `removeVideo` call to also:
-- Remove the video's analysis from the `analyses` state (keyed by `video_id`)
-- Remove the video's transcript ID from `transcriptIds` state
-- Persist the cleaned-up state to `stepData`
-
-### 3. Add a stuck-detection mechanism to the poller
-
-**File:** `src/hooks/useVideoTranscriptionFlow.ts` or `src/components/ad-copy-studio/AdCopyWizard.tsx`
-
-When polling detects a video has been in `PENDING` status for more than 30 seconds, re-trigger the edge function automatically. This handles cases where the initial invocation failed (as happened here).
-
-### 4. Manually fix the current stuck video
-
-The existing Video 6 record (`27f89e0f`) needs its transcription re-triggered. The poller stuck-detection fix (item 3) will handle this automatically on the next page load, or the user can click the retry button.
+**useAdCopyGeneration changes** (`src/hooks/useAdCopyGeneration.ts`):
+- No structural changes needed -- it already accepts `refcode` as a parameter
 
 ## Technical Details
 
-### Updated removeVideo (useVideoUpload.ts)
+### Updated CampaignConfig Type
 
-```text
-removeVideo(id):
-  find video by local id
-  if video has video_id (DB record):
-    delete from meta_ad_transcripts where video_ref = video.video_id
-    delete from meta_ad_videos where id = video.video_id
-    delete audio file from meta-ad-audio bucket
-    delete video file from meta-ad-videos bucket (if exists)
-  remove from local state
+```typescript
+export interface CampaignConfig {
+  actblue_form_name: string;
+  refcode: string;              // kept for backward compat, used as fallback
+  refcode_auto_generated: boolean;
+  refcodes: Record<string, string>;  // NEW: videoId -> refcode
+  amount_preset?: number;
+  recurring_default: boolean;
+  audience_segments: AudienceSegment[];
+}
 ```
 
-### Wrapped removal in AdCopyWizard
+### CopyExportStep Props Update
 
-```text
-handleRemoveVideo(id):
-  find the video's video_id (DB ID)
-  call removeVideo(id)  // does DB + local cleanup
-  remove analyses[video_id]
-  remove transcriptIds[video_id]
-  update stepData with cleaned analyses, transcriptIds, and filtered videos list
-```
-
-### Stuck detection in polling loop
-
-```text
-pollForCompletion(videoId):
-  ...existing polling loop...
-  if status === 'PENDING' and elapsed > 30s:
-    log warning
-    re-invoke transcribe-meta-ad-video edge function
-    reset elapsed timer
-    continue polling
+```typescript
+export interface CopyExportStepProps {
+  // ...existing props...
+  videos?: Array<{ id: string; filename: string; video_id?: string }>;
+  activeVideoRefcode?: string;
+}
 ```
 
 ### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/hooks/useVideoUpload.ts` | Make `removeVideo` delete DB records, transcripts, and storage files |
-| `src/components/ad-copy-studio/AdCopyWizard.tsx` | Wrap `removeVideo` to also clean up `analyses` and `transcriptIds` state + stepData |
-| `src/hooks/useVideoTranscriptionFlow.ts` | Add stuck-detection: re-trigger edge function if PENDING > 30 seconds |
+| `src/types/ad-copy-studio.ts` | Add `refcodes` field to `CampaignConfig` |
+| `src/components/ad-copy-studio/steps/CampaignConfigStep.tsx` | Replace single refcode with per-video refcode list; needs videos prop |
+| `src/components/ad-copy-studio/steps/CopyExportStep.tsx` | Add video identifier header with name + refcode; include refcode in copy output |
+| `src/components/ad-copy-studio/AdCopyWizard.tsx` | Pass videos to CampaignConfigStep and CopyExportStep; use per-video refcode in generation |
 
-### Database Impact
+### Auto-Generated Refcode Format
 
-No schema changes needed. This only deletes data rows for the specific removed video.
+Each video gets a refcode like: `ad{N}-{MMDD}-{random4}` where N is the video number (1-based), MMDD is today's date, and random4 is a short random string.
+
+### Export Step Video Identifier
+
+At the top of the export step, a styled banner will show:
+- Video name/number (e.g., "Ad 1: my_campaign_video.mp4")
+- The refcode for that video
+- If multiple videos exist, tabs or a selector to switch between them
 
