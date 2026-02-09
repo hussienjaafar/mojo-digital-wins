@@ -2,19 +2,21 @@
  * useAdCopyGeneration - Copy generation management hook
  *
  * Handles AI-powered ad copy generation for the Ad Copy Studio:
- * - Calls generate-ad-copy edge function
+ * - Calls generate-ad-copy edge function per video
  * - Progress tracking during generation
- * - Stores and manages generated results
+ * - Stores and manages generated results per video
  * - Segment-level regeneration
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type {
   GeneratedCopy,
   MetaReadyCopy,
   AudienceSegment,
+  PerVideoGeneratedCopy,
+  PerVideoMetaReadyCopy,
   GenerateAdCopyResponse,
 } from '@/types/ad-copy-studio';
 
@@ -26,12 +28,27 @@ export interface UseAdCopyGenerationOptions {
   organizationId: string;
 }
 
-export interface GenerateCopyParams {
+export interface VideoGenerationParams {
+  videoId: string;
   transcriptId: string;
-  videoId?: string;
+  refcode: string;
+}
+
+export interface GenerateCopyParams {
+  videos: VideoGenerationParams[];
   audienceSegments: AudienceSegment[];
   actblueFormName: string;
+  amountPreset?: number;
+  recurringDefault?: boolean;
+}
+
+// Legacy single-video params (kept for regenerateSegment)
+interface SingleVideoParams {
+  transcriptId: string;
+  videoId?: string;
   refcode: string;
+  audienceSegments: AudienceSegment[];
+  actblueFormName: string;
   amountPreset?: number;
   recurringDefault?: boolean;
 }
@@ -39,28 +56,20 @@ export interface GenerateCopyParams {
 export interface UseAdCopyGenerationReturn {
   isGenerating: boolean;
   progress: number;
+  perVideoGeneratedCopy: PerVideoGeneratedCopy;
+  perVideoMetaReadyCopy: PerVideoMetaReadyCopy;
+  perVideoTrackingUrls: Record<string, string>;
+  generationId: string | null;
+  error: string | null;
+  warnings: string[];
+  generateCopy: (params: GenerateCopyParams) => Promise<void>;
+  regenerateSegment: (videoId: string, segmentName: string) => Promise<void>;
+  clearGeneration: () => void;
+  // Legacy accessors for backward compat (first video's data)
   generatedCopy: GeneratedCopy | null;
   metaReadyCopy: MetaReadyCopy | null;
   trackingUrl: string | null;
-  generationId: string | null;
-  error: string | null;
-  generateCopy: (params: GenerateCopyParams) => Promise<void>;
-  regenerateSegment: (segmentName: string) => Promise<void>;
-  clearGeneration: () => void;
 }
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-const GENERATION_PROGRESS_STEPS = {
-  STARTED: 10,
-  FETCHING_TRANSCRIPT: 20,
-  GENERATING_COPY: 50,
-  VALIDATING: 80,
-  SAVING: 90,
-  COMPLETE: 100,
-};
 
 // =============================================================================
 // Hook Implementation
@@ -75,41 +84,30 @@ export function useAdCopyGeneration(
   // State
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [generatedCopy, setGeneratedCopy] = useState<GeneratedCopy | null>(null);
-  const [metaReadyCopy, setMetaReadyCopy] = useState<MetaReadyCopy | null>(null);
-  const [trackingUrl, setTrackingUrl] = useState<string | null>(null);
+  const [perVideoGeneratedCopy, setPerVideoGeneratedCopy] = useState<PerVideoGeneratedCopy>({});
+  const [perVideoMetaReadyCopy, setPerVideoMetaReadyCopy] = useState<PerVideoMetaReadyCopy>({});
+  const [perVideoTrackingUrls, setPerVideoTrackingUrls] = useState<Record<string, string>>({});
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   // Store the last params for regeneration
-  const [lastParams, setLastParams] = useState<GenerateCopyParams | null>(null);
+  const lastParamsRef = useRef<GenerateCopyParams | null>(null);
 
   // =========================================================================
-  // Copy Generation
+  // Copy Generation (per-video loop)
   // =========================================================================
 
-  /**
-   * Generate ad copy using the edge function
-   */
   const generateCopy = useCallback(async (params: GenerateCopyParams) => {
     if (!organizationId) {
       setError('Organization ID is required');
       return;
     }
 
-    const {
-      transcriptId,
-      videoId,
-      audienceSegments,
-      actblueFormName,
-      refcode,
-      amountPreset,
-      recurringDefault,
-    } = params;
+    const { videos, audienceSegments, actblueFormName, amountPreset, recurringDefault } = params;
 
-    // Validate required params
-    if (!transcriptId) {
-      setError('Transcript ID is required');
+    if (!videos || videos.length === 0) {
+      setError('At least one video with a transcript is required');
       return;
     }
 
@@ -123,81 +121,108 @@ export function useAdCopyGeneration(
       return;
     }
 
-    if (!refcode?.trim()) {
-      setError('Refcode is required');
-      return;
-    }
-
     // Store params for potential regeneration
-    setLastParams(params);
+    lastParamsRef.current = params;
 
     // Reset state
     setIsGenerating(true);
-    setProgress(GENERATION_PROGRESS_STEPS.STARTED);
+    setProgress(0);
     setError(null);
-    setGeneratedCopy(null);
-    setMetaReadyCopy(null);
-    setTrackingUrl(null);
+    setWarnings([]);
+    setPerVideoGeneratedCopy({});
+    setPerVideoMetaReadyCopy({});
+    setPerVideoTrackingUrls({});
     setGenerationId(null);
 
+    const totalVideos = videos.length;
+    const accumulatedCopy: PerVideoGeneratedCopy = {};
+    const accumulatedMeta: PerVideoMetaReadyCopy = {};
+    const accumulatedUrls: Record<string, string> = {};
+    const accumulatedWarnings: string[] = [];
+    let lastGenId: string | null = null;
+
     try {
-      // Simulate progress while waiting for API
-      setProgress(GENERATION_PROGRESS_STEPS.FETCHING_TRANSCRIPT);
+      for (let i = 0; i < totalVideos; i++) {
+        const video = videos[i];
+        const videoProgress = ((i) / totalVideos) * 100;
+        setProgress(Math.round(videoProgress));
 
-      // Call the edge function
-      const { data, error: functionError } = await supabase.functions.invoke<GenerateAdCopyResponse>(
-        'generate-ad-copy',
-        {
-          body: {
-            organization_id: organizationId,
-            transcript_id: transcriptId,
-            video_id: videoId,
-            audience_segments: audienceSegments,
-            actblue_form_name: actblueFormName.trim(),
-            refcode: refcode.trim(),
-            amount_preset: amountPreset,
-            recurring_default: recurringDefault,
-          },
+        try {
+          console.log(`[useAdCopyGeneration] Generating copy for video ${i + 1}/${totalVideos}: ${video.videoId}`);
+
+          const { data, error: functionError } = await supabase.functions.invoke<GenerateAdCopyResponse>(
+            'generate-ad-copy',
+            {
+              body: {
+                organization_id: organizationId,
+                transcript_id: video.transcriptId,
+                video_id: video.videoId,
+                audience_segments: audienceSegments,
+                actblue_form_name: actblueFormName.trim(),
+                refcode: video.refcode.trim(),
+                amount_preset: amountPreset,
+                recurring_default: recurringDefault,
+              },
+            }
+          );
+
+          if (functionError) {
+            console.error(`[useAdCopyGeneration] Edge function error for video ${video.videoId}:`, functionError);
+            accumulatedWarnings.push(`Video ${i + 1}: ${functionError.message || 'Generation failed'}`);
+            continue;
+          }
+
+          if (!data || !data.success) {
+            accumulatedWarnings.push(`Video ${i + 1}: Generation was not successful`);
+            continue;
+          }
+
+          accumulatedCopy[video.videoId] = data.generated_copy;
+          accumulatedMeta[video.videoId] = data.meta_ready_copy;
+          if (data.tracking_url) accumulatedUrls[video.videoId] = data.tracking_url;
+          if (data.generation_id) lastGenId = data.generation_id;
+
+          // Update state progressively so UI can show partial results
+          setPerVideoGeneratedCopy({ ...accumulatedCopy });
+          setPerVideoMetaReadyCopy({ ...accumulatedMeta });
+          setPerVideoTrackingUrls({ ...accumulatedUrls });
+
+        } catch (videoErr: unknown) {
+          const msg = videoErr instanceof Error ? videoErr.message : 'Unknown error';
+          console.error(`[useAdCopyGeneration] Error for video ${video.videoId}:`, videoErr);
+          accumulatedWarnings.push(`Video ${i + 1}: ${msg}`);
         }
+      }
+
+      setProgress(100);
+      setGenerationId(lastGenId);
+      setWarnings(accumulatedWarnings);
+
+      const successCount = Object.keys(accumulatedCopy).length;
+      if (successCount === 0) {
+        throw new Error('All video generations failed');
+      }
+
+      const totalVariations = Object.values(accumulatedMeta).reduce(
+        (sum, videoMeta) => sum + Object.values(videoMeta).reduce(
+          (vSum, segment) => vSum + (segment.variations?.length || 0), 0
+        ), 0
       );
 
-      setProgress(GENERATION_PROGRESS_STEPS.GENERATING_COPY);
+      console.log(`[useAdCopyGeneration] Generated copy for ${successCount}/${totalVideos} videos, ${totalVariations} total variations`);
 
-      if (functionError) {
-        console.error('[useAdCopyGeneration] Edge function error:', functionError);
-        throw new Error(functionError.message || 'Generation failed');
+      if (accumulatedWarnings.length > 0) {
+        toast({
+          title: `Generated copy for ${successCount}/${totalVideos} videos`,
+          description: `${accumulatedWarnings.length} video(s) had issues`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Copy generated successfully',
+          description: `Generated ${totalVariations} ad variations across ${successCount} video${successCount !== 1 ? 's' : ''}`,
+        });
       }
-
-      if (!data) {
-        throw new Error('No response from generation service');
-      }
-
-      if (!data.success) {
-        throw new Error('Generation was not successful');
-      }
-
-      setProgress(GENERATION_PROGRESS_STEPS.VALIDATING);
-
-      // Update state with results
-      setGeneratedCopy(data.generated_copy);
-      setMetaReadyCopy(data.meta_ready_copy);
-      setTrackingUrl(data.tracking_url);
-      setGenerationId(data.generation_id);
-
-      setProgress(GENERATION_PROGRESS_STEPS.COMPLETE);
-
-      // Count total variations generated
-      const totalVariations = Object.values(data.meta_ready_copy || {}).reduce(
-        (sum, segment) => sum + (segment.variations?.length || 0),
-        0
-      );
-
-      console.log(`[useAdCopyGeneration] Generated ${totalVariations} variations for ${Object.keys(data.generated_copy || {}).length} segments`);
-
-      toast({
-        title: 'Copy generated successfully',
-        description: `Generated ${totalVariations} ad variations`,
-      });
     } catch (err: unknown) {
       console.error('[useAdCopyGeneration] Generation error:', err);
       const message = err instanceof Error ? err.message : 'Failed to generate ad copy';
@@ -213,46 +238,47 @@ export function useAdCopyGeneration(
   }, [organizationId, toast]);
 
   // =========================================================================
-  // Segment Regeneration
+  // Segment Regeneration (for a specific video)
   // =========================================================================
 
-  /**
-   * Regenerate copy for a specific audience segment
-   * Note: This requires re-calling the generation endpoint with a single segment
-   */
-  const regenerateSegment = useCallback(async (segmentName: string) => {
-    if (!lastParams) {
+  const regenerateSegment = useCallback(async (videoId: string, segmentName: string) => {
+    if (!lastParamsRef.current) {
       setError('No previous generation parameters available');
       return;
     }
 
-    // Find the segment to regenerate
-    const segment = lastParams.audienceSegments.find(s => s.name === segmentName);
+    const params = lastParamsRef.current;
+    const video = params.videos.find(v => v.videoId === videoId);
+    if (!video) {
+      setError(`Video not found in generation params`);
+      return;
+    }
+
+    const segment = params.audienceSegments.find(s => s.name === segmentName);
     if (!segment) {
       setError(`Segment "${segmentName}" not found`);
       return;
     }
 
     setIsGenerating(true);
-    setProgress(GENERATION_PROGRESS_STEPS.STARTED);
+    setProgress(10);
     setError(null);
 
     try {
-      setProgress(GENERATION_PROGRESS_STEPS.GENERATING_COPY);
+      setProgress(50);
 
-      // Call edge function with just this segment
       const { data, error: functionError } = await supabase.functions.invoke<GenerateAdCopyResponse>(
         'generate-ad-copy',
         {
           body: {
             organization_id: organizationId,
-            transcript_id: lastParams.transcriptId,
-            video_id: lastParams.videoId,
-            audience_segments: [segment], // Only this segment
-            actblue_form_name: lastParams.actblueFormName.trim(),
-            refcode: lastParams.refcode.trim(),
-            amount_preset: lastParams.amountPreset,
-            recurring_default: lastParams.recurringDefault,
+            transcript_id: video.transcriptId,
+            video_id: video.videoId,
+            audience_segments: [segment],
+            actblue_form_name: params.actblueFormName.trim(),
+            refcode: video.refcode.trim(),
+            amount_preset: params.amountPreset,
+            recurring_default: params.recurringDefault,
           },
         }
       );
@@ -265,31 +291,32 @@ export function useAdCopyGeneration(
         throw new Error('Regeneration was not successful');
       }
 
-      setProgress(GENERATION_PROGRESS_STEPS.VALIDATING);
+      setProgress(80);
 
-      // Merge the regenerated segment with existing data
-      if (generatedCopy && data.generated_copy) {
-        setGeneratedCopy({
-          ...generatedCopy,
-          ...data.generated_copy,
-        });
-      }
+      // Merge the regenerated segment into existing per-video data
+      setPerVideoGeneratedCopy(prev => {
+        const existingForVideo = prev[videoId] || {};
+        return {
+          ...prev,
+          [videoId]: { ...existingForVideo, ...data.generated_copy },
+        };
+      });
 
-      if (metaReadyCopy && data.meta_ready_copy) {
-        setMetaReadyCopy({
-          ...metaReadyCopy,
-          ...data.meta_ready_copy,
-        });
-      }
+      setPerVideoMetaReadyCopy(prev => {
+        const existingForVideo = prev[videoId] || {};
+        return {
+          ...prev,
+          [videoId]: { ...existingForVideo, ...data.meta_ready_copy },
+        };
+      });
 
-      // Update generation ID if changed
       if (data.generation_id) {
         setGenerationId(data.generation_id);
       }
 
-      setProgress(GENERATION_PROGRESS_STEPS.COMPLETE);
+      setProgress(100);
 
-      console.log(`[useAdCopyGeneration] Regenerated segment: ${segmentName}`);
+      console.log(`[useAdCopyGeneration] Regenerated segment "${segmentName}" for video ${videoId}`);
 
       toast({
         title: 'Segment regenerated',
@@ -307,25 +334,32 @@ export function useAdCopyGeneration(
     } finally {
       setIsGenerating(false);
     }
-  }, [organizationId, lastParams, generatedCopy, metaReadyCopy, toast]);
+  }, [organizationId, toast]);
 
   // =========================================================================
   // State Management
   // =========================================================================
 
-  /**
-   * Clear all generation state
-   */
   const clearGeneration = useCallback(() => {
     setIsGenerating(false);
     setProgress(0);
-    setGeneratedCopy(null);
-    setMetaReadyCopy(null);
-    setTrackingUrl(null);
+    setPerVideoGeneratedCopy({});
+    setPerVideoMetaReadyCopy({});
+    setPerVideoTrackingUrls({});
     setGenerationId(null);
     setError(null);
-    setLastParams(null);
+    setWarnings([]);
+    lastParamsRef.current = null;
   }, []);
+
+  // =========================================================================
+  // Legacy accessors (first video's data for backward compat)
+  // =========================================================================
+
+  const firstVideoId = Object.keys(perVideoGeneratedCopy)[0] || null;
+  const generatedCopy = firstVideoId ? perVideoGeneratedCopy[firstVideoId] : null;
+  const metaReadyCopy = firstVideoId ? perVideoMetaReadyCopy[firstVideoId] : null;
+  const trackingUrl = firstVideoId ? perVideoTrackingUrls[firstVideoId] || null : null;
 
   // =========================================================================
   // Return
@@ -334,13 +368,18 @@ export function useAdCopyGeneration(
   return {
     isGenerating,
     progress,
-    generatedCopy,
-    metaReadyCopy,
-    trackingUrl,
+    perVideoGeneratedCopy,
+    perVideoMetaReadyCopy,
+    perVideoTrackingUrls,
     generationId,
     error,
+    warnings,
     generateCopy,
     regenerateSegment,
     clearGeneration,
+    // Legacy
+    generatedCopy,
+    metaReadyCopy,
+    trackingUrl,
   };
 }

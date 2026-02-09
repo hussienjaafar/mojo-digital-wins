@@ -40,6 +40,8 @@ import type {
   MetaReadyCopy,
   AudienceSegment,
   VideoUpload,
+  PerVideoGeneratedCopy,
+  PerVideoMetaReadyCopy,
 } from '@/types/ad-copy-studio';
 import { META_COPY_LIMITS } from '@/types/ad-copy-studio';
 import { getCharCountColor } from '@/components/ad-copy-studio/components/analysis-primitives';
@@ -49,13 +51,13 @@ import { getCharCountColor } from '@/components/ad-copy-studio/components/analys
 // =============================================================================
 
 export interface CopyExportStepProps {
-  generatedCopy: GeneratedCopy;
-  metaReadyCopy: MetaReadyCopy;
-  trackingUrl: string;
+  perVideoGeneratedCopy: PerVideoGeneratedCopy;
+  perVideoMetaReadyCopy: PerVideoMetaReadyCopy;
+  perVideoTrackingUrls: Record<string, string>;
   audienceSegments: AudienceSegment[];
   onBack: () => void;
   onStartNew: () => void;
-  onRegenerateSegment?: (segmentName: string) => Promise<void>;
+  onRegenerateSegment?: (segmentName: string, videoId?: string) => Promise<void>;
   isRegenerating?: boolean;
   organizationName?: string;
   videos?: VideoUpload[];
@@ -458,9 +460,9 @@ function SegmentContent({
 const ALL_SEGMENTS_KEY = '__all__';
 
 export function CopyExportStep({
-  generatedCopy,
-  metaReadyCopy,
-  trackingUrl,
+  perVideoGeneratedCopy,
+  perVideoMetaReadyCopy,
+  perVideoTrackingUrls,
   audienceSegments,
   onBack,
   onStartNew,
@@ -485,6 +487,12 @@ export function CopyExportStep({
   const videosWithIds = videos.filter(v => v.video_id);
   const activeVideo = videosWithIds[activeVideoIdx] || videosWithIds[0];
   const activeRefcode = activeVideo?.video_id ? refcodes[activeVideo.video_id] : '';
+
+  // Derive the active video's copy from per-video maps
+  const activeVideoId = activeVideo?.video_id || Object.keys(perVideoGeneratedCopy)[0] || '';
+  const generatedCopy: GeneratedCopy = perVideoGeneratedCopy[activeVideoId] || {};
+  const metaReadyCopy: MetaReadyCopy = perVideoMetaReadyCopy[activeVideoId] || {};
+  const trackingUrl: string = perVideoTrackingUrls[activeVideoId] || '';
 
   // Issue A5: Map active segment id back to name for generatedCopy lookup
   const activeSegment = audienceSegments.find(s => s.id === activeSegmentId);
@@ -535,9 +543,9 @@ export function CopyExportStep({
   // Issue A6: Per-segment regeneration
   const handleRegenerate = useCallback(async () => {
     if (onRegenerateSegment && activeSegmentName) {
-      await onRegenerateSegment(activeSegmentName);
+      await onRegenerateSegment(activeSegmentName, activeVideoId);
     }
-  }, [onRegenerateSegment, activeSegmentName]);
+  }, [onRegenerateSegment, activeSegmentName, activeVideoId]);
 
   // =========================================================================
   // Render
