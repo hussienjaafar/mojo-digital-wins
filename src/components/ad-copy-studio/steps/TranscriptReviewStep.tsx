@@ -61,6 +61,7 @@ export interface TranscriptReviewStepProps {
   onReanalyze?: (options: ReanalyzeOptions) => Promise<ReanalyzeResult | null>;
   onSaveTranscript?: (transcriptId: string, transcriptText: string) => Promise<boolean>;
   onAnalysisUpdate?: (videoId: string, analysis: TranscriptAnalysis) => void;
+  onRetranscribe?: (videoId: string) => Promise<void>;
 }
 
 // =============================================================================
@@ -192,6 +193,7 @@ export function TranscriptReviewStep({
   onReanalyze,
   onSaveTranscript,
   onAnalysisUpdate,
+  onRetranscribe,
 }: TranscriptReviewStepProps) {
   // State
   const [activeVideoId, setActiveVideoId] = useState(videos[0]?.id || '');
@@ -199,6 +201,7 @@ export function TranscriptReviewStep({
   const [editedTranscript, setEditedTranscript] = useState('');
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [retranscribingVideoId, setRetranscribingVideoId] = useState<string | null>(null);
   const [pendingContexts, setPendingContexts] = useState<Record<string, string>>({});
   const [transcriptChanges, setTranscriptChanges] = useState<Record<string, string>>({});
 
@@ -380,6 +383,20 @@ export function TranscriptReviewStep({
     }
   }, [activeTranscriptId, activeVideoId, activeAnalysis, transcriptChanges, pendingContexts, onReanalyze, onAnalysisUpdate]);
 
+  const handleRetranscribe = useCallback(async (videoId: string) => {
+    if (!onRetranscribe) return;
+    setRetranscribingVideoId(videoId);
+    try {
+      await onRetranscribe(videoId);
+      toast.success('Video retranscribed successfully');
+    } catch (err) {
+      console.error('Retranscribe error:', err);
+      toast.error('Failed to retranscribe video');
+    } finally {
+      setRetranscribingVideoId(null);
+    }
+  }, [onRetranscribe]);
+
   // =========================================================================
   // Render
   // =========================================================================
@@ -430,20 +447,38 @@ export function TranscriptReviewStep({
 
           return (
             <TabsContent key={video.id} value={video.id} className="mt-6">
-              {analysis ? (
+              {retranscribingVideoId === video.id ? (
+                <div className="flex flex-col items-center justify-center gap-4 py-16">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+                  <p className="text-sm text-[#94a3b8]">Retranscribing video…</p>
+                  <p className="text-xs text-[#64748b]">This may take a minute. Other videos are not affected.</p>
+                </div>
+              ) : analysis ? (
                 <div className="space-y-4">
                   {/* Hallucination Warning Banner */}
                   {(analysis.hallucination_risk != null && analysis.hallucination_risk > 0.5) && (
                     <div className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3">
                       <AlertTriangle className="h-5 w-5 text-amber-400 mt-0.5 shrink-0" />
-                      <div className="space-y-1">
+                      <div className="flex-1 space-y-2">
                         <p className="text-sm font-medium text-amber-300">
                           Low-confidence transcript
                         </p>
                         <p className="text-xs text-amber-400/80">
                           This transcript may be inaccurate. The audio may contain mostly music or background noise.
-                          You can edit the transcript manually below or re-upload the video with clearer audio.
+                          You can edit the transcript manually below or retranscribe the video.
                         </p>
+                        {onRetranscribe && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => handleRetranscribe(video.id)}
+                            disabled={retranscribingVideoId !== null}
+                            className="gap-1.5 mt-1 bg-amber-600 hover:bg-amber-700 text-white"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            Retry Transcription
+                          </Button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -462,16 +497,29 @@ export function TranscriptReviewStep({
                           </span>
                         )}
                       </div>
-                      {!editingTranscript && video.id === activeVideoId && (
-                        <button
-                          type="button"
-                          onClick={handleStartEdit}
-                          className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                          Edit transcript
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {onRetranscribe && !editingTranscript && video.id === activeVideoId && (
+                          <button
+                            type="button"
+                            onClick={() => handleRetranscribe(video.id)}
+                            disabled={retranscribingVideoId !== null}
+                            className="flex items-center gap-1.5 text-xs text-[#94a3b8] hover:text-amber-400 transition-colors disabled:opacity-50"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            Retranscribe
+                          </button>
+                        )}
+                        {!editingTranscript && video.id === activeVideoId && (
+                          <button
+                            type="button"
+                            onClick={handleStartEdit}
+                            className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                            Edit transcript
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <AnimatePresence mode="wait">
