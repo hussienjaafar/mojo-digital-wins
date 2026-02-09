@@ -39,6 +39,7 @@ import type {
   GeneratedCopy,
   MetaReadyCopy,
   AudienceSegment,
+  VideoUpload,
 } from '@/types/ad-copy-studio';
 import { META_COPY_LIMITS } from '@/types/ad-copy-studio';
 import { getCharCountColor } from '@/components/ad-copy-studio/components/analysis-primitives';
@@ -57,6 +58,8 @@ export interface CopyExportStepProps {
   onRegenerateSegment?: (segmentName: string) => Promise<void>;
   isRegenerating?: boolean;
   organizationName?: string;
+  videos?: VideoUpload[];
+  refcodes?: Record<string, string>;
 }
 
 // =============================================================================
@@ -67,9 +70,14 @@ function formatCopyForClipboard(
   generatedCopy: GeneratedCopy,
   audienceSegments: AudienceSegment[],
   trackingUrl: string,
-  organizationName?: string
+  organizationName?: string,
+  videoName?: string,
+  refcode?: string
 ): string {
-  let output = organizationName ? `=== ${organizationName.toUpperCase()} - AD COPY ===\n\n` : '';
+  let output = organizationName ? `=== ${organizationName.toUpperCase()} - AD COPY ===\n` : '';
+  if (videoName) output += `Ad: ${videoName}\n`;
+  if (refcode) output += `Refcode: ${refcode}\n`;
+  output += '\n';
 
   for (const segment of audienceSegments) {
     const copy = generatedCopy[segment.name];
@@ -459,6 +467,8 @@ export function CopyExportStep({
   onRegenerateSegment,
   isRegenerating,
   organizationName,
+  videos = [],
+  refcodes = {},
 }: CopyExportStepProps) {
   // Issue A5: Use segment.id as tab key
   const [activeSegmentId, setActiveSegmentId] = useState(audienceSegments[0]?.id || ALL_SEGMENTS_KEY);
@@ -469,6 +479,12 @@ export function CopyExportStep({
   const [copiedAll, setCopiedAll] = useState(false);
   const [viewMode, setViewMode] = useState<'variation' | 'element'>('variation');
   const [copiedVariationIndex, setCopiedVariationIndex] = useState<number | null>(null);
+  const [activeVideoIdx, setActiveVideoIdx] = useState(0);
+
+  // Derive active video info
+  const videosWithIds = videos.filter(v => v.video_id);
+  const activeVideo = videosWithIds[activeVideoIdx] || videosWithIds[0];
+  const activeRefcode = activeVideo?.video_id ? refcodes[activeVideo.video_id] : '';
 
   // Issue A5: Map active segment id back to name for generatedCopy lookup
   const activeSegment = audienceSegments.find(s => s.id === activeSegmentId);
@@ -491,11 +507,11 @@ export function CopyExportStep({
   }, [trackingUrl]);
 
   const handleCopyAll = useCallback(() => {
-    const formattedCopy = formatCopyForClipboard(generatedCopy, audienceSegments, trackingUrl, organizationName);
+    const formattedCopy = formatCopyForClipboard(generatedCopy, audienceSegments, trackingUrl, organizationName, activeVideo?.filename, activeRefcode);
     navigator.clipboard.writeText(formattedCopy);
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 2000);
-  }, [generatedCopy, audienceSegments, trackingUrl, organizationName]);
+  }, [generatedCopy, audienceSegments, trackingUrl, organizationName, activeVideo?.filename, activeRefcode]);
 
   const handleCopyVariation = useCallback((text: string, index: number) => {
     navigator.clipboard.writeText(text);
@@ -536,6 +552,44 @@ export function CopyExportStep({
           Review your generated ad copy{organizationName ? <> for <span className="text-blue-400 font-medium">{organizationName}</span></> : ''} and export for Meta Ads Manager
         </p>
       </div>
+
+      {/* Video Identifier Banner */}
+      {videosWithIds.length > 0 && (
+        <div className="rounded-xl border border-[#1e2a45] bg-[#141b2d] p-3">
+          {videosWithIds.length > 1 ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-medium uppercase tracking-wider text-[#64748b] mr-1">Current Ad:</span>
+              {videosWithIds.map((video, idx) => (
+                <button
+                  key={video.video_id}
+                  type="button"
+                  onClick={() => setActiveVideoIdx(idx)}
+                  className={cn(
+                    'flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors',
+                    activeVideoIdx === idx
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-[#0a0f1a] text-[#94a3b8] hover:bg-[#1e2a45] hover:text-[#e2e8f0] border border-[#1e2a45]'
+                  )}
+                >
+                  <span className="font-medium">Ad {idx + 1}</span>
+                  <span className="truncate max-w-[120px]">{video.filename}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium uppercase tracking-wider text-[#64748b]">Current Ad:</span>
+              <span className="text-sm text-[#e2e8f0] font-medium">Ad 1: {videosWithIds[0]?.filename}</span>
+            </div>
+          )}
+          {activeRefcode && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs text-[#64748b]">Refcode:</span>
+              <code className="rounded bg-[#0a0f1a] border border-[#1e2a45] px-2 py-0.5 text-xs text-blue-400 font-mono">{activeRefcode}</code>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Audience Tabs + View Toggle */}
       <div className="flex items-center justify-between gap-4 flex-wrap">

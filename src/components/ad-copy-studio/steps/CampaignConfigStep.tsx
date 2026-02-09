@@ -36,7 +36,7 @@ import {
   Check,
   Undo2,
 } from 'lucide-react';
-import type { CampaignConfig, AudienceSegment } from '@/types/ad-copy-studio';
+import type { CampaignConfig, AudienceSegment, VideoUpload } from '@/types/ad-copy-studio';
 
 // =============================================================================
 // Types
@@ -46,6 +46,7 @@ export interface CampaignConfigStepProps {
   config: CampaignConfig;
   onConfigChange: (config: CampaignConfig) => void;
   actblueForms: string[];
+  videos: VideoUpload[];
   onBack: () => void;
   onComplete: () => void;
 }
@@ -202,6 +203,7 @@ export function CampaignConfigStep({
   config,
   onConfigChange,
   actblueForms,
+  videos,
   onBack,
   onComplete,
 }: CampaignConfigStepProps) {
@@ -215,26 +217,45 @@ export function CampaignConfigStep({
   const [nameError, setNameError] = useState<string | null>(null);
   const [editNameError, setEditNameError] = useState<string | null>(null);
 
-  // Issue #8: Auto-generate refcode on mount if empty
+  // Auto-generate per-video refcodes on mount if empty
   useEffect(() => {
-    if (!config.refcode) {
+    const videosWithIds = videos.filter(v => v.video_id);
+    if (videosWithIds.length === 0) return;
+
+    const existingRefcodes = config.refcodes || {};
+    const needsGeneration = videosWithIds.some(v => !existingRefcodes[v.video_id!]);
+
+    if (needsGeneration) {
       const date = new Date();
       const dateStr = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
-      const shortId = Math.random().toString(36).substring(2, 6);
-      const newRefcode = `campaign-${dateStr}-${shortId}`;
+      const newRefcodes = { ...existingRefcodes };
+      videosWithIds.forEach((v, idx) => {
+        if (!newRefcodes[v.video_id!]) {
+          const shortId = Math.random().toString(36).substring(2, 6);
+          newRefcodes[v.video_id!] = `ad${idx + 1}-${dateStr}-${shortId}`;
+        }
+      });
+      // Also set the first refcode as the legacy refcode
+      const firstVideoId = videosWithIds[0]?.video_id;
       onConfigChange({
         ...config,
-        refcode: newRefcode,
+        refcodes: newRefcodes,
+        refcode: firstVideoId ? newRefcodes[firstVideoId] : config.refcode || `campaign-${dateStr}-${Math.random().toString(36).substring(2, 6)}`,
         refcode_auto_generated: true,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [videos]);
 
-  // Computed
+  // Computed: require at least one refcode to be set
+  const videosWithIds = videos.filter(v => v.video_id);
+  const allRefcodesSet = videosWithIds.length > 0
+    ? videosWithIds.every(v => config.refcodes?.[v.video_id!]?.trim())
+    : !!config.refcode;
+
   const canProceed =
     config.actblue_form_name &&
-    config.refcode &&
+    allRefcodesSet &&
     config.audience_segments.length > 0;
 
   // Issue A4: Check name uniqueness
@@ -449,32 +470,89 @@ export function CampaignConfigStep({
           </Select>
         </div>
 
-        {/* Refcode */}
-        <div className="space-y-2">
+        {/* Per-Video Refcodes */}
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
             <Label className="text-xs font-medium uppercase tracking-wider text-[#64748b]">
-              Refcode
+              Refcodes
             </Label>
-            <button
-              type="button"
-              onClick={handleRegenerateRefcode}
-              className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Regenerate
-            </button>
           </div>
-          <Input
-            type="text"
-            value={config.refcode}
-            onChange={handleRefcodeChange}
-            placeholder="Enter refcode"
-            className="bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#64748b]"
-          />
+          {videosWithIds.length > 0 ? (
+            <div className="space-y-3">
+              {videosWithIds.map((video, idx) => {
+                const videoId = video.video_id!;
+                const refcode = config.refcodes?.[videoId] || '';
+                return (
+                  <div key={videoId} className="rounded-lg border border-[#1e2a45] bg-[#0a0f1a] p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-xs font-medium text-white">
+                        {idx + 1}
+                      </span>
+                      <span className="text-sm text-[#e2e8f0] truncate">{video.filename}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="text"
+                        value={refcode}
+                        onChange={(e) => {
+                          const newRefcodes = { ...config.refcodes, [videoId]: e.target.value };
+                          onConfigChange({
+                            ...config,
+                            refcodes: newRefcodes,
+                            refcode: videosWithIds[0]?.video_id === videoId ? e.target.value : config.refcode,
+                            refcode_auto_generated: false,
+                          });
+                        }}
+                        placeholder="Enter refcode"
+                        className="bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#64748b]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const date = new Date();
+                          const dateStr = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+                          const shortId = Math.random().toString(36).substring(2, 6);
+                          const newRefcode = `ad${idx + 1}-${dateStr}-${shortId}`;
+                          const newRefcodes = { ...config.refcodes, [videoId]: newRefcode };
+                          onConfigChange({
+                            ...config,
+                            refcodes: newRefcodes,
+                            refcode: videosWithIds[0]?.video_id === videoId ? newRefcode : config.refcode,
+                            refcode_auto_generated: true,
+                          });
+                        }}
+                        className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors flex-shrink-0"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handleRegenerateRefcode}
+                  className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Regenerate
+                </button>
+              </div>
+              <Input
+                type="text"
+                value={config.refcode}
+                onChange={handleRefcodeChange}
+                placeholder="Enter refcode"
+                className="bg-[#0a0f1a] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#64748b]"
+              />
+            </div>
+          )}
           <p className="text-xs text-[#64748b]">
-            {config.refcode_auto_generated
-              ? 'Auto-generated from video analysis. Edit if needed.'
-              : 'Custom refcode entered.'}
+            Each video gets its own refcode for tracking in Meta Ads Manager.
           </p>
         </div>
 
