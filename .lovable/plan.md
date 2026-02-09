@@ -1,73 +1,122 @@
 
 
-# Fix: Ad Copy Generation Failures (Empty AI Responses)
+# Deep Investigation: Multi-Video Upload Flow -- Stuck Second Video
 
-## Root Cause
+## Root Cause Found
 
-The `generate-ad-copy` edge function calls `google/gemini-2.5-pro` with tool calling (`toolChoice: "required"`). The AI gateway is returning **completely empty responses** — no tool calls, no content, zero bytes. This causes both segments to fail, and since there's no retry logic, the entire generation fails.
+The second video gets stuck at "Transcribing" in the UI even though the backend has completed transcription successfully. The core bug is a **missing status update** in the polling/analysis flow.
 
-The logs confirm:
-- "No tool calls returned. Content length: 0"
-- "Content preview: empty"  
-- Both segments failed with the same error
-- Latency was ~20 seconds each (the model processed but returned nothing)
+### The Bug (Critical)
 
-## Solution
+In `AdCopyWizard.tsx` (lines 394-431), the polling effect successfully:
+1. Polls until `TRANSCRIBED` status
+2. Fetches the transcript analysis
+3. Updates `analyses` and `transcriptIds` state
 
-### 1. Add Retry Logic to `callLovableAIWithTools` in `_shared/ai-client.ts`
+But it **never calls `updateVideoStatus(videoId, 'ready')`** to update the video card's visual status. The video card reads its status from the `videos` array in `useVideoUpload`, which stays stuck at `transcribing` forever.
 
-When the AI returns an empty response (no tool calls AND no content), retry up to 2 additional times with a brief delay before throwing. This handles transient empty responses from the gateway.
+### Why Video 1 Works (Usually)
 
-- Retry only on empty responses (not on actual errors like 429/402)
-- Add a 1-second delay between retries
-- Log each retry attempt for debugging
+Video 1 often appears to work because:
+- The `onStatusChange` callback fires during polling transitions (PENDING -> DOWNLOADED -> TRANSCRIBED)
+- The backend sync effect (lines 312-377) may catch it on subsequent renders
+- But `onStatusChange` only updates a **dead-end** `videoStatuses` state that no component reads
 
-### 2. Add Model Fallback in `generate-ad-copy/index.ts`
+### Secondary Issues Found
 
-If `google/gemini-2.5-pro` fails for a segment, retry once with `google/gemini-2.5-flash` as a fallback model. Flash is faster and may succeed when Pro returns empty responses.
+**Issue 2: Sequential Processing Blocks UI**
 
-- Wrap the `generateCopyForSegment` call with fallback logic
-- Log which model ultimately succeeded
-- This ensures at least partial generation even when one model has issues
+The `uploadFiles` function in `useVideoUpload.ts` (line 209) uses a `for...of` loop that processes files **one at a time**:
+- Extract audio for Video 1 (30-60s)
+- Upload Video 1 audio
+- Create DB record for Video 1
+- **Await** transcription edge function for Video 1
+- THEN start Video 2
 
-### 3. Partial Success Handling
+This means Video 2's extraction doesn't even begin until Video 1's transcription API call returns. For 2 large files, this can take several minutes of unnecessary serial waiting.
 
-Currently, if ALL segments fail the function returns an error. But if generation worked for some segments but not others, we should return partial results with a warning rather than failing entirely.
+**Issue 3: `videoStatuses` State is Never Consumed**
 
-- Return whatever segments succeeded
-- Include a `warnings` array in the response listing which segments failed
-- Frontend already handles per-segment data so partial results will render correctly
+The `onStatusChange` callback (line 264-267) updates a `videoStatuses` state map, but this state is **never passed to any component or used anywhere**. It's dead code that gives a false sense that status updates are being propagated.
+
+**Issue 4: Race Condition in Polling Effect Dependencies**
+
+The polling effect depends on `[videos, stepData.videos, fetchAnalysis, pollForCompletion, updateStepData]`. When `videos` changes (e.g., Video 2 is added while Video 1 is still processing), the effect re-runs. But `processingVideosRef` prevents duplicate polling, so this is mostly safe -- except that the effect can fire before Video 2's `video_id` is set, causing it to be skipped initially.
+
+---
+
+## Fix Plan
+
+### Fix 1: Update Video Status to `ready` After Analysis Fetch (Critical)
+
+**File:** `src/components/ad-copy-studio/AdCopyWizard.tsx`
+
+In the polling effect (around line 414), after successfully fetching the analysis, add a call to update the video's UI status:
+
+```typescript
+if (result) {
+  const { analysis, transcriptId } = result;
+  // UPDATE VIDEO STATUS TO READY
+  updateVideoStatus(videoId, 'ready');
+  
+  setAnalyses(prev => { ... });
+  setTranscriptIds(prev => { ... });
+}
+```
+
+This ensures the video card transitions from "Transcribing" to "Ready" when the analysis is available.
+
+### Fix 2: Parallelize File Processing
+
+**File:** `src/hooks/useVideoUpload.ts`
+
+Change the sequential `for` loop to process files in parallel using `Promise.allSettled`:
+
+```text
+Current (sequential):
+  for (const video of newVideos) {
+    await extractAudio(video1);
+    await upload(video1);
+    await triggerTranscription(video1);
+    // NOW video2 starts...
+  }
+
+Proposed (parallel):
+  await Promise.allSettled(
+    newVideos.map(async (video) => {
+      await extractAudio(video);
+      await upload(video);
+      await triggerTranscription(video);
+    })
+  );
+```
+
+This lets both videos extract audio and upload simultaneously, significantly reducing total wait time.
+
+### Fix 3: Remove Dead `videoStatuses` State
+
+**File:** `src/components/ad-copy-studio/AdCopyWizard.tsx`
+
+Remove the unused `videoStatuses` state variable and the `onStatusChange` callback that populates it. Replace it with direct calls to `updateVideoStatus` during polling transitions so the video card status updates in real-time (e.g., showing "Downloaded" -> "Transcribing" -> "Ready" transitions).
+
+### Fix 4: Ensure Polling Picks Up Late-Added Videos
+
+**File:** `src/components/ad-copy-studio/AdCopyWizard.tsx`
+
+The polling effect checks `v.video_id` but for the second video in a sequential upload, `video_id` might not be set yet when the effect first runs. Add a small check or ensure the effect re-triggers when `video_id` is assigned.
+
+---
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/_shared/ai-client.ts` | Add retry loop (up to 3 attempts) for empty responses in `callLovableAIWithTools` |
-| `supabase/functions/generate-ad-copy/index.ts` | Add model fallback (Pro then Flash) per segment; return partial results on partial failure |
+| `src/components/ad-copy-studio/AdCopyWizard.tsx` | Add `updateVideoStatus(videoId, 'ready')` in polling effect after analysis fetch; remove dead `videoStatuses` state; wire `onStatusChange` to `updateVideoStatus` |
+| `src/hooks/useVideoUpload.ts` | Parallelize file processing with `Promise.allSettled` instead of sequential `for` loop |
 
-## Technical Details
+## Technical Notes
 
-### Retry Logic (ai-client.ts)
-
-```text
-callLovableAIWithTools():
-  for attempt 1..3:
-    result = callLovableAI(options)
-    if result has tool calls OR parseable content -> return
-    if attempt < 3 -> log warning, wait 1s, retry
-  throw "AI did not return structured tool call output"
-```
-
-### Model Fallback (generate-ad-copy/index.ts)
-
-```text
-for each segment:
-  result = generateCopyForSegment(transcript, segment, "google/gemini-2.5-pro")
-  if result is null:
-    log "Pro failed, trying Flash fallback"
-    result = generateCopyForSegment(transcript, segment, "google/gemini-2.5-flash")
-  if result -> add to results
-  else -> add to warnings
-```
-
-The `generateCopyForSegment` function will accept an optional `model` parameter to support fallback.
+- No database or edge function changes needed
+- The backend is working correctly (both videos reach TRANSCRIBED status)
+- This is purely a frontend state management issue
+- The parallel upload change also improves UX by showing both progress bars simultaneously
