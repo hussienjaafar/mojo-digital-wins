@@ -1,75 +1,35 @@
 
-# Fix: Generate Unique Ad Copy Per Video
 
-## Problem
+# Increase Primary Text Length for Better Fundraising Copy
 
-The generation step calls the edge function only once using the first video's transcript. All videos therefore show identical ad copy in the export step, even though each video has its own unique transcript and analysis.
+## What Changes
 
-## Solution
+The primary text limit will be raised from 300 to 900 characters, and the AI prompt will be updated to produce longer, multi-paragraph fundraising copy. The first 125 characters remain the scroll-stopping hook (this is the part visible before "See More" on Meta), but the full text will now include a proper narrative arc.
 
-Loop over all videos during generation, calling the edge function once per video with that video's specific transcript and refcode. Store results keyed by video ID so each video tab in the export step shows its own unique copy.
+## Why
 
-## Changes Required
+Meta allows up to 2,200 characters for primary text. Research shows that fundraising ads perform best in the 400-900 character range because they give enough room for emotional storytelling, impact framing, and a strong CTA. The current 300-character cap forces the AI to compress everything into a single short paragraph, losing persuasive power.
 
-### 1. Types (`src/types/ad-copy-studio.ts`)
+## Changes (2 files, 4 edits)
 
-- Add a new type alias for per-video results:
-  ```
-  PerVideoGeneratedCopy = Record<videoId, GeneratedCopy>
-  PerVideoMetaReadyCopy = Record<videoId, MetaReadyCopy>
-  ```
-- Update `SessionStepData.generated_copy` to support the per-video structure
+### File 1: `supabase/functions/_shared/prompts.ts`
 
-### 2. Generation Hook (`src/hooks/useAdCopyGeneration.ts`)
+1. **System prompt character limit** (line 146): Change "300 chars max" to "600-900 chars target"
+2. **Ad structure arc** (lines 150-153): Update the structure to have a proper 4-part arc:
+   - HOOK (first 125 chars): Scroll-stopper (unchanged)
+   - BRIDGE (~150 chars): Stakes, evidence, emotional deepening
+   - EMOTIONAL DEEPENING (~200 chars): Transcript-derived story, consequences, villain/hero contrast
+   - CTA (~100 chars): Specific dollar amount + impact framing + action verb
+3. **Tool schema** (line 399): Update `primary_text` description from "max 300 chars" to "600-900 chars target"
 
-- Change `generateCopy` to accept an array of videos (each with transcript ID, video ID, and refcode) instead of a single transcript ID
-- Loop over each video, calling the edge function per video
-- Accumulate results into a `Record<videoId, GeneratedCopy>` and `Record<videoId, MetaReadyCopy>` map
-- Track progress across all videos (e.g., 20% per video if 5 videos)
-- Support partial success: if one video fails, others still succeed (with warnings)
+### File 2: `supabase/functions/generate-ad-copy/index.ts`
 
-### 3. Wizard (`src/components/ad-copy-studio/AdCopyWizard.tsx`)
+4. **Validation limit** (line 132): Change `primary_text_max` from `300` to `900`
 
-- Update `handleGenerate` to build the per-video params array from all videos that have transcripts
-- Pass each video's specific refcode from `campaignConfig.refcodes[videoId]`
-- Pass the per-video results down to `CopyExportStep`
+## What Stays the Same
 
-### 4. Export Step (`src/components/ad-copy-studio/steps/CopyExportStep.tsx`)
-
-- Accept per-video copy maps instead of flat maps
-- When a video tab is selected, look up that video's copy from the per-video map
-- The segment tabs and variation cards remain unchanged -- they just read from the active video's slice of data
-- Update "Copy All" and CSV export to include all videos or just the active one
-
-### 5. Edge function -- No changes needed
-
-The edge function already accepts a single `transcript_id` and `refcode` and returns copy for that transcript. We just call it multiple times from the frontend.
-
-## Flow Diagram
-
-```text
-Before:
-  handleGenerate -> generateCopy(video1.transcriptId) -> edge function -> same copy for all tabs
-
-After:
-  handleGenerate -> for each video:
-    generateCopy(video.transcriptId, video.refcode) -> edge function -> video-specific copy
-  -> store as { videoId1: { segmentCopy... }, videoId2: { segmentCopy... } }
-  -> CopyExportStep reads activeVideo's copy
-```
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/types/ad-copy-studio.ts` | Add per-video type aliases, update SessionStepData |
-| `src/hooks/useAdCopyGeneration.ts` | Accept multi-video params, loop and accumulate results per video |
-| `src/components/ad-copy-studio/AdCopyWizard.tsx` | Build per-video params array in handleGenerate |
-| `src/components/ad-copy-studio/steps/CopyExportStep.tsx` | Read copy from per-video map based on active video tab |
-
-## Edge Cases
-
-- If a video's generation fails, the others still complete; a warning toast is shown
-- Single-video sessions work identically (map has one entry)
-- Session recovery: persisted `step_data.generated_copy` uses the new per-video structure
-- History panel: existing generation history records use the old flat format and will continue to work as-is (they were single-video generations)
+- Headlines: 27 chars max
+- Descriptions: 25 chars max
+- First 125 chars of primary text remain the hook (visible before "See More")
+- All 5 frameworks (PAS, BAB, AIDA, Social Proof, Identity) still used
+- Few-shot examples will be updated to demonstrate the longer format
