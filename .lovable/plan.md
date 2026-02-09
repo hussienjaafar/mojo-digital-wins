@@ -1,109 +1,101 @@
 
 
-# Fix Video 2 Persistent Hallucination - Deep Investigation Results
+# Fix Video Deletion Cleanup and Stuck Transcription
 
-## Root Cause (Three Cascading Failures)
+## Problem 1: Old Video 2 Data Persists After Deletion
 
-### Failure 1: Original Video Never Available for Retry
+When a user removes a video from the upload step, `removeVideo()` only removes it from local React state. It does not:
+- Delete the `meta_ad_videos` database record
+- Delete the associated `meta_ad_transcripts` record
+- Clean up the analysis from `stepData.analyses`
+- Remove related storage files
 
-When you upload a large video (Video 2 is 289MB), the client extracts audio to a small `.m4a` file and uploads **only the audio** to the `meta-ad-audio` bucket. The original video file is never stored in Supabase Storage. The `video_source_url` in the database points to this extracted `.m4a` file.
+This means the old hallucinated transcript and analysis for Video 2 (DB ID `86d560c8`) still exist in the database and in the persisted session data.
 
-When the retry logic tries to find the original video, it looks at the wrong path (`videos/{org_id}/{video_id}.mp4`) in the `meta-ad-videos` bucket -- but the original video was never uploaded there. The lookup fails silently, and it retries with the same bad audio.
+## Problem 2: Re-uploaded Video (Video 6) Stuck at PENDING
 
-### Failure 2: Detection Thresholds Too Lenient
+The re-uploaded video (`27f89e0f`) was inserted and the edge function was invoked, but the OLD code (before the ID fix deployment) was still running. It passed the `video_id` column value (`upload_xxx`) instead of the UUID primary key, causing a postgres UUID parse error. The function returned 404 and exited.
 
-The `no_speech_prob` values for Video 2's segments average ~0.35 (range 0.17-0.44). The current threshold requires >0.4 to flag as "elevated" risk. This means Whisper is ~35% confident there's no speech, but the system treats this as acceptable.
+After the code fix was deployed, the function was never re-invoked. The poller sees `PENDING` in the DB forever, but `PENDING` is not a terminal status, so it just keeps polling without ever re-triggering the transcription.
 
-### Failure 3: No Semantic Validation
+## Solution
 
-The transcript text is coherent-sounding English gibberish ("I'm a lesbian. I'm morally distracted from the moment my life began...") -- it's grammatically plausible but completely unrelated to the video content. Neither repetition detection nor language checks can catch semantically wrong but linguistically valid text.
-
-## Solution: Three-Pronged Fix
-
-### 1. Upload Original Video Alongside Audio
+### 1. Make `removeVideo` a full cleanup operation
 
 **File:** `src/hooks/useVideoUpload.ts`
 
-After extracting audio, also upload the original video file to the `meta-ad-videos` bucket at a predictable path. This ensures the retry logic can actually find and use the original video.
+Update `removeVideo` to:
+- Delete the `meta_ad_videos` record from the database (if it has a `video_id`)
+- Delete the associated `meta_ad_transcripts` record
+- Delete associated audio/video files from storage buckets
+- Remove from local state (as it does now)
 
-- Upload audio to `meta-ad-audio` bucket (as now, for initial transcription)
-- Also upload original video to `meta-ad-videos` bucket at path `{org_id}/{batchId}/{videoId}_{filename}`
-- Store the original video storage path in the database
+### 2. Clean up analyses in AdCopyWizard when video is removed
 
-### 2. Lower the no_speech_prob Threshold
+**File:** `src/components/ad-copy-studio/AdCopyWizard.tsx`
 
-**File:** `supabase/functions/_shared/hallucination-detection.ts`
+Wrap the `removeVideo` call to also:
+- Remove the video's analysis from the `analyses` state (keyed by `video_id`)
+- Remove the video's transcript ID from `transcriptIds` state
+- Persist the cleaned-up state to `stepData`
 
-Lower the threshold from 0.4 to 0.3 for the "elevated" tier. Video 2's average of 0.35 would then be caught:
+### 3. Add a stuck-detection mechanism to the poller
 
-```text
-Current:
-  > 0.6 -> risk 0.9
-  > 0.4 -> risk 0.6
+**File:** `src/hooks/useVideoTranscriptionFlow.ts` or `src/components/ad-copy-studio/AdCopyWizard.tsx`
 
-New:
-  > 0.5 -> risk 0.9
-  > 0.3 -> risk 0.6
-```
+When polling detects a video has been in `PENDING` status for more than 30 seconds, re-trigger the edge function automatically. This handles cases where the initial invocation failed (as happened here).
 
-### 3. Add LLM-Based Semantic Coherence Check
+### 4. Manually fix the current stuck video
 
-**File:** `supabase/functions/_shared/hallucination-detection.ts` and edge functions
-
-After transcription, use Lovable AI (which requires no extra API key) to do a quick coherence check: "Does this transcript sound like a real political advocacy advertisement?" This catches the case where Whisper produces grammatically valid but semantically nonsensical text.
-
-- Only run this check when `no_speech_prob` is borderline (0.2-0.5 range)
-- Use a fast, cheap model (gemini-2.5-flash-lite) with a simple yes/no prompt
-- If the LLM says "no", flag hallucination risk at 0.85
-
-### 4. Fix the Retry Video Path Lookup
-
-**File:** `supabase/functions/transcribe-meta-ad-video/index.ts`
-
-Fix the retry code to look up the original video at the correct storage path. Query the `meta_ad_videos` table for the actual storage path information instead of guessing.
-
-For existing videos that were already uploaded (like Video 2), the original video isn't in storage. In this case, the system should clearly tell the user that a re-upload is needed.
+The existing Video 6 record (`27f89e0f`) needs its transcription re-triggered. The poller stuck-detection fix (item 3) will handle this automatically on the next page load, or the user can click the retry button.
 
 ## Technical Details
 
-### Storage Path Fix for Retry
-
-The current retry code guesses: `videos/{org_id}/{video_id}.mp4`
-
-The actual upload path is: `{org_id}/{batch_id}/{video_id}_{sanitized_filename}`
-
-Fix: Query the `meta_ad_videos` table for `original_filename` and reconstruct the path, or better yet, store the video storage path in a new column.
-
-### Semantic Check Prompt
+### Updated removeVideo (useVideoUpload.ts)
 
 ```text
-You are evaluating if a transcript is real or hallucinated by an AI speech model.
-A real transcript from a political ad would discuss policy, candidates, donations, or community issues.
-A hallucinated transcript contains random, incoherent, or unrelated content.
+removeVideo(id):
+  find video by local id
+  if video has video_id (DB record):
+    delete from meta_ad_transcripts where video_ref = video.video_id
+    delete from meta_ad_videos where id = video.video_id
+    delete audio file from meta-ad-audio bucket
+    delete video file from meta-ad-videos bucket (if exists)
+  remove from local state
+```
 
-Transcript: "{text}"
+### Wrapped removal in AdCopyWizard
 
-Is this a real political ad transcript? Reply with only "real" or "hallucinated".
+```text
+handleRemoveVideo(id):
+  find the video's video_id (DB ID)
+  call removeVideo(id)  // does DB + local cleanup
+  remove analyses[video_id]
+  remove transcriptIds[video_id]
+  update stepData with cleaned analyses, transcriptIds, and filtered videos list
+```
+
+### Stuck detection in polling loop
+
+```text
+pollForCompletion(videoId):
+  ...existing polling loop...
+  if status === 'PENDING' and elapsed > 30s:
+    log warning
+    re-invoke transcribe-meta-ad-video edge function
+    reset elapsed timer
+    continue polling
 ```
 
 ### Files to Modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/_shared/hallucination-detection.ts` | Lower `no_speech_prob` thresholds (0.4 to 0.3); add `semanticCoherenceCheck()` function |
-| `supabase/functions/transcribe-meta-ad-video/index.ts` | Fix retry video path lookup; integrate semantic check; log more detail on retry failures |
-| `supabase/functions/upload-video-for-transcription/index.ts` | Integrate semantic check |
-| `src/hooks/useVideoUpload.ts` | Upload original video alongside extracted audio for future retries |
+| `src/hooks/useVideoUpload.ts` | Make `removeVideo` delete DB records, transcripts, and storage files |
+| `src/components/ad-copy-studio/AdCopyWizard.tsx` | Wrap `removeVideo` to also clean up `analyses` and `transcriptIds` state + stepData |
+| `src/hooks/useVideoTranscriptionFlow.ts` | Add stuck-detection: re-trigger edge function if PENDING > 30 seconds |
 
-### Database Changes
+### Database Impact
 
-Add column to `meta_ad_videos`:
-- `video_storage_path` (text, nullable) -- stores the path to the original video in storage for retry purposes
-
-## What This Fixes
-
-- **Immediate**: Lowered `no_speech_prob` threshold catches Video 2 (avg 0.35 > new 0.3 threshold)
-- **Semantic check**: Even if `no_speech_prob` is low, the LLM coherence check catches gibberish text like "I'm morally distracted from the moment my life began"
-- **Future retries**: Original video is uploaded to storage, so retry can use a different audio extraction approach
-- **Existing videos**: For videos already uploaded without the original file, the UI will prompt the user to re-upload
+No schema changes needed. This only deletes data rows for the specific removed video.
 
