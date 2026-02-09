@@ -710,6 +710,63 @@ export function AdCopyWizard({
           }
         };
 
+        // Handler to retranscribe a single video
+        const handleRetranscribeVideo = async (videoId: string) => {
+          // videoId here is the local video ID; find the video to get video_id (DB ID)
+          const video = currentVideos.find((v: VideoUpload) => v.id === videoId);
+          if (!video?.video_id) {
+            console.error('[AdCopyWizard] Cannot retranscribe: no video_id for', videoId);
+            return;
+          }
+          const dbVideoId = video.video_id;
+
+          // Clear old analysis for this video
+          setAnalyses(prev => {
+            const updated = { ...prev };
+            delete updated[dbVideoId];
+            updateStepData({ analyses: updated });
+            return updated;
+          });
+          setTranscriptIds(prev => {
+            const updated = { ...prev };
+            delete updated[dbVideoId];
+            updateStepData({ transcriptIds: updated });
+            return updated;
+          });
+
+          // Remove from failed set and processing set to allow re-polling
+          failedVideosRef.current.delete(dbVideoId);
+          processingVideosRef.current.delete(dbVideoId);
+
+          // Reset DB status to PENDING and re-trigger transcription
+          await retryTranscription(video.id);
+
+          // Update stepData to persist transcribing state
+          const updatedVideos = (stepData.videos || []).map((v: VideoUpload) =>
+            v.id === video.id ? { ...v, status: 'transcribing' as const, error_message: undefined, transcriptionStartTime: Date.now() } : v
+          );
+          updateStepData({ videos: updatedVideos });
+
+          // Poll for completion and fetch new analysis
+          const finalStatus = await pollForCompletion(dbVideoId);
+          if (finalStatus === 'TRANSCRIBED' || finalStatus === 'ANALYZED') {
+            const result = await fetchAnalysis(dbVideoId);
+            if (result) {
+              updateVideoStatus(dbVideoId, 'ready');
+              setAnalyses(prev => {
+                const updated = { ...prev, [dbVideoId]: result.analysis };
+                updateStepData({ analyses: updated });
+                return updated;
+              });
+              setTranscriptIds(prev => {
+                const updated = { ...prev, [dbVideoId]: result.transcriptId };
+                updateStepData({ transcriptIds: updated });
+                return updated;
+              });
+            }
+          }
+        };
+
         return (
           <TranscriptReviewStep
             videos={currentVideos}
@@ -720,6 +777,7 @@ export function AdCopyWizard({
             onReanalyze={reanalyzeTranscript}
             onSaveTranscript={saveTranscript}
             onAnalysisUpdate={handleAnalysisUpdate}
+            onRetranscribe={handleRetranscribeVideo}
           />
         );
 
