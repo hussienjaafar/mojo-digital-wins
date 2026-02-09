@@ -1,91 +1,102 @@
 
 
-# Enrich Ad Copy Generation with Organization Context and Research-Backed Improvements
+# Fix: Detect and Handle Whisper Hallucinations
 
-## Overview
+## Problem
 
-The ad copy generation currently only uses transcript data and audience segment info. The `organization_profiles` table already stores rich organization context (mission, focus areas, allies, opponents, stakeholders, key issues, geographies, sensitivity redlines, and raw AI-extracted website data) that is never passed to the AI. This plan integrates that context into the prompt and applies research-backed improvements to donation amount strategy.
+Whisper-1 is generating completely fabricated transcripts when a video has poor audio quality, background music, or minimal speech. The telltale sign is Whisper detecting the language as "latin" and producing nonsensical text about unrelated topics (e.g., "Buddha Shakyamuni..."). This is a well-documented Whisper hallucination problem.
 
-## Changes
+## Evidence from the Database
 
-### 1. Fetch Organization Profile in Edge Function
+- Video 2 ("AD 1 - 1x1 (1).mp4"): language = "latin", transcript is total gibberish
+- All other 4 videos: language = "english", transcripts are accurate and relevant
 
-**File:** `supabase/functions/generate-ad-copy/index.ts`
+## Solution: Multi-Layer Hallucination Detection
 
-After fetching the org slug (line ~403), also fetch the organization profile:
+### Layer 1: Use Whisper's Built-in `no_speech_prob` (Backend)
 
-```sql
-SELECT mission_summary, focus_areas, key_issues, allies, opponents,
-       stakeholders, geographies, sensitivity_redlines, ai_extracted_data
-FROM organization_profiles
-WHERE organization_id = effectiveOrgId
+Whisper returns a `no_speech_prob` value per segment. When this is high (>0.5), the segment is likely hallucinated. Currently the edge function ignores this field.
+
+**Files:** `supabase/functions/transcribe-meta-ad-video/index.ts` and `supabase/functions/upload-video-for-transcription/index.ts`
+
+- Parse `no_speech_prob` from each Whisper segment
+- Calculate average `no_speech_prob` across all segments
+- If average > 0.5, or if detected language is unexpected (not in a reasonable set like english, spanish, arabic, etc.), flag the transcript as `LOW_CONFIDENCE`
+- Store a `hallucination_risk` score (0-1) in the transcript record
+
+### Layer 2: Language Sanity Check (Backend)
+
+If Whisper detects "latin", "welsh", "maori", or other highly unlikely languages for political ad content, automatically flag the transcript.
+
+- Add a set of "expected languages" (configurable, defaulting to common languages)
+- If detected language is not in the expected set, mark `transcription_confidence` as low (e.g., 0.2 instead of hardcoded 0.95)
+
+### Layer 3: Retry with Enhanced Whisper Settings (Backend)
+
+When a hallucination is detected, automatically retry with better Whisper parameters:
+
+- Add `language: "en"` to force English detection (prevents Whisper from drifting into hallucination)
+- Add `prompt` parameter with context hint like "This is a political advertisement about advocacy and policy" to ground Whisper
+
+### Layer 4: UI Warning (Frontend)
+
+When a transcript has low confidence or hallucination risk, show a warning banner in the transcript review step.
+
+**File:** Transcript display component in Ad Copy Studio
+
+- Show an amber warning: "This transcript may be inaccurate. The audio may contain mostly music or background noise. You can edit the transcript manually or re-upload the video."
+- Make the "Edit transcript" button more prominent for flagged transcripts
+
+## Database Changes
+
+Add two columns to `meta_ad_transcripts`:
+- `hallucination_risk` (float, nullable) - 0 to 1 score
+- `auto_retry_count` (int, default 0) - tracks retry attempts
+
+## Implementation Order
+
+1. Add database columns
+2. Update `transcribe-meta-ad-video` edge function with hallucination detection + auto-retry
+3. Update `upload-video-for-transcription` edge function with same logic
+4. Add UI warning for low-confidence transcripts
+5. Deploy edge functions
+
+## Technical Details
+
+### Whisper API Enhancement
+
+```text
+Current call:
+  formData.append('model', 'whisper-1')
+  formData.append('response_format', 'verbose_json')
+  formData.append('timestamp_granularities[]', 'segment')
+
+Enhanced call (on retry):
+  + formData.append('language', 'en')
+  + formData.append('prompt', 'Political advocacy advertisement about policy and community organizing.')
 ```
 
-This data is already in the database from the onboarding scrape -- no new scraping needed at generation time.
+### Hallucination Detection Logic
 
-### 2. Add Organization Context to the Prompt
-
-**File:** `supabase/functions/_shared/prompts.ts`
-
-Update `buildAdCopyUserMessage` to accept an optional `organizationContext` parameter and inject a new `## ORGANIZATION CONTEXT` section into the user message:
-
-```
-## ORGANIZATION CONTEXT
-Mission: [mission_summary]
-Focus Areas: [focus_areas joined]
-Key Issues: [key_issues joined]
-Allies: [allies joined]
-Opponents: [opponents joined]
-Geographic Focus: [geographies joined]
-Redlines (NEVER say this): [sensitivity_redlines]
+```text
+function detectHallucination(result):
+  avgNoSpeechProb = average of segments[].no_speech_prob
+  unexpectedLanguage = language NOT IN ['english','spanish','arabic','french','urdu','hindi','chinese','korean','japanese','german','portuguese','italian','russian','turkish','persian','tagalog','vietnamese','polish','ukrainian','dutch','indonesian','malay','thai','bengali','swahili','hausa','amharic','somali','hebrew']
+  
+  hallucinationRisk = 0
+  if avgNoSpeechProb > 0.6: hallucinationRisk = 0.9
+  else if avgNoSpeechProb > 0.4: hallucinationRisk = 0.6
+  if unexpectedLanguage: hallucinationRisk = max(hallucinationRisk, 0.8)
+  
+  return { hallucinationRisk, shouldRetry: hallucinationRisk > 0.5 }
 ```
 
-This gives the AI grounding in who the organization is, what they stand for, and what to avoid -- all derived from their actual website.
-
-### 3. Update System Prompt with Research-Backed Improvements
-
-**File:** `supabase/functions/_shared/prompts.ts`
-
-Enhance `AD_COPY_SYSTEM_PROMPT` with three additions:
-
-**a) Segment-Aware Donation Amounts** -- Currently hardcoded. Add a rule:
-- Acquisition/cold traffic: suggest $5, $10 (low friction)
-- Retention/warm traffic: suggest $27, $50 (higher anchor)
-- The segment tone guidance already handles this per-segment, so reinforce it in the system prompt as a hard rule
-
-**b) Enforced Impact Framing** -- Currently optional. Make it a hard rule:
-- Every CTA with a dollar amount MUST connect it to a concrete outcome from the transcript (e.g., "Your $10 helps us fight the bill that would cut X")
-- Add this as Hard Rule #7
-
-**c) Organization Alignment Rule** -- New hard rule:
-- Copy MUST reflect the organization's mission and values from the context
-- Copy MUST NOT violate any sensitivity redlines
-- Add this as Hard Rule #8
-
-### 4. Pass Organization Context Through the Generation Pipeline
-
-**File:** `supabase/functions/generate-ad-copy/index.ts`
-
-- Pass the fetched profile data into `generateCopyForSegment`
-- `generateCopyForSegment` passes it to `buildAdCopyUserMessage`
-- No changes to the tool schema or AI response format needed -- this is purely additional context in the user message
-
-### 5. Graceful Degradation
-
-If no organization profile exists (e.g., profile wasn't set up during onboarding), generation proceeds as before with no organization context section. The profile fetch uses `.maybeSingle()` so a missing profile is not an error.
-
-## Files to Modify
+### Files to Modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/generate-ad-copy/index.ts` | Fetch org profile from DB; pass to `generateCopyForSegment` |
-| `supabase/functions/_shared/prompts.ts` | Add org context param to `buildAdCopyUserMessage`; add hard rules #7 (impact framing) and #8 (org alignment + redlines) to system prompt |
-
-## What This Does NOT Change
-
-- No database migrations needed (data already exists)
-- No UI changes needed (context is injected server-side)
-- No changes to the tool calling schema or response format
-- No new edge functions or API calls at generation time
-- The existing scrape-organization-website flow during onboarding already populates this data
+| Database migration | Add `hallucination_risk` and `auto_retry_count` columns |
+| `supabase/functions/transcribe-meta-ad-video/index.ts` | Add hallucination detection, auto-retry with language hint |
+| `supabase/functions/upload-video-for-transcription/index.ts` | Same hallucination detection logic |
+| Transcript review UI component | Add low-confidence warning banner |
 
