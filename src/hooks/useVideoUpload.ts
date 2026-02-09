@@ -445,11 +445,11 @@ export function useVideoUpload(
 
         // Trigger transcription edge function
         try {
-          console.log(`[useVideoUpload] Triggering transcription for video_id: ${insertedVideo.video_id}`);
+          console.log(`[useVideoUpload] Triggering transcription for video DB id: ${insertedVideo.id}`);
           const { error: transcribeError } = await supabase.functions.invoke('transcribe-meta-ad-video', {
             body: {
               organization_id: organizationId,
-              video_id: insertedVideo.video_id, // Use video_id column, not id
+              video_id: insertedVideo.id, // Use primary key `id`, not the `video_id` column
               mode: 'single',
             },
           });
