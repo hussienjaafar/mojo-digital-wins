@@ -215,21 +215,38 @@ serve(async (req) => {
         failed++; results.push({ video_id: video.video_id, status: 'failed', error: 'Transcription failed' }); continue;
       }
 
-      // Hallucination detection
+      // Hallucination detection (now includes repetition check)
       let autoRetryCount = 0;
-      const hallucinationCheck = detectHallucination(transcription.segments, transcription.language);
+      const hallucinationCheck = detectHallucination(transcription.segments, transcription.language, transcription.text);
 
       if (hallucinationCheck.shouldRetry) {
-        console.log(`[TRANSCRIBE] Hallucination detected (risk=${hallucinationCheck.hallucinationRisk.toFixed(2)}, reason: ${hallucinationCheck.reason}). Retrying with language hint...`);
+        console.log(`[TRANSCRIBE] Hallucination detected (risk=${hallucinationCheck.hallucinationRisk.toFixed(2)}, reason: ${hallucinationCheck.reason}). Retrying...`);
         autoRetryCount = 1;
 
-        const retryResult = await transcribeWithWhisper(mediaResult.blob, mediaResult.filename, openaiApiKey, {
+        // If repetition detected and source is extracted audio (.m4a), try original video instead
+        let retryBlob = mediaResult.blob;
+        let retryFilename = mediaResult.filename;
+        if (hallucinationCheck.repetitionDetected && mediaResult.filename.endsWith('.m4a') && video.video_source_url) {
+          console.log(`[TRANSCRIBE] Repetition detected with extracted audio — attempting original video download...`);
+          // Try to find and use the original video from storage
+          const videoPath = `videos/${video.organization_id}/${video.video_id}.mp4`;
+          const { data: videoData } = await supabase.storage.from('meta-ad-videos').download(videoPath);
+          if (videoData) {
+            console.log(`[TRANSCRIBE] Using original video file for retry (${(videoData.size / 1024 / 1024).toFixed(2)} MB)`);
+            retryBlob = videoData;
+            retryFilename = 'video.mp4';
+          } else {
+            console.log(`[TRANSCRIBE] Original video not found in storage, retrying with same audio`);
+          }
+        }
+
+        const retryResult = await transcribeWithWhisper(retryBlob, retryFilename, openaiApiKey, {
           language: 'en',
           prompt: 'Political advocacy advertisement about policy and community organizing.',
         });
 
         if (retryResult) {
-          const retryCheck = detectHallucination(retryResult.segments, retryResult.language);
+          const retryCheck = detectHallucination(retryResult.segments, retryResult.language, retryResult.text);
           console.log(`[TRANSCRIBE] Retry result: risk=${retryCheck.hallucinationRisk.toFixed(2)}`);
           // Use retry if it's better
           if (retryCheck.hallucinationRisk < hallucinationCheck.hallucinationRisk) {
@@ -239,7 +256,7 @@ serve(async (req) => {
       }
 
       // Final hallucination risk after potential retry
-      const finalCheck = detectHallucination(transcription.segments, transcription.language);
+      const finalCheck = detectHallucination(transcription.segments, transcription.language, transcription.text);
       const transcriptionConfidence = computeConfidence(finalCheck.hallucinationRisk);
 
       if (await isCancelled(video.id)) { results.push({ video_id: video.video_id, status: 'cancelled' }); continue; }
