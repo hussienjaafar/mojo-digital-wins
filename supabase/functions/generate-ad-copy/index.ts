@@ -129,7 +129,7 @@ interface TranscriptData {
 
 const META_COPY_LIMITS = {
   primary_text_visible: 125,
-  primary_text_max: 300,
+  primary_text_max: 900,
   headline_max: 27,
   description_max: 25,
 };
