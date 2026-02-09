@@ -1,102 +1,50 @@
 
 
-# Fix: Detect and Handle Whisper Hallucinations
+# Add "Retranscribe" Button to Transcript Review Step
 
-## Problem
+## Overview
 
-Whisper-1 is generating completely fabricated transcripts when a video has poor audio quality, background music, or minimal speech. The telltale sign is Whisper detecting the language as "latin" and producing nonsensical text about unrelated topics (e.g., "Buddha Shakyamuni..."). This is a well-documented Whisper hallucination problem.
+Add a button on the transcript review step that lets you retranscribe a single video without affecting other videos. This is especially useful when a transcript came back as gibberish (hallucination) and you want to try again.
 
-## Evidence from the Database
+## What You'll See
 
-- Video 2 ("AD 1 - 1x1 (1).mp4"): language = "latin", transcript is total gibberish
-- All other 4 videos: language = "english", transcripts are accurate and relevant
-
-## Solution: Multi-Layer Hallucination Detection
-
-### Layer 1: Use Whisper's Built-in `no_speech_prob` (Backend)
-
-Whisper returns a `no_speech_prob` value per segment. When this is high (>0.5), the segment is likely hallucinated. Currently the edge function ignores this field.
-
-**Files:** `supabase/functions/transcribe-meta-ad-video/index.ts` and `supabase/functions/upload-video-for-transcription/index.ts`
-
-- Parse `no_speech_prob` from each Whisper segment
-- Calculate average `no_speech_prob` across all segments
-- If average > 0.5, or if detected language is unexpected (not in a reasonable set like english, spanish, arabic, etc.), flag the transcript as `LOW_CONFIDENCE`
-- Store a `hallucination_risk` score (0-1) in the transcript record
-
-### Layer 2: Language Sanity Check (Backend)
-
-If Whisper detects "latin", "welsh", "maori", or other highly unlikely languages for political ad content, automatically flag the transcript.
-
-- Add a set of "expected languages" (configurable, defaulting to common languages)
-- If detected language is not in the expected set, mark `transcription_confidence` as low (e.g., 0.2 instead of hardcoded 0.95)
-
-### Layer 3: Retry with Enhanced Whisper Settings (Backend)
-
-When a hallucination is detected, automatically retry with better Whisper parameters:
-
-- Add `language: "en"` to force English detection (prevents Whisper from drifting into hallucination)
-- Add `prompt` parameter with context hint like "This is a political advertisement about advocacy and policy" to ground Whisper
-
-### Layer 4: UI Warning (Frontend)
-
-When a transcript has low confidence or hallucination risk, show a warning banner in the transcript review step.
-
-**File:** Transcript display component in Ad Copy Studio
-
-- Show an amber warning: "This transcript may be inaccurate. The audio may contain mostly music or background noise. You can edit the transcript manually or re-upload the video."
-- Make the "Edit transcript" button more prominent for flagged transcripts
-
-## Database Changes
-
-Add two columns to `meta_ad_transcripts`:
-- `hallucination_risk` (float, nullable) - 0 to 1 score
-- `auto_retry_count` (int, default 0) - tracks retry attempts
-
-## Implementation Order
-
-1. Add database columns
-2. Update `transcribe-meta-ad-video` edge function with hallucination detection + auto-retry
-3. Update `upload-video-for-transcription` edge function with same logic
-4. Add UI warning for low-confidence transcripts
-5. Deploy edge functions
+- A "Retranscribe" button in the hallucination warning banner (for flagged transcripts) and in the transcript panel header (for all transcripts)
+- Clicking it will re-run the transcription for just that one video
+- The video's transcript area will show a loading state while processing
+- Other videos' transcripts remain completely untouched
+- Once complete, the new transcript and analysis replace the old one
 
 ## Technical Details
 
-### Whisper API Enhancement
+### 1. Pass retranscribe capability to TranscriptReviewStep
 
-```text
-Current call:
-  formData.append('model', 'whisper-1')
-  formData.append('response_format', 'verbose_json')
-  formData.append('timestamp_granularities[]', 'segment')
+**File:** `src/components/ad-copy-studio/AdCopyWizard.tsx`
 
-Enhanced call (on retry):
-  + formData.append('language', 'en')
-  + formData.append('prompt', 'Political advocacy advertisement about policy and community organizing.')
-```
+- Add a new `onRetranscribe` prop that accepts a video ID, resets that video's DB status back to PENDING, re-triggers the `transcribe-meta-ad-video` edge function, polls for completion, and updates the analysis state
+- Wire this up using the existing `retryTranscription` (from `useVideoUpload`) combined with re-polling and re-fetching analysis (from `useVideoTranscriptionFlow`)
 
-### Hallucination Detection Logic
+### 2. Add retranscribe handler and UI to TranscriptReviewStep
 
-```text
-function detectHallucination(result):
-  avgNoSpeechProb = average of segments[].no_speech_prob
-  unexpectedLanguage = language NOT IN ['english','spanish','arabic','french','urdu','hindi','chinese','korean','japanese','german','portuguese','italian','russian','turkish','persian','tagalog','vietnamese','polish','ukrainian','dutch','indonesian','malay','thai','bengali','swahili','hausa','amharic','somali','hebrew']
-  
-  hallucinationRisk = 0
-  if avgNoSpeechProb > 0.6: hallucinationRisk = 0.9
-  else if avgNoSpeechProb > 0.4: hallucinationRisk = 0.6
-  if unexpectedLanguage: hallucinationRisk = max(hallucinationRisk, 0.8)
-  
-  return { hallucinationRisk, shouldRetry: hallucinationRisk > 0.5 }
-```
+**File:** `src/components/ad-copy-studio/steps/TranscriptReviewStep.tsx`
+
+- Accept `onRetranscribe?: (videoId: string) => Promise<void>` prop
+- Add a "Retranscribe" button with a `RefreshCw` icon in the transcript panel header (next to "Edit transcript")
+- For videos with high hallucination risk, add a prominent "Retry Transcription" button inside the warning banner
+- While retranscribing, show a spinner and disable the button; hide the transcript text and show a "Retranscribing..." placeholder
+- Track `retranscribingVideoId` state to know which video is currently being retranscribed
+
+### 3. Handle state updates after retranscription
+
+**File:** `src/components/ad-copy-studio/AdCopyWizard.tsx`
+
+- After retranscription completes, clear the old analysis and fetch the new one
+- Update `analyses`, `transcriptIds`, and `stepData` for just the affected video
+- Other videos' state remains completely unchanged
 
 ### Files to Modify
 
 | File | Change |
 |------|--------|
-| Database migration | Add `hallucination_risk` and `auto_retry_count` columns |
-| `supabase/functions/transcribe-meta-ad-video/index.ts` | Add hallucination detection, auto-retry with language hint |
-| `supabase/functions/upload-video-for-transcription/index.ts` | Same hallucination detection logic |
-| Transcript review UI component | Add low-confidence warning banner |
+| `src/components/ad-copy-studio/AdCopyWizard.tsx` | Create `handleRetranscribeVideo` callback; pass as `onRetranscribe` prop to TranscriptReviewStep |
+| `src/components/ad-copy-studio/steps/TranscriptReviewStep.tsx` | Add `onRetranscribe` prop, retranscribe button in header + warning banner, loading state |
 
