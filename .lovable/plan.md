@@ -1,86 +1,73 @@
 
 
-# Generation History: Reassignment + Org Safeguards
+# Fix: Ad Copy Generation Failures (Empty AI Responses)
 
-## Part 1: Reassign Past Generations to Correct Organization
+## Root Cause
 
-### Problem
-All 6 MPAC generations (actblue_form_name: "mpac-meta") are stored under "A New Policy" (346d6aaf...) because they were created before the Step 0 org gate existed.
+The `generate-ad-copy` edge function calls `google/gemini-2.5-pro` with tool calling (`toolChoice: "required"`). The AI gateway is returning **completely empty responses** — no tool calls, no content, zero bytes. This causes both segments to fail, and since there's no retry logic, the entire generation fails.
 
-### Solution: "Move to Organization" action in GenerationHistoryPanel
+The logs confirm:
+- "No tool calls returned. Content length: 0"
+- "Content preview: empty"  
+- Both segments failed with the same error
+- Latency was ~20 seconds each (the model processed but returned nothing)
 
-Add a "Move" button on each generation card in the detail view that:
-1. Opens a small org picker dialog
-2. User selects the correct target organization
-3. Updates `organization_id` on the `ad_copy_generations` row
-4. Shows a success toast and refreshes the list
+## Solution
 
-**UI placement:** In `GenerationDetail`, add a "Move to..." button in the meta info card, next to the existing metadata. Uses a small popover/dialog with the same org search list from `AdminOrganizationPicker`.
+### 1. Add Retry Logic to `callLovableAIWithTools` in `_shared/ai-client.ts`
 
-### Files
+When the AI returns an empty response (no tool calls AND no content), retry up to 2 additional times with a brief delay before throwing. This handles transient empty responses from the gateway.
+
+- Retry only on empty responses (not on actual errors like 429/402)
+- Add a 1-second delay between retries
+- Log each retry attempt for debugging
+
+### 2. Add Model Fallback in `generate-ad-copy/index.ts`
+
+If `google/gemini-2.5-pro` fails for a segment, retry once with `google/gemini-2.5-flash` as a fallback model. Flash is faster and may succeed when Pro returns empty responses.
+
+- Wrap the `generateCopyForSegment` call with fallback logic
+- Log which model ultimately succeeded
+- This ensures at least partial generation even when one model has issues
+
+### 3. Partial Success Handling
+
+Currently, if ALL segments fail the function returns an error. But if generation worked for some segments but not others, we should return partial results with a warning rather than failing entirely.
+
+- Return whatever segments succeeded
+- Include a `warnings` array in the response listing which segments failed
+- Frontend already handles per-segment data so partial results will render correctly
+
+## Files to Modify
+
 | File | Change |
 |------|--------|
-| `GenerationHistoryPanel.tsx` | Add "Move to Organization" button in detail view, with org picker popover and Supabase UPDATE call |
-| `useGenerationHistory.ts` | Add a `moveGeneration(generationId, newOrgId)` helper function; expose `refetch` |
-
----
-
-## Part 2: Prevent Generating Under the Wrong Organization
-
-### Problem
-There's no validation that the ActBlue form name actually belongs to the selected organization. A user could select Org A but configure an ActBlue form that belongs to Org B.
-
-### Solution: ActBlue Form-to-Org Association Check
-
-The ActBlue forms are currently fetched globally for the admin. To add a safeguard:
-
-1. **Visual warning in CopyGenerationStep (Step 4):** Before generation, if a previous generation exists with the same `actblue_form_name` under a DIFFERENT organization, show a warning banner:
-   > "The form 'mpac-meta' was previously used with organization 'MPAC'. You're currently generating for 'A New Policy'. Are you sure this is correct?"
-
-2. **Confirmation dialog on Generate:** If the mismatch warning is active, require an explicit confirmation before proceeding with generation.
-
-This is a soft safeguard (warning, not blocking) since some forms may legitimately be shared, but it catches the common mistake.
-
-### Implementation
-
-Query on Step 4 mount:
-```sql
-SELECT DISTINCT organization_id 
-FROM ad_copy_generations 
-WHERE actblue_form_name = $formName 
-  AND organization_id != $currentOrgId
-LIMIT 1
-```
-
-If results exist, look up the org name and show the warning.
-
-### Files
-| File | Change |
-|------|--------|
-| `CopyGenerationStep.tsx` | Add mismatch check query on mount, warning banner UI, confirmation gate on generate |
-| `AdCopyWizard.tsx` | Pass `organizations` list to CopyGenerationStep so it can resolve org names for the warning |
-
----
+| `supabase/functions/_shared/ai-client.ts` | Add retry loop (up to 3 attempts) for empty responses in `callLovableAIWithTools` |
+| `supabase/functions/generate-ad-copy/index.ts` | Add model fallback (Pro then Flash) per segment; return partial results on partial failure |
 
 ## Technical Details
 
-### Database Changes
-None required -- just UPDATE and SELECT queries using existing tables and columns.
+### Retry Logic (ai-client.ts)
 
-### Reassignment Flow
 ```text
-Detail View -> "Move to..." button -> Org Picker Popover
-  -> Select target org -> Confirm dialog ("Move this generation from [A] to [B]?")
-  -> UPDATE ad_copy_generations SET organization_id = $newOrgId WHERE id = $genId
-  -> Toast "Moved to [Org Name]" -> Refetch list
+callLovableAIWithTools():
+  for attempt 1..3:
+    result = callLovableAI(options)
+    if result has tool calls OR parseable content -> return
+    if attempt < 3 -> log warning, wait 1s, retry
+  throw "AI did not return structured tool call output"
 ```
 
-### Mismatch Warning Flow
+### Model Fallback (generate-ad-copy/index.ts)
+
 ```text
-Step 4 mounts -> Query: any other org used this ActBlue form?
-  -> If yes: show yellow warning banner with org name
-  -> User clicks "Generate" -> Extra confirmation dialog
-  -> User confirms -> Proceed normally
-  -> If no mismatch: generate as normal (no extra step)
+for each segment:
+  result = generateCopyForSegment(transcript, segment, "google/gemini-2.5-pro")
+  if result is null:
+    log "Pro failed, trying Flash fallback"
+    result = generateCopyForSegment(transcript, segment, "google/gemini-2.5-flash")
+  if result -> add to results
+  else -> add to warnings
 ```
 
+The `generateCopyForSegment` function will accept an optional `model` parameter to support fallback.
