@@ -205,8 +205,8 @@ export function useVideoUpload(
     // Track successful uploads (avoid stale closure by counting directly)
     let uploadSuccessCount = 0;
 
-    // Process each file
-    for (const video of newVideos) {
+    // FIX 2: Process all files in parallel instead of sequentially
+    await Promise.allSettled(newVideos.map(async (video) => {
       const file = video.file!;
 
       // Validate file
@@ -216,7 +216,7 @@ export function useVideoUpload(
           status: 'error',
           error_message: validation.error,
         });
-        continue;
+        return;
       }
 
       // Update status to uploading
@@ -335,7 +335,7 @@ export function useVideoUpload(
                  extractionStage: undefined,
                  extractionElapsedMs: undefined,
                });
-               continue;
+                return;
              }
            }
          }
@@ -354,7 +354,7 @@ export function useVideoUpload(
             status: 'error',
             error_message: `Upload failed: ${uploadError.message}`,
           });
-          continue;
+          return;
         }
 
          // Update progress (upload complete, now creating record)
@@ -408,7 +408,7 @@ export function useVideoUpload(
             status: 'error',
             error_message: `Failed to create video record: ${dbError.message}`,
           });
-          continue;
+          return;
         }
 
         // Update video with transcribing status (transcription will be triggered)
@@ -462,7 +462,7 @@ export function useVideoUpload(
           error_message: err?.message || 'Upload failed',
         });
       }
-    }
+    }));
 
     setIsUploading(false);
 
