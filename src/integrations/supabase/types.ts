@@ -6285,6 +6285,7 @@ export type Database = {
           video_resolution: string | null
           video_source_expires_at: string | null
           video_source_url: string | null
+          video_storage_path: string | null
         }
         Insert: {
           ad_id: string
@@ -6324,6 +6325,7 @@ export type Database = {
           video_resolution?: string | null
           video_source_expires_at?: string | null
           video_source_url?: string | null
+          video_storage_path?: string | null
         }
         Update: {
           ad_id?: string
@@ -6363,6 +6365,7 @@ export type Database = {
           video_resolution?: string | null
           video_source_expires_at?: string | null
           video_source_url?: string | null
+          video_storage_path?: string | null
         }
         Relationships: [
           {

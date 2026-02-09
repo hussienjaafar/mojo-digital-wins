@@ -17,7 +17,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { callLovableAIWithTools, AIGatewayError } from "../_shared/ai-client.ts";
 import { buildTranscriptAnalysisPrompt, TRANSCRIPT_ANALYSIS_TOOL } from "../_shared/prompts.ts";
-import { detectHallucination, computeConfidence } from "../_shared/hallucination-detection.ts";
+import { detectHallucination, computeConfidence, checkSemanticCoherence } from "../_shared/hallucination-detection.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -212,7 +212,26 @@ serve(async (req) => {
 
     // Hallucination detection + auto-retry
     let autoRetryCount = 0;
-    const hallucinationCheck = detectHallucination(transcription.segments, transcription.language, transcription.text);
+    let hallucinationCheck = detectHallucination(transcription.segments, transcription.language, transcription.text);
+
+    // Semantic coherence check for borderline cases
+    const avgNoSpeechProb = transcription.segments
+      .map(s => s.no_speech_prob ?? 0)
+      .reduce((a, b) => a + b, 0) / (transcription.segments.length || 1);
+    
+    if (avgNoSpeechProb > 0.2 || hallucinationCheck.hallucinationRisk > 0) {
+      console.log(`[UPLOAD-TRANSCRIBE] Running semantic coherence check...`);
+      const semanticResult = await checkSemanticCoherence(transcription.text);
+      if (!semanticResult.isCoherent) {
+        console.log(`[UPLOAD-TRANSCRIBE] Semantic check: transcript is HALLUCINATED`);
+        hallucinationCheck = {
+          ...hallucinationCheck,
+          hallucinationRisk: Math.max(hallucinationCheck.hallucinationRisk, 0.85),
+          shouldRetry: true,
+          reason: [hallucinationCheck.reason, 'LLM semantic check: hallucinated'].filter(Boolean).join('; '),
+        };
+      }
+    }
 
     if (hallucinationCheck.shouldRetry) {
       console.log(`[UPLOAD-TRANSCRIBE] Hallucination detected (risk=${hallucinationCheck.hallucinationRisk.toFixed(2)}, reason: ${hallucinationCheck.reason}). Retrying with language hint...`);
@@ -225,8 +244,12 @@ serve(async (req) => {
 
       if (retryResult) {
         const retryCheck = detectHallucination(retryResult.segments, retryResult.language, retryResult.text);
-        console.log(`[UPLOAD-TRANSCRIBE] Retry result: risk=${retryCheck.hallucinationRisk.toFixed(2)}`);
-        if (retryCheck.hallucinationRisk < hallucinationCheck.hallucinationRisk) {
+        const retrySemanticResult = await checkSemanticCoherence(retryResult.text);
+        let retryRisk = retryCheck.hallucinationRisk;
+        if (!retrySemanticResult.isCoherent) retryRisk = Math.max(retryRisk, 0.85);
+        
+        console.log(`[UPLOAD-TRANSCRIBE] Retry result: risk=${retryRisk.toFixed(2)}`);
+        if (retryRisk < hallucinationCheck.hallucinationRisk) {
           transcription = retryResult;
         }
       }
@@ -234,15 +257,21 @@ serve(async (req) => {
 
     // Final hallucination risk
     const finalCheck = detectHallucination(transcription.segments, transcription.language, transcription.text);
-    const transcriptionConfidence = computeConfidence(finalCheck.hallucinationRisk);
+    let finalRisk = finalCheck.hallucinationRisk;
+    // Final semantic check if still borderline
+    if (finalRisk < 0.5 && avgNoSpeechProb > 0.2) {
+      const finalSemantic = await checkSemanticCoherence(transcription.text);
+      if (!finalSemantic.isCoherent) finalRisk = Math.max(finalRisk, 0.85);
+    }
+    const transcriptionConfidence = computeConfidence(finalRisk);
 
     // Only analyze if confidence is reasonable
-    const analysis = finalCheck.hallucinationRisk < 0.8
+    const analysis = finalRisk < 0.8
       ? await analyzeTranscript(transcription.text)
       : null;
 
-    if (finalCheck.hallucinationRisk >= 0.8) {
-      console.log(`[UPLOAD-TRANSCRIBE] Skipping analysis for hallucinated transcript (risk=${finalCheck.hallucinationRisk.toFixed(2)})`);
+    if (finalRisk >= 0.8) {
+      console.log(`[UPLOAD-TRANSCRIBE] Skipping analysis for hallucinated transcript (risk=${finalRisk.toFixed(2)})`);
     }
 
     const speakingMetrics = calculateSpeakingMetrics(transcription.text, transcription.duration, transcription.segments);
@@ -300,7 +329,7 @@ serve(async (req) => {
       key_phrases: analysis?.key_phrases || [],
       transcription_model: 'whisper-1',
       transcription_confidence: transcriptionConfidence,
-      hallucination_risk: finalCheck.hallucinationRisk,
+      hallucination_risk: finalRisk,
       auto_retry_count: autoRetryCount,
       analysis_model: analysis ? 'google/gemini-3-flash-preview' : null,
       analysis_version: '3.1',
@@ -314,7 +343,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: `Database error: ${transcriptError.message}` }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    console.log(`[UPLOAD-TRANSCRIBE] Success! Video ${finalVideoId} transcribed (hallucination_risk=${finalCheck.hallucinationRisk.toFixed(2)})`);
+    console.log(`[UPLOAD-TRANSCRIBE] Success! Video ${finalVideoId} transcribed (hallucination_risk=${finalRisk.toFixed(2)})`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -325,7 +354,7 @@ serve(async (req) => {
       issue_primary: analysis?.issue_primary || null,
       political_stances: analysis?.political_stances || [],
       targets_attacked: analysis?.targets_attacked || [],
-      hallucination_risk: finalCheck.hallucinationRisk,
+      hallucination_risk: finalRisk,
       analysis_version: '3.1',
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 

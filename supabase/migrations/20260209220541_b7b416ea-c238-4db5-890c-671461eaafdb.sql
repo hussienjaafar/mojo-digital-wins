@@ -1,0 +1,1 @@
+ALTER TABLE public.meta_ad_videos ADD COLUMN IF NOT EXISTS video_storage_path text;

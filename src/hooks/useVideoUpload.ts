@@ -340,7 +340,7 @@ export function useVideoUpload(
            }
          }
 
-         // Upload to Supabase Storage (either extracted audio or original video)
+          // Upload to Supabase Storage (either extracted audio or original video)
         const { error: uploadError } = await supabase.storage
            .from(storageBucket)
            .upload(storagePath, fileToUpload, {
@@ -355,6 +355,25 @@ export function useVideoUpload(
             error_message: `Upload failed: ${uploadError.message}`,
           });
           return;
+        }
+
+        // Also upload the original video file for retry purposes (if we extracted audio)
+        let videoStoragePath: string | undefined;
+        if (needsAudioExtraction) {
+          const originalVideoPath = `${organizationId}/${batchId}/${videoId}_original_${sanitizedFilename}`;
+          console.log(`[useVideoUpload] Uploading original video for retry: ${originalVideoPath}`);
+          const { error: videoUploadError } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .upload(originalVideoPath, file, {
+              contentType: file.type,
+              upsert: false,
+            });
+          if (videoUploadError) {
+            console.warn('[useVideoUpload] Original video upload failed (non-fatal):', videoUploadError.message);
+          } else {
+            videoStoragePath = originalVideoPath;
+            console.log(`[useVideoUpload] Original video uploaded: ${originalVideoPath}`);
+          }
         }
 
          // Update progress (upload complete, now creating record)
@@ -375,6 +394,7 @@ export function useVideoUpload(
             ad_id: `upload_${videoId}`,
             video_id: videoId,
             video_source_url: videoUrl,
+            video_storage_path: videoStoragePath || null,
             source: 'uploaded',
             original_filename: file.name,
             video_file_size_bytes: file.size,
