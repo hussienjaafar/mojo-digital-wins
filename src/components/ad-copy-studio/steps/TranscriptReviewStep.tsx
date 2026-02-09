@@ -62,6 +62,7 @@ export interface TranscriptReviewStepProps {
   onSaveTranscript?: (transcriptId: string, transcriptText: string) => Promise<boolean>;
   onAnalysisUpdate?: (videoId: string, analysis: TranscriptAnalysis) => void;
   onRetranscribe?: (videoId: string) => Promise<void>;
+  onRemoveVideo?: (id: string) => Promise<void>;
 }
 
 // =============================================================================
@@ -194,6 +195,7 @@ export function TranscriptReviewStep({
   onSaveTranscript,
   onAnalysisUpdate,
   onRetranscribe,
+  onRemoveVideo,
 }: TranscriptReviewStepProps) {
   // State
   const [activeVideoId, setActiveVideoId] = useState(videos[0]?.id || '');
@@ -419,13 +421,14 @@ export function TranscriptReviewStep({
           {videos.map((video) => {
             const index = getVideoIndex(video.id);
             const hasAnalysis = !!analyses[video.id];
+            const isActive = activeVideoId === video.id;
 
             return (
               <TabsTrigger
                 key={video.id}
                 value={video.id}
                 className={cn(
-                  'relative gap-2 px-4 py-2 rounded-lg transition-colors',
+                  'relative gap-2 px-4 py-2 rounded-lg transition-colors group',
                   'data-[state=active]:bg-blue-600 data-[state=active]:text-white',
                   'data-[state=inactive]:bg-transparent data-[state=inactive]:text-[#94a3b8]',
                   'data-[state=inactive]:hover:bg-[#1e2a45] data-[state=inactive]:hover:text-[#e2e8f0]'
@@ -435,6 +438,33 @@ export function TranscriptReviewStep({
                   <CheckCircle className="h-3.5 w-3.5 text-[#22c55e]" />
                 )}
                 <span>Video {index}</span>
+                {onRemoveVideo && videos.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      // If removing the active video, switch to another tab first
+                      if (isActive) {
+                        const remaining = videos.filter(v => v.id !== video.id);
+                        if (remaining.length > 0) {
+                          setActiveVideoId(remaining[0].id);
+                        }
+                      }
+                      onRemoveVideo(video.id);
+                    }}
+                    className={cn(
+                      'ml-1 rounded-full p-0.5 transition-opacity',
+                      'opacity-0 group-hover:opacity-100 focus:opacity-100',
+                      isActive
+                        ? 'hover:bg-blue-500 text-white/70 hover:text-white'
+                        : 'hover:bg-[#2a3654] text-[#64748b] hover:text-[#e2e8f0]'
+                    )}
+                    aria-label={`Remove Video ${index}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </TabsTrigger>
             );
           })}
