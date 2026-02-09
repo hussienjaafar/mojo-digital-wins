@@ -825,6 +825,7 @@ export function AdCopyWizard({
             onConfigChange={handleCampaignConfigChange}
             actblueForms={actblueForms}
             videos={currentVideos}
+            organizationName={selectedOrg?.name}
             onBack={() => handleGoBack(2)}
             onComplete={handleCampaignConfigComplete}
           />

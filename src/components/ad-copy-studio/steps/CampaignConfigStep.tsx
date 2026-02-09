@@ -39,6 +39,30 @@ import {
 import type { CampaignConfig, AudienceSegment, VideoUpload } from '@/types/ad-copy-studio';
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+function generateRefcode(orgName: string | undefined, filename: string): string {
+  const orgSlug = (orgName || 'org')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .substring(0, 10);
+
+  const fileSlug = filename
+    .replace(/\.[^.]+$/, '')       // remove extension
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '_') // normalize
+    .replace(/_+/g, '_')          // collapse underscores
+    .substring(0, 15);
+
+  const date = new Date();
+  const dateStr = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+  const shortId = Math.random().toString(36).substring(2, 6);
+
+  return `${orgSlug}-${fileSlug}-${dateStr}-${shortId}`;
+}
+
+// =============================================================================
 // Types
 // =============================================================================
 
@@ -47,6 +71,7 @@ export interface CampaignConfigStepProps {
   onConfigChange: (config: CampaignConfig) => void;
   actblueForms: string[];
   videos: VideoUpload[];
+  organizationName?: string;
   onBack: () => void;
   onComplete: () => void;
 }
@@ -204,6 +229,7 @@ export function CampaignConfigStep({
   onConfigChange,
   actblueForms,
   videos,
+  organizationName,
   onBack,
   onComplete,
 }: CampaignConfigStepProps) {
@@ -226,21 +252,17 @@ export function CampaignConfigStep({
     const needsGeneration = videosWithIds.some(v => !existingRefcodes[v.video_id!]);
 
     if (needsGeneration) {
-      const date = new Date();
-      const dateStr = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
       const newRefcodes = { ...existingRefcodes };
-      videosWithIds.forEach((v, idx) => {
+      videosWithIds.forEach((v) => {
         if (!newRefcodes[v.video_id!]) {
-          const shortId = Math.random().toString(36).substring(2, 6);
-          newRefcodes[v.video_id!] = `ad${idx + 1}-${dateStr}-${shortId}`;
+          newRefcodes[v.video_id!] = generateRefcode(organizationName, v.filename);
         }
       });
-      // Also set the first refcode as the legacy refcode
       const firstVideoId = videosWithIds[0]?.video_id;
       onConfigChange({
         ...config,
         refcodes: newRefcodes,
-        refcode: firstVideoId ? newRefcodes[firstVideoId] : config.refcode || `campaign-${dateStr}-${Math.random().toString(36).substring(2, 6)}`,
+        refcode: firstVideoId ? newRefcodes[firstVideoId] : config.refcode || generateRefcode(organizationName, 'campaign'),
         refcode_auto_generated: true,
       });
     }
@@ -295,16 +317,14 @@ export function CampaignConfigStep({
   );
 
   const handleRegenerateRefcode = useCallback(() => {
-    const date = new Date();
-    const dateStr = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
-    const shortId = Math.random().toString(36).substring(2, 6);
-    const newRefcode = `campaign-${dateStr}-${shortId}`;
+    const firstFilename = videos[0]?.filename || 'campaign';
+    const newRefcode = generateRefcode(organizationName, firstFilename);
     onConfigChange({
       ...config,
       refcode: newRefcode,
       refcode_auto_generated: true,
     });
-  }, [config, onConfigChange]);
+  }, [config, onConfigChange, organizationName, videos]);
 
   const handleAmountChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -508,11 +528,8 @@ export function CampaignConfigStep({
                       />
                       <button
                         type="button"
-                        onClick={() => {
-                          const date = new Date();
-                          const dateStr = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
-                          const shortId = Math.random().toString(36).substring(2, 6);
-                          const newRefcode = `ad${idx + 1}-${dateStr}-${shortId}`;
+                      onClick={() => {
+                          const newRefcode = generateRefcode(organizationName, video.filename);
                           const newRefcodes = { ...config.refcodes, [videoId]: newRefcode };
                           onConfigChange({
                             ...config,
