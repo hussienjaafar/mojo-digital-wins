@@ -216,8 +216,7 @@ export function AdCopyWizard({
     return stepData.analyses || {};
   });
 
-  // Track video statuses locally for UI updates
-  const [videoStatuses, setVideoStatuses] = useState<Record<string, string>>({});
+  // (videoStatuses state removed - was dead code never consumed by UI)
 
   // Track transcript IDs for each video (needed for copy generation)
   // Issue B2: Initialize from stepData for session persistence
@@ -263,7 +262,21 @@ export function AdCopyWizard({
     organizationId,
     onStatusChange: (videoId, status) => {
       console.log(`[AdCopyWizard] Video ${videoId} status changed to: ${status}`);
-      setVideoStatuses(prev => ({ ...prev, [videoId]: status }));
+      // Map backend statuses to UI statuses and update the video card directly
+      const uiStatusMap: Record<string, VideoUpload['status']> = {
+        'PENDING': 'transcribing',
+        'DOWNLOADED': 'transcribing',
+        'URL_FETCHED': 'transcribing',
+        'TRANSCRIBING': 'transcribing',
+        'TRANSCRIBED': 'ready',
+        'ANALYZED': 'ready',
+        'COMPLETED': 'ready',
+        'ERROR': 'error',
+        'FAILED': 'error',
+        'CANCELLED': 'error',
+      };
+      const uiStatus = uiStatusMap[status] || 'transcribing';
+      updateVideoStatus(videoId, uiStatus);
     },
     onAnalysisReady: (videoId, analysis) => {
       console.log(`[AdCopyWizard] Analysis ready for video: ${videoId}`);
@@ -413,6 +426,9 @@ export function AdCopyWizard({
 
       if (result) {
         const { analysis, transcriptId } = result;
+        // FIX 1: Update video status to 'ready' so the video card transitions
+        updateVideoStatus(videoId, 'ready');
+        
         // Issue B1: Use functional updaters to avoid stale closures
         setAnalyses(prev => {
           const updated = { ...prev, [videoId]: analysis };
