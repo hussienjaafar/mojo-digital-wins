@@ -6059,12 +6059,14 @@ export type Database = {
           analysis_model: string | null
           analysis_version: string | null
           analyzed_at: string | null
+          auto_retry_count: number
           cta_text: string | null
           cta_type: string | null
           donor_pain_points: string[] | null
           duration_seconds: number | null
           emotional_appeals: string[] | null
           emotional_triggers: string[] | null
+          hallucination_risk: number | null
           hook_duration_seconds: number | null
           hook_text: string | null
           hook_word_count: number | null
@@ -6111,12 +6113,14 @@ export type Database = {
           analysis_model?: string | null
           analysis_version?: string | null
           analyzed_at?: string | null
+          auto_retry_count?: number
           cta_text?: string | null
           cta_type?: string | null
           donor_pain_points?: string[] | null
           duration_seconds?: number | null
           emotional_appeals?: string[] | null
           emotional_triggers?: string[] | null
+          hallucination_risk?: number | null
           hook_duration_seconds?: number | null
           hook_text?: string | null
           hook_word_count?: number | null
@@ -6163,12 +6167,14 @@ export type Database = {
           analysis_model?: string | null
           analysis_version?: string | null
           analyzed_at?: string | null
+          auto_retry_count?: number
           cta_text?: string | null
           cta_type?: string | null
           donor_pain_points?: string[] | null
           duration_seconds?: number | null
           emotional_appeals?: string[] | null
           emotional_triggers?: string[] | null
+          hallucination_risk?: number | null
           hook_duration_seconds?: number | null
           hook_text?: string | null
           hook_word_count?: number | null

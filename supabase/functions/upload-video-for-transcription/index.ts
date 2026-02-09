@@ -1,10 +1,12 @@
 /**
  * =============================================================================
- * UPLOAD VIDEO FOR TRANSCRIPTION (v3.0)
+ * UPLOAD VIDEO FOR TRANSCRIPTION (v3.1)
  * =============================================================================
  *
  * Accepts video files and transcribes using OpenAI Whisper (audio only).
  * Analysis step migrated to Lovable AI Gateway (google/gemini-3-flash-preview).
+ *
+ * v3.1: Hallucination detection + auto-retry with language hint.
  *
  * Note: Whisper transcription still requires OPENAI_API_KEY (audio not supported
  * by Lovable AI Gateway). Analysis uses Lovable AI with tool calling.
@@ -15,6 +17,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { callLovableAIWithTools, AIGatewayError } from "../_shared/ai-client.ts";
 import { buildTranscriptAnalysisPrompt, TRANSCRIPT_ANALYSIS_TOOL } from "../_shared/prompts.ts";
+import { detectHallucination, computeConfidence } from "../_shared/hallucination-detection.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +28,7 @@ interface TranscriptSegment {
   start: number;
   end: number;
   text: string;
+  no_speech_prob?: number;
 }
 
 interface TranscriptionResult {
@@ -58,16 +62,24 @@ async function downloadVideo(source: string, supabase: any): Promise<Blob | null
 }
 
 /**
- * Transcribe video using OpenAI Whisper API (still requires OPENAI_API_KEY)
+ * Transcribe video using OpenAI Whisper API
  */
-async function transcribeWithWhisper(videoBlob: Blob, openaiApiKey: string): Promise<TranscriptionResult | null> {
+async function transcribeWithWhisper(
+  videoBlob: Blob,
+  openaiApiKey: string,
+  options?: { language?: string; prompt?: string },
+): Promise<TranscriptionResult | null> {
   try {
-    console.log(`[UPLOAD-TRANSCRIBE] Calling Whisper API...`);
+    const retryLabel = options?.language ? ' (retry with language hint)' : '';
+    console.log(`[UPLOAD-TRANSCRIBE] Calling Whisper API${retryLabel}...`);
     const formData = new FormData();
     formData.append('file', videoBlob, 'video.mp4');
     formData.append('model', 'whisper-1');
     formData.append('response_format', 'verbose_json');
     formData.append('timestamp_granularities[]', 'segment');
+
+    if (options?.language) formData.append('language', options.language);
+    if (options?.prompt) formData.append('prompt', options.prompt);
 
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
@@ -82,10 +94,15 @@ async function transcribeWithWhisper(videoBlob: Blob, openaiApiKey: string): Pro
     }
 
     const result = await response.json();
-    console.log(`[UPLOAD-TRANSCRIBE] Transcription complete. Duration: ${result.duration}s`);
+    console.log(`[UPLOAD-TRANSCRIBE] Transcription complete. Duration: ${result.duration}s, Language: ${result.language}`);
     return {
       text: result.text,
-      segments: (result.segments || []).map((s: any) => ({ start: s.start, end: s.end, text: s.text })),
+      segments: (result.segments || []).map((s: any) => ({
+        start: s.start,
+        end: s.end,
+        text: s.text,
+        no_speech_prob: s.no_speech_prob,
+      })),
       language: result.language,
       duration: result.duration,
     };
@@ -187,14 +204,46 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Failed to download/decode video' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Transcribe with Whisper (OpenAI)
-    const transcription = await transcribeWithWhisper(videoBlob, openaiApiKey);
+    // First transcription attempt
+    let transcription = await transcribeWithWhisper(videoBlob, openaiApiKey);
     if (!transcription) {
       return new Response(JSON.stringify({ error: 'Transcription failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Analyze transcript with Lovable AI (migrated from OpenAI)
-    const analysis = await analyzeTranscript(transcription.text);
+    // Hallucination detection + auto-retry
+    let autoRetryCount = 0;
+    const hallucinationCheck = detectHallucination(transcription.segments, transcription.language);
+
+    if (hallucinationCheck.shouldRetry) {
+      console.log(`[UPLOAD-TRANSCRIBE] Hallucination detected (risk=${hallucinationCheck.hallucinationRisk.toFixed(2)}, reason: ${hallucinationCheck.reason}). Retrying with language hint...`);
+      autoRetryCount = 1;
+
+      const retryResult = await transcribeWithWhisper(videoBlob, openaiApiKey, {
+        language: 'en',
+        prompt: 'Political advocacy advertisement about policy and community organizing.',
+      });
+
+      if (retryResult) {
+        const retryCheck = detectHallucination(retryResult.segments, retryResult.language);
+        console.log(`[UPLOAD-TRANSCRIBE] Retry result: risk=${retryCheck.hallucinationRisk.toFixed(2)}`);
+        if (retryCheck.hallucinationRisk < hallucinationCheck.hallucinationRisk) {
+          transcription = retryResult;
+        }
+      }
+    }
+
+    // Final hallucination risk
+    const finalCheck = detectHallucination(transcription.segments, transcription.language);
+    const transcriptionConfidence = computeConfidence(finalCheck.hallucinationRisk);
+
+    // Only analyze if confidence is reasonable
+    const analysis = finalCheck.hallucinationRisk < 0.8
+      ? await analyzeTranscript(transcription.text)
+      : null;
+
+    if (finalCheck.hallucinationRisk >= 0.8) {
+      console.log(`[UPLOAD-TRANSCRIBE] Skipping analysis for hallucinated transcript (risk=${finalCheck.hallucinationRisk.toFixed(2)})`);
+    }
 
     const speakingMetrics = calculateSpeakingMetrics(transcription.text, transcription.duration, transcription.segments);
     const hook = extractHook(transcription.segments);
@@ -221,7 +270,7 @@ serve(async (req) => {
       transcript_segments: transcription.segments,
       duration_seconds: transcription.duration,
       language: transcription.language,
-      language_confidence: 0.95,
+      language_confidence: transcriptionConfidence,
       speaker_count: analysis?.speaker_count || 1,
       words_total: speakingMetrics.wordsTotal,
       words_per_minute: speakingMetrics.wordsPerMinute,
@@ -250,9 +299,11 @@ serve(async (req) => {
       emotional_appeals: analysis?.emotional_appeals || [],
       key_phrases: analysis?.key_phrases || [],
       transcription_model: 'whisper-1',
-      transcription_confidence: 0.95,
+      transcription_confidence: transcriptionConfidence,
+      hallucination_risk: finalCheck.hallucinationRisk,
+      auto_retry_count: autoRetryCount,
       analysis_model: analysis ? 'google/gemini-3-flash-preview' : null,
-      analysis_version: '3.0',
+      analysis_version: '3.1',
       transcribed_at: new Date().toISOString(),
       analyzed_at: analysis ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
@@ -263,7 +314,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: `Database error: ${transcriptError.message}` }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    console.log(`[UPLOAD-TRANSCRIBE] Success! Video ${finalVideoId} transcribed with v3.0 analysis`);
+    console.log(`[UPLOAD-TRANSCRIBE] Success! Video ${finalVideoId} transcribed (hallucination_risk=${finalCheck.hallucinationRisk.toFixed(2)})`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -274,7 +325,8 @@ serve(async (req) => {
       issue_primary: analysis?.issue_primary || null,
       political_stances: analysis?.political_stances || [],
       targets_attacked: analysis?.targets_attacked || [],
-      analysis_version: '3.0',
+      hallucination_risk: finalCheck.hallucinationRisk,
+      analysis_version: '3.1',
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (err) {

@@ -223,6 +223,9 @@ export function useVideoTranscriptionFlow(
         user_context_post: data.user_context_post,
         analysis_count: data.analysis_count,
         last_analyzed_at: data.last_analyzed_at,
+        // Hallucination detection
+        hallucination_risk: data.hallucination_risk,
+        transcription_confidence: data.transcription_confidence,
       };
 
       console.log('[useVideoTranscriptionFlow] Analysis fetched successfully, transcript_id:', data.id);
