@@ -612,6 +612,7 @@ describe('useAdCopyStudio Hook', () => {
          actblue_form_name: 'Test Form',
          refcode: '',
          refcode_auto_generated: true,
+         refcodes: {},
          recurring_default: false,
          audience_segments: [],
        } 

@@ -129,6 +129,7 @@ export interface CampaignConfig {
   actblue_form_name: string;
   refcode: string;
   refcode_auto_generated: boolean;
+  refcodes: Record<string, string>; // videoId -> per-video refcode
   amount_preset?: number;
   recurring_default: boolean;
   audience_segments: AudienceSegment[];

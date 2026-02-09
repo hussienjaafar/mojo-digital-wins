@@ -105,6 +105,7 @@ const DEFAULT_CAMPAIGN_CONFIG: CampaignConfig = {
   actblue_form_name: '',
   refcode: '',
   refcode_auto_generated: true,
+  refcodes: {},
   amount_preset: undefined,
   recurring_default: false,
   audience_segments: [],
@@ -823,6 +824,7 @@ export function AdCopyWizard({
             config={campaignConfig}
             onConfigChange={handleCampaignConfigChange}
             actblueForms={actblueForms}
+            videos={currentVideos}
             onBack={() => handleGoBack(2)}
             onComplete={handleCampaignConfigComplete}
           />
@@ -861,6 +863,8 @@ export function AdCopyWizard({
             onRegenerateSegment={handleRegenerateSegment}
             isRegenerating={isGenerating}
             organizationName={selectedOrg?.name}
+            videos={currentVideos}
+            refcodes={campaignConfig.refcodes}
           />
         );
 
