@@ -813,6 +813,7 @@ export function AdCopyWizard({
             onSaveTranscript={saveTranscript}
             onAnalysisUpdate={handleAnalysisUpdate}
             onRetranscribe={handleRetranscribeVideo}
+            onRemoveVideo={handleRemoveVideo}
           />
         );
 
