@@ -287,12 +287,13 @@ export function VideoUploadStep({
       {/* File Upload Drop Zone */}
       <div
         className={cn(
-          'relative rounded-xl border-2 border-dashed transition-all duration-200',
+          'relative rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer',
           isDragging
             ? 'border-blue-500 bg-blue-500/10'
             : 'border-[#1e2a45] bg-[#0a0f1a] hover:border-[#3b82f6]/50',
           isMaxVideos && 'opacity-50 cursor-not-allowed'
         )}
+        onClick={() => !isMaxVideos && fileInputRef.current?.click()}
         onDrop={handleFileDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
