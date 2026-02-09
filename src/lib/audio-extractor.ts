@@ -490,15 +490,39 @@ async function readFileWithProgress(
 }
 
 // =============================================================================
-// Audio Extraction
+// Audio Extraction (with mutex to prevent parallel FFmpeg FS conflicts)
 // =============================================================================
+
+let extractionQueue: Promise<void> = Promise.resolve();
 
 /**
  * Extract audio from a video file using FFmpeg.wasm
  *
- * Uses chunked file reading with progress and copy-first extraction strategy.
+ * Wraps the internal extraction with a mutex queue so that only one
+ * extraction runs at a time (FFmpeg.wasm shares a single virtual filesystem).
  */
 export async function extractAudio(
+  videoFile: File,
+  options: AudioExtractorOptions = {}
+): Promise<AudioExtractionResult> {
+  const result = await new Promise<AudioExtractionResult>((resolve, reject) => {
+    extractionQueue = extractionQueue.then(async () => {
+      try {
+        const r = await extractAudioInternal(videoFile, options);
+        resolve(r);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
+  return result;
+}
+
+/**
+ * Internal extraction implementation - must not be called directly.
+ * Uses chunked file reading with progress and copy-first extraction strategy.
+ */
+async function extractAudioInternal(
   videoFile: File,
   options: AudioExtractorOptions = {}
 ): Promise<AudioExtractionResult> {
