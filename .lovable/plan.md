@@ -1,122 +1,61 @@
 
 
-# Deep Investigation: Multi-Video Upload Flow -- Stuck Second Video
+# Fix: Duplicate Transcripts From Parallel FFmpeg Processing
 
-## Root Cause Found
+## Root Cause
 
-The second video gets stuck at "Transcribing" in the UI even though the backend has completed transcription successfully. The core bug is a **missing status update** in the polling/analysis flow.
+The audio extraction uses a **shared singleton FFmpeg instance** with **hardcoded filenames** in its virtual filesystem:
+- Input: `input_video.mp4`
+- Output: `output_audio.m4a`
 
-### The Bug (Critical)
+When two videos are processed in parallel (via the `Promise.allSettled` change), they both write to the same virtual filesystem paths. The second video overwrites the first video's data, causing both extractions to produce the same audio -- and therefore the same transcript.
 
-In `AdCopyWizard.tsx` (lines 394-431), the polling effect successfully:
-1. Polls until `TRANSCRIBED` status
-2. Fetches the transcript analysis
-3. Updates `analyses` and `transcriptIds` state
+## Fix
 
-But it **never calls `updateVideoStatus(videoId, 'ready')`** to update the video card's visual status. The video card reads its status from the `videos` array in `useVideoUpload`, which stays stuck at `transcribing` forever.
+Add a **processing lock** (mutex) to the `extractAudio` function so that only one extraction runs at a time. This is the safest approach because:
+- FFmpeg.wasm's virtual filesystem is shared across calls
+- Creating multiple FFmpeg instances is memory-prohibitive (each loads ~30MB WASM)
+- Unique filenames alone aren't sufficient because FFmpeg.wasm may have other shared state
 
-### Why Video 1 Works (Usually)
+The parallel `Promise.allSettled` remains in place for the overall flow (upload, DB insert, transcription trigger), but audio extraction specifically will be serialized.
 
-Video 1 often appears to work because:
-- The `onStatusChange` callback fires during polling transitions (PENDING -> DOWNLOADED -> TRANSCRIBED)
-- The backend sync effect (lines 312-377) may catch it on subsequent renders
-- But `onStatusChange` only updates a **dead-end** `videoStatuses` state that no component reads
+## Implementation
 
-### Secondary Issues Found
+### File: `src/lib/audio-extractor.ts`
 
-**Issue 2: Sequential Processing Blocks UI**
+Add a simple async mutex (promise chain) at the module level:
 
-The `uploadFiles` function in `useVideoUpload.ts` (line 209) uses a `for...of` loop that processes files **one at a time**:
-- Extract audio for Video 1 (30-60s)
-- Upload Video 1 audio
-- Create DB record for Video 1
-- **Await** transcription edge function for Video 1
-- THEN start Video 2
+```
+let extractionQueue: Promise<void> = Promise.resolve();
 
-This means Video 2's extraction doesn't even begin until Video 1's transcription API call returns. For 2 large files, this can take several minutes of unnecessary serial waiting.
+export async function extractAudio(videoFile, options) {
+  // Queue this extraction behind any in-progress one
+  const result = await new Promise((resolve, reject) => {
+    extractionQueue = extractionQueue.then(async () => {
+      try {
+        const r = await extractAudioInternal(videoFile, options);
+        resolve(r);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
+  return result;
+}
 
-**Issue 3: `videoStatuses` State is Never Consumed**
-
-The `onStatusChange` callback (line 264-267) updates a `videoStatuses` state map, but this state is **never passed to any component or used anywhere**. It's dead code that gives a false sense that status updates are being propagated.
-
-**Issue 4: Race Condition in Polling Effect Dependencies**
-
-The polling effect depends on `[videos, stepData.videos, fetchAnalysis, pollForCompletion, updateStepData]`. When `videos` changes (e.g., Video 2 is added while Video 1 is still processing), the effect re-runs. But `processingVideosRef` prevents duplicate polling, so this is mostly safe -- except that the effect can fire before Video 2's `video_id` is set, causing it to be skipped initially.
-
----
-
-## Fix Plan
-
-### Fix 1: Update Video Status to `ready` After Analysis Fetch (Critical)
-
-**File:** `src/components/ad-copy-studio/AdCopyWizard.tsx`
-
-In the polling effect (around line 414), after successfully fetching the analysis, add a call to update the video's UI status:
-
-```typescript
-if (result) {
-  const { analysis, transcriptId } = result;
-  // UPDATE VIDEO STATUS TO READY
-  updateVideoStatus(videoId, 'ready');
-  
-  setAnalyses(prev => { ... });
-  setTranscriptIds(prev => { ... });
+// Rename current extractAudio to extractAudioInternal (no other changes)
+async function extractAudioInternal(videoFile, options) {
+  // ... existing extraction logic unchanged ...
 }
 ```
 
-This ensures the video card transitions from "Transcribing" to "Ready" when the analysis is available.
+This ensures:
+- Video 1 extracts audio, completes, cleans up virtual FS
+- Video 2 then extracts audio with clean virtual FS
+- Both videos still upload and trigger transcription in parallel (only the FFmpeg step is serialized)
+- No risk of filename collisions or shared state corruption
 
-### Fix 2: Parallelize File Processing
+### No other files need changes
 
-**File:** `src/hooks/useVideoUpload.ts`
+The `useVideoUpload.ts` parallel processing stays as-is. The serialization is scoped to just the FFmpeg extraction step, which is the only part that can't safely run concurrently.
 
-Change the sequential `for` loop to process files in parallel using `Promise.allSettled`:
-
-```text
-Current (sequential):
-  for (const video of newVideos) {
-    await extractAudio(video1);
-    await upload(video1);
-    await triggerTranscription(video1);
-    // NOW video2 starts...
-  }
-
-Proposed (parallel):
-  await Promise.allSettled(
-    newVideos.map(async (video) => {
-      await extractAudio(video);
-      await upload(video);
-      await triggerTranscription(video);
-    })
-  );
-```
-
-This lets both videos extract audio and upload simultaneously, significantly reducing total wait time.
-
-### Fix 3: Remove Dead `videoStatuses` State
-
-**File:** `src/components/ad-copy-studio/AdCopyWizard.tsx`
-
-Remove the unused `videoStatuses` state variable and the `onStatusChange` callback that populates it. Replace it with direct calls to `updateVideoStatus` during polling transitions so the video card status updates in real-time (e.g., showing "Downloaded" -> "Transcribing" -> "Ready" transitions).
-
-### Fix 4: Ensure Polling Picks Up Late-Added Videos
-
-**File:** `src/components/ad-copy-studio/AdCopyWizard.tsx`
-
-The polling effect checks `v.video_id` but for the second video in a sequential upload, `video_id` might not be set yet when the effect first runs. Add a small check or ensure the effect re-triggers when `video_id` is assigned.
-
----
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/ad-copy-studio/AdCopyWizard.tsx` | Add `updateVideoStatus(videoId, 'ready')` in polling effect after analysis fetch; remove dead `videoStatuses` state; wire `onStatusChange` to `updateVideoStatus` |
-| `src/hooks/useVideoUpload.ts` | Parallelize file processing with `Promise.allSettled` instead of sequential `for` loop |
-
-## Technical Notes
-
-- No database or edge function changes needed
-- The backend is working correctly (both videos reach TRANSCRIBED status)
-- This is purely a frontend state management issue
-- The parallel upload change also improves UX by showing both progress bars simultaneously
