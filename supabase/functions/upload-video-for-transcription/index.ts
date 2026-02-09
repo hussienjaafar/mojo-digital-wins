@@ -212,7 +212,7 @@ serve(async (req) => {
 
     // Hallucination detection + auto-retry
     let autoRetryCount = 0;
-    const hallucinationCheck = detectHallucination(transcription.segments, transcription.language);
+    const hallucinationCheck = detectHallucination(transcription.segments, transcription.language, transcription.text);
 
     if (hallucinationCheck.shouldRetry) {
       console.log(`[UPLOAD-TRANSCRIBE] Hallucination detected (risk=${hallucinationCheck.hallucinationRisk.toFixed(2)}, reason: ${hallucinationCheck.reason}). Retrying with language hint...`);
@@ -224,7 +224,7 @@ serve(async (req) => {
       });
 
       if (retryResult) {
-        const retryCheck = detectHallucination(retryResult.segments, retryResult.language);
+        const retryCheck = detectHallucination(retryResult.segments, retryResult.language, retryResult.text);
         console.log(`[UPLOAD-TRANSCRIBE] Retry result: risk=${retryCheck.hallucinationRisk.toFixed(2)}`);
         if (retryCheck.hallucinationRisk < hallucinationCheck.hallucinationRisk) {
           transcription = retryResult;
@@ -233,7 +233,7 @@ serve(async (req) => {
     }
 
     // Final hallucination risk
-    const finalCheck = detectHallucination(transcription.segments, transcription.language);
+    const finalCheck = detectHallucination(transcription.segments, transcription.language, transcription.text);
     const transcriptionConfidence = computeConfidence(finalCheck.hallucinationRisk);
 
     // Only analyze if confidence is reasonable
