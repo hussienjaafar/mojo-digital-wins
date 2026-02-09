@@ -580,7 +580,7 @@ export function CopyExportStep({
                   )}
                 >
                   <span className="font-medium">Ad {idx + 1}</span>
-                  <span className="truncate max-w-[120px]">{video.filename}</span>
+                  <span className="break-all">{video.filename}</span>
                 </button>
               ))}
             </div>
