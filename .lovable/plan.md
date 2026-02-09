@@ -1,50 +1,95 @@
 
+# Fix Persistent Whisper Hallucination on Video 2
 
-# Add "Retranscribe" Button to Transcript Review Step
+## Problem
 
-## Overview
+The hallucination detection catches language-based hallucinations (e.g., "latin") but misses a very common Whisper failure mode: **repetitive looping text**. When Whisper retries with `language: 'en'`, it produces English-sounding gibberish ("I'm Eachy who work in executive work...") that repeats itself -- this passes the current checks because:
+- Language = "english" (expected)
+- `no_speech_prob` is low (Whisper thinks it heard speech)
 
-Add a button on the transcript review step that lets you retranscribe a single video without affecting other videos. This is especially useful when a transcript came back as gibberish (hallucination) and you want to try again.
+The transcript clearly loops: the same paragraph appears twice, which is a telltale sign of Whisper hallucination.
 
-## What You'll See
+## Solution: Add Repetition Detection Layer
 
-- A "Retranscribe" button in the hallucination warning banner (for flagged transcripts) and in the transcript panel header (for all transcripts)
-- Clicking it will re-run the transcription for just that one video
-- The video's transcript area will show a loading state while processing
-- Other videos' transcripts remain completely untouched
-- Once complete, the new transcript and analysis replace the old one
+### 1. Add repetition detection to hallucination-detection.ts
+
+**File:** `supabase/functions/_shared/hallucination-detection.ts`
+
+Add a `detectRepetition` function that:
+- Splits transcript into sentences
+- Checks if any substantial sentence (>5 words) appears more than once
+- Calculates a "repetition ratio" (repeated content / total content)
+- If ratio > 0.3 (30%+ of text is repeated), flag as hallucination risk 0.85
+
+Integrate this into the existing `detectHallucination` function so both edge functions benefit automatically.
+
+### 2. Update both edge functions to send original video on retry
+
+Currently, retries use the same extracted audio file. If the audio extraction was poor quality (e.g., mostly music track, speech on a different channel), retrying with the same bad audio won't help.
+
+**File:** `supabase/functions/upload-video-for-transcription/index.ts`
+
+When hallucination is detected (including repetition), retry by sending the **original video blob** directly to Whisper instead of just the extracted audio. Whisper accepts video files (mp4) and extracts audio internally, which may capture a different/better audio stream.
+
+**File:** `supabase/functions/transcribe-meta-ad-video/index.ts`
+
+Same change: on hallucination retry, if the source is an extracted audio file (`.m4a`), try to fetch and use the original video file from storage instead. If the original video isn't available, fall back to retrying with the same audio + language hint.
+
+### 3. Lower the confidence threshold for edge cases
+
+**File:** `supabase/functions/_shared/hallucination-detection.ts`
+
+Update `computeConfidence` to also factor in repetition. A transcript with significant repetition should get a confidence of 0.3 max, ensuring the UI shows the warning banner.
 
 ## Technical Details
 
-### 1. Pass retranscribe capability to TranscriptReviewStep
+### Repetition Detection Algorithm
 
-**File:** `src/components/ad-copy-studio/AdCopyWizard.tsx`
+```text
+function detectRepetition(text):
+  sentences = split text by period/exclamation/question
+  filter sentences with > 5 words
+  
+  seen = Map<normalizedSentence, count>
+  for each sentence:
+    normalized = lowercase, trim whitespace
+    seen[normalized] += 1
+  
+  repeatedWordCount = sum of (wordCount * (count - 1)) for sentences where count > 1
+  totalWordCount = total words in text
+  
+  repetitionRatio = repeatedWordCount / totalWordCount
+  return { repetitionRatio, hasRepetition: repetitionRatio > 0.3 }
+```
 
-- Add a new `onRetranscribe` prop that accepts a video ID, resets that video's DB status back to PENDING, re-triggers the `transcribe-meta-ad-video` edge function, polls for completion, and updates the analysis state
-- Wire this up using the existing `retryTranscription` (from `useVideoUpload`) combined with re-polling and re-fetching analysis (from `useVideoTranscriptionFlow`)
+### Updated detectHallucination
 
-### 2. Add retranscribe handler and UI to TranscriptReviewStep
-
-**File:** `src/components/ad-copy-studio/steps/TranscriptReviewStep.tsx`
-
-- Accept `onRetranscribe?: (videoId: string) => Promise<void>` prop
-- Add a "Retranscribe" button with a `RefreshCw` icon in the transcript panel header (next to "Edit transcript")
-- For videos with high hallucination risk, add a prominent "Retry Transcription" button inside the warning banner
-- While retranscribing, show a spinner and disable the button; hide the transcript text and show a "Retranscribing..." placeholder
-- Track `retranscribingVideoId` state to know which video is currently being retranscribed
-
-### 3. Handle state updates after retranscription
-
-**File:** `src/components/ad-copy-studio/AdCopyWizard.tsx`
-
-- After retranscription completes, clear the old analysis and fetch the new one
-- Update `analyses`, `transcriptIds`, and `stepData` for just the affected video
-- Other videos' state remains completely unchanged
+```text
+function detectHallucination(segments, language, text):
+  // Existing checks...
+  avgNoSpeechProb check
+  unexpectedLanguage check
+  
+  // NEW: Repetition check
+  repetition = detectRepetition(text)
+  if repetition.hasRepetition:
+    hallucinationRisk = max(hallucinationRisk, 0.85)
+    reasons.push("repetitive text detected (X% repeated)")
+  
+  return { hallucinationRisk, shouldRetry, reason }
+```
 
 ### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/ad-copy-studio/AdCopyWizard.tsx` | Create `handleRetranscribeVideo` callback; pass as `onRetranscribe` prop to TranscriptReviewStep |
-| `src/components/ad-copy-studio/steps/TranscriptReviewStep.tsx` | Add `onRetranscribe` prop, retranscribe button in header + warning banner, loading state |
+| `supabase/functions/_shared/hallucination-detection.ts` | Add `detectRepetition()` function; integrate into `detectHallucination()`; update `computeConfidence()` |
+| `supabase/functions/transcribe-meta-ad-video/index.ts` | Pass transcript text to updated `detectHallucination()`; attempt original video on retry |
+| `supabase/functions/upload-video-for-transcription/index.ts` | Pass transcript text to updated `detectHallucination()`; send original video blob on retry |
 
+## What This Fixes
+
+- Video 2's repeated "I'm Eachy..." text will be caught by repetition detection
+- The UI will show the hallucination warning banner for this video
+- On retry, it will attempt using a different audio source for better results
+- No database changes needed -- uses existing `hallucination_risk` column
