@@ -516,6 +516,14 @@ export function AdCopyWizard({
         updateStepData({ transcriptIds: updated });
         return updated;
       });
+      // Clean up refcode for the deleted video
+      setCampaignConfig(prev => {
+        const updatedRefcodes = { ...prev.refcodes };
+        delete updatedRefcodes[dbId];
+        const updated = { ...prev, refcodes: updatedRefcodes };
+        updateStepData({ config: updated });
+        return updated;
+      });
     }
 
     // Update persisted video list in stepData
