@@ -247,7 +247,7 @@ async function generateCopyForSegment(
         { role: 'user', content: userMessage },
       ],
       temperature: 0.85,
-      maxTokens: 3000,
+      maxTokens: 8000,
       tools: [AD_COPY_GENERATION_TOOL],
       toolChoice: "required",
     });
