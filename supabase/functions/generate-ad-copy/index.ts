@@ -216,7 +216,8 @@ function getSegmentTone(segmentDescription: string): string {
 async function generateCopyForSegment(
   transcript: TranscriptData,
   segment: AudienceSegment,
-  model = 'google/gemini-2.5-pro'
+  model = 'google/gemini-2.5-pro',
+  organizationProfile?: any
 ): Promise<{ copy: GeneratedCopySegment; reasoning: AIGenerationResult['reasoning']; rawVariations: AIVariation[]; model: string } | null> {
   try {
     const segmentTone = getSegmentTone(segment.description);
@@ -236,6 +237,7 @@ async function generateCopyForSegment(
       segmentName: segment.name,
       segmentDescription: segment.description,
       segmentTone,
+      organizationContext: organizationProfile || undefined,
     });
 
     const { result, model: usedModel } = await callLovableAIWithTools<AIGenerationResult>({
@@ -415,6 +417,19 @@ serve(async (req) => {
 
     const trackingUrl = buildTrackingUrl(org.slug, actblue_form_name.trim(), refcode.trim(), amount_preset, recurring_default);
 
+    // Fetch organization profile for context enrichment (graceful degradation)
+    const { data: orgProfile } = await supabase
+      .from('organization_profiles')
+      .select('mission_summary, focus_areas, key_issues, allies, opponents, stakeholders, geographies, sensitivity_redlines, ai_extracted_data')
+      .eq('organization_id', effectiveOrgId)
+      .maybeSingle();
+
+    if (orgProfile) {
+      console.log(`[generate-ad-copy] Found organization profile for context enrichment`);
+    } else {
+      console.log(`[generate-ad-copy] No organization profile found, proceeding without org context`);
+    }
+
     // Generate copy for each segment
     const generatedCopy: Record<string, GeneratedCopySegment> = {};
     const metaReadyCopy: Record<string, MetaReadyCopySegment> = {};
@@ -424,12 +439,12 @@ serve(async (req) => {
 
     for (const segment of audience_segments) {
       console.log(`[generate-ad-copy] Generating copy for segment: ${segment.name}`);
-      let result = await generateCopyForSegment(transcript as TranscriptData, segment);
+      let result = await generateCopyForSegment(transcript as TranscriptData, segment, 'google/gemini-2.5-pro', orgProfile);
 
       // Model fallback: if Pro fails, try Flash
       if (!result) {
         console.warn(`[generate-ad-copy] Pro failed for "${segment.name}", trying Flash fallback`);
-        result = await generateCopyForSegment(transcript as TranscriptData, segment, 'google/gemini-2.5-flash');
+        result = await generateCopyForSegment(transcript as TranscriptData, segment, 'google/gemini-2.5-flash', orgProfile);
       }
 
       if (!result) {
@@ -482,7 +497,7 @@ serve(async (req) => {
         tracking_url: trackingUrl,
         copy_validation_status: validationStatus,
         generation_model: successModel,
-        generation_prompt_version: '4.0-reasoning-variations',
+        generation_prompt_version: '4.1-org-context-impact-framing',
         generated_at: generatedAt,
         created_at: generatedAt,
         updated_at: generatedAt,
