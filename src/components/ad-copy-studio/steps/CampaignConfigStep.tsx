@@ -48,15 +48,50 @@ function generateRefcode(orgName: string | undefined, filename: string, analysis
     .replace(/[^a-z0-9]/g, '')
     .substring(0, 10);
 
-  // Prefer AI-extracted topic, fall back to filename
-  const topicSource = analysis?.issue_primary
-    || analysis?.topic_primary
-    || filename.replace(/\.[^.]+$/, '');
+  // Extract a distinctive topic slug from analysis, skipping generic prefixes
+  let topicSlug = '';
+  if (analysis) {
+    const skipWords = new Set([
+      'pro', 'anti', 'palestinian', 'palestine', 'israel', 'israeli',
+      'muslim', 'and', 'the', 'of', 'in', 'for', 'to', 'a', 'an',
+    ]);
 
-  const topicSlug = topicSource
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '')
-    .substring(0, 12);
+    // Try issue_primary first, extracting meaningful words
+    const issueWords = (analysis.issue_primary || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .split(/\s+/)
+      .filter(w => w.length > 1 && !skipWords.has(w));
+
+    if (issueWords.length > 0) {
+      // Take up to 2 meaningful words
+      topicSlug = issueWords.slice(0, 2).join('');
+    }
+
+    // Fallback: first target attacked
+    if (!topicSlug && analysis.targets_attacked?.length) {
+      topicSlug = analysis.targets_attacked[0]
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+    }
+
+    // Fallback: topic_primary
+    if (!topicSlug) {
+      topicSlug = (analysis.topic_primary || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+    }
+  }
+
+  // Final fallback: filename
+  if (!topicSlug) {
+    topicSlug = filename
+      .replace(/\.[^.]+$/, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  topicSlug = topicSlug.substring(0, 12);
 
   const date = new Date();
   const dateStr = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
