@@ -1,66 +1,82 @@
 
 
-# Per-Video Refcodes with Organization and Filename Context
+# Topic-Based Refcodes from Video Analysis
 
-## Current State
+## What Changes
 
-Refcodes are generated as `ad1-0209-x4f2` -- generic with no indication of which organization or video they belong to.
-
-## New Refcode Format
+Instead of using the raw filename in refcodes, extract a short topic slug from the AI-analyzed transcript data (`issue_primary` or `topic_primary` fields). This produces cleaner, more meaningful refcodes like:
 
 ```
-{org_slug}-{file_slug}-{MMDD}-{random4}
+mojo-aice-0209-x4f2      (Anti-ICE ad, org "Mojo Digital")
+mojo-gunreform-0209-k8m1  (Gun reform ad)
+mojo-climate-0209-p3q7    (Climate ad)
 ```
-
-Examples (org: "Mojo Digital", file: "campaign_rally_speech.mp4"):
-- `mojo-rally_speech-0209-x4f2`
-- `mojo-town_hall-0209-k8m1`
 
 ### Slug Logic
-- **Org slug**: Take org name, lowercase, strip non-alphanumeric, take first word (max 10 chars). E.g., "Mojo Digital Wins" becomes `mojo`.
-- **File slug**: Take filename without extension, lowercase, strip non-alphanumeric (keep underscores/hyphens), truncate to 15 chars. E.g., "Campaign_Rally_Speech.mp4" becomes `campaign_rally_s`.
 
-Total refcode stays under ~35 characters to remain practical for ActBlue tracking.
+1. **Topic source**: Use `issue_primary` from the transcript analysis (falls back to `topic_primary`, then filename if no analysis exists yet)
+2. **Topic slug**: Lowercase, strip non-alphanumeric, truncate to 12 chars
+3. **Org slug**: Same as current (first word of org name, max 10 chars)
+4. **Format**: `{org_slug}-{topic_slug}-{MMDD}-{random4}`
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/ad-copy-studio/steps/CampaignConfigStep.tsx` | Update auto-generation logic and regenerate button to use org name + filename in refcode format |
-
-That's it -- single file change. The `organizationName` prop is already passed to this component, and video filenames are available via the `videos` prop.
+| `src/components/ad-copy-studio/steps/CampaignConfigStep.tsx` | Accept `analyses` prop; update `generateRefcode` to use topic from analysis instead of filename |
+| `src/components/ad-copy-studio/AdCopyWizard.tsx` | Pass `analyses` state to `CampaignConfigStep` |
 
 ## Technical Details
 
-### Helper function (inside CampaignConfigStep)
+### Updated generateRefcode helper
 
 ```typescript
-function generateRefcode(orgName: string | undefined, filename: string, index: number): string {
+function generateRefcode(
+  orgName: string | undefined,
+  filename: string,
+  analysis?: TranscriptAnalysis
+): string {
   const orgSlug = (orgName || 'org')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '')
     .substring(0, 10);
 
-  const fileSlug = filename
-    .replace(/\.[^.]+$/, '')       // remove extension
+  // Prefer AI-extracted topic, fall back to filename
+  const topicSource = analysis?.issue_primary
+    || analysis?.topic_primary
+    || filename.replace(/\.[^.]+$/, '');
+
+  const topicSlug = topicSource
     .toLowerCase()
-    .replace(/[^a-z0-9_-]/g, '_') // normalize
-    .replace(/_+/g, '_')          // collapse underscores
-    .substring(0, 15);
+    .replace(/[^a-z0-9]/g, '')
+    .substring(0, 12);
 
   const date = new Date();
   const dateStr = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
   const shortId = Math.random().toString(36).substring(2, 6);
 
-  return `${orgSlug}-${fileSlug}-${dateStr}-${shortId}`;
+  return `${orgSlug}-${topicSlug}-${dateStr}-${shortId}`;
 }
 ```
 
-### Update locations
+### Props update
 
-1. **Auto-generation on mount** (the `useEffect` block around line 220-248): Replace the `ad${idx+1}-${dateStr}-${shortId}` pattern with `generateRefcode(organizationName, video.filename, idx)`.
+Add `analyses?: Record<string, TranscriptAnalysis>` to `CampaignConfigStepProps`. The key is the `video_id`, matching what's already stored in the wizard state.
 
-2. **Per-video regenerate button** (around line 513-515): Same replacement.
+### Auto-generation update
 
-3. **Legacy single regenerate** (`handleRegenerateRefcode` around line 297-307): Update to use the new format with the first video's filename.
+In the `useEffect` that generates refcodes on mount, pass the matching analysis for each video:
 
+```typescript
+newRefcodes[v.video_id!] = generateRefcode(
+  organizationName,
+  v.filename,
+  analyses?.[v.video_id!]
+);
+```
+
+Same change for the per-video "Regenerate" button.
+
+### Dependency note
+
+The `analyses` dependency is added to the `useEffect` so that if a video's analysis completes after the config step loads, refcodes that were generated with filename-only fallback get upgraded to use the topic automatically (only for videos that don't already have a user-edited refcode).
