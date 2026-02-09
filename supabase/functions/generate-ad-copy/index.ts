@@ -104,6 +104,7 @@ interface GenerateAdCopyResponse {
   meta_ready_copy: Record<string, MetaReadyCopySegment>;
   tracking_url: string;
   generated_at: string;
+  warnings?: string[];
 }
 
 interface TranscriptData {
@@ -214,8 +215,9 @@ function getSegmentTone(segmentDescription: string): string {
  */
 async function generateCopyForSegment(
   transcript: TranscriptData,
-  segment: AudienceSegment
-): Promise<{ copy: GeneratedCopySegment; reasoning: AIGenerationResult['reasoning']; rawVariations: AIVariation[] } | null> {
+  segment: AudienceSegment,
+  model = 'google/gemini-2.5-pro'
+): Promise<{ copy: GeneratedCopySegment; reasoning: AIGenerationResult['reasoning']; rawVariations: AIVariation[]; model: string } | null> {
   try {
     const segmentTone = getSegmentTone(segment.description);
     const userMessage = buildAdCopyUserMessage({
@@ -236,8 +238,8 @@ async function generateCopyForSegment(
       segmentTone,
     });
 
-    const { result } = await callLovableAIWithTools<AIGenerationResult>({
-      model: 'google/gemini-2.5-pro',
+    const { result, model: usedModel } = await callLovableAIWithTools<AIGenerationResult>({
+      model,
       messages: [
         { role: 'system', content: AD_COPY_SYSTEM_PROMPT },
         { role: 'user', content: userMessage },
@@ -259,6 +261,7 @@ async function generateCopyForSegment(
         },
         reasoning: result.reasoning,
         rawVariations: variations,
+        model: usedModel,
       };
     }
 
@@ -274,6 +277,7 @@ async function generateCopyForSegment(
         },
         reasoning: result.reasoning || { core_conflict: '', emotional_lever: '', donor_identity: '', villain: '', stakes: '' },
         rawVariations: [],
+        model: usedModel,
       };
     }
 
@@ -415,20 +419,35 @@ serve(async (req) => {
     const generatedCopy: Record<string, GeneratedCopySegment> = {};
     const metaReadyCopy: Record<string, MetaReadyCopySegment> = {};
 
+    const warnings: string[] = [];
+    let successModel = 'google/gemini-2.5-pro';
+
     for (const segment of audience_segments) {
       console.log(`[generate-ad-copy] Generating copy for segment: ${segment.name}`);
-      const result = await generateCopyForSegment(transcript as TranscriptData, segment);
+      let result = await generateCopyForSegment(transcript as TranscriptData, segment);
+
+      // Model fallback: if Pro fails, try Flash
+      if (!result) {
+        console.warn(`[generate-ad-copy] Pro failed for "${segment.name}", trying Flash fallback`);
+        result = await generateCopyForSegment(transcript as TranscriptData, segment, 'google/gemini-2.5-flash');
+      }
 
       if (!result) {
+        warnings.push(`Generation failed for segment "${segment.name}" after retry with fallback model`);
         generatedCopy[segment.name] = { primary_texts: [], headlines: [], descriptions: [] };
         metaReadyCopy[segment.name] = { variations: [] };
         continue;
       }
 
+      if (result.model !== 'google/gemini-2.5-pro') {
+        warnings.push(`Segment "${segment.name}" used fallback model: ${result.model}`);
+      }
+      successModel = result.model;
+
       generatedCopy[segment.name] = result.copy;
       metaReadyCopy[segment.name] = createMetaReadyCopy(result.copy, result.rawVariations, trackingUrl);
 
-      console.log(`[generate-ad-copy] Segment "${segment.name}": ${metaReadyCopy[segment.name].variations.length} variations | Reasoning: ${result.reasoning.core_conflict?.slice(0, 80)}`);
+      console.log(`[generate-ad-copy] Segment "${segment.name}" (${result.model}): ${metaReadyCopy[segment.name].variations.length} variations | Reasoning: ${result.reasoning.core_conflict?.slice(0, 80)}`);
     }
 
     // Check if ALL segments produced empty results
@@ -462,7 +481,7 @@ serve(async (req) => {
         meta_ready_copy: metaReadyCopy,
         tracking_url: trackingUrl,
         copy_validation_status: validationStatus,
-        generation_model: 'google/gemini-2.5-pro',
+        generation_model: successModel,
         generation_prompt_version: '4.0-reasoning-variations',
         generated_at: generatedAt,
         created_at: generatedAt,
@@ -487,6 +506,7 @@ serve(async (req) => {
       meta_ready_copy: metaReadyCopy,
       tracking_url: trackingUrl,
       generated_at: generatedAt,
+      ...(warnings.length > 0 ? { warnings } : {}),
     };
 
     return new Response(JSON.stringify(response), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
