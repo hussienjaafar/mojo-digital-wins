@@ -261,7 +261,20 @@ EMPOWERMENT:
 - Questions in hooks outperform statements by ~15% on CTR
 - Numbers and dollar amounts stop the scroll ("$27", "47 million", "14 states")
 - Authentic, passionate voice > polished marketing speak
-- Copy that drives engagement (likes, shares) costs less to deliver`;
+- Copy that drives engagement (likes, shares) costs less to deliver
+
+## HARD RULE #7 — SEGMENT-AWARE DONATION AMOUNTS & ENFORCED IMPACT FRAMING
+- Acquisition / cold traffic / grassroots / first-time segments: suggest $3, $5, $10 (low friction)
+- Retention / warm traffic / progressive base segments: suggest $27, $50 (higher anchor, "Bernie anchor")
+- High-dollar / major donor segments: suggest $100, $250, $500
+- Every CTA that mentions a dollar amount MUST connect it to a concrete outcome derived from the transcript. Example: "Your $10 helps us fight the bill that would cut X" — generic "chip in $10" without impact framing is NOT acceptable.
+
+## HARD RULE #8 — ORGANIZATION ALIGNMENT & SENSITIVITY REDLINES
+- If ORGANIZATION CONTEXT is provided in the user message, copy MUST reflect the organization's mission and values.
+- Copy MUST align with the organization's focus areas and key issues.
+- Copy MUST NEVER violate any sensitivity redlines listed in the organization context — these are words, phrases, or framings the organization explicitly forbids.
+- When allies or opponents are listed, use them to strengthen comparative framing (ally = hero, opponent = villain).
+- Geographic focus should inform regional language and local stakes when applicable.`;
 
 /**
  * Build the user message for ad copy generation.
@@ -282,7 +295,33 @@ export function buildAdCopyUserMessage(params: {
   segmentName: string;
   segmentDescription: string;
   segmentTone: string;
+  organizationContext?: {
+    mission_summary?: string | null;
+    focus_areas?: string[] | null;
+    key_issues?: string[] | null;
+    allies?: string[] | null;
+    opponents?: string[] | null;
+    stakeholders?: string[] | null;
+    geographies?: string[] | null;
+    sensitivity_redlines?: string[] | null;
+    ai_extracted_data?: any;
+  };
 }): string {
+  let orgContextSection = '';
+  if (params.organizationContext) {
+    const ctx = params.organizationContext;
+    const lines: string[] = ['## ORGANIZATION CONTEXT'];
+    if (ctx.mission_summary) lines.push(`Mission: ${ctx.mission_summary}`);
+    if (ctx.focus_areas?.length) lines.push(`Focus Areas: ${ctx.focus_areas.join(', ')}`);
+    if (ctx.key_issues?.length) lines.push(`Key Issues: ${ctx.key_issues.join(', ')}`);
+    if (ctx.allies?.length) lines.push(`Allies: ${ctx.allies.join(', ')}`);
+    if (ctx.opponents?.length) lines.push(`Opponents: ${ctx.opponents.join(', ')}`);
+    if (ctx.stakeholders?.length) lines.push(`Stakeholders: ${ctx.stakeholders.join(', ')}`);
+    if (ctx.geographies?.length) lines.push(`Geographic Focus: ${ctx.geographies.join(', ')}`);
+    if (ctx.sensitivity_redlines?.length) lines.push(`Redlines (NEVER use these words/framings): ${ctx.sensitivity_redlines.join(', ')}`);
+    orgContextSection = '\n' + lines.join('\n') + '\n';
+  }
+
   return `## VIDEO ANALYSIS
 Transcript: ${params.transcriptText || 'No transcript available'}
 Primary Issue: ${params.issuePrimary || 'Not specified'}
@@ -295,7 +334,7 @@ Key Phrases: ${(params.keyPhrases || []).join(', ') || 'None'}
 CTA from Video: ${params.ctaText || 'Not specified'}
 Urgency Level: ${params.urgencyLevel || 'medium'}
 Values Appealed: ${(params.valuesAppealed || []).join(', ') || 'Not specified'}
-
+${orgContextSection}
 ## TARGET AUDIENCE
 Name: ${params.segmentName}
 Description: ${params.segmentDescription}
@@ -311,7 +350,8 @@ Then generate exactly 5 variations, one per framework:
 4. Social Proof + Urgency
 5. Identity + Empowerment
 
-Each variation must follow the Hook-Bridge-CTA arc and respect all character limits.`;
+Each variation must follow the Hook-Bridge-CTA arc and respect all character limits.
+Every dollar amount in the CTA MUST be tied to a specific impact from the transcript or organization context.`;
 }
 
 /**
