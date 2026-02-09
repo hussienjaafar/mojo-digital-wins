@@ -83,10 +83,11 @@ export function detectHallucination(
   let hallucinationRisk = 0;
   const reasons: string[] = [];
 
-  if (avgNoSpeechProb > 0.6) {
+  // Lowered thresholds: 0.5 -> high risk, 0.3 -> elevated risk
+  if (avgNoSpeechProb > 0.5) {
     hallucinationRisk = 0.9;
     reasons.push(`high no_speech_prob (${avgNoSpeechProb.toFixed(2)})`);
-  } else if (avgNoSpeechProb > 0.4) {
+  } else if (avgNoSpeechProb > 0.3) {
     hallucinationRisk = 0.6;
     reasons.push(`elevated no_speech_prob (${avgNoSpeechProb.toFixed(2)})`);
   }
@@ -118,5 +119,67 @@ export function detectHallucination(
 export function computeConfidence(hallucinationRisk: number): number {
   if (hallucinationRisk >= 0.8) return 0.2;
   if (hallucinationRisk >= 0.5) return 0.3;
+  if (hallucinationRisk >= 0.3) return 0.5;
   return 0.95;
+}
+
+/**
+ * LLM-based semantic coherence check using Lovable AI Gateway.
+ * Checks if a transcript sounds like a real political ad vs. Whisper gibberish.
+ * Only call this when no_speech_prob is borderline (0.2-0.5).
+ */
+export async function checkSemanticCoherence(text: string): Promise<{
+  isCoherent: boolean;
+  confidence: number;
+}> {
+  const apiKey = Deno.env.get('LOVABLE_API_KEY');
+  if (!apiKey) {
+    console.warn('[HALLUCINATION] LOVABLE_API_KEY not set, skipping semantic check');
+    return { isCoherent: true, confidence: 0 };
+  }
+
+  // Only check substantial text
+  if (!text || text.trim().split(/\s+/).length < 20) {
+    return { isCoherent: true, confidence: 0 };
+  }
+
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-lite',
+        messages: [
+          {
+            role: 'system',
+            content: 'You evaluate if a transcript is real or hallucinated by an AI speech-to-text model (Whisper). A real transcript from a political ad discusses policy, candidates, donations, elections, community issues, or advocacy. A hallucinated transcript contains random, incoherent, repetitive, or completely unrelated content that sounds like gibberish even if grammatically correct. Reply with ONLY the word "real" or "hallucinated".',
+          },
+          {
+            role: 'user',
+            content: `Is this a real political ad transcript or hallucinated gibberish?\n\n"${text.substring(0, 1500)}"`,
+          },
+        ],
+        temperature: 0,
+        max_tokens: 10,
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn(`[HALLUCINATION] Semantic check failed: ${response.status}`);
+      return { isCoherent: true, confidence: 0 };
+    }
+
+    const data = await response.json();
+    const answer = (data.choices?.[0]?.message?.content || '').trim().toLowerCase();
+    console.log(`[HALLUCINATION] Semantic check result: "${answer}"`);
+
+    const isCoherent = !answer.includes('hallucinated');
+    return { isCoherent, confidence: answer.includes('hallucinated') || answer.includes('real') ? 0.85 : 0.5 };
+  } catch (err) {
+    console.warn('[HALLUCINATION] Semantic check error:', err);
+    return { isCoherent: true, confidence: 0 };
+  }
 }

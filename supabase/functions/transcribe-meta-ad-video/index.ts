@@ -17,7 +17,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { callLovableAIWithTools, AIGatewayError } from "../_shared/ai-client.ts";
 import { buildTranscriptAnalysisPrompt, TRANSCRIPT_ANALYSIS_TOOL } from "../_shared/prompts.ts";
-import { detectHallucination, computeConfidence } from "../_shared/hallucination-detection.ts";
+import { detectHallucination, computeConfidence, checkSemanticCoherence } from "../_shared/hallucination-detection.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -217,27 +217,55 @@ serve(async (req) => {
 
       // Hallucination detection (now includes repetition check)
       let autoRetryCount = 0;
-      const hallucinationCheck = detectHallucination(transcription.segments, transcription.language, transcription.text);
+      let hallucinationCheck = detectHallucination(transcription.segments, transcription.language, transcription.text);
+
+      // Semantic coherence check for borderline cases (no_speech_prob 0.2-0.5 range or any detection)
+      const avgNoSpeechProb = transcription.segments
+        .map(s => s.no_speech_prob ?? 0)
+        .reduce((a, b) => a + b, 0) / (transcription.segments.length || 1);
+      
+      if (avgNoSpeechProb > 0.2 || hallucinationCheck.hallucinationRisk > 0) {
+        console.log(`[TRANSCRIBE] Running semantic coherence check (avgNoSpeechProb=${avgNoSpeechProb.toFixed(2)}, risk=${hallucinationCheck.hallucinationRisk.toFixed(2)})...`);
+        const semanticResult = await checkSemanticCoherence(transcription.text);
+        if (!semanticResult.isCoherent) {
+          console.log(`[TRANSCRIBE] Semantic check: transcript is HALLUCINATED`);
+          hallucinationCheck = {
+            ...hallucinationCheck,
+            hallucinationRisk: Math.max(hallucinationCheck.hallucinationRisk, 0.85),
+            shouldRetry: true,
+            reason: [hallucinationCheck.reason, 'LLM semantic check: hallucinated'].filter(Boolean).join('; '),
+          };
+        }
+      }
 
       if (hallucinationCheck.shouldRetry) {
         console.log(`[TRANSCRIBE] Hallucination detected (risk=${hallucinationCheck.hallucinationRisk.toFixed(2)}, reason: ${hallucinationCheck.reason}). Retrying...`);
         autoRetryCount = 1;
 
-        // If repetition detected and source is extracted audio (.m4a), try original video instead
+        // Try to find and use the original video from storage
         let retryBlob = mediaResult.blob;
         let retryFilename = mediaResult.filename;
-        if (hallucinationCheck.repetitionDetected && mediaResult.filename.endsWith('.m4a') && video.video_source_url) {
-          console.log(`[TRANSCRIBE] Repetition detected with extracted audio — attempting original video download...`);
-          // Try to find and use the original video from storage
-          const videoPath = `videos/${video.organization_id}/${video.video_id}.mp4`;
-          const { data: videoData } = await supabase.storage.from('meta-ad-videos').download(videoPath);
+        
+        // Look up the video_storage_path from the database
+        const { data: videoRecord } = await supabase
+          .from('meta_ad_videos')
+          .select('video_storage_path, original_filename')
+          .eq('id', video.id)
+          .single();
+        
+        const videoStoragePath = (videoRecord as any)?.video_storage_path;
+        if (videoStoragePath) {
+          console.log(`[TRANSCRIBE] Found video_storage_path: ${videoStoragePath}, attempting download...`);
+          const { data: videoData } = await supabase.storage.from('meta-ad-videos').download(videoStoragePath);
           if (videoData) {
             console.log(`[TRANSCRIBE] Using original video file for retry (${(videoData.size / 1024 / 1024).toFixed(2)} MB)`);
             retryBlob = videoData;
             retryFilename = 'video.mp4';
           } else {
-            console.log(`[TRANSCRIBE] Original video not found in storage, retrying with same audio`);
+            console.log(`[TRANSCRIBE] Original video not found at stored path, retrying with same audio`);
           }
+        } else {
+          console.log(`[TRANSCRIBE] No video_storage_path in DB, retrying with same audio + language hint`);
         }
 
         const retryResult = await transcribeWithWhisper(retryBlob, retryFilename, openaiApiKey, {
@@ -247,9 +275,17 @@ serve(async (req) => {
 
         if (retryResult) {
           const retryCheck = detectHallucination(retryResult.segments, retryResult.language, retryResult.text);
-          console.log(`[TRANSCRIBE] Retry result: risk=${retryCheck.hallucinationRisk.toFixed(2)}`);
+          
+          // Also run semantic check on retry
+          const retrySemanticResult = await checkSemanticCoherence(retryResult.text);
+          let retryRisk = retryCheck.hallucinationRisk;
+          if (!retrySemanticResult.isCoherent) {
+            retryRisk = Math.max(retryRisk, 0.85);
+          }
+          
+          console.log(`[TRANSCRIBE] Retry result: risk=${retryRisk.toFixed(2)} (semantic: ${retrySemanticResult.isCoherent ? 'coherent' : 'hallucinated'})`);
           // Use retry if it's better
-          if (retryCheck.hallucinationRisk < hallucinationCheck.hallucinationRisk) {
+          if (retryRisk < hallucinationCheck.hallucinationRisk) {
             transcription = retryResult;
           }
         }
@@ -257,17 +293,27 @@ serve(async (req) => {
 
       // Final hallucination risk after potential retry
       const finalCheck = detectHallucination(transcription.segments, transcription.language, transcription.text);
-      const transcriptionConfidence = computeConfidence(finalCheck.hallucinationRisk);
+      
+      // Run final semantic check if risk is still borderline
+      let finalRisk = finalCheck.hallucinationRisk;
+      if (finalRisk < 0.5 && avgNoSpeechProb > 0.2) {
+        const finalSemantic = await checkSemanticCoherence(transcription.text);
+        if (!finalSemantic.isCoherent) {
+          finalRisk = Math.max(finalRisk, 0.85);
+          console.log(`[TRANSCRIBE] Final semantic check elevated risk to ${finalRisk.toFixed(2)}`);
+        }
+      }
+      const transcriptionConfidence = computeConfidence(finalRisk);
 
       if (await isCancelled(video.id)) { results.push({ video_id: video.video_id, status: 'cancelled' }); continue; }
 
       // Only analyze if confidence is reasonable
-      const analysis = finalCheck.hallucinationRisk < 0.8
+      const analysis = finalRisk < 0.8
         ? await analyzeTranscript(transcription.text)
         : null;
 
-      if (finalCheck.hallucinationRisk >= 0.8) {
-        console.log(`[TRANSCRIBE] Skipping analysis for hallucinated transcript (risk=${finalCheck.hallucinationRisk.toFixed(2)})`);
+      if (finalRisk >= 0.8) {
+        console.log(`[TRANSCRIBE] Skipping analysis for hallucinated transcript (risk=${finalRisk.toFixed(2)})`);
       }
 
       const speakingMetrics = calculateSpeakingMetrics(transcription.text, transcription.duration, transcription.segments);
@@ -312,7 +358,7 @@ serve(async (req) => {
         key_phrases: analysis?.key_phrases || [],
         transcription_model: 'whisper-1',
         transcription_confidence: transcriptionConfidence,
-        hallucination_risk: finalCheck.hallucinationRisk,
+        hallucination_risk: finalRisk,
         auto_retry_count: autoRetryCount,
         analysis_model: analysis ? 'google/gemini-3-flash-preview' : null,
         analysis_version: '3.1',
@@ -329,8 +375,8 @@ serve(async (req) => {
       await supabase.from('meta_ad_videos').update({ status: 'TRANSCRIBED', duration_seconds: Math.round(transcription.duration), transcribed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', video.id);
 
       transcribed++;
-      results.push({ video_id: video.video_id, status: 'transcribed', hallucination_risk: finalCheck.hallucinationRisk });
-      console.log(`[TRANSCRIBE] Successfully transcribed video ${video.video_id} (hallucination_risk=${finalCheck.hallucinationRisk.toFixed(2)})`);
+      results.push({ video_id: video.video_id, status: 'transcribed', hallucination_risk: finalRisk });
+      console.log(`[TRANSCRIBE] Successfully transcribed video ${video.video_id} (hallucination_risk=${finalRisk.toFixed(2)})`);
     }
 
     console.log(`[TRANSCRIBE] Complete. Transcribed: ${transcribed}, Failed: ${failed}`);
