@@ -1,35 +1,122 @@
 
 
-# Increase Primary Text Length for Better Fundraising Copy
+# Per-Variation Feedback and Regeneration
 
-## What Changes
+## Overview
 
-The primary text limit will be raised from 300 to 900 characters, and the AI prompt will be updated to produce longer, multi-paragraph fundraising copy. The first 125 characters remain the scroll-stopping hook (this is the part visible before "See More" on Meta), but the full text will now include a proper narrative arc.
+Add the ability to give text feedback on any individual copy variation (primary text, headline, or description) and regenerate just that one piece using AI. Feedback history accumulates per variation, creating a learning loop where each regeneration incorporates all prior feedback.
 
-## Why
+## How It Works (User Perspective)
 
-Meta allows up to 2,200 characters for primary text. Research shows that fundraising ads perform best in the 400-900 character range because they give enough room for emotional storytelling, impact framing, and a strong CTA. The current 300-character cap forces the AI to compress everything into a single short paragraph, losing persuasive power.
+1. On each variation card in the export step, a new "Feedback" button appears next to Copy
+2. Clicking it expands a small text input below the variation
+3. The user types feedback like "Make the hook more urgent" or "Remove the mention of taxes"
+4. Clicking "Regenerate" sends the feedback + current text + transcript context to the AI
+5. The variation is replaced inline with the improved version
+6. Previous feedback is retained -- if the user gives feedback again, all prior notes are included so the AI learns from the full history
 
-## Changes (2 files, 4 edits)
+## Technical Changes
 
-### File 1: `supabase/functions/_shared/prompts.ts`
+### 1. New Edge Function: `regenerate-variation`
 
-1. **System prompt character limit** (line 146): Change "300 chars max" to "600-900 chars target"
-2. **Ad structure arc** (lines 150-153): Update the structure to have a proper 4-part arc:
-   - HOOK (first 125 chars): Scroll-stopper (unchanged)
-   - BRIDGE (~150 chars): Stakes, evidence, emotional deepening
-   - EMOTIONAL DEEPENING (~200 chars): Transcript-derived story, consequences, villain/hero contrast
-   - CTA (~100 chars): Specific dollar amount + impact framing + action verb
-3. **Tool schema** (line 399): Update `primary_text` description from "max 300 chars" to "600-900 chars target"
+A lightweight edge function that regenerates a single copy element (primary text, headline, or description) given:
+- The current text
+- User feedback (string)
+- Feedback history (array of previous feedback strings)
+- The element type (primary_text | headline | description)
+- Transcript context (transcript_id to fetch analysis)
+- Segment name and description (for tone guidance)
+- Organization ID (for org profile context)
 
-### File 2: `supabase/functions/generate-ad-copy/index.ts`
+The function will use a focused prompt that includes the original text, all accumulated feedback, and instructs the AI to produce one improved version respecting the same character limits and style rules.
 
-4. **Validation limit** (line 132): Change `primary_text_max` from `300` to `900`
+**File:** `supabase/functions/regenerate-variation/index.ts`
 
-## What Stays the Same
+### 2. New Hook: `useVariationFeedback`
 
-- Headlines: 27 chars max
-- Descriptions: 25 chars max
-- First 125 chars of primary text remain the hook (visible before "See More")
-- All 5 frameworks (PAS, BAB, AIDA, Social Proof, Identity) still used
-- Few-shot examples will be updated to demonstrate the longer format
+Manages the feedback state and API calls:
+- Tracks feedback history per variation (keyed by `videoId-segmentName-elementType-index`)
+- `submitFeedback(key, feedback)` -- calls the edge function, returns new text
+- `getFeedbackHistory(key)` -- returns all prior feedback for a variation
+- Loading state per variation
+
+**File:** `src/hooks/useVariationFeedback.ts`
+
+### 3. Updated UI: Inline Feedback in Variation Cards
+
+Modify the variation view in `CopyExportStep.tsx` to add per-element feedback controls:
+- Each element (Primary Text, Headline, Description) gets a small "Refine" icon button
+- Clicking it toggles a compact input row below that element
+- Input + "Regenerate" button + feedback count badge
+- While regenerating, the element shows a subtle loading shimmer
+- After regeneration, the new text replaces the old one in the per-video copy state
+
+### 4. State Integration in `AdCopyWizard.tsx`
+
+- Wire the new hook into the wizard
+- When a variation is regenerated, update the `perVideoGeneratedCopy` and `perVideoMetaReadyCopy` maps
+- Persist feedback history in `sessionStepData` for session recovery
+
+### 5. Types Update
+
+Add to `src/types/ad-copy-studio.ts`:
+```
+type CopyElementType = 'primary_text' | 'headline' | 'description';
+
+interface VariationFeedback {
+  feedback: string;
+  timestamp: string;
+  previous_text: string;
+  new_text: string;
+}
+
+// Keyed by "videoId-segmentName-elementType-variationIndex"
+type FeedbackHistory = Record<string, VariationFeedback[]>;
+```
+
+## Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| `supabase/functions/regenerate-variation/index.ts` | Create -- new edge function |
+| `src/hooks/useVariationFeedback.ts` | Create -- feedback state + API hook |
+| `src/types/ad-copy-studio.ts` | Modify -- add feedback types |
+| `src/components/ad-copy-studio/steps/CopyExportStep.tsx` | Modify -- add inline feedback UI per element |
+| `src/components/ad-copy-studio/AdCopyWizard.tsx` | Modify -- wire hook, update copy state on regeneration |
+
+## Edge Function Prompt Strategy
+
+The regeneration prompt will be concise and targeted:
+
+```
+You are refining a single ad copy element based on user feedback.
+
+ELEMENT TYPE: {primary_text|headline|description}
+CHARACTER LIMIT: {limit}
+SEGMENT: {name} - {description}
+
+CURRENT TEXT:
+{current_text}
+
+FEEDBACK HISTORY:
+1. "Make the hook more urgent" -> produced: "..."
+2. "Less aggressive tone" -> produced: "..."
+
+LATEST FEEDBACK:
+"Add a specific policy reference from the transcript"
+
+TRANSCRIPT CONTEXT:
+{key analysis fields}
+
+Produce exactly ONE improved version that addresses the feedback while maintaining character limits and the established tone.
+```
+
+This ensures each iteration builds on the last, creating a genuine feedback loop.
+
+## Edge Cases
+
+- Feedback on a headline (27 chars max) -- the AI is constrained to very short output
+- Empty feedback text -- button is disabled
+- Multiple rapid feedback submissions -- loading state prevents double-submit
+- Session recovery -- feedback history is persisted in step_data
+
