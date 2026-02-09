@@ -14,11 +14,12 @@
  */
 
 import { useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import {
   ArrowLeft,
   Copy,
@@ -34,6 +35,9 @@ import {
   AlertCircle,
   Loader2,
   Layers,
+  MessageSquare,
+  Send,
+  History,
 } from 'lucide-react';
 import type {
   GeneratedCopy,
@@ -42,6 +46,8 @@ import type {
   VideoUpload,
   PerVideoGeneratedCopy,
   PerVideoMetaReadyCopy,
+  CopyElementType,
+  VariationFeedback,
 } from '@/types/ad-copy-studio';
 import { META_COPY_LIMITS } from '@/types/ad-copy-studio';
 import { getCharCountColor } from '@/components/ad-copy-studio/components/analysis-primitives';
@@ -62,6 +68,19 @@ export interface CopyExportStepProps {
   organizationName?: string;
   videos?: VideoUpload[];
   refcodes?: Record<string, string>;
+  // Feedback props
+  onSubmitFeedback?: (
+    videoId: string,
+    segmentName: string,
+    elementType: CopyElementType,
+    index: number,
+    currentText: string,
+    feedback: string,
+  ) => Promise<string | null>;
+  isFeedbackLoading?: (videoId: string, segmentName: string, elementType: CopyElementType, index: number) => boolean;
+  getFeedbackCount?: (videoId: string, segmentName: string, elementType: CopyElementType, index: number) => number;
+  getFeedbackError?: (videoId: string, segmentName: string, elementType: CopyElementType, index: number) => string | undefined;
+  getFeedbackHistory?: (videoId: string, segmentName: string, elementType: CopyElementType, index: number) => VariationFeedback[];
 }
 
 // =============================================================================
@@ -281,6 +300,116 @@ function InlineCopyButton({ text, label }: { text: string; label: string }) {
 }
 
 // =============================================================================
+// Inline Feedback Input Component
+// =============================================================================
+
+function InlineFeedbackInput({
+  onSubmit,
+  isLoading,
+  error,
+  feedbackCount,
+}: {
+  onSubmit: (feedback: string) => void;
+  isLoading: boolean;
+  error?: string;
+  feedbackCount: number;
+}) {
+  const [text, setText] = useState('');
+  const [expanded, setExpanded] = useState(false);
+
+  const handleSubmit = () => {
+    if (!text.trim() || isLoading) return;
+    onSubmit(text.trim());
+    setText('');
+  };
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition-colors bg-[#1e2a45] text-[#64748b] hover:text-[#94a3b8]"
+        aria-label="Refine this element"
+      >
+        <MessageSquare className="h-3 w-3" />
+        Refine
+        {feedbackCount > 0 && (
+          <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600/30 text-[9px] text-blue-400">
+            {feedbackCount}
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      className="mt-2 space-y-2"
+    >
+      <div className="flex gap-2">
+        <Textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="e.g. Make the hook more urgent..."
+          className="min-h-[60px] text-xs bg-[#141b2d] border-[#1e2a45] text-[#e2e8f0] placeholder:text-[#64748b] resize-none"
+          disabled={isLoading}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              handleSubmit();
+            }
+          }}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!text.trim() || isLoading}
+            className={cn(
+              'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+              isLoading
+                ? 'bg-blue-600/50 text-blue-200 cursor-not-allowed'
+                : text.trim()
+                  ? 'bg-blue-600 text-white hover:bg-blue-500'
+                  : 'bg-[#1e2a45] text-[#64748b] cursor-not-allowed'
+            )}
+          >
+            {isLoading ? (
+              <><Loader2 className="h-3 w-3 animate-spin" /> Regenerating...</>
+            ) : (
+              <><Send className="h-3 w-3" /> Regenerate</>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setExpanded(false); setText(''); }}
+            className="text-[10px] text-[#64748b] hover:text-[#94a3b8] px-2 py-1"
+          >
+            Cancel
+          </button>
+        </div>
+        {feedbackCount > 0 && (
+          <span className="flex items-center gap-1 text-[10px] text-[#64748b]">
+            <History className="h-3 w-3" />
+            {feedbackCount} revision{feedbackCount !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+      {error && (
+        <p className="text-[10px] text-[#ef4444] flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" /> {error}
+        </p>
+      )}
+    </motion.div>
+  );
+}
+
+// =============================================================================
 // Segment Content Renderer (used for both single and all-segments views)
 // =============================================================================
 
@@ -297,6 +426,12 @@ interface SegmentContentProps {
   setCopiedPrimaryIndex: (val: number | null) => void;
   setCopiedHeadlineIndex: (val: number | null) => void;
   setCopiedDescriptionIndex: (val: number | null) => void;
+  // Feedback props
+  videoId?: string;
+  onSubmitFeedback?: (elementType: CopyElementType, index: number, currentText: string, feedback: string) => void;
+  isFeedbackLoading?: (elementType: CopyElementType, index: number) => boolean;
+  getFeedbackCount?: (elementType: CopyElementType, index: number) => number;
+  getFeedbackError?: (elementType: CopyElementType, index: number) => string | undefined;
 }
 
 function SegmentContent({
@@ -312,6 +447,11 @@ function SegmentContent({
   setCopiedPrimaryIndex,
   setCopiedHeadlineIndex,
   setCopiedDescriptionIndex,
+  videoId,
+  onSubmitFeedback,
+  isFeedbackLoading,
+  getFeedbackCount,
+  getFeedbackError,
 }: SegmentContentProps) {
   if (!segmentCopy) {
     return (
@@ -382,8 +522,19 @@ function SegmentContent({
                       {primary.length} chars
                     </span>
                     <InlineCopyButton text={primary} label="primary text" />
+                    {onSubmitFeedback && (
+                      <InlineFeedbackInput
+                        onSubmit={(fb) => onSubmitFeedback('primary_text', i, primary, fb)}
+                        isLoading={isFeedbackLoading?.('primary_text', i) || false}
+                        error={getFeedbackError?.('primary_text', i)}
+                        feedbackCount={getFeedbackCount?.('primary_text', i) || 0}
+                      />
+                    )}
                   </div>
-                  <p className="text-sm text-[#e2e8f0] leading-relaxed whitespace-pre-wrap">{primary}</p>
+                  <p className={cn(
+                    'text-sm text-[#e2e8f0] leading-relaxed whitespace-pre-wrap transition-opacity',
+                    isFeedbackLoading?.('primary_text', i) && 'opacity-50 animate-pulse'
+                  )}>{primary}</p>
                 </div>
 
                 {/* Headline */}
@@ -395,8 +546,19 @@ function SegmentContent({
                       {headline.length} chars
                     </span>
                     <InlineCopyButton text={headline} label="headline" />
+                    {onSubmitFeedback && (
+                      <InlineFeedbackInput
+                        onSubmit={(fb) => onSubmitFeedback('headline', i, headline, fb)}
+                        isLoading={isFeedbackLoading?.('headline', i) || false}
+                        error={getFeedbackError?.('headline', i)}
+                        feedbackCount={getFeedbackCount?.('headline', i) || 0}
+                      />
+                    )}
                   </div>
-                  <p className="text-sm text-[#e2e8f0] font-medium">{headline}</p>
+                  <p className={cn(
+                    'text-sm text-[#e2e8f0] font-medium transition-opacity',
+                    isFeedbackLoading?.('headline', i) && 'opacity-50 animate-pulse'
+                  )}>{headline}</p>
                 </div>
 
                 {/* Description */}
@@ -408,8 +570,19 @@ function SegmentContent({
                       {description.length} chars
                     </span>
                     <InlineCopyButton text={description} label="description" />
+                    {onSubmitFeedback && (
+                      <InlineFeedbackInput
+                        onSubmit={(fb) => onSubmitFeedback('description', i, description, fb)}
+                        isLoading={isFeedbackLoading?.('description', i) || false}
+                        error={getFeedbackError?.('description', i)}
+                        feedbackCount={getFeedbackCount?.('description', i) || 0}
+                      />
+                    )}
                   </div>
-                  <p className="text-sm text-[#e2e8f0]">{description}</p>
+                  <p className={cn(
+                    'text-sm text-[#e2e8f0] transition-opacity',
+                    isFeedbackLoading?.('description', i) && 'opacity-50 animate-pulse'
+                  )}>{description}</p>
                 </div>
               </div>
             </motion.div>
@@ -471,6 +644,11 @@ export function CopyExportStep({
   organizationName,
   videos = [],
   refcodes = {},
+  onSubmitFeedback,
+  isFeedbackLoading,
+  getFeedbackCount,
+  getFeedbackError,
+  getFeedbackHistory,
 }: CopyExportStepProps) {
   // Issue A5: Use segment.id as tab key
   const [activeSegmentId, setActiveSegmentId] = useState(audienceSegments[0]?.id || ALL_SEGMENTS_KEY);
@@ -712,6 +890,11 @@ export function CopyExportStep({
                     setCopiedPrimaryIndex={setCopiedPrimaryIndex}
                     setCopiedHeadlineIndex={setCopiedHeadlineIndex}
                     setCopiedDescriptionIndex={setCopiedDescriptionIndex}
+                    videoId={activeVideoId}
+                    onSubmitFeedback={onSubmitFeedback ? (et, idx, ct, fb) => onSubmitFeedback(activeVideoId, segment.name, et, idx, ct, fb) : undefined}
+                    isFeedbackLoading={isFeedbackLoading ? (et, idx) => isFeedbackLoading(activeVideoId, segment.name, et, idx) : undefined}
+                    getFeedbackCount={getFeedbackCount ? (et, idx) => getFeedbackCount(activeVideoId, segment.name, et, idx) : undefined}
+                    getFeedbackError={getFeedbackError ? (et, idx) => getFeedbackError(activeVideoId, segment.name, et, idx) : undefined}
                   />
                 </div>
               ))}
@@ -730,6 +913,11 @@ export function CopyExportStep({
               setCopiedPrimaryIndex={setCopiedPrimaryIndex}
               setCopiedHeadlineIndex={setCopiedHeadlineIndex}
               setCopiedDescriptionIndex={setCopiedDescriptionIndex}
+              videoId={activeVideoId}
+              onSubmitFeedback={onSubmitFeedback ? (et, idx, ct, fb) => onSubmitFeedback(activeVideoId, activeSegmentName, et, idx, ct, fb) : undefined}
+              isFeedbackLoading={isFeedbackLoading ? (et, idx) => isFeedbackLoading(activeVideoId, activeSegmentName, et, idx) : undefined}
+              getFeedbackCount={getFeedbackCount ? (et, idx) => getFeedbackCount(activeVideoId, activeSegmentName, et, idx) : undefined}
+              getFeedbackError={getFeedbackError ? (et, idx) => getFeedbackError(activeVideoId, activeSegmentName, et, idx) : undefined}
             />
           )}
         </div>

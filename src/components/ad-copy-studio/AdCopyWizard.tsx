@@ -41,6 +41,7 @@ import { useAdCopyStudio } from '@/hooks/useAdCopyStudio';
 import { useVideoUpload } from '@/hooks/useVideoUpload';
 import { useAdCopyGeneration } from '@/hooks/useAdCopyGeneration';
 import { useVideoTranscriptionFlow } from '@/hooks/useVideoTranscriptionFlow';
+import { useVariationFeedback } from '@/hooks/useVariationFeedback';
 
 // Components
 import { WizardStepIndicator } from './WizardStepIndicator';
@@ -52,7 +53,7 @@ import { CopyExportStep } from './steps/CopyExportStep';
 import { GenerationHistoryPanel } from './GenerationHistoryPanel';
 
 // Types
-import type { CampaignConfig, AudienceSegment, TranscriptAnalysis, VideoUpload } from '@/types/ad-copy-studio';
+import type { CampaignConfig, AudienceSegment, TranscriptAnalysis, VideoUpload, CopyElementType } from '@/types/ad-copy-studio';
 
 // =============================================================================
 // Types
@@ -206,6 +207,44 @@ export function AdCopyWizard({
     regenerateSegment,
     clearGeneration,
   } = useAdCopyGeneration({ organizationId });
+
+  // Variation feedback hook
+  const handleFeedbackTextUpdated = useCallback((
+    videoId: string, segmentName: string, elementType: CopyElementType, index: number, newText: string
+  ) => {
+    const copy = { ...(stepData.per_video_generated_copy || {}) };
+    const videoCopy = { ...(copy[videoId] || {}) };
+    const segCopy = { ...(videoCopy[segmentName] || { primary_texts: [], headlines: [], descriptions: [] }) };
+    
+    const fieldMap: Record<string, string> = { primary_text: 'primary_texts', headline: 'headlines', description: 'descriptions' };
+    const field = fieldMap[elementType] as 'primary_texts' | 'headlines' | 'descriptions';
+    if (field && segCopy[field]) {
+      segCopy[field] = [...segCopy[field]];
+      segCopy[field][index] = newText;
+    }
+    videoCopy[segmentName] = segCopy;
+    copy[videoId] = videoCopy;
+    updateStepData({ per_video_generated_copy: copy });
+  }, [stepData.per_video_generated_copy, updateStepData]);
+
+  const {
+    getFeedbackCount: feedbackGetCount,
+    getHistory: feedbackGetHistory,
+    isLoading: feedbackIsLoading,
+    getError: feedbackGetError,
+    submitFeedback: feedbackSubmit,
+    setFeedbackHistory,
+  } = useVariationFeedback({
+    organizationId,
+    onTextUpdated: handleFeedbackTextUpdated,
+  });
+
+  // Initialize feedback history from stepData
+  useEffect(() => {
+    if (stepData.feedback_history) {
+      setFeedbackHistory(stepData.feedback_history);
+    }
+  }, [stepData.feedback_history, setFeedbackHistory]);
 
   // =========================================================================
   // Local State
@@ -880,6 +919,16 @@ export function AdCopyWizard({
             organizationName={selectedOrg?.name}
             videos={currentVideos}
             refcodes={campaignConfig.refcodes}
+            onSubmitFeedback={async (videoId, segName, elType, idx, curText, fb) => {
+              const seg = campaignConfig.audience_segments.find(s => s.name === segName);
+              const video = currentVideos.find((v: VideoUpload) => v.video_id === videoId);
+              const tId = video?.video_id ? (transcriptIds[video.video_id] || video.transcript_id) : '';
+              return feedbackSubmit(videoId, segName, elType, idx, curText, fb, tId || '', seg?.description || '');
+            }}
+            isFeedbackLoading={(vid, seg, et, idx) => feedbackIsLoading(vid, seg, et, idx)}
+            getFeedbackCount={(vid, seg, et, idx) => feedbackGetCount(vid, seg, et, idx)}
+            getFeedbackError={(vid, seg, et, idx) => feedbackGetError(vid, seg, et, idx)}
+            getFeedbackHistory={(vid, seg, et, idx) => feedbackGetHistory(vid, seg, et, idx)}
           />
         );
 

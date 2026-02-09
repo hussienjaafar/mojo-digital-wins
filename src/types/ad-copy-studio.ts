@@ -208,6 +208,22 @@ export interface AdCopyStudioSession {
 export type PerVideoGeneratedCopy = Record<string, GeneratedCopy>;
 export type PerVideoMetaReadyCopy = Record<string, MetaReadyCopy>;
 
+// ============================================================================
+// 6b. Feedback Types
+// ============================================================================
+
+export type CopyElementType = 'primary_text' | 'headline' | 'description';
+
+export interface VariationFeedback {
+  feedback: string;
+  timestamp: string;
+  previous_text: string;
+  new_text: string;
+}
+
+/** Keyed by "videoId-segmentName-elementType-variationIndex" */
+export type FeedbackHistory = Record<string, VariationFeedback[]>;
+
 export interface SessionStepData {
   videos?: VideoUpload[];
   analyses?: Record<string, TranscriptAnalysis>;
@@ -219,6 +235,7 @@ export interface SessionStepData {
   generation_id?: string;
   tracking_url?: string;
   per_video_tracking_urls?: Record<string, string>;
+  feedback_history?: FeedbackHistory;
 }
 
 // ============================================================================
