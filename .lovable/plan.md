@@ -1,83 +1,66 @@
 
 
-# Per-Video Refcodes and Ad Identifiers
+# Per-Video Refcodes with Organization and Filename Context
 
-## What Changes
+## Current State
 
-### 1. Per-Video Refcodes in Campaign Config (Step 3)
+Refcodes are generated as `ad1-0209-x4f2` -- generic with no indication of which organization or video they belong to.
 
-Currently there's a single refcode for the entire campaign. This will change so each video gets its own refcode, auto-generated from the video name/number.
+## New Refcode Format
 
-**Type changes** (`src/types/ad-copy-studio.ts`):
-- Add `refcodes: Record<string, string>` to `CampaignConfig` (keyed by video_id)
-- Keep the existing `refcode` field for backward compatibility but deprecate it
-
-**CampaignConfigStep changes** (`src/components/ad-copy-studio/steps/CampaignConfigStep.tsx`):
-- Replace the single refcode input with a list showing each video and its own refcode field
-- Each video displays its name/number (e.g., "Video 1 - filename.mp4") with an editable refcode
-- Auto-generate refcodes per video on mount (e.g., `ad1-0209-x4f2`, `ad2-0209-k8m1`)
-- Each has its own "Regenerate" button
-
-### 2. Video Identifier in Export Step (Step 5)
-
-**CopyExportStep changes** (`src/components/ad-copy-studio/steps/CopyExportStep.tsx`):
-- Add a video selector/indicator at the top showing which video's ad copy is being displayed
-- Display the video name and its associated refcode prominently (e.g., "Ad 1: campaign_video1.mp4 | Refcode: ad1-0209-x4f2")
-- Include the refcode in the variation card headers and clipboard copy output
-- The tracking URL section shows the specific refcode for the currently viewed ad
-
-### 3. Generation Updates
-
-**AdCopyWizard changes** (`src/components/ad-copy-studio/AdCopyWizard.tsx`):
-- Pass the per-video refcode (from `campaignConfig.refcodes[videoId]`) when calling `generateCopy`
-- Pass video info to CopyExportStep so it can display the video identifier
-
-**useAdCopyGeneration changes** (`src/hooks/useAdCopyGeneration.ts`):
-- No structural changes needed -- it already accepts `refcode` as a parameter
-
-## Technical Details
-
-### Updated CampaignConfig Type
-
-```typescript
-export interface CampaignConfig {
-  actblue_form_name: string;
-  refcode: string;              // kept for backward compat, used as fallback
-  refcode_auto_generated: boolean;
-  refcodes: Record<string, string>;  // NEW: videoId -> refcode
-  amount_preset?: number;
-  recurring_default: boolean;
-  audience_segments: AudienceSegment[];
-}
+```
+{org_slug}-{file_slug}-{MMDD}-{random4}
 ```
 
-### CopyExportStep Props Update
+Examples (org: "Mojo Digital", file: "campaign_rally_speech.mp4"):
+- `mojo-rally_speech-0209-x4f2`
+- `mojo-town_hall-0209-k8m1`
 
-```typescript
-export interface CopyExportStepProps {
-  // ...existing props...
-  videos?: Array<{ id: string; filename: string; video_id?: string }>;
-  activeVideoRefcode?: string;
-}
-```
+### Slug Logic
+- **Org slug**: Take org name, lowercase, strip non-alphanumeric, take first word (max 10 chars). E.g., "Mojo Digital Wins" becomes `mojo`.
+- **File slug**: Take filename without extension, lowercase, strip non-alphanumeric (keep underscores/hyphens), truncate to 15 chars. E.g., "Campaign_Rally_Speech.mp4" becomes `campaign_rally_s`.
 
-### Files to Modify
+Total refcode stays under ~35 characters to remain practical for ActBlue tracking.
+
+## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/types/ad-copy-studio.ts` | Add `refcodes` field to `CampaignConfig` |
-| `src/components/ad-copy-studio/steps/CampaignConfigStep.tsx` | Replace single refcode with per-video refcode list; needs videos prop |
-| `src/components/ad-copy-studio/steps/CopyExportStep.tsx` | Add video identifier header with name + refcode; include refcode in copy output |
-| `src/components/ad-copy-studio/AdCopyWizard.tsx` | Pass videos to CampaignConfigStep and CopyExportStep; use per-video refcode in generation |
+| `src/components/ad-copy-studio/steps/CampaignConfigStep.tsx` | Update auto-generation logic and regenerate button to use org name + filename in refcode format |
 
-### Auto-Generated Refcode Format
+That's it -- single file change. The `organizationName` prop is already passed to this component, and video filenames are available via the `videos` prop.
 
-Each video gets a refcode like: `ad{N}-{MMDD}-{random4}` where N is the video number (1-based), MMDD is today's date, and random4 is a short random string.
+## Technical Details
 
-### Export Step Video Identifier
+### Helper function (inside CampaignConfigStep)
 
-At the top of the export step, a styled banner will show:
-- Video name/number (e.g., "Ad 1: my_campaign_video.mp4")
-- The refcode for that video
-- If multiple videos exist, tabs or a selector to switch between them
+```typescript
+function generateRefcode(orgName: string | undefined, filename: string, index: number): string {
+  const orgSlug = (orgName || 'org')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .substring(0, 10);
+
+  const fileSlug = filename
+    .replace(/\.[^.]+$/, '')       // remove extension
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '_') // normalize
+    .replace(/_+/g, '_')          // collapse underscores
+    .substring(0, 15);
+
+  const date = new Date();
+  const dateStr = `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+  const shortId = Math.random().toString(36).substring(2, 6);
+
+  return `${orgSlug}-${fileSlug}-${dateStr}-${shortId}`;
+}
+```
+
+### Update locations
+
+1. **Auto-generation on mount** (the `useEffect` block around line 220-248): Replace the `ad${idx+1}-${dateStr}-${shortId}` pattern with `generateRefcode(organizationName, video.filename, idx)`.
+
+2. **Per-video regenerate button** (around line 513-515): Same replacement.
+
+3. **Legacy single regenerate** (`handleRegenerateRefcode` around line 297-307): Update to use the new format with the first video's filename.
 
