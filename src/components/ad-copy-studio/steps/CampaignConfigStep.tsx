@@ -283,16 +283,27 @@ export function CampaignConfigStep({
   const [nameError, setNameError] = useState<string | null>(null);
   const [editNameError, setEditNameError] = useState<string | null>(null);
 
-  // Auto-generate per-video refcodes on mount if empty
+  // Auto-generate per-video refcodes on mount if empty + prune stale entries
   useEffect(() => {
     const videosWithIds = videos.filter(v => v.video_id);
     if (videosWithIds.length === 0) return;
 
     const existingRefcodes = config.refcodes || {};
-    const needsGeneration = videosWithIds.some(v => !existingRefcodes[v.video_id!]);
+    const currentVideoIds = new Set(videosWithIds.map(v => v.video_id!));
 
-    if (needsGeneration) {
-      const newRefcodes = { ...existingRefcodes };
+    // Prune refcodes for videos that no longer exist
+    const prunedRefcodes: Record<string, string> = {};
+    for (const [vid, rc] of Object.entries(existingRefcodes)) {
+      if (currentVideoIds.has(vid)) {
+        prunedRefcodes[vid] = rc;
+      }
+    }
+
+    const needsGeneration = videosWithIds.some(v => !prunedRefcodes[v.video_id!]);
+    const wasPruned = Object.keys(existingRefcodes).length !== Object.keys(prunedRefcodes).length;
+
+    if (needsGeneration || wasPruned) {
+      const newRefcodes = { ...prunedRefcodes };
       videosWithIds.forEach((v) => {
         if (!newRefcodes[v.video_id!]) {
           newRefcodes[v.video_id!] = generateRefcode(organizationName, v.filename, analyses?.[v.video_id!]);
@@ -366,6 +377,22 @@ export function CampaignConfigStep({
       refcode: newRefcode,
       refcode_auto_generated: true,
     });
+  }, [config, onConfigChange, organizationName, videos, analyses]);
+
+  const handleRegenerateAllRefcodes = useCallback(() => {
+    const vids = videos.filter(v => v.video_id);
+    const newRefcodes: Record<string, string> = {};
+    vids.forEach((v) => {
+      newRefcodes[v.video_id!] = generateRefcode(organizationName, v.filename, analyses?.[v.video_id!]);
+    });
+    const firstVideoId = vids[0]?.video_id;
+    onConfigChange({
+      ...config,
+      refcodes: newRefcodes,
+      refcode: firstVideoId ? newRefcodes[firstVideoId] : config.refcode,
+      refcode_auto_generated: true,
+    });
+    toast.success('All refcodes regenerated');
   }, [config, onConfigChange, organizationName, videos, analyses]);
 
   const handleAmountChange = useCallback(
@@ -538,6 +565,16 @@ export function CampaignConfigStep({
             <Label className="text-xs font-medium uppercase tracking-wider text-[#64748b]">
               Refcodes
             </Label>
+            {videosWithIds.length > 1 && (
+              <button
+                type="button"
+                onClick={handleRegenerateAllRefcodes}
+                className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Regenerate All
+              </button>
+            )}
           </div>
           {videosWithIds.length > 0 ? (
             <div className="space-y-3">
