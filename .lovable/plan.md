@@ -1,61 +1,91 @@
 
 
-# Fix: Duplicate Transcripts From Parallel FFmpeg Processing
+# Enrich Ad Copy Generation with Organization Context and Research-Backed Improvements
 
-## Root Cause
+## Overview
 
-The audio extraction uses a **shared singleton FFmpeg instance** with **hardcoded filenames** in its virtual filesystem:
-- Input: `input_video.mp4`
-- Output: `output_audio.m4a`
+The ad copy generation currently only uses transcript data and audience segment info. The `organization_profiles` table already stores rich organization context (mission, focus areas, allies, opponents, stakeholders, key issues, geographies, sensitivity redlines, and raw AI-extracted website data) that is never passed to the AI. This plan integrates that context into the prompt and applies research-backed improvements to donation amount strategy.
 
-When two videos are processed in parallel (via the `Promise.allSettled` change), they both write to the same virtual filesystem paths. The second video overwrites the first video's data, causing both extractions to produce the same audio -- and therefore the same transcript.
+## Changes
 
-## Fix
+### 1. Fetch Organization Profile in Edge Function
 
-Add a **processing lock** (mutex) to the `extractAudio` function so that only one extraction runs at a time. This is the safest approach because:
-- FFmpeg.wasm's virtual filesystem is shared across calls
-- Creating multiple FFmpeg instances is memory-prohibitive (each loads ~30MB WASM)
-- Unique filenames alone aren't sufficient because FFmpeg.wasm may have other shared state
+**File:** `supabase/functions/generate-ad-copy/index.ts`
 
-The parallel `Promise.allSettled` remains in place for the overall flow (upload, DB insert, transcription trigger), but audio extraction specifically will be serialized.
+After fetching the org slug (line ~403), also fetch the organization profile:
 
-## Implementation
-
-### File: `src/lib/audio-extractor.ts`
-
-Add a simple async mutex (promise chain) at the module level:
-
-```
-let extractionQueue: Promise<void> = Promise.resolve();
-
-export async function extractAudio(videoFile, options) {
-  // Queue this extraction behind any in-progress one
-  const result = await new Promise((resolve, reject) => {
-    extractionQueue = extractionQueue.then(async () => {
-      try {
-        const r = await extractAudioInternal(videoFile, options);
-        resolve(r);
-      } catch (e) {
-        reject(e);
-      }
-    });
-  });
-  return result;
-}
-
-// Rename current extractAudio to extractAudioInternal (no other changes)
-async function extractAudioInternal(videoFile, options) {
-  // ... existing extraction logic unchanged ...
-}
+```sql
+SELECT mission_summary, focus_areas, key_issues, allies, opponents,
+       stakeholders, geographies, sensitivity_redlines, ai_extracted_data
+FROM organization_profiles
+WHERE organization_id = effectiveOrgId
 ```
 
-This ensures:
-- Video 1 extracts audio, completes, cleans up virtual FS
-- Video 2 then extracts audio with clean virtual FS
-- Both videos still upload and trigger transcription in parallel (only the FFmpeg step is serialized)
-- No risk of filename collisions or shared state corruption
+This data is already in the database from the onboarding scrape -- no new scraping needed at generation time.
 
-### No other files need changes
+### 2. Add Organization Context to the Prompt
 
-The `useVideoUpload.ts` parallel processing stays as-is. The serialization is scoped to just the FFmpeg extraction step, which is the only part that can't safely run concurrently.
+**File:** `supabase/functions/_shared/prompts.ts`
+
+Update `buildAdCopyUserMessage` to accept an optional `organizationContext` parameter and inject a new `## ORGANIZATION CONTEXT` section into the user message:
+
+```
+## ORGANIZATION CONTEXT
+Mission: [mission_summary]
+Focus Areas: [focus_areas joined]
+Key Issues: [key_issues joined]
+Allies: [allies joined]
+Opponents: [opponents joined]
+Geographic Focus: [geographies joined]
+Redlines (NEVER say this): [sensitivity_redlines]
+```
+
+This gives the AI grounding in who the organization is, what they stand for, and what to avoid -- all derived from their actual website.
+
+### 3. Update System Prompt with Research-Backed Improvements
+
+**File:** `supabase/functions/_shared/prompts.ts`
+
+Enhance `AD_COPY_SYSTEM_PROMPT` with three additions:
+
+**a) Segment-Aware Donation Amounts** -- Currently hardcoded. Add a rule:
+- Acquisition/cold traffic: suggest $5, $10 (low friction)
+- Retention/warm traffic: suggest $27, $50 (higher anchor)
+- The segment tone guidance already handles this per-segment, so reinforce it in the system prompt as a hard rule
+
+**b) Enforced Impact Framing** -- Currently optional. Make it a hard rule:
+- Every CTA with a dollar amount MUST connect it to a concrete outcome from the transcript (e.g., "Your $10 helps us fight the bill that would cut X")
+- Add this as Hard Rule #7
+
+**c) Organization Alignment Rule** -- New hard rule:
+- Copy MUST reflect the organization's mission and values from the context
+- Copy MUST NOT violate any sensitivity redlines
+- Add this as Hard Rule #8
+
+### 4. Pass Organization Context Through the Generation Pipeline
+
+**File:** `supabase/functions/generate-ad-copy/index.ts`
+
+- Pass the fetched profile data into `generateCopyForSegment`
+- `generateCopyForSegment` passes it to `buildAdCopyUserMessage`
+- No changes to the tool schema or AI response format needed -- this is purely additional context in the user message
+
+### 5. Graceful Degradation
+
+If no organization profile exists (e.g., profile wasn't set up during onboarding), generation proceeds as before with no organization context section. The profile fetch uses `.maybeSingle()` so a missing profile is not an error.
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `supabase/functions/generate-ad-copy/index.ts` | Fetch org profile from DB; pass to `generateCopyForSegment` |
+| `supabase/functions/_shared/prompts.ts` | Add org context param to `buildAdCopyUserMessage`; add hard rules #7 (impact framing) and #8 (org alignment + redlines) to system prompt |
+
+## What This Does NOT Change
+
+- No database migrations needed (data already exists)
+- No UI changes needed (context is injected server-side)
+- No changes to the tool calling schema or response format
+- No new edge functions or API calls at generation time
+- The existing scrape-organization-website flow during onboarding already populates this data
 
