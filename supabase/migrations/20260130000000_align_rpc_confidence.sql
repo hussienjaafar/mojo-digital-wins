@@ -25,6 +25,7 @@ CREATE OR REPLACE FUNCTION get_creative_intelligence(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = 'public'
 AS $$
 DECLARE
   v_significance_level NUMERIC := 0.05;

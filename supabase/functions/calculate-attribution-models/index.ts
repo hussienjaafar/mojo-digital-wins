@@ -33,7 +33,12 @@ serve(async (req) => {
 
     const { organizationId, startDate, endDate } = await req.json();
 
-    console.log(`📊 Calculating multi-touch attribution for org: ${organizationId}`);
+    console.log(`📊 Calculating attribution for org: ${organizationId}`);
+
+    // WARNING: This function currently implements SINGLE-TOUCH attribution despite the variable names.
+    // It assigns 100% credit to the FIRST matched refcode for all models (linear, position-based, etc).
+    // This is a known limitation documented in the 2026 Audit.
+    // TODO: Implement true multi-touch logic when touchpoint history data is available.
 
     // Get all transactions with their touchpoints
     const { data: transactions, error: txnError } = await supabase
