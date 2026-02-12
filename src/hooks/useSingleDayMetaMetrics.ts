@@ -31,9 +31,9 @@ async function fetchDayMetaMetrics(
   organizationId: string,
   date: string
 ): Promise<MetaDayMetrics> {
-  // Query 1: Meta ad metrics from meta_ad_metrics_daily
-  const metricsQuery = supabase
-    .from('meta_ad_metrics_daily')
+  // Query 1: Meta ad metrics filtered to fundraising campaigns only
+  const metricsQuery = (supabase as any)
+    .from('meta_fundraising_metrics_daily')
     .select('spend, impressions, link_clicks')
     .eq('organization_id', organizationId)
     .eq('date', date);
