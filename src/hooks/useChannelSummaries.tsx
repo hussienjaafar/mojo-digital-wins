@@ -43,8 +43,9 @@ export function useChannelSummaries(organizationId: string, startDate: string, e
     const loadSummaries = async () => {
       // Fetch Meta Ads summary
       try {
+        // Use fundraising-filtered view so ROAS only reflects fundraising campaigns
         const { data: metaData } = await (supabase as any)
-          .from('meta_ad_metrics')
+          .from('meta_fundraising_metrics_daily')
           .select('spend, conversions, conversion_value, date')
           .eq('organization_id', organizationId)
           .gte('date', startDate)

@@ -69,9 +69,9 @@ async function fetchChannelSpend(
   startDate: string,
   endDate: string
 ): Promise<ChannelSpendData> {
-  // Build Meta query - use meta_ad_metrics_daily for link clicks data
-  const metaQuery = supabase
-    .from('meta_ad_metrics_daily')
+  // Build Meta query - use fundraising-filtered view for ROI-relevant spend
+  const metaQuery = (supabase as any)
+    .from('meta_fundraising_metrics_daily')
     .select('date, spend, conversions, impressions, clicks, link_clicks')
     .eq('organization_id', organizationId)
     .gte('date', startDate)

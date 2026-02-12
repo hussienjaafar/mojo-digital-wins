@@ -9,6 +9,10 @@ import { channelKeys } from "./queryKeys";
 
 export interface MetaSummary {
   spend: number;
+  /** Total spend across ALL campaigns (including awareness) */
+  totalSpend: number;
+  /** Spend on non-fundraising campaigns (awareness, engagement, etc.) */
+  awarenessSpend: number;
   conversions: number;
   roas: number;
   hasConversionValueData: boolean;
@@ -129,34 +133,48 @@ async function fetchMetaSummary(
   startDate: string,
   endDate: string
 ): Promise<MetaSummary> {
-  const { data, error } = await supabase
-    .from("meta_ad_metrics")
-    .select("spend, conversions, conversion_value, date")
-    .eq("organization_id", organizationId)
-    .gte("date", startDate)
-    .lte("date", endDate)
-    .order("date", { ascending: false });
+  // Fetch fundraising-only metrics and total metrics in parallel
+  const [fundraisingResult, totalResult] = await Promise.all([
+    (supabase as any)
+      .from("meta_fundraising_metrics_daily")
+      .select("spend, conversions, conversion_value, date")
+      .eq("organization_id", organizationId)
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .order("date", { ascending: false }),
+    (supabase as any)
+      .from("meta_ad_metrics_daily")
+      .select("spend, date")
+      .eq("organization_id", organizationId)
+      .gte("date", startDate)
+      .lte("date", endDate),
+  ]);
 
-  if (error) {
-    console.error("[useChannelSummariesQuery] Meta fetch error:", error);
-    throw error;
+  if (fundraisingResult.error) {
+    console.error("[useChannelSummariesQuery] Meta fundraising fetch error:", fundraisingResult.error);
+    throw fundraisingResult.error;
   }
 
-  const metrics = data || [];
-  const spend = metrics.reduce((sum, m) => sum + Number(m.spend || 0), 0);
-  const conversions = metrics.reduce((sum, m) => sum + (m.conversions || 0), 0);
-  const conversionValue = metrics.reduce((sum, m) => sum + Number(m.conversion_value || 0), 0);
+  const metrics = fundraisingResult.data || [];
+  const spend = metrics.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0);
+  const conversions = metrics.reduce((sum: number, m: any) => sum + (m.conversions || 0), 0);
+  const conversionValue = metrics.reduce((sum: number, m: any) => sum + Number(m.conversion_value || 0), 0);
   const hasConversionValueData = conversionValue > 0;
   const roas = spend > 0 && conversionValue > 0 ? conversionValue / spend : 0;
   const lastDataDate = metrics[0]?.date || null;
 
+  const totalSpendAll = (totalResult.data || []).reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0);
+  const awarenessSpend = Math.max(0, totalSpendAll - spend);
+
   return {
     spend,
+    totalSpend: totalSpendAll,
+    awarenessSpend,
     conversions,
     roas,
     hasConversionValueData,
     lastDataDate,
-    hasData: metrics.length > 0,
+    hasData: metrics.length > 0 || (totalResult.data || []).length > 0,
   };
 }
 
