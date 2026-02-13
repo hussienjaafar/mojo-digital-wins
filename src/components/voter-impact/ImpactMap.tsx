@@ -429,6 +429,8 @@ export function ImpactMap({
         mapStyle={MAP_STYLE}
         style={{ width: "100%", height: "100%" }}
         minZoom={2.5}
+        renderWorldCopies={false}
+        maxBounds={[[-190, 10], [-50, 75]]}
         interactiveLayerIds={["states-fill", "districts-fill"]}
         onClick={(e) => {
           if (showDistricts) {
