@@ -4,37 +4,41 @@
  * Displays a continuous gradient bar legend for the Muslim voter population heatmap.
  */
 
-import { POPULATION_COLOR_STOPS } from "@/types/voter-impact";
+import { getColorStopsForMetric, getMetricLabel, METRIC_CONFIGS } from "@/types/voter-impact";
+import type { MetricType } from "@/types/voter-impact";
 
 interface MapLegendProps {
   isDistrictView?: boolean;
+  activeMetric?: MetricType;
 }
 
-export const MapLegend: React.FC<MapLegendProps> = ({ isDistrictView = false }) => {
+export const MapLegend: React.FC<MapLegendProps> = ({ isDistrictView = false, activeMetric = "population" }) => {
+  const config = METRIC_CONFIGS[activeMetric];
+  const colorStops = getColorStopsForMetric(activeMetric);
+
+  // Show "not available" for district-level metrics that don't exist
+  const noDistrictData = isDistrictView && !config.districtField;
+
   // Build gradient string from color stops
-  const gradientColors = POPULATION_COLOR_STOPS.map(
-    (stop, i) => `${stop.color} ${(i / (POPULATION_COLOR_STOPS.length - 1)) * 100}%`
+  const gradientColors = colorStops.map(
+    (stop, i) => `${stop.color} ${(i / (colorStops.length - 1)) * 100}%`
   ).join(", ");
 
-  // Show fewer tick marks to keep it clean
-  const ticks = isDistrictView
-    ? [
-        { label: "0", pos: 0 },
-        { label: "1K", pos: 15 },
-        { label: "5K", pos: 33 },
-        { label: "10K", pos: 44 },
-        { label: "25K", pos: 56 },
-        { label: "50K", pos: 67 },
-        { label: "65K+", pos: 100 },
-      ]
-    : [
-        { label: "0", pos: 0 },
-        { label: "5K", pos: 22 },
-        { label: "25K", pos: 44 },
-        { label: "100K", pos: 67 },
-        { label: "200K", pos: 78 },
-        { label: "500K+", pos: 100 },
-      ];
+  // Build ticks from color stops - show first, last, and evenly spaced middle ones
+  const maxTicks = 6;
+  const step = Math.max(1, Math.floor((colorStops.length - 1) / (maxTicks - 1)));
+  const ticks: { label: string; pos: number }[] = [];
+  for (let i = 0; i < colorStops.length; i += step) {
+    ticks.push({
+      label: colorStops[i].label,
+      pos: (i / (colorStops.length - 1)) * 100,
+    });
+  }
+  // Ensure last tick is always included
+  const lastStop = colorStops[colorStops.length - 1];
+  if (ticks[ticks.length - 1]?.label !== lastStop.label) {
+    ticks.push({ label: lastStop.label + "+", pos: 100 });
+  }
 
   return (
     <div
@@ -45,9 +49,15 @@ export const MapLegend: React.FC<MapLegendProps> = ({ isDistrictView = false }) 
       <div className="flex items-center gap-2 mb-3">
         <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
         <span className="text-xs text-[#64748b] uppercase tracking-wider font-medium">
-          Muslim Voters {isDistrictView ? "(Districts)" : "(States)"}
+          {getMetricLabel(activeMetric)} {isDistrictView ? "(Districts)" : "(States)"}
         </span>
       </div>
+
+      {noDistrictData && (
+        <div className="text-xs text-[#f59e0b] mb-2">
+          ⚠ Not available at district level
+        </div>
+      )}
 
       {/* Gradient bar */}
       <div

@@ -12,8 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 
-import type { MapFilters } from "@/types/voter-impact";
-import { DEFAULT_MAP_FILTERS } from "@/types/voter-impact";
+import type { MapFilters, MetricType } from "@/types/voter-impact";
+import { DEFAULT_MAP_FILTERS, METRIC_CONFIGS } from "@/types/voter-impact";
 
 // ============================================================================
 // Types
@@ -23,7 +23,16 @@ export interface MapControlsProps {
   filters: MapFilters;
   onFiltersChange: (filters: MapFilters) => void;
   maxVoters: number;
+  activeMetric: MetricType;
+  onMetricChange: (metric: MetricType) => void;
 }
+
+const METRIC_OPTIONS: { key: MetricType; label: string }[] = [
+  { key: "population", label: "Population" },
+  { key: "donors", label: "Donors" },
+  { key: "activists", label: "Activists" },
+  { key: "turnout", label: "Turnout %" },
+];
 
 // ============================================================================
 // Helper Functions
@@ -44,6 +53,8 @@ export function MapControls({
   filters,
   onFiltersChange,
   maxVoters,
+  activeMetric,
+  onMetricChange,
 }: MapControlsProps) {
   const hasActiveFilters = useMemo(() => {
     return (
@@ -82,6 +93,27 @@ export function MapControls({
       role="toolbar"
       aria-label="Map filter controls"
     >
+      {/* Metric Toggle */}
+      <div className="flex items-center bg-[#141b2d] rounded-lg border border-[#1e2a45] p-0.5" role="radiogroup" aria-label="Select metric to visualize">
+        {METRIC_OPTIONS.map((opt) => (
+          <button
+            key={opt.key}
+            role="radio"
+            aria-checked={activeMetric === opt.key}
+            onClick={() => onMetricChange(opt.key)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
+              activeMetric === opt.key
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#1e2a45]"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="h-6 w-px bg-[#1e2a45] mx-1" />
+
       {/* Search Input */}
       <div className="relative flex-shrink-0 w-52">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#64748b]" aria-hidden="true" />

@@ -19,7 +19,7 @@ import type {
   VoterImpactState,
   VoterImpactDistrict,
 } from '@/queries/useVoterImpactQueries';
-import type { MapFilters, ComparisonItem } from '@/types/voter-impact';
+import type { MapFilters, ComparisonItem, MetricType } from '@/types/voter-impact';
 import { DEFAULT_MAP_FILTERS, applyFilters } from '@/types/voter-impact';
 import { V3ErrorBoundary } from '@/components/v3/V3ErrorBoundary';
 import { MapControls } from '@/components/voter-impact/MapControls';
@@ -61,6 +61,7 @@ export default function VoterImpactMap() {
   }, []);
 
   const [filters, setFilters] = useState<MapFilters>(initialFilters);
+  const [activeMetric, setActiveMetric] = useState<MetricType>("population");
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(initialRegionId);
   const [selectedRegionType, setSelectedRegionType] = useState<'state' | 'district'>(initialRegionType);
   const [comparisonItems, setComparisonItems] = useState<ComparisonItem[]>([]);
@@ -248,6 +249,8 @@ export default function VoterImpactMap() {
         filters={filters}
         onFiltersChange={setFilters}
         maxVoters={maxVoters}
+        activeMetric={activeMetric}
+        onMetricChange={setActiveMetric}
       />
 
       {/* Main Content Area */}
@@ -286,9 +289,10 @@ export default function VoterImpactMap() {
                   filteredDistrictCount={filteredDistricts.length}
                   hasActiveFilters={hasActiveFilters}
                   onClearFilters={() => setFilters(DEFAULT_MAP_FILTERS)}
+                  activeMetric={activeMetric}
                 />
               </Suspense>
-              <MapLegend isDistrictView={isDistrictView} />
+              <MapLegend isDistrictView={isDistrictView} activeMetric={activeMetric} />
             </V3ErrorBoundary>
           )}
         </div>
