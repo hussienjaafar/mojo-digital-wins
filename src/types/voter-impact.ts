@@ -13,7 +13,130 @@ import type {
 // Metric Types
 // ============================================================================
 
-export type MetricType = "population";
+export type MetricType = "population" | "donors" | "activists" | "turnout";
+
+// ============================================================================
+// Metric Configuration
+// ============================================================================
+
+export interface ColorStop {
+  threshold: number;
+  color: string;
+  label: string;
+}
+
+export interface MetricConfig {
+  key: MetricType;
+  label: string;
+  shortLabel: string;
+  stateField: string;
+  districtField: string | null;
+  format: "number" | "percentage";
+  colorStops: readonly ColorStop[];
+}
+
+export const POPULATION_COLOR_STOPS: readonly ColorStop[] = [
+  { threshold: 0, color: "#0a0a1a", label: "0" },
+  { threshold: 500, color: "#0d2847", label: "500" },
+  { threshold: 2000, color: "#0f4c75", label: "2K" },
+  { threshold: 5000, color: "#1277a8", label: "5K" },
+  { threshold: 10000, color: "#15a2c2", label: "10K" },
+  { threshold: 25000, color: "#22c7a0", label: "25K" },
+  { threshold: 50000, color: "#4ae08a", label: "50K" },
+  { threshold: 100000, color: "#8ef06e", label: "100K" },
+  { threshold: 200000, color: "#c8f74d", label: "200K" },
+  { threshold: 500000, color: "#f9f535", label: "500K" },
+];
+
+const DONORS_COLOR_STOPS: readonly ColorStop[] = [
+  { threshold: 0, color: "#0a0a1a", label: "0" },
+  { threshold: 100, color: "#0d2847", label: "100" },
+  { threshold: 500, color: "#0f4c75", label: "500" },
+  { threshold: 2000, color: "#1277a8", label: "2K" },
+  { threshold: 5000, color: "#15a2c2", label: "5K" },
+  { threshold: 10000, color: "#22c7a0", label: "10K" },
+  { threshold: 25000, color: "#4ae08a", label: "25K" },
+  { threshold: 50000, color: "#8ef06e", label: "50K" },
+  { threshold: 86000, color: "#f9f535", label: "86K" },
+] as const;
+
+const ACTIVISTS_COLOR_STOPS: readonly ColorStop[] = [
+  { threshold: 0, color: "#0a0a1a", label: "0" },
+  { threshold: 10, color: "#0d2847", label: "10" },
+  { threshold: 50, color: "#0f4c75", label: "50" },
+  { threshold: 100, color: "#1277a8", label: "100" },
+  { threshold: 250, color: "#15a2c2", label: "250" },
+  { threshold: 500, color: "#22c7a0", label: "500" },
+  { threshold: 1000, color: "#4ae08a", label: "1K" },
+  { threshold: 2000, color: "#8ef06e", label: "2K" },
+  { threshold: 3000, color: "#f9f535", label: "3K" },
+] as const;
+
+const TURNOUT_COLOR_STOPS: readonly ColorStop[] = [
+  { threshold: 0, color: "#0a0a1a", label: "0%" },
+  { threshold: 0.05, color: "#0d2847", label: "5%" },
+  { threshold: 0.15, color: "#0f4c75", label: "15%" },
+  { threshold: 0.25, color: "#1277a8", label: "25%" },
+  { threshold: 0.35, color: "#15a2c2", label: "35%" },
+  { threshold: 0.45, color: "#22c7a0", label: "45%" },
+  { threshold: 0.55, color: "#4ae08a", label: "55%" },
+  { threshold: 0.65, color: "#8ef06e", label: "65%" },
+  { threshold: 0.75, color: "#f9f535", label: "75%" },
+] as const;
+
+export const METRIC_CONFIGS: Record<MetricType, MetricConfig> = {
+  population: {
+    key: "population",
+    label: "Muslim Voters",
+    shortLabel: "Population",
+    stateField: "muslim_voters",
+    districtField: "muslim_voters",
+    format: "number",
+    colorStops: POPULATION_COLOR_STOPS,
+  },
+  donors: {
+    key: "donors",
+    label: "Political Donors",
+    shortLabel: "Donors",
+    stateField: "political_donors",
+    districtField: null,
+    format: "number",
+    colorStops: DONORS_COLOR_STOPS,
+  },
+  activists: {
+    key: "activists",
+    label: "Political Activists",
+    shortLabel: "Activists",
+    stateField: "political_activists",
+    districtField: null,
+    format: "number",
+    colorStops: ACTIVISTS_COLOR_STOPS,
+  },
+  turnout: {
+    key: "turnout",
+    label: "2024 Turnout",
+    shortLabel: "Turnout %",
+    stateField: "vote_2024_pct",
+    districtField: "turnout_pct",
+    format: "percentage",
+    colorStops: TURNOUT_COLOR_STOPS,
+  },
+};
+
+export function getColorStopsForMetric(metric: MetricType): readonly ColorStop[] {
+  return METRIC_CONFIGS[metric].colorStops;
+}
+
+export function getMetricLabel(metric: MetricType): string {
+  return METRIC_CONFIGS[metric].label;
+}
+
+export function formatMetricValue(value: number, metric: MetricType): string {
+  if (METRIC_CONFIGS[metric].format === "percentage") {
+    return `${(value * 100).toFixed(1)}%`;
+  }
+  return value.toLocaleString();
+}
 
 // ============================================================================
 // Filter Types
@@ -42,26 +165,7 @@ export interface MapViewState {
   zoom: number;
 }
 
-// ============================================================================
-// Population Heatmap Color Scale
-// ============================================================================
-
-/**
- * Population-based color stops for the heatmap gradient.
- * Uses a continuous scale from dark (zero) to bright (high population).
- */
-export const POPULATION_COLOR_STOPS = [
-  { threshold: 0, color: "#0a0a1a", label: "0" },
-  { threshold: 500, color: "#0d2847", label: "500" },
-  { threshold: 2000, color: "#0f4c75", label: "2K" },
-  { threshold: 5000, color: "#1277a8", label: "5K" },
-  { threshold: 10000, color: "#15a2c2", label: "10K" },
-  { threshold: 25000, color: "#22c7a0", label: "25K" },
-  { threshold: 50000, color: "#4ae08a", label: "50K" },
-  { threshold: 100000, color: "#8ef06e", label: "100K" },
-  { threshold: 200000, color: "#c8f74d", label: "200K" },
-  { threshold: 500000, color: "#f9f535", label: "500K" },
-] as const;
+// (POPULATION_COLOR_STOPS moved above METRIC_CONFIGS)
 
 /**
  * Get color for a given Muslim voter population count.

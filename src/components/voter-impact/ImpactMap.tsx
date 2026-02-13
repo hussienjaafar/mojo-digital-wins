@@ -24,8 +24,8 @@ import type {
   VoterImpactState,
   VoterImpactDistrict,
 } from "@/queries/useVoterImpactQueries";
-import type { MapFilters } from "@/types/voter-impact";
-import { POPULATION_COLOR_STOPS } from "@/types/voter-impact";
+import type { MapFilters, MetricType, ColorStop } from "@/types/voter-impact";
+import { POPULATION_COLOR_STOPS, METRIC_CONFIGS, getMetricLabel, formatMetricValue } from "@/types/voter-impact";
 
 // ============================================================================
 // Types
@@ -41,6 +41,7 @@ export interface ImpactMapProps {
   filteredDistrictCount?: number;
   hasActiveFilters?: boolean;
   onClearFilters?: () => void;
+  activeMetric?: MetricType;
 }
 
 interface ViewState {
@@ -123,9 +124,9 @@ function getStateFromFips(fips: string): string | null {
  * Build a MapLibre interpolate expression for population-based coloring.
  * Uses the POPULATION_COLOR_STOPS for a continuous gradient.
  */
-function buildPopulationColorExpression(property: string): ExpressionSpecification {
+function buildColorExpression(property: string, colorStops: readonly ColorStop[]): ExpressionSpecification {
   const stops: (number | string)[] = [];
-  for (const stop of POPULATION_COLOR_STOPS) {
+  for (const stop of colorStops) {
     stops.push(stop.threshold, stop.color);
   }
   return [
@@ -150,6 +151,7 @@ export function ImpactMap({
   filteredDistrictCount,
   hasActiveFilters,
   onClearFilters,
+  activeMetric = "population",
 }: ImpactMapProps) {
   const [viewState, setViewState] = useState<ViewState>(INITIAL_VIEW_STATE);
   const [hoveredRegion, setHoveredRegion] = useState<string | null>(null);
@@ -204,18 +206,20 @@ export function ImpactMap({
 
   const showDistricts = viewState.zoom >= DISTRICT_VISIBILITY_ZOOM;
 
-  // Create enriched GeoJSON with muslimVoters injected into state properties
+  const metricConfig = METRIC_CONFIGS[activeMetric];
+
+  // Create enriched GeoJSON with metric value injected into state properties
   const enrichedStatesGeoJSON = useMemo(() => {
     if (!statesGeoJSON || states.length === 0) return statesGeoJSON;
 
-    // Build lookup: FIPS -> muslim_voters
-    const stateVotersMap = new Map<string, number>();
+    const stateDataMap = new Map<string, number>();
     states.forEach((state) => {
       const fips = Object.entries(FIPS_TO_ABBR).find(
         ([, abbr]) => abbr === state.state_code
       )?.[0];
       if (fips) {
-        stateVotersMap.set(fips, state.muslim_voters || 0);
+        const val = (state as any)[metricConfig.stateField] || 0;
+        stateDataMap.set(fips, val);
       }
     });
 
@@ -223,19 +227,19 @@ export function ImpactMap({
       ...statesGeoJSON,
       features: statesGeoJSON.features.map((feature) => {
         const fips = String(feature.id).padStart(2, '0');
-        const muslimVoters = stateVotersMap.get(fips) ?? 0;
+        const metricValue = stateDataMap.get(fips) ?? 0;
         return {
           ...feature,
           properties: {
             ...feature.properties,
-            muslimVoters,
+            metricValue,
           },
         };
       }),
     };
-  }, [statesGeoJSON, states]);
+  }, [statesGeoJSON, states, metricConfig.stateField]);
 
-  // Create enriched GeoJSON with muslimVoters injected into district properties
+  // Create enriched GeoJSON with metric value injected into district properties
   const enrichedDistrictsGeoJSON = useMemo(() => {
     if (!districtsGeoJSON || districts.length === 0) return districtsGeoJSON;
 
@@ -246,23 +250,26 @@ export function ImpactMap({
         const districtNum = feature.properties?.CD;
         const cdCode = stateCode && districtNum ? buildDistrictCode(stateCode, districtNum) : null;
         const districtData = cdCode ? districts.find(d => d.cd_code === cdCode) : null;
-        const muslimVoters = districtData?.muslim_voters || 0;
+        const metricValue = metricConfig.districtField && districtData
+          ? (districtData as any)[metricConfig.districtField] || 0
+          : 0;
 
         return {
           ...feature,
           properties: {
             ...feature.properties,
             cdCode,
-            muslimVoters,
+            metricValue,
           },
         };
       }),
     };
-  }, [districtsGeoJSON, districts]);
+  }, [districtsGeoJSON, districts, metricConfig.districtField]);
 
-  // Population-based color expressions
-  const stateColorExpression = useMemo(() => buildPopulationColorExpression("muslimVoters"), []);
-  const districtColorExpression = useMemo(() => buildPopulationColorExpression("muslimVoters"), []);
+  // Metric-based color expressions
+  const colorStops = metricConfig.colorStops;
+  const stateColorExpression = useMemo(() => buildColorExpression("metricValue", colorStops), [colorStops]);
+  const districtColorExpression = useMemo(() => buildColorExpression("metricValue", colorStops), [colorStops]);
 
   // Handle view state change
   const handleMove = useCallback((evt: ViewStateChangeEvent) => {
@@ -356,7 +363,7 @@ export function ImpactMap({
           x: event.point.x,
           y: event.point.y,
           name: stateName,
-          voters: stateData?.muslim_voters || 0,
+          voters: stateData ? (stateData as any)[metricConfig.stateField] || 0 : 0,
           type: 'state',
         });
         onRegionHover(stateAbbr, "state");
@@ -388,7 +395,9 @@ export function ImpactMap({
             x: event.point.x,
             y: event.point.y,
             name: `${stateAbbr} District ${parseInt(districtNum, 10) || 'At-Large'}`,
-            voters: districtData?.muslim_voters || 0,
+            voters: metricConfig.districtField && districtData
+              ? (districtData as any)[metricConfig.districtField] || 0
+              : 0,
             type: 'district',
           });
           onRegionHover(cdCode, "district");
@@ -716,8 +725,8 @@ export function ImpactMap({
             <span className="font-bold text-[#e2e8f0] text-sm">{hoverInfo.name}</span>
           </div>
           <div>
-            <div className="text-xl font-bold text-[#e2e8f0]">{hoverInfo.voters.toLocaleString()}</div>
-            <div className="text-xs text-[#64748b]">Muslim Voters</div>
+            <div className="text-xl font-bold text-[#e2e8f0]">{formatMetricValue(hoverInfo.voters, activeMetric)}</div>
+            <div className="text-xs text-[#64748b]">{getMetricLabel(activeMetric)}</div>
           </div>
         </div>
       )}
