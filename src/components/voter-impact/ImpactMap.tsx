@@ -32,7 +32,8 @@ import {
   buildDistrictCode,
   getStateFromFips,
 } from "@/hooks/useImpactMapLayers";
-import { InsetMap } from "./InsetMap";
+import { StateMiniCard } from "./StateMiniCard";
+import { formatMetricValue as fmtMetric } from "@/types/voter-impact";
 
 // ============================================================================
 // Types
@@ -335,24 +336,50 @@ export function ImpactMap({
     onRegionHover(null, "state");
   }, [onRegionHover]);
 
-  // Handle inset map clicks (Alaska/Hawaii)
+  // Compute fill color for a state from color stops
+  const getStateColor = useCallback(
+    (code: string): string => {
+      const stateData = states.find(s => s.state_code === code);
+      const val = stateData ? (stateData as any)[metricConfig.stateField] || 0 : 0;
+      const stops = metricConfig.colorStops;
+      if (val <= stops[0].threshold) return stops[0].color;
+      for (let i = 1; i < stops.length; i++) {
+        if (val <= stops[i].threshold) {
+          const t = (val - stops[i - 1].threshold) / (stops[i].threshold - stops[i - 1].threshold);
+          // Simple: just return the lower stop color (good enough for a card indicator)
+          return t > 0.5 ? stops[i].color : stops[i - 1].color;
+        }
+      }
+      return stops[stops.length - 1].color;
+    },
+    [states, metricConfig]
+  );
+
+  const getStateFormattedValue = useCallback(
+    (code: string): string => {
+      const stateData = states.find(s => s.state_code === code);
+      const val = stateData ? (stateData as any)[metricConfig.stateField] || 0 : 0;
+      return fmtMetric(val, activeMetric);
+    },
+    [states, metricConfig, activeMetric]
+  );
+
+  // Handle inset card clicks (Alaska/Hawaii)
   const handleInsetRegionSelect = useCallback(
     (regionId: string | null, type: "state" | "district") => {
       if (regionId) {
         onRegionSelect(regionId, type);
-        // For state clicks, set up the state info
         if (type === "state") {
-          const stateData = states.find(s => s.state_code === regionId);
           const stateDistrictCount = districts.filter(d => d.state_code === regionId).length;
           setSelectedStateInfo({
-            name: stateData?.state_code === "AK" ? "Alaska" : stateData?.state_code === "HI" ? "Hawaii" : regionId,
+            name: regionId === "AK" ? "Alaska" : regionId === "HI" ? "Hawaii" : regionId,
             code: regionId,
             districtCount: stateDistrictCount,
           });
         }
       }
     },
-    [onRegionSelect, states, districts]
+    [onRegionSelect, districts]
   );
 
   if (isLoading) {
@@ -382,7 +409,7 @@ export function ImpactMap({
       className="w-full h-full relative"
       role="application"
       aria-label="Muslim Voter Population Heatmap"
-      aria-description="Interactive heatmap showing Muslim voter population across states and congressional districts. Click on a state to zoom in and view district-level data. Colors range from dark (zero voters) to bright yellow (highest population)."
+      data-testid="impact-map-container"
     >
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {screenReaderAnnouncement}
@@ -394,7 +421,6 @@ export function ImpactMap({
         onMove={handleMove}
         mapStyle={MAP_STYLE}
         style={{ width: "100%", height: "100%" }}
-        
         minZoom={2.5}
         interactiveLayerIds={["states-fill", "districts-fill"]}
         onClick={(e) => {
@@ -429,43 +455,27 @@ export function ImpactMap({
         </Source>
       </MapGL>
 
-      {/* Alaska & Hawaii Inset Maps */}
-      <div className="absolute bottom-4 left-4 z-10 flex gap-3 pointer-events-auto">
-        <InsetMap
-          label="Alaska"
-          center={[-160, 64]}
-          zoom={1.4}
-          width={160}
-          height={110}
-          enrichedStatesGeoJSON={enrichedStatesGeoJSON}
-          enrichedDistrictsGeoJSON={enrichedDistrictsGeoJSON}
-          statesFillLayer={statesFillLayer}
-          statesBorderLayer={statesBorderLayer}
-          districtsFillLayer={districtsFillLayer}
-          districtsBorderLayer={districtsBorderLayer}
-          showDistricts={showDistricts}
-          onRegionSelect={handleInsetRegionSelect}
-          onRegionHover={onRegionHover}
-          mapStyle={MAP_STYLE}
-        />
-        <InsetMap
-          label="Hawaii"
-          center={[-157.0, 20.5]}
-          zoom={5.0}
-          width={120}
-          height={85}
-          enrichedStatesGeoJSON={enrichedStatesGeoJSON}
-          enrichedDistrictsGeoJSON={enrichedDistrictsGeoJSON}
-          statesFillLayer={statesFillLayer}
-          statesBorderLayer={statesBorderLayer}
-          districtsFillLayer={districtsFillLayer}
-          districtsBorderLayer={districtsBorderLayer}
-          showDistricts={showDistricts}
-          onRegionSelect={handleInsetRegionSelect}
-          onRegionHover={onRegionHover}
-          mapStyle={MAP_STYLE}
-        />
-      </div>
+      {/* Alaska & Hawaii Mini Cards — hidden during district drill-down */}
+      {!showDistricts && (
+        <div className="absolute bottom-4 left-4 z-10 flex gap-2">
+          <StateMiniCard
+            stateCode="AK"
+            stateName="Alaska"
+            formattedValue={getStateFormattedValue("AK")}
+            fillColor={getStateColor("AK")}
+            onSelect={handleInsetRegionSelect}
+            onHover={onRegionHover}
+          />
+          <StateMiniCard
+            stateCode="HI"
+            stateName="Hawaii"
+            formattedValue={getStateFormattedValue("HI")}
+            fillColor={getStateColor("HI")}
+            onSelect={handleInsetRegionSelect}
+            onHover={onRegionHover}
+          />
+        </div>
+      )}
 
       {/* State Context Header */}
       {showDistricts && selectedStateInfo && (
