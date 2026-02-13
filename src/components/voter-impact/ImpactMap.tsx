@@ -369,7 +369,7 @@ export function ImpactMap({
         onRegionHover(stateAbbr, "state");
       }
     },
-    [onRegionHover, states]
+    [onRegionHover, states, metricConfig]
   );
 
   // Handle district hover
@@ -404,7 +404,7 @@ export function ImpactMap({
         }
       }
     },
-    [onRegionHover, districts]
+    [onRegionHover, districts, metricConfig]
   );
 
   const handleMouseLeave = useCallback(() => {
