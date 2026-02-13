@@ -18,7 +18,7 @@ import MapGL, {
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { FeatureCollection, Feature, Geometry } from "geojson";
 import bbox from "@turf/bbox";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, LocateFixed } from "lucide-react";
 
 import type {
   VoterImpactState,
@@ -484,6 +484,18 @@ export function ImpactMap({
             onHover={onRegionHover}
           />
         </div>
+      )}
+
+      {/* Recenter Button — shown when panned far from continental US */}
+      {(viewState.longitude < -130 || viewState.longitude > -65 || viewState.latitude < 24 || viewState.latitude > 55) && (
+        <button
+          onClick={() => setViewState(INITIAL_VIEW_STATE)}
+          className="absolute bottom-4 right-4 z-10 flex items-center gap-2 px-3 py-2 bg-[#0a0f1a]/95 backdrop-blur-md border border-[#1e2a45] rounded-lg text-[#94a3b8] hover:text-white hover:bg-[#1e2a45] transition-all shadow-xl text-sm font-medium"
+          aria-label="Recenter map to continental United States"
+        >
+          <LocateFixed className="h-4 w-4" />
+          Recenter
+        </button>
       )}
 
       {/* State Context Header */}
