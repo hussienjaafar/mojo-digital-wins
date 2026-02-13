@@ -364,6 +364,12 @@ export function ImpactMap({
     [states, metricConfig, activeMetric]
   );
 
+  // Geographic centers for non-contiguous states
+  const INSET_STATE_BOUNDS: Record<string, { center: [number, number]; zoom: number }> = {
+    AK: { center: [-153.5, 64.2], zoom: 3.5 },
+    HI: { center: [-155.5, 19.9], zoom: 6 },
+  };
+
   // Handle inset card clicks (Alaska/Hawaii)
   const handleInsetRegionSelect = useCallback(
     (regionId: string | null, type: "state" | "district") => {
@@ -376,6 +382,15 @@ export function ImpactMap({
             code: regionId,
             districtCount: stateDistrictCount,
           });
+          // Fly the map to the state's location
+          const target = INSET_STATE_BOUNDS[regionId];
+          if (target && mapRef.current) {
+            mapRef.current.flyTo({
+              center: target.center,
+              zoom: target.zoom,
+              duration: 1200,
+            });
+          }
         }
       }
     },
