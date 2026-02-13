@@ -138,15 +138,6 @@ export function formatMetricValue(value: number, metric: MetricType): string {
   return value.toLocaleString();
 }
 
-// ============================================================================
-// Filter Types
-// ============================================================================
-
-export interface MapFilters {
-  minVoters: number;
-  searchQuery: string;
-}
-
 export interface RegionSelection {
   type: "state" | "district";
   id: string;
@@ -257,39 +248,6 @@ export function getImpactColor(score: number): string {
   return IMPACT_COLORS.NONE;
 }
 
-/**
- * Apply filters to districts (simplified for population view)
- */
-export function applyFilters(
-  districts: VoterImpactDistrict[],
-  filters: MapFilters
-): VoterImpactDistrict[] {
-  let result = [...districts];
-
-  if (filters.minVoters > 0) {
-    result = result.filter((d) => d.muslim_voters >= filters.minVoters);
-  }
-
-  if (filters.searchQuery.trim()) {
-    const query = filters.searchQuery.toLowerCase().trim();
-    result = result.filter(
-      (d) =>
-        d.cd_code.toLowerCase().includes(query) ||
-        d.state_code.toLowerCase().includes(query)
-    );
-  }
-
-  return result;
-}
-
-// ============================================================================
-// Default Values
-// ============================================================================
-
-export const DEFAULT_MAP_FILTERS: MapFilters = {
-  minVoters: 0,
-  searchQuery: "",
-};
 
 export const DEFAULT_MAP_VIEW_STATE: MapViewState = {
   longitude: -98.5795,

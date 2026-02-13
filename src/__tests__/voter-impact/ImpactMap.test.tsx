@@ -13,8 +13,6 @@ import './setup';
 
 import { ImpactMap } from '@/components/voter-impact/ImpactMap';
 import { mockVoterImpactStates, mockVoterImpactDistricts, setupGeoJSONMock } from './setup';
-import type { MapFilters } from '@/types/voter-impact';
-import { DEFAULT_MAP_FILTERS } from '@/types/voter-impact';
 
 describe('ImpactMap', () => {
   beforeEach(() => {
@@ -25,7 +23,6 @@ describe('ImpactMap', () => {
   const defaultProps = {
     states: mockVoterImpactStates,
     districts: mockVoterImpactDistricts,
-    filters: DEFAULT_MAP_FILTERS,
     selectedRegion: null,
     onRegionSelect: vi.fn(),
     onRegionHover: vi.fn(),
@@ -45,9 +42,8 @@ describe('ImpactMap', () => {
     });
   });
 
-  it('accepts filter props', async () => {
-    const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, minVoters: 5000 };
-    render(<ImpactMap {...defaultProps} filters={filters} />);
+  it('accepts activeMetric prop', async () => {
+    render(<ImpactMap {...defaultProps} activeMetric="donors" />);
     await waitFor(() => {
       expect(screen.getByTestId('impact-map-container')).toBeInTheDocument();
     });

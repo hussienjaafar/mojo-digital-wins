@@ -24,7 +24,7 @@ import type {
   VoterImpactState,
   VoterImpactDistrict,
 } from "@/queries/useVoterImpactQueries";
-import type { MapFilters, MetricType, ColorStop } from "@/types/voter-impact";
+import type { MetricType, ColorStop } from "@/types/voter-impact";
 import { getMetricLabel, formatMetricValue } from "@/types/voter-impact";
 import {
   useImpactMapLayers,
@@ -42,13 +42,9 @@ import { formatMetricValue as fmtMetric } from "@/types/voter-impact";
 export interface ImpactMapProps {
   states: VoterImpactState[];
   districts: VoterImpactDistrict[];
-  filters: MapFilters;
   selectedRegion: string | null;
   onRegionSelect: (regionId: string | null, type: "state" | "district") => void;
   onRegionHover: (regionId: string | null, type: "state" | "district") => void;
-  filteredDistrictCount?: number;
-  hasActiveFilters?: boolean;
-  onClearFilters?: () => void;
   activeMetric?: MetricType;
   localDistrictColorStops?: ColorStop[] | null;
 }
@@ -103,13 +99,9 @@ const DISTRICT_VISIBILITY_ZOOM = 5.5;
 export function ImpactMap({
   states,
   districts,
-  filters,
   selectedRegion,
   onRegionSelect,
   onRegionHover,
-  filteredDistrictCount,
-  hasActiveFilters,
-  onClearFilters,
   activeMetric = "population",
   localDistrictColorStops,
 }: ImpactMapProps) {
@@ -539,28 +531,6 @@ export function ImpactMap({
         </div>
       )}
 
-      {/* Empty State Overlay */}
-      {filteredDistrictCount === 0 && hasActiveFilters && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-          <div className="bg-[#0a0f1a]/95 backdrop-blur-md border border-[#1e2a45] rounded-xl px-8 py-6 shadow-2xl text-center pointer-events-auto max-w-sm">
-            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[#1e2a45] flex items-center justify-center">
-              <svg className="w-6 h-6 text-[#64748b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <p className="text-[#e2e8f0] text-lg font-semibold mb-1">No districts found</p>
-            <p className="text-[#64748b] text-sm mb-4">Try adjusting your filters to see more results</p>
-            {onClearFilters && (
-              <button
-                onClick={onClearFilters}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                Clear all filters
-              </button>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

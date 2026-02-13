@@ -19,8 +19,8 @@ import type {
   VoterImpactState,
   VoterImpactDistrict,
 } from '@/queries/useVoterImpactQueries';
-import type { MapFilters, ComparisonItem, MetricType, ColorStop } from '@/types/voter-impact';
-import { DEFAULT_MAP_FILTERS, applyFilters, METRIC_CONFIGS } from '@/types/voter-impact';
+import type { ComparisonItem, MetricType, ColorStop } from '@/types/voter-impact';
+import { METRIC_CONFIGS } from '@/types/voter-impact';
 import { V3ErrorBoundary } from '@/components/v3/V3ErrorBoundary';
 import { MapControls } from '@/components/voter-impact/MapControls';
 
@@ -39,16 +39,6 @@ export default function VoterImpactMap() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
 
-  const initialFilters = useMemo<MapFilters>(() => {
-    const minVotersParam = searchParams.get('minVoters');
-    const searchQueryParam = searchParams.get('q');
-    return {
-      minVoters: minVotersParam ? Math.max(0, parseInt(minVotersParam, 10) || 0) : DEFAULT_MAP_FILTERS.minVoters,
-      searchQuery: searchQueryParam || DEFAULT_MAP_FILTERS.searchQuery,
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const initialRegionId = useMemo<string | null>(() => {
     return searchParams.get('region') || null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -60,7 +50,6 @@ export default function VoterImpactMap() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [filters, setFilters] = useState<MapFilters>(initialFilters);
   const [activeMetric, setActiveMetric] = useState<MetricType>("population");
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(initialRegionId);
   const [selectedRegionType, setSelectedRegionType] = useState<'state' | 'district'>(initialRegionType);
@@ -72,14 +61,12 @@ export default function VoterImpactMap() {
   // Sync state changes to URL params
   useEffect(() => {
     const params = new URLSearchParams();
-    if (filters.minVoters > 0) params.set('minVoters', filters.minVoters.toString());
-    if (filters.searchQuery) params.set('q', filters.searchQuery);
     if (selectedRegionId) {
       params.set('region', selectedRegionId);
       params.set('type', selectedRegionType);
     }
     setSearchParams(params, { replace: true });
-  }, [filters, selectedRegionId, selectedRegionType, setSearchParams]);
+  }, [selectedRegionId, selectedRegionType, setSearchParams]);
 
   // Data fetching
   const { data: rawStates = [], isLoading: statesLoading } = useVoterImpactStates();
@@ -99,20 +86,6 @@ export default function VoterImpactMap() {
       return state;
     });
   }, [rawStates, districts]);
-
-  const maxVoters = useMemo(() => {
-    if (districts.length === 0) return 100000;
-    return Math.max(...districts.map((d) => d.muslim_voters));
-  }, [districts]);
-
-  const filteredDistricts = useMemo(
-    () => applyFilters(districts, filters),
-    [districts, filters]
-  );
-
-  const hasActiveFilters = useMemo(() => {
-    return filters.minVoters > 0 || filters.searchQuery !== '';
-  }, [filters]);
 
   // Compute state-relative color stops for district view
   const localDistrictColorStops = useMemo<ColorStop[] | null>(() => {
@@ -290,9 +263,6 @@ export default function VoterImpactMap() {
 
       {/* Controls Bar */}
       <MapControls
-        filters={filters}
-        onFiltersChange={setFilters}
-        maxVoters={maxVoters}
         activeMetric={activeMetric}
         onMetricChange={setActiveMetric}
       />
@@ -326,13 +296,9 @@ export default function VoterImpactMap() {
                 <ImpactMap
                   states={states}
                   districts={districts}
-                  filters={filters}
                   selectedRegion={selectedRegionId}
                   onRegionSelect={handleRegionSelect}
                   onRegionHover={handleRegionHover}
-                  filteredDistrictCount={filteredDistricts.length}
-                  hasActiveFilters={hasActiveFilters}
-                  onClearFilters={() => setFilters(DEFAULT_MAP_FILTERS)}
                   activeMetric={activeMetric}
                   localDistrictColorStops={localDistrictColorStops}
                 />
