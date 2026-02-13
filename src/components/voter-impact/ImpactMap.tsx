@@ -448,24 +448,24 @@ export function ImpactMap({
           "case",
           ["==", ["id"], selectedFips], COLORS.glowSelected,
           ["==", ["id"], hoveredFips], COLORS.glowHover,
-          "transparent",
+          showDistricts ? "#475569" : "transparent",
         ] as ExpressionSpecification,
         "line-width": [
           "case",
           ["==", ["id"], selectedFips], 12,
           ["==", ["id"], hoveredFips], 10,
-          0,
+          showDistricts ? 6 : 0,
         ] as ExpressionSpecification,
         "line-opacity": [
           "case",
           ["==", ["id"], selectedFips], 0.5,
           ["==", ["id"], hoveredFips], 0.4,
-          0,
+          showDistricts ? 0.3 : 0,
         ] as ExpressionSpecification,
         "line-blur": 4,
       },
     };
-  }, [selectedRegion, hoveredRegion, hoveredType]);
+  }, [selectedRegion, hoveredRegion, hoveredType, showDistricts]);
 
   // States border layer
   const statesBorderLayer: LineLayerSpecification = useMemo(() => {
@@ -482,17 +482,17 @@ export function ImpactMap({
           "case",
           ["==", ["id"], selectedFips], COLORS.selectedBorder,
           ["==", ["id"], hoveredFips], COLORS.hoverBorder,
-          COLORS.border,
+          showDistricts ? "#cbd5e1" : COLORS.border,
         ] as ExpressionSpecification,
         "line-width": [
           "case",
           ["==", ["id"], selectedFips], 5,
           ["==", ["id"], hoveredFips], 4,
-          1.5,
+          showDistricts ? 3 : 1.5,
         ] as ExpressionSpecification,
       },
     };
-  }, [selectedRegion, hoveredRegion, hoveredType]);
+  }, [selectedRegion, hoveredRegion, hoveredType, showDistricts]);
 
   // Districts fill layer
   const districtsFillLayer: FillLayerSpecification = useMemo(
