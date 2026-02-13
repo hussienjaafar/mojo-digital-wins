@@ -19,8 +19,8 @@ import type {
   VoterImpactState,
   VoterImpactDistrict,
 } from '@/queries/useVoterImpactQueries';
-import type { MapFilters, ComparisonItem, MetricType } from '@/types/voter-impact';
-import { DEFAULT_MAP_FILTERS, applyFilters } from '@/types/voter-impact';
+import type { MapFilters, ComparisonItem, MetricType, ColorStop } from '@/types/voter-impact';
+import { DEFAULT_MAP_FILTERS, applyFilters, METRIC_CONFIGS } from '@/types/voter-impact';
 import { V3ErrorBoundary } from '@/components/v3/V3ErrorBoundary';
 import { MapControls } from '@/components/voter-impact/MapControls';
 
@@ -112,6 +112,43 @@ export default function VoterImpactMap() {
   const hasActiveFilters = useMemo(() => {
     return filters.minVoters > 0 || filters.searchQuery !== '';
   }, [filters]);
+
+  // Compute state-relative color stops for district view
+  const localDistrictColorStops = useMemo<ColorStop[] | null>(() => {
+    if (!isDistrictView || !selectedRegionId) return null;
+    const metricConfig = METRIC_CONFIGS[activeMetric];
+    if (!metricConfig.districtField) return null;
+
+    const stateDistricts = districts.filter(d => d.state_code === selectedRegionId);
+    const values = stateDistricts
+      .map(d => (d as any)[metricConfig.districtField!] || 0)
+      .filter((v: number) => v > 0);
+
+    if (values.length < 2) return null;
+
+    const localMin = Math.min(...values);
+    const localMax = Math.max(...values);
+    if (localMax <= localMin) return null;
+
+    const globalStops = metricConfig.colorStops;
+    const colors = globalStops.map(s => s.color);
+    const range = localMax - localMin;
+    const isPercent = metricConfig.format === "percentage";
+
+    return colors.map((color, i): ColorStop => {
+      const t = i / (colors.length - 1);
+      const threshold = localMin + range * t;
+      let label: string;
+      if (isPercent) {
+        label = `${(threshold * 100).toFixed(0)}%`;
+      } else if (threshold >= 1000) {
+        label = `${(threshold / 1000).toFixed(threshold >= 10000 ? 0 : 1)}K`;
+      } else {
+        label = Math.round(threshold).toLocaleString();
+      }
+      return { threshold, color, label };
+    });
+  }, [isDistrictView, selectedRegionId, districts, activeMetric]);
 
   const selectedRegion = useMemo(() => {
     if (!selectedRegionId) return null;
@@ -290,9 +327,10 @@ export default function VoterImpactMap() {
                   hasActiveFilters={hasActiveFilters}
                   onClearFilters={() => setFilters(DEFAULT_MAP_FILTERS)}
                   activeMetric={activeMetric}
+                  localDistrictColorStops={localDistrictColorStops}
                 />
               </Suspense>
-              <MapLegend isDistrictView={isDistrictView} activeMetric={activeMetric} />
+              <MapLegend isDistrictView={isDistrictView} activeMetric={activeMetric} colorStopsOverride={localDistrictColorStops} />
             </V3ErrorBoundary>
           )}
         </div>

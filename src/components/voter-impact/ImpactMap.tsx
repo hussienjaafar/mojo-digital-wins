@@ -25,7 +25,7 @@ import type {
   VoterImpactDistrict,
 } from "@/queries/useVoterImpactQueries";
 import type { MapFilters, MetricType, ColorStop } from "@/types/voter-impact";
-import { POPULATION_COLOR_STOPS, METRIC_CONFIGS, getMetricLabel, formatMetricValue } from "@/types/voter-impact";
+import { METRIC_CONFIGS, getMetricLabel, formatMetricValue } from "@/types/voter-impact";
 
 // ============================================================================
 // Types
@@ -42,6 +42,7 @@ export interface ImpactMapProps {
   hasActiveFilters?: boolean;
   onClearFilters?: () => void;
   activeMetric?: MetricType;
+  localDistrictColorStops?: ColorStop[] | null;
 }
 
 interface ViewState {
@@ -152,6 +153,7 @@ export function ImpactMap({
   hasActiveFilters,
   onClearFilters,
   activeMetric = "population",
+  localDistrictColorStops,
 }: ImpactMapProps) {
   const [viewState, setViewState] = useState<ViewState>(INITIAL_VIEW_STATE);
   const [hoveredRegion, setHoveredRegion] = useState<string | null>(null);
@@ -269,7 +271,11 @@ export function ImpactMap({
   // Metric-based color expressions
   const colorStops = metricConfig.colorStops;
   const stateColorExpression = useMemo(() => buildColorExpression("metricValue", colorStops), [colorStops]);
-  const districtColorExpression = useMemo(() => buildColorExpression("metricValue", colorStops), [colorStops]);
+
+  const districtColorExpression = useMemo(
+    () => buildColorExpression("metricValue", localDistrictColorStops ?? colorStops),
+    [localDistrictColorStops, colorStops]
+  );
 
   // Handle view state change
   const handleMove = useCallback((evt: ViewStateChangeEvent) => {
