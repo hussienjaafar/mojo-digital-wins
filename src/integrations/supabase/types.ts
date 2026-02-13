@@ -12981,10 +12981,12 @@ export type Database = {
         Row: {
           can_impact: boolean
           cd_code: string
+          cell_phones: number | null
           cost_estimate: number | null
           created_at: string
           didnt_vote_2024: number
           district_num: number
+          households: number | null
           id: string
           margin_pct: number | null
           margin_votes: number | null
@@ -13007,10 +13009,12 @@ export type Database = {
         Insert: {
           can_impact?: boolean
           cd_code: string
+          cell_phones?: number | null
           cost_estimate?: number | null
           created_at?: string
           didnt_vote_2024?: number
           district_num: number
+          households?: number | null
           id?: string
           margin_pct?: number | null
           margin_votes?: number | null
@@ -13033,10 +13037,12 @@ export type Database = {
         Update: {
           can_impact?: boolean
           cd_code?: string
+          cell_phones?: number | null
           cost_estimate?: number | null
           created_at?: string
           didnt_vote_2024?: number
           district_num?: number
+          households?: number | null
           id?: string
           margin_pct?: number | null
           margin_votes?: number | null

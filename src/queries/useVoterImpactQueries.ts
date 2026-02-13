@@ -46,6 +46,8 @@ export interface VoterImpactDistrict {
   can_impact: boolean;
   votes_needed: number | null;
   cost_estimate: number | null;
+  cell_phones: number;
+  households: number;
 }
 
 // ============================================================================
