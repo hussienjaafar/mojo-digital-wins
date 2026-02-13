@@ -1,32 +1,41 @@
 
-
-# Replace Mini Card Indicators with State SVG Outlines + Auto-Scroll on Click
+# Remove Search, Min Population Filter, and Fix Sidebar Empty State
 
 ## What Changes
 
-### 1. SVG State Outlines Instead of Color Bars
-Replace the plain colored rectangle in each `StateMiniCard` with a **simplified SVG outline** of the actual state shape (Alaska and Hawaii). The SVG paths will be filled with the metric-derived color, giving an instantly recognizable visual indicator.
+### 1. Simplify MapControls to metric toggle only
+**File: `src/components/voter-impact/MapControls.tsx`**
+- Remove the search input, min population slider, clear filters button, and all dividers
+- Remove unused imports: `Search`, `X`, `Input`, `Slider`, `Button`
+- Remove props: `filters`, `onFiltersChange`, `maxVoters`
+- Remove helpers: `formatVoterCount`, `hasActiveFilters`, `handleSearchChange`, `handleMinVotersChange`, `handleClearFilters`
+- Keep only the metric toggle radio group
 
-### 2. Auto-Scroll to Sidebar on Click
-When a user clicks an AK or HI card, the `RegionSidebar` will scroll into view. On wider screens the sidebar is already visible, but on smaller screens (or if focus is elsewhere) the page will smoothly scroll the sidebar panel into the viewport so the user immediately sees the state data.
+### 2. Remove filter types and logic
+**File: `src/types/voter-impact.ts`**
+- Remove `MapFilters` interface
+- Remove `DEFAULT_MAP_FILTERS` constant
+- Remove `applyFilters` function
 
-## Technical Details
+### 3. Remove filter state from page
+**File: `src/pages/admin/VoterImpactMap.tsx`**
+- Remove `filters` state, `initialFilters` memo, `maxVoters` memo, `filteredDistricts` memo, `hasActiveFilters` memo
+- Remove filter-related URL param syncing (`minVoters`, `q`)
+- Remove filter-related imports (`MapFilters`, `DEFAULT_MAP_FILTERS`, `applyFilters`)
+- Simplify `MapControls` props (only `activeMetric` and `onMetricChange`)
+- Remove `filters`, `filteredDistrictCount`, `hasActiveFilters`, `onClearFilters` props from `ImpactMap`
 
-### File: `src/components/voter-impact/StateMiniCard.tsx`
-- Add a lookup object mapping `"AK"` and `"HI"` to simplified SVG path data (compact `d` strings representing each state outline)
-- Replace the `<div className="w-3 h-8 ...">` color bar with an inline `<svg>` element (~24x24px viewBox) rendering the state shape filled with `fillColor` and a subtle stroke
-- Keep the same text layout (state code + formatted value) beside the SVG
+### 4. Remove filter props from ImpactMap
+**File: `src/components/voter-impact/ImpactMap.tsx`**
+- Remove `filters` from props interface
+- Remove `filteredDistrictCount`, `hasActiveFilters`, `onClearFilters` props
+- Remove the "No districts found" empty state overlay (lines ~541-561)
+- Remove `MapFilters` import
 
-### File: `src/components/voter-impact/ImpactMap.tsx`
-- No changes needed here -- the click handler already calls `handleInsetRegionSelect` which triggers `onRegionSelect` in the parent
+### 5. Fix sidebar empty state -- remove "Use presets" tip
+**File: `src/components/voter-impact/RegionSidebar.tsx`**
+- Remove the third tip card that says "Use presets / Find high-impact targets" (lines 572-580)
+- Keep only the "Click a state" and "Zoom in" tips, which are still accurate
 
-### File: `src/pages/admin/VoterImpactMap.tsx`
-- Add a `ref` to the `RegionSidebar` wrapper (or the sidebar component itself)
-- In `handleRegionSelect`, after setting state, call `sidebarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })` so the sidebar scrolls into view when AK/HI (or any state) is selected
-- This works for all selections, not just AK/HI, improving UX across the board
-
-### SVG Path Approach
-- Use highly simplified (~10-15 point) path data for Alaska and Hawaii outlines -- just enough to be recognizable at 24px
-- These are hardcoded constants (no external files needed), keeping the component lightweight
-- The fill color comes from the existing `fillColor` prop, and a thin `#64748b` stroke provides definition against the dark card background
-
+### 6. Update tests
+- Update any test files referencing `MapFilters`, search inputs, slider, or the preset text
