@@ -5,7 +5,7 @@
  * - calculateImpactScore
  * - calculateStateImpactScore
  * - getImpactColor
- * - applyFilters
+ * - applyFilters (removed)
  */
 
 import { describe, it, expect } from 'vitest';
@@ -13,11 +13,8 @@ import {
   calculateImpactScore,
   calculateStateImpactScore,
   getImpactColor,
-  applyFilters,
-  DEFAULT_MAP_FILTERS,
   IMPACT_THRESHOLDS,
   IMPACT_COLORS,
-  type MapFilters,
 } from '@/types/voter-impact';
 import {
   mockVoterImpactDistricts,
@@ -368,124 +365,3 @@ describe('getImpactColor', () => {
   });
 });
 
-// ============================================================================
-// applyFilters Tests
-// ============================================================================
-
-describe('applyFilters', () => {
-  describe('minVoters filter', () => {
-    it('returns all when minVoters is 0', () => {
-      const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, minVoters: 0 };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-      expect(result.length).toBe(mockVoterImpactDistricts.length);
-    });
-
-    it('filters districts below minimum voter threshold', () => {
-      const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, minVoters: 20000 };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      result.forEach((d) => {
-        expect(d.muslim_voters).toBeGreaterThanOrEqual(20000);
-      });
-    });
-
-    it('excludes small population districts', () => {
-      const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, minVoters: 5000 };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      // PA-012 has only 2500 voters, should be excluded
-      const pa12 = result.find((d) => d.cd_code === 'PA-012');
-      expect(pa12).toBeUndefined();
-    });
-  });
-
-  describe('searchQuery filter', () => {
-    it('returns all when searchQuery is empty', () => {
-      const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, searchQuery: '' };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-      expect(result.length).toBe(mockVoterImpactDistricts.length);
-    });
-
-    it('filters by district code (cd_code)', () => {
-      const filters: MapFilters = {
-        ...DEFAULT_MAP_FILTERS,
-        searchQuery: 'MI-011',
-      };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      expect(result.length).toBe(1);
-      expect(result[0].cd_code).toBe('MI-011');
-    });
-
-    it('filters by state code (partial match)', () => {
-      const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, searchQuery: 'MI' };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      expect(result.length).toBeGreaterThan(0);
-      result.forEach((d) => {
-        expect(d.state_code).toBe('MI');
-      });
-    });
-
-    it('is case insensitive', () => {
-      const filters: MapFilters = {
-        ...DEFAULT_MAP_FILTERS,
-        searchQuery: 'pa-007',
-      };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      expect(result.length).toBe(1);
-      expect(result[0].cd_code).toBe('PA-007');
-    });
-
-    it('trims whitespace from query', () => {
-      const filters: MapFilters = {
-        ...DEFAULT_MAP_FILTERS,
-        searchQuery: '  CA  ',
-      };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      expect(result.length).toBeGreaterThan(0);
-      result.forEach((d) => {
-        expect(d.state_code).toBe('CA');
-      });
-    });
-  });
-
-  describe('combined filters', () => {
-    it('applies multiple filters together', () => {
-      const filters: MapFilters = {
-        minVoters: 10000,
-        searchQuery: 'MI',
-      };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      result.forEach((d) => {
-        expect(d.state_code).toBe('MI');
-        expect(d.muslim_voters).toBeGreaterThanOrEqual(10000);
-      });
-    });
-
-    it('returns empty array when no districts match all filters', () => {
-      const filters: MapFilters = {
-        minVoters: 100000,
-        searchQuery: 'XY',
-      };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-      expect(result.length).toBe(0);
-    });
-  });
-
-  describe('edge cases', () => {
-    it('handles empty input array', () => {
-      const result = applyFilters([], DEFAULT_MAP_FILTERS);
-      expect(result).toEqual([]);
-    });
-
-    it('does not mutate the original array', () => {
-      const original = [...mockVoterImpactDistricts];
-      applyFilters(mockVoterImpactDistricts, { ...DEFAULT_MAP_FILTERS, minVoters: 5000 });
-      expect(mockVoterImpactDistricts).toEqual(original);
-    });
-  });
-});

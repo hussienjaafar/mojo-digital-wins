@@ -569,15 +569,6 @@ export function RegionSidebar({
                   <div className="text-xs text-[#64748b]">See congressional districts</div>
                 </div>
               </div>
-              <div className="flex items-center gap-3 p-3 bg-[#0a0f1a] rounded-lg border border-[#1e2a45]">
-                <div className="w-8 h-8 rounded-lg bg-[#1e2a45] flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm">⚡</span>
-                </div>
-                <div className="text-left">
-                  <div className="text-xs font-medium text-[#e2e8f0]">Use presets</div>
-                  <div className="text-xs text-[#64748b]">Find high-impact targets</div>
-                </div>
-              </div>
             </div>
           </div>
         )}
