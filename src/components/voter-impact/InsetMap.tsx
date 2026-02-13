@@ -62,11 +62,26 @@ export function InsetMap({
   const insetPrefix = label.toLowerCase().replace(/\s+/g, '-');
 
   const insetStatesFillLayer = useMemo(
-    () => ({ ...statesFillLayer, id: `${insetPrefix}-states-fill` }),
+    () => ({
+      ...statesFillLayer,
+      id: `${insetPrefix}-states-fill`,
+      paint: {
+        ...((statesFillLayer as any).paint || {}),
+        'fill-opacity': 0.7,
+      },
+    }),
     [statesFillLayer, insetPrefix]
   );
   const insetStatesBorderLayer = useMemo(
-    () => ({ ...statesBorderLayer, id: `${insetPrefix}-states-border` }),
+    () => ({
+      ...statesBorderLayer,
+      id: `${insetPrefix}-states-border`,
+      paint: {
+        ...((statesBorderLayer as any).paint || {}),
+        'line-color': '#64748b',
+        'line-width': 1.5,
+      },
+    }),
     [statesBorderLayer, insetPrefix]
   );
   const insetDistrictsFillLayer = useMemo(

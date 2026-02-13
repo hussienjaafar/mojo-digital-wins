@@ -86,11 +86,9 @@ const INITIAL_VIEW_STATE: ViewState = {
   zoom: 3.5,
 };
 
-/** Bounding box constraining main map to the lower 48 states */
-const LOWER_48_BOUNDS: [[number, number], [number, number]] = [
-  [-135, 20], // Southwest corner (wider for small screens)
-  [-60, 52],  // Northeast corner
-];
+/** Soft clamp bounds for smooth drag (no elastic snap-back) */
+const CLAMP_LNG: [number, number] = [-170, -60];
+const CLAMP_LAT: [number, number] = [18, 72];
 
 const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 const GEOJSON_STATES_URL = "/geojson/us-states.json";
@@ -193,7 +191,11 @@ export function ImpactMap({
 
   // Handle view state change
   const handleMove = useCallback((evt: ViewStateChangeEvent) => {
-    setViewState(evt.viewState);
+    setViewState({
+      ...evt.viewState,
+      longitude: Math.min(Math.max(evt.viewState.longitude, CLAMP_LNG[0]), CLAMP_LNG[1]),
+      latitude: Math.min(Math.max(evt.viewState.latitude, CLAMP_LAT[0]), CLAMP_LAT[1]),
+    });
   }, []);
 
   // Handle state click
@@ -392,7 +394,7 @@ export function ImpactMap({
         onMove={handleMove}
         mapStyle={MAP_STYLE}
         style={{ width: "100%", height: "100%" }}
-        maxBounds={LOWER_48_BOUNDS}
+        
         minZoom={2.5}
         interactiveLayerIds={["states-fill", "districts-fill"]}
         onClick={(e) => {
@@ -428,13 +430,13 @@ export function ImpactMap({
       </MapGL>
 
       {/* Alaska & Hawaii Inset Maps */}
-      <div className="absolute bottom-4 left-4 z-10 hidden sm:flex gap-3 pointer-events-auto">
+      <div className="absolute bottom-4 left-4 z-10 flex gap-3 pointer-events-auto">
         <InsetMap
           label="Alaska"
           center={[-152, 64]}
-          zoom={2.2}
-          width={140}
-          height={95}
+          zoom={2.5}
+          width={160}
+          height={110}
           enrichedStatesGeoJSON={enrichedStatesGeoJSON}
           enrichedDistrictsGeoJSON={enrichedDistrictsGeoJSON}
           statesFillLayer={statesFillLayer}
@@ -448,9 +450,9 @@ export function ImpactMap({
         <InsetMap
           label="Hawaii"
           center={[-157.5, 20.5]}
-          zoom={5.5}
-          width={110}
-          height={75}
+          zoom={5.8}
+          width={120}
+          height={85}
           enrichedStatesGeoJSON={enrichedStatesGeoJSON}
           enrichedDistrictsGeoJSON={enrichedDistrictsGeoJSON}
           statesFillLayer={statesFillLayer}
