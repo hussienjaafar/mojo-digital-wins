@@ -291,7 +291,7 @@ export default function VoterImpactMap() {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-h-0">
         <div className="flex-1 relative">
           {isDataLoading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-[#0a0f1a]">
