@@ -1,39 +1,23 @@
 
-# Fix Map Wrapping / Europe Glitch When Dragging Left
+# Fix Map Glitch When Zooming Out All the Way
 
 ## Problem
-Dragging the map too far left causes it to wrap around and show Europe/other continents. This happens because MapLibre renders duplicate copies of the world by default (`renderWorldCopies: true`), and the soft longitude clamp (`-170` to `-60`) alone doesn't prevent the visual wrapping and snapping behavior.
+At `minZoom: 2.5`, MapLibre struggles to reconcile the `maxBounds` constraint with an extremely zoomed-out view. The map tries to fit the bounded area (`[-190, 10] to [-50, 75]`) into too small a tile area, causing visual glitches -- grey tiles, snapping, and rendering artifacts.
 
 ## Solution
-Add two MapLibre properties to the `<Map>` component in `src/components/voter-impact/ImpactMap.tsx`:
-
-1. **`renderWorldCopies={false}`** -- Prevents the map from rendering duplicate world tiles, so there's nothing to "wrap" into.
-2. **`maxBounds`** -- Hard-constrains the viewport to a bounding box around the US (including Alaska and Hawaii). Unlike the soft clamp in `handleMove`, this is enforced at the MapLibre engine level, preventing any visual glitching.
+Increase `minZoom` from `2.5` to `3.5` in `src/components/voter-impact/ImpactMap.tsx`. At zoom 3.5, the entire continental US (plus Alaska/Hawaii) is still fully visible, but the map never zooms out far enough to trigger the boundary-fitting glitch.
 
 ## Technical Details
 
-### File: `src/components/voter-impact/ImpactMap.tsx`
+**File: `src/components/voter-impact/ImpactMap.tsx`** (line 431)
 
-Add two props to the `<MapGL>` component (around line 425):
-
+Change:
 ```tsx
-<MapGL
-  ref={mapRef}
-  {...viewState}
-  onMove={handleMove}
-  mapStyle={MAP_STYLE}
-  style={{ width: "100%", height: "100%" }}
-  minZoom={2.5}
-  renderWorldCopies={false}
-  maxBounds={[[-190, 10], [-50, 75]]}
-  // ... rest of props
->
+minZoom={2.5}
+```
+To:
+```tsx
+minZoom={3.5}
 ```
 
-The bounds `[[-190, 10], [-50, 75]]` cover:
-- West: `-190` (enough to include western Alaska/Aleutian Islands)
-- South: `10` (below Hawaii)
-- East: `-50` (east of Maine)
-- North: `75` (above Alaska)
-
-The existing soft clamp in `handleMove` can remain as a secondary safeguard but will rarely trigger since `maxBounds` handles it at the engine level.
+This single-line change prevents the glitch while keeping the full US view accessible. The `maxBounds` and `renderWorldCopies={false}` settings remain in place as additional safeguards.
