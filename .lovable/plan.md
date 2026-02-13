@@ -1,110 +1,56 @@
 
 
-# Add Alaska and Hawaii Inset Maps
+# Fix Map Viewport, Legend Overlap, and Responsiveness
 
-## Approach
+## Problems Identified
 
-Render three separate MapGL instances: a main map showing only the lower 48 states, and two smaller inset maps in the bottom-left corner for Alaska and Hawaii. All three maps share the same data, color scales, and interaction handlers.
+1. **Cannot zoom out enough**: `minZoom: 3` combined with tight `maxBounds` (`[[-130, 23], [-64, 50]]`) prevents seeing both coasts on smaller screens
+2. **Legend covers inset maps**: Both the MapLegend (`absolute bottom-4 left-4`) and the Alaska/Hawaii insets (`absolute bottom-6 left-4`) are positioned in the same bottom-left corner, causing overlap
+3. **Insets hidden on small screens**: Fixed-size insets (160px + 130px + gap) don't fit on narrow viewports
 
-## Why This Approach
+## Solution
 
-- Preserves all existing MapLibre functionality (WebGL rendering, smooth zoom, dark tile basemap)
-- Keeps real geographic coordinates (no coordinate hacking)
-- Professional look matching standard US political maps
-- Each inset is still interactive (clickable for state/district drill-down)
+### 1. Relax zoom and bounds constraints
 
-## Changes
+**File: `src/components/voter-impact/ImpactMap.tsx`**
 
-### 1. Extract shared map logic into a hook -- New file: `src/hooks/useImpactMapLayers.ts`
+- Lower `minZoom` from `3` to `2.5` so users can zoom out enough to see both coasts on smaller screens
+- Widen `LOWER_48_BOUNDS` slightly to `[[-135, 20], [-60, 52]]` to add breathing room at the edges and prevent coast clipping
 
-Move the layer definitions (fill, border, glow for both states and districts) and GeoJSON enrichment logic out of `ImpactMap.tsx` into a reusable hook. This avoids duplicating ~200 lines of layer/color logic across 3 map instances.
+### 2. Reposition legend to bottom-right to avoid overlap
 
-The hook will accept:
-- `states`, `districts`, `filters`, `activeMetric`, `localDistrictColorStops`
-- `hoveredRegion`, `selectedRegion`, `showDistricts`
+**File: `src/components/voter-impact/MapLegend.tsx`**
 
-And return:
-- `enrichedStatesGeoJSON`, `enrichedDistrictsGeoJSON`
-- All layer specs (statesFillLayer, statesBorderLayer, etc.)
+- Change positioning from `bottom-4 left-4` to `bottom-4 right-4`
+- This gives the inset maps exclusive use of the bottom-left corner, and the legend sits cleanly in the bottom-right (where the navigation controls are at the top-right, so there's no conflict)
 
-### 2. Create InsetMap component -- New file: `src/components/voter-impact/InsetMap.tsx`
+### 3. Make insets responsive
 
-A small, reusable map component for Alaska and Hawaii insets:
-- Takes a `center` (lat/lng), `zoom`, `bounds` (to restrict view), and `label`
-- Renders a MapGL instance with the same sources/layers as the main map
-- Has click handlers that delegate to the parent's `onRegionSelect`
-- Fixed size container (~180x120px for Alaska, ~150x100px for Hawaii)
-- Styled with a subtle border and state label
-- No NavigationControl (too small for zoom buttons)
-- Non-interactive for pan/zoom (locked viewport) but clickable
+**File: `src/components/voter-impact/ImpactMap.tsx`**
 
-### 3. Update ImpactMap.tsx
-
-**Main map changes:**
-- Remove `maxBounds` and the `US_BOUNDS` constant
-- Set `maxBounds` to constrain to just the lower 48 states: `[[-130, 23], [-64, 50]]`
-- Set `minZoom` to 3 so the lower 48 fill the viewport nicely
-- Import and use the extracted `useImpactMapLayers` hook
-
-**Add inset maps:**
-- Render two `InsetMap` components in the bottom-left corner, positioned absolutely
-- Alaska: centered at ~(-152, 64), zoom ~2.5, placed bottom-left
-- Hawaii: centered at ~(-157, 20.5), zoom ~5.5, placed to the right of Alaska
-- Both wrapped in a container with `pointer-events-auto` so clicks work
-
-**Drill-down behavior:**
-- When a user clicks Alaska or Hawaii in the inset, it triggers the same `onRegionSelect` as clicking a state on the main map
-- If districts are shown for AK or HI, the inset map also shows the district layer (AK has 1 at-large district, HI has 2)
-
-### 4. Styling
-
-- Inset containers: dark background (`bg-[#0a0f1a]`), thin border (`border-[#1e2a45]`), rounded corners
-- Small label below each inset ("Alaska", "Hawaii") in muted text
-- Positioned in the bottom-left with some padding to avoid overlapping the map attribution
-- Responsive: on very small screens, insets could be hidden or made smaller
+- Add responsive classes to the inset container: hide on very small screens (`hidden sm:flex`) where they'd be too cramped
+- Reduce inset sizes slightly on medium screens using Tailwind responsive classes or slightly smaller default dimensions (140x95 for Alaska, 110x75 for Hawaii)
 
 ## Technical Details
 
 ```text
-File structure:
-  src/hooks/useImpactMapLayers.ts          (NEW - extracted layer logic)
-  src/components/voter-impact/InsetMap.tsx  (NEW - inset map component)
-  src/components/voter-impact/ImpactMap.tsx (MODIFIED - use hook + add insets)
+Changes by file:
 
-Main map bounds (lower 48 only):
-  maxBounds: [[-130, 23], [-64, 50]]
-  minZoom: 3
+src/components/voter-impact/ImpactMap.tsx
+  - LOWER_48_BOUNDS: [[-130, 23], [-64, 50]] -> [[-135, 20], [-60, 52]]
+  - minZoom: 3 -> 2.5
+  - Inset container: add "hidden sm:flex" for responsive hiding
+  - Reduce inset sizes slightly for better fit
 
-Alaska inset:
-  center: [-152, 64]
-  zoom: 2.5
-  size: ~180x120px
-
-Hawaii inset:
-  center: [-157, 20.5]
-  zoom: 5.5
-  size: ~150x100px
-
-Shared state between all 3 maps:
-  - activeMetric, filters, color stops
-  - enriched GeoJSON data
-  - selectedRegion, hoveredRegion
-  - showDistricts flag
+src/components/voter-impact/MapLegend.tsx
+  - Position: "bottom-4 left-4" -> "bottom-4 right-4"
 ```
 
 ## What stays the same
 
-- All data enrichment and color scale logic (just moved to a hook)
-- District drill-down behavior
-- Region sidebar detail panel
-- Filter and search functionality
-- The dark basemap tile style
-- Hover tooltips and click interactions
-
-## Scope
-
-- 2 new files: `useImpactMapLayers.ts`, `InsetMap.tsx`
-- 1 file modified: `ImpactMap.tsx`
-- No database changes
-- No new dependencies
+- All click, hover, and drill-down functionality
+- Color scales and data enrichment
+- Inset map interactivity (clickable for state/district selection)
+- State context header and tooltip behavior
+- Dark theme styling
 
