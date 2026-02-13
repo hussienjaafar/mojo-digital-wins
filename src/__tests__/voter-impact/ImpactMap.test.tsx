@@ -34,14 +34,14 @@ describe('ImpactMap', () => {
   it('renders map container', async () => {
     render(<ImpactMap {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument();
+      expect(screen.getByTestId('impact-map-container')).toBeInTheDocument();
     });
   });
 
   it('renders with empty states and districts', async () => {
     render(<ImpactMap {...defaultProps} states={[]} districts={[]} />);
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument();
+      expect(screen.getByTestId('impact-map-container')).toBeInTheDocument();
     });
   });
 
@@ -49,21 +49,21 @@ describe('ImpactMap', () => {
     const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, minVoters: 5000 };
     render(<ImpactMap {...defaultProps} filters={filters} />);
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument();
+      expect(screen.getByTestId('impact-map-container')).toBeInTheDocument();
     });
   });
 
   it('accepts selectedRegion prop', async () => {
     render(<ImpactMap {...defaultProps} selectedRegion="MI" />);
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument();
+      expect(screen.getByTestId('impact-map-container')).toBeInTheDocument();
     });
   });
 
   it('calls onRegionSelect when provided', async () => {
     render(<ImpactMap {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument();
+      expect(screen.getByTestId('impact-map-container')).toBeInTheDocument();
     });
     // onRegionSelect is a mock, just verify it was passed
     expect(defaultProps.onRegionSelect).toBeDefined();
