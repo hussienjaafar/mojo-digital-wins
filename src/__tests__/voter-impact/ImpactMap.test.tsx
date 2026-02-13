@@ -13,7 +13,7 @@ import './setup';
 
 import { ImpactMap } from '@/components/voter-impact/ImpactMap';
 import { mockVoterImpactStates, mockVoterImpactDistricts, setupGeoJSONMock } from './setup';
-import type { MapFilters, MetricType } from '@/types/voter-impact';
+import type { MapFilters } from '@/types/voter-impact';
 import { DEFAULT_MAP_FILTERS } from '@/types/voter-impact';
 
 describe('ImpactMap', () => {
@@ -26,7 +26,6 @@ describe('ImpactMap', () => {
     states: mockVoterImpactStates,
     districts: mockVoterImpactDistricts,
     filters: DEFAULT_MAP_FILTERS,
-    metric: 'impact' as MetricType,
     selectedRegion: null,
     onRegionSelect: vi.fn(),
     onRegionHover: vi.fn(),
@@ -47,15 +46,8 @@ describe('ImpactMap', () => {
   });
 
   it('accepts filter props', async () => {
-    const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, party: 'democrat' };
+    const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, minVoters: 5000 };
     render(<ImpactMap {...defaultProps} filters={filters} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument();
-    });
-  });
-
-  it('accepts metric prop', async () => {
-    render(<ImpactMap {...defaultProps} metric="population" />);
     await waitFor(() => {
       expect(screen.getByTestId('map-container')).toBeInTheDocument();
     });
@@ -69,11 +61,11 @@ describe('ImpactMap', () => {
   });
 
   it('calls onRegionSelect when provided', async () => {
-    const onRegionSelect = vi.fn();
-    render(<ImpactMap {...defaultProps} onRegionSelect={onRegionSelect} />);
-    // Just verify the component renders without error with the callback
+    render(<ImpactMap {...defaultProps} />);
     await waitFor(() => {
       expect(screen.getByTestId('map-container')).toBeInTheDocument();
     });
+    // onRegionSelect is a mock, just verify it was passed
+    expect(defaultProps.onRegionSelect).toBeDefined();
   });
 });

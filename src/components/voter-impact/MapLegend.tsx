@@ -1,54 +1,76 @@
 /**
  * MapLegend Component
  *
- * Displays the color scale legend for the voter impact map.
- * Shows flippability levels based on mobilizable Muslim voters vs election margin.
+ * Displays a continuous gradient bar legend for the Muslim voter population heatmap.
  */
 
-import { IMPACT_COLORS } from "@/types/voter-impact";
+import { POPULATION_COLOR_STOPS } from "@/types/voter-impact";
 
-const legendItems = [
-  { color: IMPACT_COLORS.HIGH, label: "High", description: "Can flip district", bgClass: "bg-[#22c55e]/10 border-[#22c55e]/30" },
-  { color: IMPACT_COLORS.MEDIUM, label: "Medium", description: "Strong influence", bgClass: "bg-[#f97316]/10 border-[#f97316]/30" },
-  { color: IMPACT_COLORS.LOW, label: "Low", description: "Some influence", bgClass: "bg-[#a855f7]/10 border-[#a855f7]/30" },
-  { color: IMPACT_COLORS.NONE, label: "None", description: "Minimal impact", bgClass: "bg-[#64748b]/10 border-[#64748b]/30" },
-];
+interface MapLegendProps {
+  isDistrictView?: boolean;
+}
 
-export const MapLegend: React.FC = () => {
+export const MapLegend: React.FC<MapLegendProps> = ({ isDistrictView = false }) => {
+  // Build gradient string from color stops
+  const gradientColors = POPULATION_COLOR_STOPS.map(
+    (stop, i) => `${stop.color} ${(i / (POPULATION_COLOR_STOPS.length - 1)) * 100}%`
+  ).join(", ");
+
+  // Show fewer tick marks to keep it clean
+  const ticks = isDistrictView
+    ? [
+        { label: "0", pos: 0 },
+        { label: "1K", pos: 15 },
+        { label: "5K", pos: 33 },
+        { label: "10K", pos: 44 },
+        { label: "25K", pos: 56 },
+        { label: "50K", pos: 67 },
+        { label: "65K+", pos: 100 },
+      ]
+    : [
+        { label: "0", pos: 0 },
+        { label: "5K", pos: 22 },
+        { label: "25K", pos: 44 },
+        { label: "100K", pos: 67 },
+        { label: "200K", pos: 78 },
+        { label: "500K+", pos: 100 },
+      ];
+
   return (
     <div
-      className="absolute bottom-4 left-4 bg-[#0a0f1a]/95 backdrop-blur-md rounded-xl border border-[#1e2a45] p-4 shadow-xl"
+      className="absolute bottom-4 left-4 bg-[#0a0f1a]/95 backdrop-blur-md rounded-xl border border-[#1e2a45] p-4 shadow-xl min-w-[220px]"
       role="region"
       aria-label="Map legend"
     >
-      <div className="flex items-center gap-2 mb-3" id="legend-title">
+      <div className="flex items-center gap-2 mb-3">
         <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
         <span className="text-xs text-[#64748b] uppercase tracking-wider font-medium">
-          Impact Score
+          Muslim Voters {isDistrictView ? "(Districts)" : "(States)"}
         </span>
       </div>
-      <ul className="flex flex-col gap-2" role="list" aria-labelledby="legend-title">
-        {legendItems.map((item) => (
-          <li
-            key={item.label}
-            role="listitem"
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${item.bgClass} transition-all hover:scale-[1.02]`}
+
+      {/* Gradient bar */}
+      <div
+        className="h-3 rounded-full mb-2"
+        style={{
+          background: `linear-gradient(to right, ${gradientColors})`,
+        }}
+        role="img"
+        aria-label="Color scale from dark (zero voters) to bright yellow (500K+ voters)"
+      />
+
+      {/* Tick labels */}
+      <div className="relative h-4">
+        {ticks.map((tick) => (
+          <span
+            key={tick.label}
+            className="absolute text-[10px] text-[#94a3b8] -translate-x-1/2"
+            style={{ left: `${tick.pos}%` }}
           >
-            <div
-              className="w-3 h-3 rounded-full shadow-lg"
-              style={{ backgroundColor: item.color, boxShadow: `0 0 8px ${item.color}50` }}
-              aria-label={`${item.label} impact: ${item.description}`}
-              role="img"
-            />
-            <div className="flex flex-col">
-              <span className="text-sm text-[#e2e8f0] font-medium leading-tight">
-                {item.label}
-              </span>
-              <span className="text-xs text-[#64748b] leading-tight">{item.description}</span>
-            </div>
-          </li>
+            {tick.label}
+          </span>
         ))}
-      </ul>
+      </div>
     </div>
   );
 };
