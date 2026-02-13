@@ -1,39 +1,68 @@
 
-# Enhance State Boundaries in District View
+# Add Phone Number and Address Data to Detail Panel
 
-## Problem
+## Overview
 
-When viewing districts, state borders look the same as district borders (both thin lines with the same color), making it hard to tell which state you're looking at.
+Display phone number and address (household) counts in the detail sidebar when selecting a state or congressional district.
 
-## Solution
+## Current State
 
-Make state borders significantly more prominent when the district view is active. This involves two changes to the existing state border layers:
+- **States table** already has `cell_phones` and `households` columns with data (e.g., MI has 128,768 cell phones and 126,373 households)
+- **Districts table** does NOT have these columns yet -- they need to be added
+- The `VoterImpactState` TypeScript interface already includes `cell_phones` and `households`
 
-**File: `src/components/voter-impact/ImpactMap.tsx`**
+## Changes
 
-### 1. Thicker state borders in district mode
+### 1. Database Migration -- Add columns to `voter_impact_districts`
 
-Update the `statesBorderLayer` to use a wider default line width when `showDistricts` is true:
-- Default width: 1.5px (state view) --> 3px (district view)
-- Use a brighter/more contrasting color for state borders in district mode, e.g. `#cbd5e1` (lighter slate) instead of `#94a3b8`
+Add two new nullable integer columns to the districts table:
+- `cell_phones` (integer, default 0)
+- `households` (integer, default 0)
 
-### 2. Persistent state border glow in district mode
+These will store per-district phone and address counts. They default to 0 so existing rows won't break.
 
-Update the `statesBorderGlowLayer` to show a subtle glow on ALL state borders when in district view (not just hovered/selected):
-- Default glow width: 0 --> 6px when `showDistricts` is true
-- Default glow color: a subtle `#475569` (slate-600)
-- Default glow opacity: 0.3
-- This creates a soft "halo" effect around state boundaries that visually separates them from district lines
+### 2. TypeScript Type Update -- `src/queries/useVoterImpactQueries.ts`
 
-### 3. Add `showDistricts` dependency
+Add `cell_phones` and `households` fields to the `VoterImpactDistrict` interface.
 
-Both layer memos need `showDistricts` added to their dependency arrays so they recompute when switching between state and district views.
+### 3. State Detail Panel -- `src/components/voter-impact/RegionSidebar.tsx`
 
-## Result
+Add a new "Contact Data" info section to the `StateDetails` component (after the Political Engagement section) showing:
+- Phone numbers count (from `cell_phones`)
+- Addresses count (from `households`)
 
-State boundaries will appear as thick, slightly glowing lines that clearly separate groups of districts, while district borders remain thinner. The visual hierarchy makes it immediately obvious which state each district belongs to.
+### 4. District Detail Panel -- `src/components/voter-impact/RegionSidebar.tsx`
 
-## Scope
-- 1 file modified: `ImpactMap.tsx`
-- 2 layer definitions updated (state border + state border glow)
-- No new layers or components
+Add the same "Contact Data" section to the `DistrictDetails` component, displaying `cell_phones` and `households` for the selected district.
+
+Both sections will use the existing dark card styling with a 2-column grid layout, matching the Political Engagement section design.
+
+## Technical Details
+
+```text
+New DB columns:
+  voter_impact_districts.cell_phones  INTEGER DEFAULT 0
+  voter_impact_districts.households   INTEGER DEFAULT 0
+
+Updated interface:
+  VoterImpactDistrict {
+    ...existing fields...
+    cell_phones: number;
+    households: number;
+  }
+
+New UI section (both State + District details):
+  "Contact Data"
+  ┌─────────────┬─────────────┐
+  │  128,768    │  126,373    │
+  │ Phone #s    │ Addresses   │
+  └─────────────┴─────────────┘
+```
+
+## Files Modified
+- `src/queries/useVoterImpactQueries.ts` -- add fields to `VoterImpactDistrict` interface
+- `src/components/voter-impact/RegionSidebar.tsx` -- add Contact Data sections to both detail views
+- Database migration -- add 2 columns to `voter_impact_districts`
+
+## Note
+District-level phone/address data will show 0 until you populate those columns with actual data (e.g., via the Excel import tool). State-level data is already populated and will display immediately.
