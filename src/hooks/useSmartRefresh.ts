@@ -199,7 +199,8 @@ export function useSmartRefresh({
         return;
       }
       
-      // Step 3: Trigger syncs for stale sources
+      // Step 3: Fire-and-forget syncs for stale sources
+      // useAutoRefreshOnSync will invalidate caches when syncs complete
       const sourceLabels: Record<SyncSource, string> = {
         meta: 'Meta Ads',
         actblue: 'ActBlue',
@@ -207,53 +208,21 @@ export function useSmartRefresh({
       };
       
       const staleLabels = stale.map(s => sourceLabels[s]).join(', ');
-      toast.info(`Syncing ${staleLabels}...`, { id: 'smart-refresh' });
-      
-      const syncPromises: Promise<void>[] = [];
+      toast.info(`Syncing ${staleLabels} in background...`, { id: 'smart-refresh' });
       
       for (const source of stale) {
         setIsSyncing(prev => ({ ...prev, [source]: true }));
-        syncPromises.push(
-          triggerSync(source)
-            .catch(err => {
-              logger.warn(`Sync failed for ${source}`, err);
-              toast.error(`${sourceLabels[source]} sync failed`);
-            })
-            .finally(() => setIsSyncing(prev => ({ ...prev, [source]: false })))
-        );
+        triggerSync(source)
+          .catch(err => {
+            logger.warn(`Sync failed for ${source}`, err);
+            toast.error(`${sourceLabels[source]} sync failed`);
+          })
+          .finally(() => setIsSyncing(prev => ({ ...prev, [source]: false })));
       }
       
-      await Promise.allSettled(syncPromises);
-      
-      // Step 4: Refresh cache again with new data (same comprehensive list)
-      await queryClient.invalidateQueries({ 
-        queryKey: ['dashboard'],
-        refetchType: 'all'
-      });
-      
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['actblue'] }),
-        queryClient.invalidateQueries({ queryKey: ['meta-metrics'] }),
-        queryClient.invalidateQueries({ queryKey: ['meta'] }),
-        queryClient.invalidateQueries({ queryKey: ['sms'] }),
-        queryClient.invalidateQueries({ queryKey: ['hourly-metrics'] }),
-        queryClient.invalidateQueries({ queryKey: ['single-day-meta'] }),
-        queryClient.invalidateQueries({ queryKey: ['recurring-health'] }),
-        queryClient.invalidateQueries({ queryKey: ['recurring-health-v2'] }),
-        queryClient.invalidateQueries({ queryKey: ['attribution'] }),
-        queryClient.invalidateQueries({ queryKey: ['intelligence'] }),
-        queryClient.invalidateQueries({ queryKey: ['creative-intelligence'] }),
-        queryClient.invalidateQueries({ queryKey: ['donations'] }),
-        queryClient.invalidateQueries({ queryKey: ['channels'] }),
-        queryClient.invalidateQueries({ queryKey: ['kpis'] }),
-        queryClient.invalidateQueries({ queryKey: ['alerts'] }),
-        queryClient.invalidateQueries({ queryKey: ['actblue-metrics'] }),
-        queryClient.invalidateQueries({ queryKey: ['channel-spend'] }),
-        queryClient.invalidateQueries({ queryKey: ['dashboard-sparkline'] }),
-        queryClient.invalidateQueries({ queryKey: ['adPerformance'] }),
-      ]);
-      
-      toast.success('Smart refresh complete', { id: 'smart-refresh' });
+      // Don't await syncs — cache was already refreshed in Step 1,
+      // and useAutoRefreshOnSync will re-invalidate when syncs finish.
+      toast.success('Dashboard refreshed', { id: 'smart-refresh-done' });
       onComplete?.();
       
     } catch (error) {
