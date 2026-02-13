@@ -61,6 +61,12 @@ const INITIAL_VIEW_STATE: ViewState = {
   zoom: 3.5,
 };
 
+/** Bounding box covering all US states including Alaska and Hawaii */
+const US_BOUNDS: [[number, number], [number, number]] = [
+  [-175, 17],   // Southwest corner (Hawaii longitude + Puerto Rico latitude)
+  [-64, 72],    // Northeast corner (Maine longitude + Alaska latitude)
+];
+
 const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 const GEOJSON_STATES_URL = "/geojson/us-states.json";
 const GEOJSON_DISTRICTS_URL = "/geojson/congressional-districts-118.json";
@@ -657,6 +663,8 @@ export function ImpactMap({
         onMove={handleMove}
         mapStyle={MAP_STYLE}
         style={{ width: "100%", height: "100%" }}
+        maxBounds={US_BOUNDS}
+        minZoom={2.5}
         interactiveLayerIds={["states-fill", "districts-fill"]}
         onClick={(e) => {
           if (showDistricts) {
