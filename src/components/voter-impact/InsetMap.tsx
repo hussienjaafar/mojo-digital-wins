@@ -109,43 +109,41 @@ export function InsetMap({
   if (!enrichedStatesGeoJSON) return null;
 
   return (
-    <div className="flex flex-col items-center">
-      <div
-        className="rounded-lg overflow-hidden border border-[#1e2a45] bg-[#0a0f1a]"
-        style={{ width, height }}
+    <div
+      className="relative rounded-lg overflow-hidden border border-[#1e2a45] bg-[#0a0f1a]"
+      style={{ width, height }}
+    >
+      <MapGL
+        longitude={center[0]}
+        latitude={center[1]}
+        zoom={zoom}
+        mapStyle={mapStyle}
+        style={{ width: "100%", height: "100%" }}
+        interactive={false}
+        dragPan={false}
+        dragRotate={false}
+        scrollZoom={false}
+        doubleClickZoom={false}
+        touchZoomRotate={false}
+        keyboard={false}
+        interactiveLayerIds={interactiveLayerIds}
+        onClick={handleClick}
+        cursor="pointer"
+        attributionControl={false}
       >
-        <MapGL
-          longitude={center[0]}
-          latitude={center[1]}
-          zoom={zoom}
-          mapStyle={mapStyle}
-          style={{ width: "100%", height: "100%" }}
-          interactive={false}
-          dragPan={false}
-          dragRotate={false}
-          scrollZoom={false}
-          doubleClickZoom={false}
-          touchZoomRotate={false}
-          keyboard={false}
-          interactiveLayerIds={interactiveLayerIds}
-          onClick={handleClick}
-          cursor="pointer"
-          attributionControl={false}
-        >
-          <Source id={`${insetPrefix}-states`} type="geojson" data={enrichedStatesGeoJSON}>
-            <Layer {...insetStatesFillLayer} source={`${insetPrefix}-states`} />
-            <Layer {...insetStatesBorderLayer} source={`${insetPrefix}-states`} />
-          </Source>
+        <Source id={`${insetPrefix}-states`} type="geojson" data={enrichedStatesGeoJSON}>
+          <Layer {...insetStatesFillLayer} source={`${insetPrefix}-states`} />
+          <Layer {...insetStatesBorderLayer} source={`${insetPrefix}-states`} />
+        </Source>
 
-          {enrichedDistrictsGeoJSON && (
-            <Source id={`${insetPrefix}-districts`} type="geojson" data={enrichedDistrictsGeoJSON}>
-              <Layer {...insetDistrictsFillLayer} source={`${insetPrefix}-districts`} />
-              <Layer {...insetDistrictsBorderLayer} source={`${insetPrefix}-districts`} />
-            </Source>
-          )}
-        </MapGL>
-      </div>
-      <span className="text-[10px] text-[#64748b] mt-1 font-medium tracking-wide">
+        {enrichedDistrictsGeoJSON && (
+          <Source id={`${insetPrefix}-districts`} type="geojson" data={enrichedDistrictsGeoJSON}>
+            <Layer {...insetDistrictsFillLayer} source={`${insetPrefix}-districts`} />
+            <Layer {...insetDistrictsBorderLayer} source={`${insetPrefix}-districts`} />
+          </Source>
+        )}
+      </MapGL>
+      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] text-[#94a3b8] font-medium tracking-wide pointer-events-none bg-[#0a0f1a]/70 px-1.5 rounded">
         {label}
       </span>
     </div>

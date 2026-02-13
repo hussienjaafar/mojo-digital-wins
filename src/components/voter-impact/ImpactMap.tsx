@@ -428,7 +428,7 @@ export function ImpactMap({
       </MapGL>
 
       {/* Alaska & Hawaii Inset Maps */}
-      <div className="absolute bottom-6 left-4 z-10 hidden sm:flex gap-3 pointer-events-auto">
+      <div className="absolute bottom-4 left-4 z-10 hidden sm:flex gap-3 pointer-events-auto">
         <InsetMap
           label="Alaska"
           center={[-152, 64]}
