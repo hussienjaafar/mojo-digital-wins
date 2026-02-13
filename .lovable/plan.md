@@ -1,100 +1,95 @@
 
 
-# Filter ROI/ROAS to Fundraising Campaigns Only
+# Rebuild Voter Impact Map: Muslim Voter Population Heatmap
 
-## Problem
+## Overview
 
-Currently, all Meta ad spend is included in ROI and ROAS calculations, regardless of campaign objective. Awareness campaigns (e.g., `OUTCOME_AWARENESS`) are not designed to generate donations, so including their spend deflates ROI numbers and misrepresents fundraising performance. For example, Wesam Shahed's account has both a `OUTCOME_AWARENESS` GOTV campaign and a `OUTCOME_SALES` fundraising campaign, but both are lumped together.
+Replace the current "flippability score" choropleth with a **population-based heatmap** showing total Muslim voters per state, with a drill-down to congressional districts on click. The color scale will use a **continuous gradient with many shades** to clearly distinguish between zero, very few, moderate, and high-population areas.
 
-## Solution
+## Current State
 
-Join `meta_ad_metrics` with `meta_campaigns` on `campaign_id` and filter to only fundraising objectives when calculating ROI and ROAS. Non-fundraising spend will still be visible in total spend breakdowns but will be excluded from the ROI denominator.
+The map currently colors states/districts by a calculated "impact score" (flippability based on margin vs. mobilizable voters). The new design shifts focus entirely to **Muslim voter population counts** as the primary visual metric.
 
-### Fundraising Objectives (included in ROI)
-- `OUTCOME_SALES` (current standard for purchase/donation campaigns)
-- `CONVERSIONS` (legacy equivalent)
+## New User Flow
 
-### Non-Fundraising Objectives (excluded from ROI)
-- `OUTCOME_AWARENESS`, `AWARENESS`, `REACH`
-- `OUTCOME_ENGAGEMENT`, `POST_ENGAGEMENT`
-- `OUTCOME_TRAFFIC`, `LINK_CLICKS`
+1. **Initial view**: US states colored by total Muslim voters (continuous heatmap gradient)
+2. **Hover**: Tooltip shows state name + Muslim voter count
+3. **Click state**: Map zooms into that state and shows congressional districts, each colored by their Muslim voter count using the same gradient logic
+4. **Click district**: Sidebar shows district details (existing behavior preserved)
+5. **Back button**: Returns to US state-level view
 
-## Changes
+## Color Scale Design
 
-### 1. Database: Update `get_dashboard_sparkline_data` RPC
+A continuous gradient with **9+ distinct color stops** to maximize sensitivity:
 
-The `daily_meta_spend` CTE currently sums ALL spend from `meta_ad_metrics`. Update it to JOIN with `meta_campaigns` and filter to fundraising objectives only.
-
-```sql
-daily_meta_spend AS (
-  SELECT m.date as day, SUM(m.spend) as meta_spend
-  FROM meta_ad_metrics m
-  JOIN meta_campaigns mc ON m.campaign_id = mc.campaign_id 
-    AND m.organization_id = mc.organization_id
-  WHERE m.organization_id = p_organization_id
-    AND m.date BETWEEN p_start_date AND p_end_date
-    AND mc.objective IN ('OUTCOME_SALES', 'CONVERSIONS')
-  GROUP BY m.date
-)
+```text
+0 voters        --> #1a1a2e (very dark / near-black)
+1-500           --> #2d1b69 (dark indigo)
+500-2,000       --> #4a1a8a (deep purple)
+2,000-5,000     --> #6b21a8 (purple)
+5,000-10,000    --> #7c3aed (violet)
+10,000-25,000   --> #3b82f6 (blue)
+25,000-50,000   --> #06b6d4 (cyan)
+50,000-100,000  --> #10b981 (emerald)
+100,000-200,000 --> #84cc16 (lime)
+200,000+        --> #facc15 (yellow/gold)
 ```
 
-### 2. Frontend: Update `useDashboardMetricsV2.ts` - `fetchChannelSpend`
+This ensures:
+- Zero is visually distinct (near-black)
+- Small populations (500-5,000) have clear purple shades
+- High populations "glow" in warm greens/yellows
+- Adjacent states/districts with different counts are distinguishable
 
-The Meta query fetches from `meta_ad_metrics_daily` without filtering by objective. Update to JOIN with `meta_campaigns` and filter. Since `meta_ad_metrics_daily` may not easily join in a Supabase `.from()` call, we have two options:
+## Technical Changes
 
-**Option A (preferred):** Create a database view `meta_fundraising_metrics_daily` that pre-joins and filters, then query from that view.
+### 1. `src/types/voter-impact.ts`
+- Add new population-based color constants and threshold arrays
+- Remove or deprecate `IMPACT_THRESHOLDS` and `IMPACT_COLORS` usage for map coloring (keep for sidebar if needed)
+- Add helper function `getPopulationColor(count: number): string`
 
-**Option B:** Use an RPC function to return filtered spend data.
+### 2. `src/components/voter-impact/ImpactMap.tsx` (major rewrite)
+- **State color expression**: Replace impact-score-based coloring with `muslim_voters` count-based `interpolate` expression using the gradient stops above
+- **District color expression**: Same approach but with district-level thresholds (lower range since max is ~65k vs ~550k for states)
+- **Enriched GeoJSON**: Inject `muslim_voters` directly into state feature properties (already partially done for districts)
+- **Tooltip**: Simplify to show name + Muslim voter count (remove impact score percentage)
+- **State click behavior**: Keep existing fit-to-bounds zoom behavior (already works well)
+- Remove filter-based opacity logic for districts (simplify to always show all)
 
-I recommend **Option A** -- a view keeps the frontend code simple and the filtering logic in one place.
+### 3. `src/components/voter-impact/MapLegend.tsx` (redesign)
+- Replace 4-tier categorical legend with a continuous gradient bar
+- Show labeled tick marks at key thresholds (0, 1k, 5k, 25k, 100k, 500k)
+- Indicate "States" vs "Districts" context when zoomed in
 
-### 3. Database: Create `meta_fundraising_metrics_daily` view
+### 4. `src/components/voter-impact/MapControls.tsx` (simplify)
+- Remove party filter, impact filter, and presets (no longer relevant to population view)
+- Keep search functionality
+- Optionally keep the min population slider
 
-```sql
-CREATE VIEW meta_fundraising_metrics_daily AS
-SELECT m.*
-FROM meta_ad_metrics_daily m
-JOIN meta_campaigns mc ON m.campaign_id = mc.campaign_id 
-  AND m.organization_id = mc.organization_id
-WHERE mc.objective IN ('OUTCOME_SALES', 'CONVERSIONS');
-```
+### 5. `src/components/voter-impact/MetricToggle.tsx`
+- Remove or hide for now -- the map has a single purpose (Muslim voter population)
+- Can be re-added later if multiple metrics are desired
 
-Then update `fetchChannelSpend` to query from `meta_fundraising_metrics_daily` instead of `meta_ad_metrics_daily` for the ROI-relevant spend fields.
+### 6. `src/pages/admin/VoterImpactMap.tsx`
+- Remove metric state and MetricToggle from header
+- Simplify filter state (fewer filter options)
+- Update page title/description if needed
 
-### 4. Frontend: Update `useChannelSummaries.tsx`
+### 7. `src/components/voter-impact/RegionSidebar.tsx`
+- Keep as-is mostly -- it already shows Muslim voter counts prominently
+- Remove or de-emphasize impact score badges
 
-The Meta section queries `meta_ad_metrics` for total spend/ROAS. Update to JOIN-filter or use the new view so ROAS only reflects fundraising campaigns.
+## What Stays the Same
+- MapLibre + Carto Dark Matter basemap
+- GeoJSON data loading (states + districts)
+- Click-to-zoom-into-state interaction
+- Back button to return to US view
+- Sidebar with region details
+- Data fetching from database
+- URL param syncing
 
-### 5. Frontend: Update `useDashboardKPIsQuery.ts` (legacy)
+## Estimated Scope
+- ~6 files modified
+- No database changes needed
+- No new dependencies
 
-Though deprecated, it still queries `meta_ad_metrics` for spend. Update to use the filtered view.
-
-### 6. UI: Show both total and fundraising spend
-
-Add a small annotation or tooltip in the Meta spend KPI card indicating the split:
-- "Fundraising Spend: $X" (used for ROI)
-- "Awareness Spend: $Y" (excluded from ROI)
-
-This gives transparency without hiding data.
-
-## Files to Create/Modify
-
-| File | Action |
-|------|--------|
-| New migration SQL | Create `meta_fundraising_metrics_daily` view + update `get_dashboard_sparkline_data` RPC |
-| `src/hooks/useDashboardMetricsV2.ts` | Query from filtered view for ROI spend |
-| `src/hooks/useChannelSummaries.tsx` | Filter Meta spend for ROAS calculation |
-| `src/queries/useDashboardKPIsQuery.ts` | Filter Meta spend (legacy) |
-| `src/components/dashboard/` (KPI display) | Add fundraising vs awareness spend annotation |
-
-## Technical Details
-
-### View vs. Materialized View
-A regular view is sufficient here since the underlying tables are not huge and the JOIN is indexed on `campaign_id`. No need for materialized view complexity.
-
-### RLS on Views
-The view inherits RLS from the underlying tables, so no additional policy changes are needed.
-
-### Edge Cases
-- Campaigns without a matching `meta_campaigns` row (orphaned metrics): These will be excluded from the view. A LEFT JOIN variant could be used if we want to default-include unknown campaigns, but excluding is safer since it forces proper campaign syncing.
-- New objective types added by Meta in the future: Only `OUTCOME_SALES` and `CONVERSIONS` are included, so new objectives default to excluded (safe default for ROI accuracy).
