@@ -433,8 +433,8 @@ export function ImpactMap({
       <div className="absolute bottom-4 left-4 z-10 flex gap-3 pointer-events-auto">
         <InsetMap
           label="Alaska"
-          center={[-153, 64]}
-          zoom={1.8}
+          center={[-160, 64]}
+          zoom={1.4}
           width={160}
           height={110}
           enrichedStatesGeoJSON={enrichedStatesGeoJSON}
@@ -450,8 +450,8 @@ export function ImpactMap({
         />
         <InsetMap
           label="Hawaii"
-          center={[-155.5, 19.7]}
-          zoom={5.5}
+          center={[-157.0, 20.5]}
+          zoom={5.0}
           width={120}
           height={85}
           enrichedStatesGeoJSON={enrichedStatesGeoJSON}
