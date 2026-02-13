@@ -29,8 +29,8 @@ describe('RegionSidebar', () => {
     it('renders without selected region', () => {
       render(<RegionSidebar {...defaultProps} />);
       // Should show heading and helpful tips
-      expect(screen.getByText('No Region Selected')).toBeInTheDocument();
-      expect(screen.getByText('Click on a state for overview data')).toBeInTheDocument();
+      expect(screen.getByText('Select a Region')).toBeInTheDocument();
+      expect(screen.getByText('Click a state')).toBeInTheDocument();
     });
   });
 
@@ -131,8 +131,8 @@ describe('RegionSidebar', () => {
           comparisonItems={[{ type: 'district', data: district }]}
         />
       );
-      // Should show comparison section
-      expect(screen.getByText(/Comparing/i)).toBeInTheDocument();
+      // Should show comparison section with district code
+      expect(screen.getByText('MI-011')).toBeInTheDocument();
     });
   });
 });

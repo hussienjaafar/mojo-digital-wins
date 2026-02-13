@@ -270,6 +270,22 @@ function DistrictDetails({ district, onDeselect }: DistrictDetailsProps) {
       </div>
 
       {/* Mobilization Opportunity - Only if impactful */}
+      {/* Contact Data */}
+      <div className="bg-[#0a0f1a] rounded-lg p-4 border border-[#1e2a45]">
+        <div className="text-xs text-[#64748b] uppercase tracking-wider mb-3">Contact Data</div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="text-center p-3 bg-[#141b2d] rounded-lg border border-[#1e2a45]">
+            <div className="text-xl font-bold text-[#38bdf8]">{formatNumber(district.cell_phones)}</div>
+            <div className="text-xs text-[#64748b]">Phone #s</div>
+          </div>
+          <div className="text-center p-3 bg-[#141b2d] rounded-lg border border-[#1e2a45]">
+            <div className="text-xl font-bold text-[#34d399]">{formatNumber(district.households)}</div>
+            <div className="text-xs text-[#64748b]">Addresses</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobilization Opportunity - Only if impactful */}
       {district.can_impact && district.votes_needed && (
         <div className="bg-gradient-to-r from-[#22c55e]/10 to-[#0a0f1a] rounded-lg p-4 border border-[#22c55e]/30">
           <div className="flex items-center gap-2 mb-2">
@@ -390,6 +406,21 @@ function StateDetails({ state, onDeselect }: StateDetailsProps) {
           <div className="text-center p-3 bg-[#141b2d] rounded-lg border border-[#1e2a45]">
             <div className="text-xl font-bold text-[#f59e0b]">{formatNumber(state.political_activists)}</div>
             <div className="text-xs text-[#64748b]">Activists</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Contact Data */}
+      <div className="bg-[#0a0f1a] rounded-lg p-4 border border-[#1e2a45]">
+        <div className="text-xs text-[#64748b] uppercase tracking-wider mb-3">Contact Data</div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="text-center p-3 bg-[#141b2d] rounded-lg border border-[#1e2a45]">
+            <div className="text-xl font-bold text-[#38bdf8]">{formatNumber(state.cell_phones)}</div>
+            <div className="text-xs text-[#64748b]">Phone #s</div>
+          </div>
+          <div className="text-center p-3 bg-[#141b2d] rounded-lg border border-[#1e2a45]">
+            <div className="text-xl font-bold text-[#34d399]">{formatNumber(state.households)}</div>
+            <div className="text-xs text-[#64748b]">Addresses</div>
           </div>
         </div>
       </div>

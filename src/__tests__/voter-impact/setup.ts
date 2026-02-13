@@ -298,6 +298,8 @@ export const mockVoterImpactDistricts: VoterImpactDistrict[] = [
     can_impact: true,
     votes_needed: 2501,
     cost_estimate: 75000,
+    cell_phones: 36000,
+    households: 34000,
   },
   // Medium impact district - moderate margin
   {
@@ -323,6 +325,8 @@ export const mockVoterImpactDistricts: VoterImpactDistrict[] = [
     can_impact: true,
     votes_needed: 7001,
     cost_estimate: 120000,
+    cell_phones: 22000,
+    households: 20000,
   },
   // Safe district - cannot impact
   {
@@ -348,6 +352,8 @@ export const mockVoterImpactDistricts: VoterImpactDistrict[] = [
     can_impact: false,
     votes_needed: null,
     cost_estimate: null,
+    cell_phones: 44000,
+    households: 42000,
   },
   // Very close race with low turnout
   {
@@ -373,6 +379,8 @@ export const mockVoterImpactDistricts: VoterImpactDistrict[] = [
     can_impact: true,
     votes_needed: 751,
     cost_estimate: 25000,
+    cell_phones: 14000,
+    households: 13000,
   },
   // District with very small Muslim population
   {
@@ -398,6 +406,8 @@ export const mockVoterImpactDistricts: VoterImpactDistrict[] = [
     can_impact: false,
     votes_needed: null,
     cost_estimate: null,
+    cell_phones: 1800,
+    households: 1500,
   },
   // At-large district (single district state)
   {
@@ -423,6 +433,8 @@ export const mockVoterImpactDistricts: VoterImpactDistrict[] = [
     can_impact: false,
     votes_needed: null,
     cost_estimate: null,
+    cell_phones: 400,
+    households: 150,
   },
   // District with no election data
   {
@@ -448,6 +460,8 @@ export const mockVoterImpactDistricts: VoterImpactDistrict[] = [
     can_impact: false,
     votes_needed: null,
     cost_estimate: null,
+    cell_phones: 12000,
+    households: 5000,
   },
 ];
 
@@ -527,6 +541,8 @@ export function createMockDistrict(
     can_impact: true,
     votes_needed: 5001,
     cost_estimate: 100000,
+    cell_phones: 16000,
+    households: 15000,
     ...overrides,
   };
 }
