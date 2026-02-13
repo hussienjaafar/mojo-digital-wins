@@ -433,8 +433,8 @@ export function ImpactMap({
       <div className="absolute bottom-4 left-4 z-10 flex gap-3 pointer-events-auto">
         <InsetMap
           label="Alaska"
-          center={[-152, 64]}
-          zoom={2.5}
+          center={[-153, 64]}
+          zoom={1.8}
           width={160}
           height={110}
           enrichedStatesGeoJSON={enrichedStatesGeoJSON}
@@ -445,12 +445,13 @@ export function ImpactMap({
           districtsBorderLayer={districtsBorderLayer}
           showDistricts={showDistricts}
           onRegionSelect={handleInsetRegionSelect}
+          onRegionHover={onRegionHover}
           mapStyle={MAP_STYLE}
         />
         <InsetMap
           label="Hawaii"
-          center={[-157.5, 20.5]}
-          zoom={5.8}
+          center={[-155.5, 19.7]}
+          zoom={5.5}
           width={120}
           height={85}
           enrichedStatesGeoJSON={enrichedStatesGeoJSON}
@@ -461,6 +462,7 @@ export function ImpactMap({
           districtsBorderLayer={districtsBorderLayer}
           showDistricts={showDistricts}
           onRegionSelect={handleInsetRegionSelect}
+          onRegionHover={onRegionHover}
           mapStyle={MAP_STYLE}
         />
       </div>
