@@ -373,90 +373,6 @@ describe('getImpactColor', () => {
 // ============================================================================
 
 describe('applyFilters', () => {
-  describe('party filter', () => {
-    it('returns all districts when party is "all"', () => {
-      const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, party: 'all' };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-      expect(result.length).toBe(mockVoterImpactDistricts.length);
-    });
-
-    it('filters to only Democrat winners', () => {
-      const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, party: 'democrat' };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      expect(result.length).toBeGreaterThan(0);
-      result.forEach((d) => {
-        expect(d.winner_party).toBe('D');
-      });
-    });
-
-    it('filters to only Republican winners', () => {
-      const filters: MapFilters = {
-        ...DEFAULT_MAP_FILTERS,
-        party: 'republican',
-      };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      expect(result.length).toBeGreaterThan(0);
-      result.forEach((d) => {
-        expect(d.winner_party).toBe('R');
-      });
-    });
-
-    it('filters to close races (margin < 5%)', () => {
-      const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, party: 'close' };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      expect(result.length).toBeGreaterThan(0);
-      result.forEach((d) => {
-        expect(d.margin_pct).toBeLessThan(0.05);
-      });
-    });
-  });
-
-  describe('impact filter', () => {
-    it('returns all districts when impact is "all"', () => {
-      const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, impact: 'all' };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-      expect(result.length).toBe(mockVoterImpactDistricts.length);
-    });
-
-    it('filters to only impactable districts', () => {
-      const filters: MapFilters = {
-        ...DEFAULT_MAP_FILTERS,
-        impact: 'can-impact',
-      };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      expect(result.length).toBeGreaterThan(0);
-      result.forEach((d) => {
-        expect(d.can_impact).toBe(true);
-      });
-    });
-
-    it('filters to non-impactable districts', () => {
-      const filters: MapFilters = {
-        ...DEFAULT_MAP_FILTERS,
-        impact: 'no-impact',
-      };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      expect(result.length).toBeGreaterThan(0);
-      result.forEach((d) => {
-        expect(d.can_impact).toBe(false);
-      });
-    });
-
-    it('filters to high impact districts (score >= IMPACT_THRESHOLDS.HIGH)', () => {
-      const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, impact: 'high' };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      result.forEach((d) => {
-        expect(calculateImpactScore(d)).toBeGreaterThanOrEqual(IMPACT_THRESHOLDS.HIGH);
-      });
-    });
-  });
-
   describe('minVoters filter', () => {
     it('returns all when minVoters is 0', () => {
       const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, minVoters: 0 };
@@ -536,103 +452,24 @@ describe('applyFilters', () => {
     });
   });
 
-  describe('preset filters', () => {
-    it('swing preset returns close races that can be impacted', () => {
-      const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, preset: 'swing' };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      result.forEach((d) => {
-        expect(d.can_impact).toBe(true);
-        expect(d.margin_pct).toBeLessThan(0.05);
-      });
-    });
-
-    it('high-roi preset filters to districts with cost estimates and sorts by cost', () => {
-      const filters: MapFilters = { ...DEFAULT_MAP_FILTERS, preset: 'high-roi' };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      result.forEach((d) => {
-        expect(d.can_impact).toBe(true);
-        expect(d.cost_estimate).not.toBeNull();
-      });
-
-      // Should be sorted by cost (ascending)
-      for (let i = 1; i < result.length; i++) {
-        expect(result[i].cost_estimate).toBeGreaterThanOrEqual(
-          result[i - 1].cost_estimate!
-        );
-      }
-    });
-
-    it('low-turnout preset filters to turnout < 50%', () => {
-      const filters: MapFilters = {
-        ...DEFAULT_MAP_FILTERS,
-        preset: 'low-turnout',
-      };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      result.forEach((d) => {
-        expect(d.turnout_pct).toBeLessThan(0.5);
-      });
-    });
-
-    it('top-population preset sorts by muslim_voters descending', () => {
-      const filters: MapFilters = {
-        ...DEFAULT_MAP_FILTERS,
-        preset: 'top-population',
-      };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      // Should be sorted by population (descending)
-      for (let i = 1; i < result.length; i++) {
-        expect(result[i].muslim_voters).toBeLessThanOrEqual(
-          result[i - 1].muslim_voters
-        );
-      }
-    });
-  });
-
   describe('combined filters', () => {
     it('applies multiple filters together', () => {
       const filters: MapFilters = {
-        party: 'democrat',
-        impact: 'can-impact',
         minVoters: 10000,
-        preset: 'none',
-        searchQuery: '',
-      };
-      const result = applyFilters(mockVoterImpactDistricts, filters);
-
-      result.forEach((d) => {
-        expect(d.winner_party).toBe('D');
-        expect(d.can_impact).toBe(true);
-        expect(d.muslim_voters).toBeGreaterThanOrEqual(10000);
-      });
-    });
-
-    it('applies search with other filters', () => {
-      const filters: MapFilters = {
-        party: 'all',
-        impact: 'can-impact',
-        minVoters: 0,
-        preset: 'none',
         searchQuery: 'MI',
       };
       const result = applyFilters(mockVoterImpactDistricts, filters);
 
       result.forEach((d) => {
         expect(d.state_code).toBe('MI');
-        expect(d.can_impact).toBe(true);
+        expect(d.muslim_voters).toBeGreaterThanOrEqual(10000);
       });
     });
 
     it('returns empty array when no districts match all filters', () => {
       const filters: MapFilters = {
-        party: 'democrat',
-        impact: 'no-impact', // This combo may not exist
         minVoters: 100000,
-        preset: 'none',
-        searchQuery: 'XY', // Non-existent state
+        searchQuery: 'XY',
       };
       const result = applyFilters(mockVoterImpactDistricts, filters);
       expect(result.length).toBe(0);
@@ -647,14 +484,7 @@ describe('applyFilters', () => {
 
     it('does not mutate the original array', () => {
       const original = [...mockVoterImpactDistricts];
-      const filters: MapFilters = {
-        ...DEFAULT_MAP_FILTERS,
-        preset: 'top-population',
-      };
-
-      applyFilters(mockVoterImpactDistricts, filters);
-
-      // Original should be unchanged
+      applyFilters(mockVoterImpactDistricts, { ...DEFAULT_MAP_FILTERS, minVoters: 5000 });
       expect(mockVoterImpactDistricts).toEqual(original);
     });
   });
