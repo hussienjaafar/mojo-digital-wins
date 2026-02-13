@@ -51,16 +51,16 @@ export interface MapViewState {
  * Uses a continuous scale from dark (zero) to bright (high population).
  */
 export const POPULATION_COLOR_STOPS = [
-  { threshold: 0, color: "#1a1a2e", label: "0" },
-  { threshold: 500, color: "#2d1b69", label: "500" },
-  { threshold: 2000, color: "#4a1a8a", label: "2K" },
-  { threshold: 5000, color: "#6b21a8", label: "5K" },
-  { threshold: 10000, color: "#7c3aed", label: "10K" },
-  { threshold: 25000, color: "#3b82f6", label: "25K" },
-  { threshold: 50000, color: "#06b6d4", label: "50K" },
-  { threshold: 100000, color: "#10b981", label: "100K" },
-  { threshold: 200000, color: "#84cc16", label: "200K" },
-  { threshold: 500000, color: "#facc15", label: "500K" },
+  { threshold: 0, color: "#0a0a1a", label: "0" },
+  { threshold: 500, color: "#0d2847", label: "500" },
+  { threshold: 2000, color: "#0f4c75", label: "2K" },
+  { threshold: 5000, color: "#1277a8", label: "5K" },
+  { threshold: 10000, color: "#15a2c2", label: "10K" },
+  { threshold: 25000, color: "#22c7a0", label: "25K" },
+  { threshold: 50000, color: "#4ae08a", label: "50K" },
+  { threshold: 100000, color: "#8ef06e", label: "100K" },
+  { threshold: 200000, color: "#c8f74d", label: "200K" },
+  { threshold: 500000, color: "#f9f535", label: "500K" },
 ] as const;
 
 /**
