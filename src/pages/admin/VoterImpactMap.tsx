@@ -5,7 +5,7 @@
  * across US states and congressional districts.
  */
 
-import React, { useState, useMemo, useCallback, lazy, Suspense, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, lazy, Suspense, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
@@ -67,6 +67,7 @@ export default function VoterImpactMap() {
   const [comparisonItems, setComparisonItems] = useState<ComparisonItem[]>([]);
   // Track whether we're viewing districts (zoomed into a state)
   const [isDistrictView, setIsDistrictView] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   // Sync state changes to URL params
   useEffect(() => {
@@ -171,6 +172,12 @@ export default function VoterImpactMap() {
         setIsDistrictView(true);
       } else if (!regionId) {
         setIsDistrictView(false);
+      }
+      // Auto-scroll sidebar into view
+      if (regionId) {
+        setTimeout(() => {
+          sidebarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
       }
     },
     []
@@ -335,6 +342,7 @@ export default function VoterImpactMap() {
           )}
         </div>
 
+        <div ref={sidebarRef}>
         <RegionSidebar
           selectedRegion={selectedRegion}
           comparisonItems={comparisonItems.map((item) => ({
@@ -346,6 +354,7 @@ export default function VoterImpactMap() {
           onClearComparison={handleClearComparison}
           onDeselect={handleDeselect}
         />
+        </div>
       </div>
     </div>
   );
