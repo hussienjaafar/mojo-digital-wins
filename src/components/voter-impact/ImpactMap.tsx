@@ -88,8 +88,8 @@ const INITIAL_VIEW_STATE: ViewState = {
 
 /** Bounding box constraining main map to the lower 48 states */
 const LOWER_48_BOUNDS: [[number, number], [number, number]] = [
-  [-130, 23], // Southwest corner
-  [-64, 50],  // Northeast corner
+  [-135, 20], // Southwest corner (wider for small screens)
+  [-60, 52],  // Northeast corner
 ];
 
 const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
@@ -393,7 +393,7 @@ export function ImpactMap({
         mapStyle={MAP_STYLE}
         style={{ width: "100%", height: "100%" }}
         maxBounds={LOWER_48_BOUNDS}
-        minZoom={3}
+        minZoom={2.5}
         interactiveLayerIds={["states-fill", "districts-fill"]}
         onClick={(e) => {
           if (showDistricts) {
@@ -428,13 +428,13 @@ export function ImpactMap({
       </MapGL>
 
       {/* Alaska & Hawaii Inset Maps */}
-      <div className="absolute bottom-6 left-4 z-10 flex gap-3 pointer-events-auto">
+      <div className="absolute bottom-6 left-4 z-10 hidden sm:flex gap-3 pointer-events-auto">
         <InsetMap
           label="Alaska"
           center={[-152, 64]}
           zoom={2.2}
-          width={160}
-          height={110}
+          width={140}
+          height={95}
           enrichedStatesGeoJSON={enrichedStatesGeoJSON}
           enrichedDistrictsGeoJSON={enrichedDistrictsGeoJSON}
           statesFillLayer={statesFillLayer}
@@ -449,8 +449,8 @@ export function ImpactMap({
           label="Hawaii"
           center={[-157.5, 20.5]}
           zoom={5.5}
-          width={130}
-          height={90}
+          width={110}
+          height={75}
           enrichedStatesGeoJSON={enrichedStatesGeoJSON}
           enrichedDistrictsGeoJSON={enrichedDistrictsGeoJSON}
           statesFillLayer={statesFillLayer}

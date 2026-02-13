@@ -36,7 +36,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ isDistrictView = false, ac
 
   return (
     <div
-      className="absolute bottom-4 left-4 bg-[#0a0f1a]/95 backdrop-blur-md rounded-xl border border-[#1e2a45] p-4 shadow-xl min-w-[260px]"
+      className="absolute bottom-4 right-4 bg-[#0a0f1a]/95 backdrop-blur-md rounded-xl border border-[#1e2a45] p-4 shadow-xl min-w-[260px]"
       role="region"
       aria-label="Map legend"
     >
