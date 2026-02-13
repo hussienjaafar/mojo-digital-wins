@@ -428,7 +428,7 @@ export function ImpactMap({
         onMove={handleMove}
         mapStyle={MAP_STYLE}
         style={{ width: "100%", height: "100%" }}
-        minZoom={2.5}
+        minZoom={3.5}
         renderWorldCopies={false}
         maxBounds={[[-190, 10], [-50, 75]]}
         interactiveLayerIds={["states-fill", "districts-fill"]}
