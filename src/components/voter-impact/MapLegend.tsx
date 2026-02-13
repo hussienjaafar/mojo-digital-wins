@@ -25,25 +25,18 @@ export const MapLegend: React.FC<MapLegendProps> = ({ isDistrictView = false, ac
     (stop, i) => `${stop.color} ${(i / (colorStops.length - 1)) * 100}%`
   ).join(", ");
 
-  // Build ticks from color stops - show first, last, and evenly spaced middle ones
-  const maxTicks = 6;
-  const step = Math.max(1, Math.floor((colorStops.length - 1) / (maxTicks - 1)));
-  const ticks: { label: string; pos: number }[] = [];
-  for (let i = 0; i < colorStops.length; i += step) {
-    ticks.push({
-      label: colorStops[i].label,
-      pos: (i / (colorStops.length - 1)) * 100,
-    });
-  }
-  // Ensure last tick is always included
-  const lastStop = colorStops[colorStops.length - 1];
-  if (ticks[ticks.length - 1]?.label !== lastStop.label) {
-    ticks.push({ label: lastStop.label + "+", pos: 100 });
-  }
+  // Build 3 ticks: start, middle, end
+  const midIndex = Math.floor((colorStops.length - 1) / 2);
+  const lastIndex = colorStops.length - 1;
+  const ticks = [
+    { label: colorStops[0].label, pos: 0, align: "left" as const },
+    { label: colorStops[midIndex].label, pos: (midIndex / lastIndex) * 100, align: "center" as const },
+    { label: colorStops[lastIndex].label + "+", pos: 100, align: "right" as const },
+  ];
 
   return (
     <div
-      className="absolute bottom-4 left-4 bg-[#0a0f1a]/95 backdrop-blur-md rounded-xl border border-[#1e2a45] p-4 shadow-xl min-w-[220px]"
+      className="absolute bottom-4 left-4 bg-[#0a0f1a]/95 backdrop-blur-md rounded-xl border border-[#1e2a45] p-4 shadow-xl min-w-[260px]"
       role="region"
       aria-label="Map legend"
     >
@@ -78,7 +71,9 @@ export const MapLegend: React.FC<MapLegendProps> = ({ isDistrictView = false, ac
         {ticks.map((tick) => (
           <span
             key={tick.label}
-            className="absolute text-[10px] text-[#94a3b8] -translate-x-1/2"
+            className={`absolute text-[10px] text-[#94a3b8] ${
+              tick.align === "left" ? "translate-x-0" : tick.align === "right" ? "-translate-x-full" : "-translate-x-1/2"
+            }`}
             style={{ left: `${tick.pos}%` }}
           >
             {tick.label}
