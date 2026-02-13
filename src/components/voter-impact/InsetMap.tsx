@@ -35,6 +35,7 @@ interface InsetMapProps {
   districtsBorderLayer: LineLayerSpecification;
   showDistricts: boolean;
   onRegionSelect: (regionId: string | null, type: "state" | "district") => void;
+  onRegionHover?: (regionId: string | null, type: "state" | "district") => void;
   mapStyle: string;
 }
 
@@ -56,6 +57,7 @@ export function InsetMap({
   districtsBorderLayer,
   showDistricts,
   onRegionSelect,
+  onRegionHover,
   mapStyle,
 }: InsetMapProps) {
   // Create inset-specific layer IDs to avoid conflicts with main map
@@ -116,6 +118,35 @@ export function InsetMap({
     [onRegionSelect, showDistricts]
   );
 
+  const handleHover = useCallback(
+    (event: MapLayerMouseEvent) => {
+      if (!onRegionHover) return;
+      const feature = event.features?.[0];
+      if (!feature) {
+        onRegionHover(null, "state");
+        return;
+      }
+      const layerId = feature.layer?.id;
+      if (layerId?.includes("districts-fill") && showDistricts) {
+        const stateCode = feature.properties?.STATE;
+        const districtNum = feature.properties?.CD;
+        if (stateCode && districtNum) {
+          const cdCode = buildDistrictCode(stateCode, districtNum);
+          if (cdCode) onRegionHover(cdCode, "district");
+        }
+      } else if (layerId?.includes("states-fill")) {
+        const fips = String(feature.id).padStart(2, '0');
+        const stateAbbr = getStateFromFips(fips);
+        if (stateAbbr) onRegionHover(stateAbbr, "state");
+      }
+    },
+    [onRegionHover, showDistricts]
+  );
+
+  const handleMouseLeave = useCallback(() => {
+    if (onRegionHover) onRegionHover(null, "state");
+  }, [onRegionHover]);
+
   const interactiveLayerIds = useMemo(
     () => [insetStatesFillLayer.id, insetDistrictsFillLayer.id],
     [insetStatesFillLayer.id, insetDistrictsFillLayer.id]
@@ -134,7 +165,6 @@ export function InsetMap({
         zoom={zoom}
         mapStyle={mapStyle}
         style={{ width: "100%", height: "100%" }}
-        interactive={false}
         dragPan={false}
         dragRotate={false}
         scrollZoom={false}
@@ -143,6 +173,8 @@ export function InsetMap({
         keyboard={false}
         interactiveLayerIds={interactiveLayerIds}
         onClick={handleClick}
+        onMouseMove={handleHover}
+        onMouseLeave={handleMouseLeave}
         cursor="pointer"
         attributionControl={false}
       >
