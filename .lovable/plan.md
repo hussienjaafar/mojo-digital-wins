@@ -1,71 +1,74 @@
 
 
-# Fix Buggy Drag and Missing Alaska/Hawaii Insets
+# Replace MapGL Insets with SVG-Based Alaska/Hawaii Cards
 
-## Problems
+## The Problem
 
-### 1. Buggy Click and Drag
-The `maxBounds` prop on the main MapGL causes MapLibre to apply a hard elastic constraint. When you drag near the edge, it snaps back jarringly -- this is the "buggy" drag behavior. The original soft-clamping approach was planned but never implemented; instead `maxBounds` was kept.
+The current approach uses full MapGL map instances for Alaska and Hawaii insets. This has been unreliable because:
+- MapGL requires precise coordinate/zoom tuning that's fragile across screen sizes
+- The dark basemap makes low-value states nearly invisible
+- Two extra map instances add rendering overhead
+- Hover tooltips don't work well inside tiny map containers
 
-### 2. Alaska and Hawaii Not Visible
-Three contributing factors:
-- **`hidden sm:flex`** hides the insets on screens narrower than 640px -- so on many laptops at certain zoom levels or smaller monitors, they disappear entirely
-- **Near-black fill colors**: When Alaska/Hawaii have low metric values, the fill color is near-black (`#0a0a1a`) on a dark basemap (`#0a0f1a`), making them essentially invisible even when the insets render
-- **Small container sizes** (140x95 and 110x75) combined with zoom levels that may not frame the states well
+## The Better Approach
 
-## Solution
+Replace the MapGL-based insets with **simple, styled SVG cards** that show the state outline, name, and metric value -- colored using the same color scale as the main map. This is the approach used by most major election/data maps (NYT, 538, etc.).
 
-### Fix 1: Replace `maxBounds` with Soft Clamping
+### How it works:
+- Each card is a small rounded rectangle with a colored background derived from the state's metric value
+- The state abbreviation and formatted metric value are displayed as text
+- Hovering triggers the same `onRegionHover` callback, so the sidebar/panel updates
+- Clicking triggers `onRegionSelect` to drill down
+- The cards **hide automatically** when `showDistricts` is true (zoomed into congressional district view)
 
-**File: `src/components/voter-impact/ImpactMap.tsx`**
+## Changes
 
-- Remove the `LOWER_48_BOUNDS` constant
-- Remove `maxBounds` prop from the MapGL component
-- Update `handleMove` to clamp the center coordinates:
-  - Longitude: clamp to [-170, -60]
-  - Latitude: clamp to [18, 72]
-- This gives smooth, natural drag with no elastic snap-back
+### 1. Create new `StateMiniCard` component
+**New file: `src/components/voter-impact/StateMiniCard.tsx`**
 
-### Fix 2: Always Show Insets + Better Sizing
+A simple div-based card (~40 lines) that:
+- Accepts state code, name, metric value, color, and click/hover handlers
+- Renders as a small colored card with state abbreviation and value
+- Has hover highlight effect
+- Calls `onRegionSelect` on click and `onRegionHover` on mouse enter/leave
 
-**File: `src/components/voter-impact/ImpactMap.tsx`**
+### 2. Update `ImpactMap.tsx`
+- Remove the `InsetMap` imports and usage
+- Import the new `StateMiniCard` component
+- Compute the fill colors for AK and HI from the existing enriched data and color scale
+- Render two `StateMiniCard` components in the bottom-left corner
+- Wrap them in a conditional: only show when `!showDistricts` (hides during district drill-down)
 
-- Change `hidden sm:flex` to just `flex` so insets are always visible
-- Increase Alaska inset to 160x110, zoom 2.5 for better framing
-- Increase Hawaii inset to 120x85, zoom 5.8 for better framing
-
-### Fix 3: Ensure AK/HI Are Visible Against Dark Basemap
-
-**File: `src/components/voter-impact/InsetMap.tsx`**
-
-- Add a subtle background fill for the inset states so they always contrast with the basemap
-- Override the fill opacity to a minimum of 0.4 in the inset fill layers so even low-value states are visible
-- Add a subtle inner border highlight on the target state (AK or HI) using a filter expression
+### 3. Delete `InsetMap.tsx`
+No longer needed since we're using the simpler card approach.
 
 ## Technical Details
 
 ```text
-Changes by file:
+New file: src/components/voter-impact/StateMiniCard.tsx
+  - Props: stateCode, stateName, metricValue, formattedValue, fillColor, onSelect, onHover
+  - Renders a ~100x60px card with colored left border or background
+  - Mouse events wire to onSelect/onHover
 
-src/components/voter-impact/ImpactMap.tsx:
-  - Delete LOWER_48_BOUNDS constant
-  - Remove maxBounds prop from MapGL
-  - Update handleMove:
-      longitude = Math.min(Math.max(evt.viewState.longitude, -170), -60)
-      latitude = Math.min(Math.max(evt.viewState.latitude, 18), 72)
-  - Inset container: "hidden sm:flex" -> "flex"
-  - Alaska: width 160, height 110, zoom 2.5
-  - Hawaii: width 120, height 85, zoom 5.8
+Modified: src/components/voter-impact/ImpactMap.tsx
+  - Remove InsetMap import and all InsetMap JSX
+  - Import StateMiniCard
+  - Compute AK/HI colors from the same color interpolation used by the fill layers
+  - Add helper: getStateColor(stateCode) that reads from the enriched GeoJSON features
+  - Render:
+    {!showDistricts && (
+      <div className="absolute bottom-4 left-4 z-10 flex gap-2">
+        <StateMiniCard stateCode="AK" ... />
+        <StateMiniCard stateCode="HI" ... />
+      </div>
+    )}
 
-src/components/voter-impact/InsetMap.tsx:
-  - Override inset fill layer paint to set minimum fill-opacity of 0.4
-  - Add a highlight border layer filtered to just the target state (AK FIPS "02" or HI FIPS "15")
-    using a bright subtle color so the state shape is always visible
+Deleted: src/components/voter-impact/InsetMap.tsx
 ```
 
 ## What Stays the Same
-- All click, hover, state drill-down, and district selection behavior
+- All main map click, hover, drill-down, and district selection behavior
 - Color scales and data enrichment logic
 - Legend positioning (bottom-right)
 - State context header and tooltip
-- minZoom of 2.5
+- Smooth drag with soft clamping
