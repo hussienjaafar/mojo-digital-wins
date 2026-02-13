@@ -5,16 +5,17 @@
  */
 
 import { getColorStopsForMetric, getMetricLabel, METRIC_CONFIGS } from "@/types/voter-impact";
-import type { MetricType } from "@/types/voter-impact";
+import type { MetricType, ColorStop } from "@/types/voter-impact";
 
 interface MapLegendProps {
   isDistrictView?: boolean;
   activeMetric?: MetricType;
+  colorStopsOverride?: ColorStop[] | null;
 }
 
-export const MapLegend: React.FC<MapLegendProps> = ({ isDistrictView = false, activeMetric = "population" }) => {
+export const MapLegend: React.FC<MapLegendProps> = ({ isDistrictView = false, activeMetric = "population", colorStopsOverride }) => {
   const config = METRIC_CONFIGS[activeMetric];
-  const colorStops = getColorStopsForMetric(activeMetric);
+  const colorStops = colorStopsOverride ?? getColorStopsForMetric(activeMetric);
 
   // Show "not available" for district-level metrics that don't exist
   const noDistrictData = isDistrictView && !config.districtField;
@@ -51,6 +52,9 @@ export const MapLegend: React.FC<MapLegendProps> = ({ isDistrictView = false, ac
         <span className="text-xs text-[#64748b] uppercase tracking-wider font-medium">
           {getMetricLabel(activeMetric)} {isDistrictView ? "(Districts)" : "(States)"}
         </span>
+        {colorStopsOverride && isDistrictView && (
+          <span className="text-[10px] text-[#60a5fa] font-medium ml-1">(relative to state)</span>
+        )}
       </div>
 
       {noDistrictData && (
