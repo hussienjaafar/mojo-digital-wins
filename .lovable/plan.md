@@ -1,56 +1,71 @@
 
 
-# Fix Map Viewport, Legend Overlap, and Responsiveness
+# Fix Buggy Drag and Missing Alaska/Hawaii Insets
 
-## Problems Identified
+## Problems
 
-1. **Cannot zoom out enough**: `minZoom: 3` combined with tight `maxBounds` (`[[-130, 23], [-64, 50]]`) prevents seeing both coasts on smaller screens
-2. **Legend covers inset maps**: Both the MapLegend (`absolute bottom-4 left-4`) and the Alaska/Hawaii insets (`absolute bottom-6 left-4`) are positioned in the same bottom-left corner, causing overlap
-3. **Insets hidden on small screens**: Fixed-size insets (160px + 130px + gap) don't fit on narrow viewports
+### 1. Buggy Click and Drag
+The `maxBounds` prop on the main MapGL causes MapLibre to apply a hard elastic constraint. When you drag near the edge, it snaps back jarringly -- this is the "buggy" drag behavior. The original soft-clamping approach was planned but never implemented; instead `maxBounds` was kept.
+
+### 2. Alaska and Hawaii Not Visible
+Three contributing factors:
+- **`hidden sm:flex`** hides the insets on screens narrower than 640px -- so on many laptops at certain zoom levels or smaller monitors, they disappear entirely
+- **Near-black fill colors**: When Alaska/Hawaii have low metric values, the fill color is near-black (`#0a0a1a`) on a dark basemap (`#0a0f1a`), making them essentially invisible even when the insets render
+- **Small container sizes** (140x95 and 110x75) combined with zoom levels that may not frame the states well
 
 ## Solution
 
-### 1. Relax zoom and bounds constraints
+### Fix 1: Replace `maxBounds` with Soft Clamping
 
 **File: `src/components/voter-impact/ImpactMap.tsx`**
 
-- Lower `minZoom` from `3` to `2.5` so users can zoom out enough to see both coasts on smaller screens
-- Widen `LOWER_48_BOUNDS` slightly to `[[-135, 20], [-60, 52]]` to add breathing room at the edges and prevent coast clipping
+- Remove the `LOWER_48_BOUNDS` constant
+- Remove `maxBounds` prop from the MapGL component
+- Update `handleMove` to clamp the center coordinates:
+  - Longitude: clamp to [-170, -60]
+  - Latitude: clamp to [18, 72]
+- This gives smooth, natural drag with no elastic snap-back
 
-### 2. Reposition legend to bottom-right to avoid overlap
-
-**File: `src/components/voter-impact/MapLegend.tsx`**
-
-- Change positioning from `bottom-4 left-4` to `bottom-4 right-4`
-- This gives the inset maps exclusive use of the bottom-left corner, and the legend sits cleanly in the bottom-right (where the navigation controls are at the top-right, so there's no conflict)
-
-### 3. Make insets responsive
+### Fix 2: Always Show Insets + Better Sizing
 
 **File: `src/components/voter-impact/ImpactMap.tsx`**
 
-- Add responsive classes to the inset container: hide on very small screens (`hidden sm:flex`) where they'd be too cramped
-- Reduce inset sizes slightly on medium screens using Tailwind responsive classes or slightly smaller default dimensions (140x95 for Alaska, 110x75 for Hawaii)
+- Change `hidden sm:flex` to just `flex` so insets are always visible
+- Increase Alaska inset to 160x110, zoom 2.5 for better framing
+- Increase Hawaii inset to 120x85, zoom 5.8 for better framing
+
+### Fix 3: Ensure AK/HI Are Visible Against Dark Basemap
+
+**File: `src/components/voter-impact/InsetMap.tsx`**
+
+- Add a subtle background fill for the inset states so they always contrast with the basemap
+- Override the fill opacity to a minimum of 0.4 in the inset fill layers so even low-value states are visible
+- Add a subtle inner border highlight on the target state (AK or HI) using a filter expression
 
 ## Technical Details
 
 ```text
 Changes by file:
 
-src/components/voter-impact/ImpactMap.tsx
-  - LOWER_48_BOUNDS: [[-130, 23], [-64, 50]] -> [[-135, 20], [-60, 52]]
-  - minZoom: 3 -> 2.5
-  - Inset container: add "hidden sm:flex" for responsive hiding
-  - Reduce inset sizes slightly for better fit
+src/components/voter-impact/ImpactMap.tsx:
+  - Delete LOWER_48_BOUNDS constant
+  - Remove maxBounds prop from MapGL
+  - Update handleMove:
+      longitude = Math.min(Math.max(evt.viewState.longitude, -170), -60)
+      latitude = Math.min(Math.max(evt.viewState.latitude, 18), 72)
+  - Inset container: "hidden sm:flex" -> "flex"
+  - Alaska: width 160, height 110, zoom 2.5
+  - Hawaii: width 120, height 85, zoom 5.8
 
-src/components/voter-impact/MapLegend.tsx
-  - Position: "bottom-4 left-4" -> "bottom-4 right-4"
+src/components/voter-impact/InsetMap.tsx:
+  - Override inset fill layer paint to set minimum fill-opacity of 0.4
+  - Add a highlight border layer filtered to just the target state (AK FIPS "02" or HI FIPS "15")
+    using a bright subtle color so the state shape is always visible
 ```
 
-## What stays the same
-
-- All click, hover, and drill-down functionality
-- Color scales and data enrichment
-- Inset map interactivity (clickable for state/district selection)
-- State context header and tooltip behavior
-- Dark theme styling
-
+## What Stays the Same
+- All click, hover, state drill-down, and district selection behavior
+- Color scales and data enrichment logic
+- Legend positioning (bottom-right)
+- State context header and tooltip
+- minZoom of 2.5
