@@ -31,12 +31,18 @@ const schema = z.object({
   buyingAuthorityInfo: z.string().max(500).optional(),
 });
 
-const KPI_OPTIONS = [
-  'Cost Per Verified Patient',
+const COMMERCIAL_KPIS = [
   'ROAS',
   'Cost Per Acquisition',
+  'Cost Per Verified Patient',
+  'Brand Lift',
+];
+
+const POLITICAL_KPIS = [
   'Voter Persuasion Lift',
   'Donor Lifetime Value',
+  'Cost Per Acquisition',
+  'Voter Registration Rate',
 ];
 
 const BUDGET_OPTIONS = [
@@ -70,6 +76,7 @@ export default function QualificationStep({
 
   const headline = content?.headline || "Let's Build Your Strategy";
   const cta = content?.cta || 'Submit & Connect';
+  const kpiOptions = segment === 'political' ? POLITICAL_KPIS : COMMERCIAL_KPIS;
 
   const toggleKpi = (kpi: string) => {
     setKpis(prev => prev.includes(kpi) ? prev.filter(k => k !== kpi) : [...prev, kpi]);
@@ -154,7 +161,7 @@ export default function QualificationStep({
         {/* KPI Multi-select */}
         <div className="space-y-2">
           <p className="text-white/70 text-sm font-medium">Primary performance KPI(s)</p>
-          {KPI_OPTIONS.map(kpi => (
+          {kpiOptions.map(kpi => (
             <button
               key={kpi}
               onClick={() => toggleKpi(kpi)}

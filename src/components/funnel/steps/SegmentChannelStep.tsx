@@ -52,7 +52,7 @@ export default function SegmentChannelStep({
   };
 
   return (
-    <div className="w-full max-w-lg mx-auto text-center space-y-8">
+    <div className="w-full max-w-lg mx-auto text-center space-y-8 pb-8">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
         <h2 className="text-3xl font-bold text-white">{headline}</h2>
         <p className="text-white/60 text-lg">{subheadline}</p>

@@ -80,7 +80,7 @@ export default function FunnelContainer({
           animate="center"
           exit="exit"
           transition={{ duration: 0.3, ease: 'easeOut' }}
-          className="absolute inset-0 flex flex-col items-center justify-center px-5 will-change-transform"
+          className="absolute inset-0 flex flex-col items-center px-5 pt-12 pb-24 overflow-y-auto will-change-transform"
           style={{ transform: 'translateZ(0)' }}
         >
           {children}
