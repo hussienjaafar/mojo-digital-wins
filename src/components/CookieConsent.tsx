@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,8 @@ interface CookiePreferences {
 }
 
 const CookieConsent = () => {
+  const location = useLocation();
+  const isFunnelRoute = location.pathname === '/experience' || location.pathname === '/get-started';
   const [showBanner, setShowBanner] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [preferences, setPreferences] = useState<CookiePreferences>({
@@ -125,48 +127,32 @@ const CookieConsent = () => {
 
   return (
     <>
-      {/* Cookie Consent Banner - Bottom banner style */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-lg border-t border-border shadow-xl">
-        <div className="container mx-auto px-4 py-4 max-w-screen-xl">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-            <div className="flex items-start gap-2 flex-1">
-              <Cookie className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm text-foreground font-medium">
-                  We use cookies to enhance your experience.{" "}
-                  <Link
-                    to="/privacy-policy"
-                    className="text-primary hover:underline inline"
-                  >
-                    Learn more
-                  </Link>
-                </p>
-              </div>
+      {/* Cookie Consent Banner - Compact top bar on funnel routes, bottom bar elsewhere */}
+      <div className={`fixed ${isFunnelRoute ? 'top-0' : 'bottom-0'} left-0 right-0 z-40 bg-background/95 backdrop-blur-lg ${isFunnelRoute ? 'border-b' : 'border-t'} border-border shadow-xl`}>
+        <div className={`container mx-auto px-4 ${isFunnelRoute ? 'py-2' : 'py-4'} max-w-screen-xl`}>
+          <div className="flex flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Cookie className="h-4 w-4 text-primary flex-shrink-0" />
+              <p className={`${isFunnelRoute ? 'text-xs' : 'text-sm'} text-foreground font-medium truncate`}>
+                We use cookies.{" "}
+                <Link to="/privacy-policy" className="text-primary hover:underline inline">
+                  Learn more
+                </Link>
+              </p>
             </div>
-            <div className="flex gap-2 w-full md:w-auto">
-              <Button
-                onClick={handleRejectAll}
-                variant="outline"
-                size="sm"
-                className="flex-1 md:flex-none min-h-[44px]"
-              >
-                Reject
-              </Button>
-              <Button
-                onClick={handleCustomize}
-                variant="outline"
-                size="sm"
-                className="flex-1 md:flex-none min-h-[44px]"
-              >
-                Settings
-              </Button>
-              <Button
-                onClick={handleAcceptAll}
-                variant="default"
-                size="sm"
-                className="flex-1 md:flex-none min-h-[44px]"
-              >
-                Accept
+            <div className="flex gap-2 shrink-0">
+              {!isFunnelRoute && (
+                <Button onClick={handleRejectAll} variant="outline" size="sm" className="min-h-[36px]">
+                  Reject
+                </Button>
+              )}
+              {!isFunnelRoute && (
+                <Button onClick={handleCustomize} variant="outline" size="sm" className="min-h-[36px]">
+                  Settings
+                </Button>
+              )}
+              <Button onClick={handleAcceptAll} variant="default" size="sm" className={`${isFunnelRoute ? 'min-h-[32px] text-xs px-3' : 'min-h-[36px]'}`}>
+                {isFunnelRoute ? 'OK' : 'Accept'}
               </Button>
             </div>
           </div>

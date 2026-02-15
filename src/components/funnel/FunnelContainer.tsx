@@ -1,5 +1,6 @@
 import { ReactNode, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronUp } from 'lucide-react';
 
 interface FunnelContainerProps {
   currentStep: number;
@@ -35,7 +36,15 @@ export default function FunnelContainer({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+      if (e.key === 'Enter' && isInput) {
+        // Let form onSubmit handle Enter in inputs
+        return;
+      }
+
+      if (e.key === 'ArrowDown' || (e.key === 'Enter' && !isInput)) {
         e.preventDefault();
         onNext?.();
       } else if (e.key === 'ArrowUp') {
@@ -71,6 +80,17 @@ export default function FunnelContainer({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
+      {/* Back button */}
+      {currentStep > 0 && onBack && (
+        <button
+          onClick={onBack}
+          className="fixed top-4 left-4 z-50 w-10 h-10 rounded-full bg-[#141b2d]/80 border border-[#1e2a45] flex items-center justify-center text-[#7c8ba3] hover:text-[#e2e8f0] hover:border-[#2d3b55] transition-colors backdrop-blur-sm"
+          aria-label="Go back"
+        >
+          <ChevronUp className="w-5 h-5" />
+        </button>
+      )}
+
       <AnimatePresence initial={false} custom={direction} mode="wait">
         <motion.div
           key={currentStep}
