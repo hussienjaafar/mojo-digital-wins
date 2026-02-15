@@ -76,7 +76,7 @@ export default function PoliticalOpportunityStep({ content, onNext }: PoliticalO
         <V3Button variant="success" size="xl" className="w-full min-h-[48px] !bg-emerald-600 hover:!bg-emerald-500 !text-white font-semibold rounded-lg shadow-lg shadow-emerald-500/25" onClick={onNext}>
           {cta}
         </V3Button>
-        <p className="text-[#94a3b8] text-sm mt-3 flex items-center justify-center gap-1">Next: See the proof <span>→</span></p>
+        <p className="text-[#94a3b8] text-sm mt-3 flex items-center justify-center gap-1">Next: See real results <span>→</span></p>
       </div>
     </div>
   );
