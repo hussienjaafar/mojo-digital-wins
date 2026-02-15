@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import type { VariantContent } from '@/hooks/useFunnelVariants';
+import { V3Button } from '@/components/v3';
+import { FUNNEL_INPUT } from '@/components/funnel/funnelTheme';
 
 interface WelcomeStepProps {
   content?: VariantContent;
@@ -26,7 +28,7 @@ export default function WelcomeStep({ content, onNext, onEmailBlur }: WelcomeSte
   return (
     <div className="w-full max-w-lg mx-auto text-center space-y-8">
       {/* Video hero placeholder */}
-      <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-white/5 border border-white/10">
+      <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-[#141b2d] border border-[#1e2a45]">
         <video
           autoPlay
           muted
@@ -39,7 +41,7 @@ export default function WelcomeStep({ content, onNext, onEmailBlur }: WelcomeSte
         </video>
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a0f1a] via-transparent to-transparent" />
         <div className="absolute bottom-4 left-4 right-4">
-          <p className="text-white/90 text-sm font-medium bg-black/60 px-3 py-1 rounded inline-block">
+          <p className="text-[#e2e8f0] text-sm font-medium bg-[#141b2d]/90 border border-[#1e2a45] px-3 py-1 rounded inline-block">
             Precision Audience Intelligence
           </p>
         </div>
@@ -51,10 +53,10 @@ export default function WelcomeStep({ content, onNext, onEmailBlur }: WelcomeSte
         transition={{ delay: 0.2 }}
         className="space-y-3"
       >
-        <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
+        <h1 className="text-3xl md:text-4xl font-bold text-[#e2e8f0] tracking-tight">
           {headline}
         </h1>
-        <p className="text-white/60 text-lg">{subheadline}</p>
+        <p className="text-[#94a3b8] text-lg">{subheadline}</p>
       </motion.div>
 
       <motion.div
@@ -70,22 +72,24 @@ export default function WelcomeStep({ content, onNext, onEmailBlur }: WelcomeSte
           value={email}
           onChange={e => setEmail(e.target.value)}
           onBlur={() => onEmailBlur(email, organization)}
-          className="w-full h-14 px-4 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-base"
+          className={FUNNEL_INPUT}
         />
         <input
           type="text"
           placeholder="Organization name"
           value={organization}
           onChange={e => setOrganization(e.target.value)}
-          className="w-full h-14 px-4 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-base"
+          className={FUNNEL_INPUT}
         />
-        <button
+        <V3Button
+          variant="primary"
+          size="xl"
+          className="w-full min-h-[48px]"
           onClick={handleSubmit}
           disabled={!email.trim()}
-          className="w-full h-14 min-h-[48px] rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold text-lg transition-all hover:from-blue-500 hover:to-blue-400 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98]"
         >
           {cta}
-        </button>
+        </V3Button>
       </motion.div>
     </div>
   );
