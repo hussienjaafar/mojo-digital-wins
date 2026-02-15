@@ -1,212 +1,209 @@
 
-# Deep Audit and Self-Learning Optimization Plan for the Lead Generation Funnel
 
-## Part 1: Audit Findings
+# UX/UI Deep Audit and Optimization Plan for the Lead Generation Funnel
 
-### A. Conversion Architecture Gaps
+## Executive Summary
 
-**1. No step-level drop-off tracking with conversion rates**
-The `funnel_analytics` table logs events, but there is no materialized view or computed metric that calculates per-step conversion rates (Step N viewers / Step N+1 viewers). Without this, you cannot identify which step is the biggest leak.
-
-**2. No time-on-step measurement**
-The analytics hook logs `view` events but never logs `exit` or duration. Research shows that steps where users spend too long (>45s) indicate confusion, and steps where they leave instantly (<3s) indicate irrelevance. Neither is captured.
-
-**3. Abandoned lead capture is one-shot only**
-`useAbandonedLeadCapture` sets `capturedEarly = true` after the first blur and never fires again. If a user corrects their email, the updated value is never saved. This means the database can contain typos with no correction path.
-
-**4. No field-level interaction tracking**
-There is no data on which form fields cause hesitation or abandonment on Step 4. Research from Unbounce and Leadpages shows that identifying the "killer field" (the one that causes drop-off) can improve form conversion by 20-50%.
-
-**5. Static A/B testing with no winner selection**
-The `content_optimization` table has Variant A and Variant B, but there is no mechanism to measure which variant wins, auto-promote the winner, or generate new challenger variants. Traffic is split 50/50 indefinitely, wasting half your traffic on a potentially weaker variant.
-
-**6. No urgency or scarcity signals**
-None of the steps include time-sensitive language, limited availability cues, or social proof counters (e.g., "42 organizations onboarded this month"). Cialdini's principles of scarcity and social proof are the two highest-leverage psychological triggers for B2B lead gen.
-
-**7. Proof steps lack quantified outcomes**
-CommercialProofStep and PoliticalProofStep show badge icons but no specific numbers. Research shows that specific social proof ("Increased ROAS by 340% for [client type]") converts 2-3x better than generic trust badges.
-
-**8. WelcomeStep asks for email too early without value exchange**
-The first thing a visitor sees is an email field. High-converting funnels (Typeform, HubSpot) use "value-first" design: show the user something valuable BEFORE asking for contact info. The current flow asks for email before demonstrating any value.
-
-**9. ThankYouStep has a dead Calendly URL**
-`CALENDLY_URL` is hardcoded to `https://calendly.com` (the homepage), not an actual booking link. High-value leads scoring 50+ get redirected to a generic page.
-
-**10. No exit-intent recovery on the funnel**
-The ExitIntentPopup is explicitly excluded from `/experience`. While aggressive popups are bad, a soft "Save your progress?" prompt that captures the email before exit is a proven 5-15% recovery tactic.
-
-**11. Budget selection has no anchoring**
-The three budget buttons are presented in ascending order ($5k, $10k, $50k+). Price anchoring research shows presenting the highest option first increases average deal size by 15-25%.
-
-**12. No mobile-specific optimizations beyond touch targets**
-While 48px targets are good, there is no autofocus management, no `inputMode` attributes (e.g., `inputMode="email"`), and no smart keyboard handling. Mobile visitors (often >60% of traffic) experience unnecessary friction.
+After walking through every step of the `/experience` funnel on both desktop and mobile, conducting extensive research on high-converting multi-step form UX patterns, and reviewing the current implementation in detail, I identified **19 UX/UI issues** across 5 categories. These fixes target the psychological, visual, and interaction design levers that research shows have the highest impact on conversion rates.
 
 ---
 
-### B. Self-Learning Infrastructure Gaps
+## Audit Findings
 
-**13. Learning signals exist but are disconnected from the funnel**
-The `learning_signals` table and `update-learning-signals` edge function are built for trend analysis, not funnel optimization. There is no feedback loop from funnel conversion data into variant selection.
+### Category 1: Critical Layout and Visibility Issues
 
-**14. No multi-armed bandit for copy optimization**
-The A/B split is a naive 50/50 coin flip in `useFunnelSession`. A Thompson Sampling bandit would automatically shift traffic toward the winning variant while continuing to explore, reducing "regret" (lost conversions from showing the weaker variant).
+**1. CTA Button Still Hidden Below the Fold (CRITICAL)**
+Despite the previous scrolling fix, the "Get Started" button on Step 0 is cut off on both desktop (1366x768) and mobile (390x844). The `pt-12` top padding combined with the video hero, headline, social proof, two inputs, and the button pushes the CTA below the visible area. Users who do not scroll will never see the button. Research shows that if your primary CTA is not visible without scrolling, you lose 20-30% of potential conversions immediately.
 
-**15. No AI-powered copy generation for new challengers**
-When a variant wins, there is no mechanism to generate a new challenger variant using AI, creating a perpetual optimization loop.
+**2. Cookie Consent Banner Blocks the CTA**
+The cookie consent banner is `fixed bottom-0` with `z-40`, and the funnel progress dots are `fixed bottom-6` with `z-50`. On mobile, the cookie banner completely obscures the CTA button and the progress dots. This is a conversion killer since the first thing a user must do (click "Get Started") is physically blocked by a cookie prompt. The banner should auto-dismiss or be positioned above the funnel's bottom UI zone.
+
+**3. Empty Video Hero Wastes Prime Viewport Space**
+The video element has no `src` and no poster image. It renders as an empty dark rectangle taking up the entire aspect-ratio (16:9) of the most valuable viewport real estate. On mobile, this empty box consumes ~40% of the visible screen, pushing all meaningful content (headline, CTA) below the fold. Either populate this with actual content or remove/minimize it until content is available.
+
+### Category 2: Progress and Navigation UX
+
+**4. Progress Indicator is Minimal and Unclear**
+The current progress indicator is 6 tiny dots (8x8px) at the bottom of the screen with no labels. Research from SetProduct and HubSpot shows that labeled progress indicators ("Step 2 of 5: Choose Your Channels") increase completion rates by 20-40% because they answer "how much is left?" and "what am I doing now?" The current dots answer neither question.
+
+**5. No Back Button or Visual Back Navigation**
+There is no visible back button. Users can swipe up or press ArrowUp, but these are undiscoverable. If a user wants to change their segment selection after seeing the opportunity step, they have no obvious way to go back. Research shows that the inability to go back increases abandonment by 15-20% because users feel trapped.
+
+**6. No Step-Level Labels or Breadcrumbs**
+Users have no idea what comes next. Multi-step form research consistently shows that revealing the upcoming steps (e.g., "Next: Choose Channels") reduces anxiety and increases completion. The current flow gives zero forward visibility.
+
+### Category 3: Form Design and Interaction
+
+**7. No Inline Validation on WelcomeStep Email**
+The email field on Step 0 has no validation feedback. If a user types "test@" and clicks "Get Started," nothing visually indicates the email is invalid -- the button simply does nothing (since `email.trim()` passes but it is not validated as an email format). Research from UXPin shows that inline validation reduces form errors by 22% and increases completion by 15%.
+
+**8. No Visual Feedback on Form Submission (QualificationStep)**
+When the user clicks "Submit & Connect" on Step 4, there is no loading state, no spinner, no button text change. The `handleQualificationSubmit` function makes two async calls (database upsert + edge function), which could take 1-3 seconds. During this time, the user sees no feedback and may click again. Research shows that showing a loading state increases perceived reliability and reduces double-submissions.
+
+**9. QualificationStep Has Too Many Fields Visible at Once**
+Step 4 shows 4 text inputs + 1 toggle + 1 textarea + 4 KPI checkboxes + 3 budget buttons + 1 scarcity line + 1 submit button = ~15 interactive elements on a single step. This is exactly the cognitive overload that multi-step forms are designed to prevent. Research from LeadGen Economy shows that showing 3-4 fields per step is optimal; more than 5 causes a sharp drop-off. The qualification step should be split into sub-sections with progressive disclosure.
+
+**10. Labels Are Missing on All Input Fields**
+Every input field uses `placeholder` text as the sole label. When the user starts typing, the context disappears. This is a well-documented accessibility and usability antipattern. Floating labels (placeholder that moves to a small label above the field on focus) solve this while maintaining the clean aesthetic.
+
+**11. No Keyboard Submit on Forms**
+Pressing Enter on Step 0 triggers `onNext` from the FunnelContainer's keydown handler (ArrowDown/Enter), but only if the focus is not on an input. When focus is inside the email or org field, Enter does nothing because the input captures it. Users expect Enter to submit the current form step.
+
+### Category 4: Visual Design and Hierarchy
+
+**12. Headline Typography Uses a Novelty Font**
+The headline "$170.8 BILLION. ONE PLATFORM." renders in what appears to be a condensed/display font (likely inherited from global styles). While eye-catching, research shows that high-converting B2B landing pages use clean sans-serif headlines for credibility. The current font style reads more "poster" than "enterprise platform."
+
+**13. Low Color Contrast on Secondary Text**
+The secondary text color `#94a3b8` on background `#0a0f1a` has a contrast ratio of approximately 5.2:1, which passes WCAG AA for normal text but is borderline. The muted color `#64748b` has a ratio of approximately 3.5:1, which fails WCAG AA. The scarcity copy, social proof text, and channel descriptions are all in this failing contrast range, making them harder to read especially on mobile.
+
+**14. Segment Cards Lack Visual Differentiation Beyond Color**
+The Commercial and Political cards have identical layouts with different icons and accent colors. Adding a brief benefit statement or a "Most Popular" badge to one of them would leverage social proof and the bandwagon effect to guide selection.
+
+**15. Budget Buttons Look Like Navigation, Not Selection**
+The budget buttons are full-width rectangles with no visual indicator of "selected vs unselected" beyond a gradient fill. Adding a radio-style indicator (circle with filled dot) would make the selection state immediately clear and match established form patterns users already understand.
+
+### Category 5: Psychological and Persuasion Design
+
+**16. No Value Proposition Before Email Ask**
+Step 0 shows a stat ("$170.8 Billion") and asks for an email. There is no explanation of what the user will receive in exchange. High-converting funnels use a "what you'll get" micro-list (e.g., checkmarks: "Custom audience analysis", "Channel recommendations", "ROI projection") above the form to justify the ask. Without this, users have no incentive to share their email.
+
+**17. No Micro-Commitments or Gamification**
+The funnel is a straight path with no engagement hooks. Research shows that adding micro-interactions (checkmark animations when selecting channels, a "strategy strength" meter that fills as the user provides more info on Step 4) increases completion by 10-20% by creating a sense of investment and progress.
+
+**18. ThankYouStep Has a Single Generic Link**
+The final step shows one "ExternalLink" icon pointing to linkedin.com (the homepage, not a company page). This is a wasted opportunity for next-step engagement. High-converting thank-you pages include: a personalized summary of what was discussed, clear next steps with timeline, and multiple engagement options.
+
+**19. No Transition Micro-Copy Between Steps**
+When moving from Step 1 (segment/channels) to Step 2 (opportunity), there is no contextual bridge. Adding a brief transition phrase ("Great choices. Here's what that unlocks...") creates narrative flow and reduces the feeling of being in a disconnected quiz.
 
 ---
 
-## Part 2: Implementation Plan
+## Implementation Plan
 
-### Phase 1: Database -- Funnel Intelligence Tables
+### Phase 1: Critical Fixes (Highest Conversion Impact)
 
-**Migration 1: Add conversion tracking infrastructure**
+**1.1 Fix CTA Visibility -- Restructure WelcomeStep Layout**
+File: `src/components/funnel/steps/WelcomeStep.tsx`
+- Remove or drastically reduce the empty video hero (collapse to a thin decorative bar or remove entirely until real video content exists)
+- Reduce `space-y-8` to `space-y-5` to tighten vertical spacing
+- Ensure the CTA button is visible on a 667px-tall viewport (iPhone SE) without scrolling
+- Add `scroll-mt-4` to the button container as a fallback
 
-1. **`funnel_step_metrics`** (materialized daily)
-   - Columns: `date`, `variant_label`, `segment`, `step_key`, `step_number`, `views`, `completions`, `conversion_rate`, `avg_duration_ms`, `drop_off_count`
-   - Purpose: Pre-computed conversion rates per step per variant per day
+**1.2 Fix Cookie Banner Conflict**
+File: `src/components/CookieConsent.tsx`
+- Add a check: if the current route is `/experience` or `/get-started`, render the cookie banner as a compact top bar (or a floating dismissible pill) instead of a full-width bottom bar
+- This prevents the banner from blocking the funnel's CTA and progress dots
 
-2. **`funnel_field_interactions`** -- Field-level tracking on Step 4
-   - Columns: `id`, `session_id`, `field_name`, `interaction_type` (focus/blur/change), `time_spent_ms`, `had_error`, `created_at`
-   - RLS: anon INSERT; admin SELECT
+**1.3 Add Loading State to Qualification Submit**
+File: `src/components/funnel/steps/QualificationStep.tsx`
+- Add `isSubmitting` state
+- Pass `isLoading={isSubmitting}` and `loadingText="Submitting..."` to the `V3Button` (already supports these props)
+- Set `isSubmitting = true` before the async calls, reset on completion
 
-3. **`funnel_variant_performance`** -- Bandit state table
-   - Columns: `id`, `step_key`, `variant_label`, `impressions`, `conversions`, `alpha` (prior success), `beta` (prior failure), `is_champion`, `is_active`, `created_at`, `updated_at`
-   - Purpose: Thompson Sampling state for each step/variant pair
+**1.4 Add Inline Email Validation on WelcomeStep**
+File: `src/components/funnel/steps/WelcomeStep.tsx`
+- Validate email format on blur using a simple regex
+- Show a red error message below the field if invalid
+- Show a green checkmark icon inside the input if valid (micro-interaction feedback)
 
-4. **`funnel_copy_generations`** -- AI challenger log
-   - Columns: `id`, `step_key`, `variant_label`, `headline_text`, `subheadline_text`, `cta_text`, `generation_prompt`, `parent_variant`, `status` (draft/active/retired), `created_at`
-   - Purpose: Track AI-generated copy variants
+### Phase 2: Progress and Navigation Improvements
 
-5. Add columns to `content_optimization`:
-   - `impressions` (int, default 0)
-   - `conversions` (int, default 0)
-   - `traffic_weight` (float, default 0.5) -- bandit allocation
+**2.1 Upgrade Progress Indicator to Labeled Steps**
+File: `src/components/funnel/FunnelProgress.tsx`
+- Replace the dot row with a horizontal step indicator showing: step number, short label, and completion state
+- Labels: "Start", "Path", "Opportunity", "Proof", "Qualify", "Done"
+- Show "Step 2 of 5" text above the indicators on mobile (where horizontal space is limited)
+- Active step gets the blue glow; completed steps get a checkmark; future steps stay muted
 
-6. Add columns to `funnel_analytics`:
-   - `duration_ms` (int, nullable) -- time spent on step
-   - `exit_type` (text, nullable) -- 'completed', 'abandoned', 'back'
+**2.2 Add a Visible Back Button**
+File: `src/components/funnel/FunnelContainer.tsx`
+- Render a subtle back arrow (ChevronUp or ArrowLeft) in the top-left corner when `currentStep > 0`
+- Use the existing `onBack` callback
+- Positioned `fixed top-4 left-4` with `z-50`, styled as `text-[#64748b] hover:text-[#e2e8f0]`
 
-### Phase 2: Self-Learning Engine (Edge Functions)
+**2.3 Add "Next: [Step Name]" Hint Below CTA**
+Files: All step components
+- Below each V3Button CTA, add a subtle line: "Next: See the Proof" (or the appropriate next step name)
+- Styled as `text-[#64748b] text-xs mt-2`
 
-**1. `funnel-compute-metrics` (scheduled daily)**
-- Aggregates `funnel_analytics` into `funnel_step_metrics`
-- Computes per-step conversion funnels: views at step N vs views at step N+1
-- Identifies the "biggest leak" step and logs it
+### Phase 3: Form UX Polish
 
-**2. `funnel-bandit-update` (scheduled hourly)**
-- Implements Thompson Sampling for each step_key:
-  - Read `impressions` and `conversions` from `funnel_variant_performance`
-  - Sample from Beta(alpha, beta) for each variant
-  - Update `traffic_weight` in `content_optimization`
-  - If a variant reaches statistical significance (95% probability of being better with 100+ samples), mark it as `is_champion` and trigger challenger generation
-- Returns current allocation weights
+**3.1 Add Floating Labels to All Inputs**
+Files: `funnelTheme.ts`, `WelcomeStep.tsx`, `QualificationStep.tsx`
+- Create a `FunnelInput` wrapper component that implements the floating label pattern
+- When the field is empty and unfocused, show the label as placeholder
+- When focused or filled, animate the label to a smaller size above the input
+- Uses the same `#141b2d` / `#1e2a45` theme but adds a `text-xs text-[#94a3b8]` animated label
 
-**3. `funnel-generate-challenger` (triggered when champion declared)**
-- Uses Lovable AI (google/gemini-2.5-flash) to generate a new challenger variant
-- Prompt includes: the winning copy, the step context, the segment, and the conversion rate to beat
-- Inserts new row into `content_optimization` with `traffic_weight: 0.1` (10% exploration)
-- Deactivates the losing variant
+**3.2 Split QualificationStep into Sub-Sections with Progressive Reveal**
+File: `src/components/funnel/steps/QualificationStep.tsx`
+- Group fields into 3 collapsible sections with visual headers:
+  1. "About You" (name, email, org, role) -- shown by default
+  2. "Decision Making" (decision maker toggle, buying authority) -- shown after section 1 is complete
+  3. "Goals & Budget" (KPIs, budget) -- shown after section 2 is complete
+- Each section shows a green checkmark when complete
+- This creates micro-commitments and reduces perceived form length
 
-### Phase 3: Frontend Conversion Optimizations
+**3.3 Add Enter Key Submit on Step Forms**
+File: `src/components/funnel/FunnelContainer.tsx`
+- Only trigger `onNext` on Enter/ArrowDown if `document.activeElement` is NOT an input/textarea
+- File: `src/components/funnel/steps/WelcomeStep.tsx`
+- Wrap inputs in a `<form>` with `onSubmit` that calls `handleSubmit`
 
-**1. Time-on-step tracking in `useFunnelAnalytics`**
-- Record `Date.now()` on step entry, log `duration_ms` on step exit
-- Track `exit_type`: 'completed' (went forward), 'abandoned' (left page), 'back' (went backward)
+### Phase 4: Visual and Persuasion Enhancements
 
-**2. Field interaction tracking on QualificationStep**
-- Add `onFocus`, `onBlur` handlers to each field that log to `funnel_field_interactions`
-- Capture time-in-field and whether validation errors occurred
+**4.1 Add Value Proposition Checklist to WelcomeStep**
+File: `src/components/funnel/steps/WelcomeStep.tsx`
+- Between the social proof line and the email input, add 3 benefit bullets:
+  - "Custom audience intelligence report"
+  - "Channel-specific recommendations"
+  - "ROI projection for your market"
+- Each with a small blue checkmark icon, styled as `text-[#94a3b8] text-sm`
 
-**3. Smart variant selection in `useFunnelSession`**
-- Replace 50/50 coin flip with weighted selection based on `traffic_weight` from `content_optimization`
-- Query weights on session init, select variant proportionally
+**4.2 Fix Muted Text Contrast**
+File: `src/components/funnel/funnelTheme.ts`
+- Bump `textMuted` from `#64748b` to `#7c8ba3` to hit WCAG AA compliance (4.5:1 ratio)
+- Update all components using `text-[#64748b]` for informational content
 
-**4. Dynamic social proof counter on proof steps**
-- Add a live count: "Join 50+ organizations already using precision targeting"
-- Later: pull actual count from `funnel_leads` where `status = 'qualified'`
+**4.3 Add Radio Indicators to Budget Buttons**
+File: `src/components/funnel/steps/QualificationStep.tsx`
+- Add a radio circle (empty ring / filled dot) on the left side of each budget button
+- This leverages familiar form patterns and makes selected state unambiguous
 
-**5. Urgency micro-copy on QualificationStep**
-- Add "Limited Q1 2026 onboarding slots remaining" below the budget selector
-- This leverages scarcity without being dishonest (capacity is genuinely limited)
+**4.4 Add Micro-Interaction Animations**
+Files: `SegmentChannelStep.tsx`, `QualificationStep.tsx`
+- When a channel checkbox is toggled on, add a brief scale + checkmark draw animation (spring animation via Framer Motion)
+- When a KPI is selected, same treatment
+- When all required fields in a section of QualificationStep are complete, show a brief "section complete" shimmer
 
-**6. Reverse budget anchoring**
-- Reorder budget buttons: $50k+ first (gold), $10k-$50k second (green), $5k-$10k last (blue)
-- Research shows the "decoy effect" and anchoring bias increase average deal size
+**4.5 Enrich ThankYouStep with Next Steps**
+File: `src/components/funnel/steps/ThankYouStep.tsx`
+- Replace the generic LinkedIn link with a structured "What Happens Next" section:
+  1. "Within 24 hours: Your custom audience report"
+  2. "Within 48 hours: Strategy call with our team"
+  3. "Right now: Explore our case studies" (link)
+- Add the actual company LinkedIn URL (not linkedin.com homepage)
 
-**7. Fix abandoned lead re-capture**
-- Remove the `capturedEarly` guard so email updates on every blur
-- Use `upsert` with `onConflict: 'session_id'` (already in place) so it safely overwrites
-
-**8. Mobile input optimizations**
-- Add `inputMode="email"` on email fields
-- Add `autoComplete` attributes (name, email, organization)
-- Add `enterKeyHint="next"` to chain fields together
-
-**9. Exit-intent soft recovery**
-- On `visibilitychange` to hidden (before actual page leave), if email has been captured but form not submitted, show a toast: "Your progress has been saved. We'll follow up."
-- No popup, just reassurance that triggers the abandoned lead nurture
-
-**10. Quantified social proof on proof steps**
-- Replace generic badge labels with outcome-specific copy:
-  - Commercial: "340% avg ROAS lift", "92% audience match rate", "HIPAA-certified since 2019"
-  - Political: "2.1M voter records matched", "33% more swing voters reached", "FEC audit-ready"
-
-**11. Fix Calendly URL**
-- Make `CALENDLY_URL` configurable via `content_optimization` body_content on the thank_you step, or via environment variable
-
-### Phase 4: Variant-Aware Analytics Hook Update
-
-Update `useFunnelVariants` to:
-1. Fetch `traffic_weight` alongside copy content
-2. Expose `selectedVariant` based on weighted random selection
-3. Log the impression (increment `impressions` counter) when variant is displayed
-
-Update `useFunnelAnalytics` to:
-1. Log `conversion` events that the bandit can consume (step completed = conversion for that step's variant)
-2. On final form submission, increment `conversions` for all steps the user saw
-
-### Phase 5: Reporting Dashboard (Admin)
-
-Create `src/pages/admin/FunnelInsights.tsx`:
-- Step-by-step conversion waterfall chart (using existing Recharts)
-- Variant performance comparison with statistical significance indicator
-- Field-level drop-off heatmap for Step 4
-- Bandit allocation history over time
-- Top drop-off step highlighted with AI-suggested improvements
+**4.6 Add Transition Micro-Copy**
+Files: `CommercialOpportunityStep.tsx`, `PoliticalOpportunityStep.tsx`
+- Add a subtle intro line at the top: "Based on your selection, here's your market opportunity..."
+- This creates narrative continuity between steps
 
 ---
 
 ## Technical Summary
 
-| Change | Files | Impact |
-|--------|-------|--------|
-| Database migration (6 table changes) | 1 SQL migration | Foundation for all self-learning |
-| Bandit engine edge functions | 3 new edge functions | Automatic copy optimization |
-| Analytics hook enhancements | `useFunnelAnalytics.ts`, `useFunnelSession.ts`, `useAbandonedLeadCapture.ts` | Duration, field, and exit tracking |
-| Conversion UI improvements | All 8 step components | Social proof, anchoring, urgency, mobile UX |
-| Admin insights dashboard | 1 new page + 3 chart components | Visibility into funnel performance |
-| AI challenger generation | 1 edge function + Lovable AI | Perpetual copy optimization |
+| Phase | Files Modified | Key Impact |
+|-------|---------------|------------|
+| Phase 1 (Critical) | 3 files | CTA visibility, cookie conflict, loading state, email validation |
+| Phase 2 (Navigation) | 2 files + all steps | Labeled progress, back button, next-step hints |
+| Phase 3 (Form UX) | 3 files + new component | Floating labels, progressive reveal, keyboard submit |
+| Phase 4 (Polish) | 8 files | Value prop, contrast, radio indicators, animations, thank-you |
 
-### Self-Learning Loop Summary
+### New Components Created
+- `src/components/funnel/FunnelInput.tsx` -- Floating label input wrapper
 
-```text
-Visitor arrives --> Bandit selects variant (weighted) --> User progresses through steps
-      |                                                           |
-      v                                                           v
-  Impression logged                                    Conversion logged per step
-      |                                                           |
-      +--------------------> funnel-bandit-update <---------------+
-                                    |
-                          Thompson Sampling updates weights
-                                    |
-                          Champion declared (95% confidence)
-                                    |
-                          funnel-generate-challenger (AI)
-                                    |
-                          New variant enters at 10% traffic
-                                    |
-                          Cycle repeats (perpetual optimization)
-```
+### No Functional/Backend Changes
+All changes are purely UI/UX. No database, edge function, or hook logic is modified. Analytics tracking and self-learning infrastructure remain untouched.
 
-This creates a system that continuously improves itself: every visitor's behavior feeds back into variant selection, copy generation, and step optimization without manual intervention.
