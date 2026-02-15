@@ -10,9 +10,9 @@ interface PoliticalProofStepProps {
 }
 
 const BADGES = [
-  { icon: ShieldCheck, label: 'National Voter File', color: 'text-emerald-400' },
-  { icon: FileCheck, label: 'FEC Compliant', color: 'text-blue-400' },
-  { icon: CheckCircle, label: 'Campaign Verify', color: 'text-amber-400' },
+  { icon: ShieldCheck, label: 'National Voter File', stat: '2.1M voter records matched', color: 'text-emerald-400' },
+  { icon: FileCheck, label: 'FEC Compliant', stat: 'FEC audit-ready compliance', color: 'text-blue-400' },
+  { icon: CheckCircle, label: 'Campaign Verify', stat: '33% more swing voters reached', color: 'text-amber-400' },
 ];
 
 export default function PoliticalProofStep({ content, onNext }: PoliticalProofStepProps) {
@@ -47,7 +47,10 @@ export default function PoliticalProofStep({ content, onNext }: PoliticalProofSt
             className="flex items-center gap-4 p-4 rounded-xl bg-[#141b2d] border border-[#1e2a45]"
           >
             <badge.icon className={`w-8 h-8 ${badge.color} shrink-0`} />
-            <span className="text-[#e2e8f0] font-medium text-left">{badge.label}</span>
+            <div className="text-left">
+              <span className="text-[#e2e8f0] font-medium block">{badge.label}</span>
+              <span className="text-[#64748b] text-xs">{badge.stat}</span>
+            </div>
           </motion.div>
         ))}
       </div>

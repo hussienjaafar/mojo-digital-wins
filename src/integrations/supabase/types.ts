@@ -3131,35 +3131,44 @@ export type Database = {
       content_optimization: {
         Row: {
           body_content: Json | null
+          conversions: number
           created_at: string
           cta_text: string
           headline_text: string
           id: string
+          impressions: number
           is_active: boolean
           step_key: string
           subheadline_text: string | null
+          traffic_weight: number
           variant_label: string
         }
         Insert: {
           body_content?: Json | null
+          conversions?: number
           created_at?: string
           cta_text: string
           headline_text: string
           id?: string
+          impressions?: number
           is_active?: boolean
           step_key: string
           subheadline_text?: string | null
+          traffic_weight?: number
           variant_label: string
         }
         Update: {
           body_content?: Json | null
+          conversions?: number
           created_at?: string
           cta_text?: string
           headline_text?: string
           id?: string
+          impressions?: number
           is_active?: boolean
           step_key?: string
           subheadline_text?: string | null
+          traffic_weight?: number
           variant_label?: string
         }
         Relationships: []
@@ -5130,6 +5139,8 @@ export type Database = {
         Row: {
           action: string
           created_at: string
+          duration_ms: number | null
+          exit_type: string | null
           id: string
           metadata: Json | null
           segment: string | null
@@ -5141,6 +5152,8 @@ export type Database = {
         Insert: {
           action: string
           created_at?: string
+          duration_ms?: number | null
+          exit_type?: string | null
           id?: string
           metadata?: Json | null
           segment?: string | null
@@ -5152,6 +5165,8 @@ export type Database = {
         Update: {
           action?: string
           created_at?: string
+          duration_ms?: number | null
+          exit_type?: string | null
           id?: string
           metadata?: Json | null
           segment?: string | null
@@ -5159,6 +5174,75 @@ export type Database = {
           step_key?: string
           step_number?: number
           variant_label?: string
+        }
+        Relationships: []
+      }
+      funnel_copy_generations: {
+        Row: {
+          created_at: string
+          cta_text: string
+          generation_prompt: string | null
+          headline_text: string
+          id: string
+          parent_variant: string | null
+          status: string
+          step_key: string
+          subheadline_text: string | null
+          variant_label: string
+        }
+        Insert: {
+          created_at?: string
+          cta_text: string
+          generation_prompt?: string | null
+          headline_text: string
+          id?: string
+          parent_variant?: string | null
+          status?: string
+          step_key: string
+          subheadline_text?: string | null
+          variant_label: string
+        }
+        Update: {
+          created_at?: string
+          cta_text?: string
+          generation_prompt?: string | null
+          headline_text?: string
+          id?: string
+          parent_variant?: string | null
+          status?: string
+          step_key?: string
+          subheadline_text?: string | null
+          variant_label?: string
+        }
+        Relationships: []
+      }
+      funnel_field_interactions: {
+        Row: {
+          created_at: string
+          field_name: string
+          had_error: boolean | null
+          id: string
+          interaction_type: string
+          session_id: string
+          time_spent_ms: number | null
+        }
+        Insert: {
+          created_at?: string
+          field_name: string
+          had_error?: boolean | null
+          id?: string
+          interaction_type: string
+          session_id: string
+          time_spent_ms?: number | null
+        }
+        Update: {
+          created_at?: string
+          field_name?: string
+          had_error?: boolean | null
+          id?: string
+          interaction_type?: string
+          session_id?: string
+          time_spent_ms?: number | null
         }
         Relationships: []
       }
@@ -5278,6 +5362,96 @@ export type Database = {
           utm_content?: string | null
           utm_medium?: string | null
           utm_source?: string | null
+          variant_label?: string
+        }
+        Relationships: []
+      }
+      funnel_step_metrics: {
+        Row: {
+          avg_duration_ms: number | null
+          completions: number
+          conversion_rate: number
+          created_at: string
+          date: string
+          drop_off_count: number
+          id: string
+          segment: string | null
+          step_key: string
+          step_number: number
+          variant_label: string
+          views: number
+        }
+        Insert: {
+          avg_duration_ms?: number | null
+          completions?: number
+          conversion_rate?: number
+          created_at?: string
+          date: string
+          drop_off_count?: number
+          id?: string
+          segment?: string | null
+          step_key: string
+          step_number: number
+          variant_label: string
+          views?: number
+        }
+        Update: {
+          avg_duration_ms?: number | null
+          completions?: number
+          conversion_rate?: number
+          created_at?: string
+          date?: string
+          drop_off_count?: number
+          id?: string
+          segment?: string | null
+          step_key?: string
+          step_number?: number
+          variant_label?: string
+          views?: number
+        }
+        Relationships: []
+      }
+      funnel_variant_performance: {
+        Row: {
+          alpha: number
+          beta: number
+          conversions: number
+          created_at: string
+          id: string
+          impressions: number
+          is_active: boolean
+          is_champion: boolean
+          step_key: string
+          traffic_weight: number
+          updated_at: string
+          variant_label: string
+        }
+        Insert: {
+          alpha?: number
+          beta?: number
+          conversions?: number
+          created_at?: string
+          id?: string
+          impressions?: number
+          is_active?: boolean
+          is_champion?: boolean
+          step_key: string
+          traffic_weight?: number
+          updated_at?: string
+          variant_label: string
+        }
+        Update: {
+          alpha?: number
+          beta?: number
+          conversions?: number
+          created_at?: string
+          id?: string
+          impressions?: number
+          is_active?: boolean
+          is_champion?: boolean
+          step_key?: string
+          traffic_weight?: number
+          updated_at?: string
           variant_label?: string
         }
         Relationships: []

@@ -12,6 +12,8 @@ interface QualificationStepProps {
   prefillEmail: string;
   prefillOrg: string;
   onSubmit: (data: QualificationData) => void;
+  onFieldFocus?: (fieldName: string) => void;
+  onFieldBlur?: (fieldName: string, hadError: boolean) => void;
 }
 
 export interface QualificationData {
@@ -47,10 +49,11 @@ const POLITICAL_KPIS = [
   'Voter Registration Rate',
 ];
 
+// Reverse anchoring: highest first
 const BUDGET_OPTIONS = [
-  { value: '$5k-$10k', label: '$5k – $10k', color: 'from-blue-600 to-blue-500', ring: 'ring-blue-500/50' },
-  { value: '$10k-$50k', label: '$10k – $50k', color: 'from-emerald-600 to-emerald-500', ring: 'ring-emerald-500/50' },
   { value: '$50k+', label: '$50k+', color: 'from-amber-600 to-amber-500', ring: 'ring-amber-500/50' },
+  { value: '$10k-$50k', label: '$10k – $50k', color: 'from-emerald-600 to-emerald-500', ring: 'ring-emerald-500/50' },
+  { value: '$5k-$10k', label: '$5k – $10k', color: 'from-blue-600 to-blue-500', ring: 'ring-blue-500/50' },
 ];
 
 export default function QualificationStep({
@@ -60,6 +63,8 @@ export default function QualificationStep({
   prefillEmail,
   prefillOrg,
   onSubmit,
+  onFieldFocus,
+  onFieldBlur,
 }: QualificationStepProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState(prefillEmail);
@@ -82,6 +87,11 @@ export default function QualificationStep({
 
   const toggleKpi = (kpi: string) => {
     setKpis(prev => prev.includes(kpi) ? prev.filter(k => k !== kpi) : [...prev, kpi]);
+  };
+
+  const handleFieldBlur = (fieldName: string) => {
+    const hasError = !!errors[fieldName];
+    onFieldBlur?.(fieldName, hasError);
   };
 
   const handleSubmit = () => {
@@ -119,19 +129,60 @@ export default function QualificationStep({
 
       <div className="space-y-4">
         <div>
-          <input type="text" placeholder="Full name" value={name} onChange={e => setName(e.target.value)} className={FUNNEL_INPUT} />
+          <input
+            type="text"
+            autoComplete="name"
+            enterKeyHint="next"
+            placeholder="Full name"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onFocus={() => onFieldFocus?.('name')}
+            onBlur={() => handleFieldBlur('name')}
+            className={FUNNEL_INPUT}
+          />
           {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
         </div>
         <div>
-          <input type="email" placeholder="Work email" value={email} onChange={e => setEmail(e.target.value)} className={FUNNEL_INPUT} />
+          <input
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            enterKeyHint="next"
+            placeholder="Work email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            onFocus={() => onFieldFocus?.('email')}
+            onBlur={() => handleFieldBlur('email')}
+            className={FUNNEL_INPUT}
+          />
           {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
         </div>
         <div>
-          <input type="text" placeholder="Organization" value={organization} onChange={e => setOrganization(e.target.value)} className={FUNNEL_INPUT} />
+          <input
+            type="text"
+            autoComplete="organization"
+            enterKeyHint="next"
+            placeholder="Organization"
+            value={organization}
+            onChange={e => setOrganization(e.target.value)}
+            onFocus={() => onFieldFocus?.('organization')}
+            onBlur={() => handleFieldBlur('organization')}
+            className={FUNNEL_INPUT}
+          />
           {errors.organization && <p className="text-red-400 text-xs mt-1">{errors.organization}</p>}
         </div>
         <div>
-          <input type="text" placeholder="Your role" value={role} onChange={e => setRole(e.target.value)} className={FUNNEL_INPUT} />
+          <input
+            type="text"
+            autoComplete="organization-title"
+            enterKeyHint="next"
+            placeholder="Your role"
+            value={role}
+            onChange={e => setRole(e.target.value)}
+            onFocus={() => onFieldFocus?.('role')}
+            onBlur={() => handleFieldBlur('role')}
+            className={FUNNEL_INPUT}
+          />
           {errors.role && <p className="text-red-400 text-xs mt-1">{errors.role}</p>}
         </div>
 
@@ -151,9 +202,12 @@ export default function QualificationStep({
         <div>
           <input
             type="text"
+            enterKeyHint="next"
             placeholder="Who else is involved in decisions?"
             value={buyingAuthority}
             onChange={e => setBuyingAuthority(e.target.value)}
+            onFocus={() => onFieldFocus?.('buyingAuthority')}
+            onBlur={() => handleFieldBlur('buyingAuthority')}
             className={FUNNEL_INPUT}
           />
         </div>
@@ -183,7 +237,7 @@ export default function QualificationStep({
           ))}
         </div>
 
-        {/* Budget Selection */}
+        {/* Budget Selection — reverse anchored (highest first) */}
         <div className="space-y-2">
           <p className="text-[#94a3b8] text-sm font-medium">Budget range</p>
           <div className="space-y-3">
@@ -202,6 +256,10 @@ export default function QualificationStep({
             ))}
           </div>
           {errors.budget && <p className="text-red-400 text-xs mt-1">{errors.budget}</p>}
+          {/* Scarcity micro-copy */}
+          <p className="text-[#64748b] text-xs text-center mt-2">
+            Limited Q1 2026 onboarding slots remaining
+          </p>
         </div>
       </div>
 

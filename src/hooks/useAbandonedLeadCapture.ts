@@ -18,17 +18,18 @@ export function useAbandonedLeadCapture({
   utmSource,
   utmCampaign,
 }: AbandonedLeadParams) {
-  const capturedEarly = useRef(false);
+  const lastCapturedEmail = useRef<string>('');
 
   const captureEmail = useCallback(
     (email: string, organization?: string) => {
-      if (capturedEarly.current) return;
       const trimmed = email.trim();
       if (!EMAIL_REGEX.test(trimmed)) return;
 
-      capturedEarly.current = true;
+      // Skip if same email already captured (avoid unnecessary writes)
+      if (trimmed === lastCapturedEmail.current) return;
+      lastCapturedEmail.current = trimmed;
 
-      // Fire-and-forget upsert
+      // Fire-and-forget upsert — allows re-capture on correction
       supabase
         .from('funnel_leads')
         .upsert(
@@ -49,5 +50,5 @@ export function useAbandonedLeadCapture({
     [sessionId, variant, segment, utmSource, utmCampaign]
   );
 
-  return { captureEmail, hasCaptured: capturedEarly };
+  return { captureEmail };
 }
