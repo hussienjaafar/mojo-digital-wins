@@ -545,3 +545,7 @@ verify_jwt = false
 # --- VARIATION FEEDBACK/REGENERATION ---
 [functions.regenerate-variation]
 verify_jwt = true
+
+# --- FUNNEL LEAD ALERT ---
+[functions.funnel-lead-alert]
+verify_jwt = false
