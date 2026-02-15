@@ -252,7 +252,7 @@ export default function Experience() {
   };
 
   return (
-    <div className="fixed inset-0 bg-[#0a0f1a] text-white overflow-hidden">
+    <div className="fixed inset-0 bg-[#0a0f1a] text-white overflow-hidden portal-theme dark">
       <FunnelContainer
         currentStep={currentStep}
         direction={direction}

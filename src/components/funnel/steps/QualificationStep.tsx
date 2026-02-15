@@ -145,10 +145,10 @@ export default function QualificationStep({
       </motion.div>
 
       {/* Section 1: About You */}
-      <div className="rounded-xl border border-[#1e2a45] overflow-hidden">
+      <div className={`rounded-xl border overflow-hidden transition-colors ${activeSection === 0 ? 'border-blue-500/40' : 'border-[#1e2a45]'}`}>
         <button
           onClick={() => setActiveSection(activeSection === 0 ? -1 : 0)}
-          className="w-full flex items-center justify-between p-4 bg-[#141b2d] text-left"
+          className="w-full flex items-center justify-between p-4 bg-[#141b2d] text-left hover:bg-[#182036] transition-colors"
         >
           <div className="flex items-center gap-3">
             {section1Complete ? (
@@ -206,9 +206,9 @@ export default function QualificationStep({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     onClick={() => setActiveSection(1)}
-                    className="text-blue-400 text-sm font-medium w-full text-right"
+                    className="w-full mt-2 py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors shadow-md shadow-blue-500/20"
                   >
-                    Continue →
+                    Continue to Decision Making →
                   </motion.button>
                 )}
               </div>
@@ -218,10 +218,10 @@ export default function QualificationStep({
       </div>
 
       {/* Section 2: Decision Making */}
-      <div className={`rounded-xl border border-[#1e2a45] overflow-hidden transition-opacity ${section1Complete ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+      <div className={`rounded-xl border overflow-hidden transition-all ${section1Complete ? 'opacity-100' : 'opacity-40 pointer-events-none'} ${activeSection === 1 ? 'border-blue-500/40' : 'border-[#1e2a45]'}`}>
         <button
           onClick={() => setActiveSection(activeSection === 1 ? -1 : 1)}
-          className="w-full flex items-center justify-between p-4 bg-[#141b2d] text-left"
+          className="w-full flex items-center justify-between p-4 bg-[#141b2d] text-left hover:bg-[#182036] transition-colors"
         >
           <div className="flex items-center gap-3">
             {section2Complete && activeSection > 1 ? (
@@ -267,9 +267,9 @@ export default function QualificationStep({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   onClick={() => setActiveSection(2)}
-                  className="text-blue-400 text-sm font-medium w-full text-right"
+                  className="w-full mt-2 py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors shadow-md shadow-blue-500/20"
                 >
-                  Continue →
+                  Continue to Goals & Budget →
                 </motion.button>
               </div>
             </motion.div>
@@ -278,10 +278,10 @@ export default function QualificationStep({
       </div>
 
       {/* Section 3: Goals & Budget */}
-      <div className={`rounded-xl border border-[#1e2a45] overflow-hidden transition-opacity ${section1Complete ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+      <div className={`rounded-xl border overflow-hidden transition-all ${section1Complete ? 'opacity-100' : 'opacity-40 pointer-events-none'} ${activeSection === 2 ? 'border-blue-500/40' : 'border-[#1e2a45]'}`}>
         <button
           onClick={() => setActiveSection(activeSection === 2 ? -1 : 2)}
-          className="w-full flex items-center justify-between p-4 bg-[#141b2d] text-left"
+          className="w-full flex items-center justify-between p-4 bg-[#141b2d] text-left hover:bg-[#182036] transition-colors"
         >
           <div className="flex items-center gap-3">
             <div className="w-5 h-5 rounded-full border-2 border-[#1e2a45] flex items-center justify-center">
@@ -374,7 +374,7 @@ export default function QualificationStep({
       <V3Button
         variant="primary"
         size="xl"
-        className="w-full min-h-[48px]"
+        className="w-full min-h-[48px] !bg-blue-600 hover:!bg-blue-500 !text-white font-semibold rounded-lg shadow-lg shadow-blue-500/25"
         onClick={handleSubmit}
         isLoading={isSubmitting}
         loadingText="Submitting..."
