@@ -58,7 +58,7 @@ export default function CommercialProofStep({ content, onNext }: CommercialProof
         <V3Button variant="primary" size="xl" className="w-full min-h-[48px] !bg-blue-600 hover:!bg-blue-500 !text-white font-semibold rounded-lg shadow-lg shadow-blue-500/25" onClick={onNext}>
           {cta}
         </V3Button>
-        <p className="text-[#94a3b8] text-sm mt-3 flex items-center justify-center gap-1">Next: Qualify your strategy <span>→</span></p>
+        <p className="text-[#94a3b8] text-sm mt-3 flex items-center justify-center gap-1">Next: Build your custom plan <span>→</span></p>
       </div>
     </div>
   );

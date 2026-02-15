@@ -82,7 +82,7 @@ export default function PoliticalProofStep({ content, onNext }: PoliticalProofSt
         >
           {canProceed ? cta : `Please review disclaimer (${disclaimerSeconds}s)`}
         </V3Button>
-        {canProceed && <p className="text-[#94a3b8] text-sm mt-3 flex items-center justify-center gap-1">Next: Qualify your campaign <span>→</span></p>}
+        {canProceed && <p className="text-[#94a3b8] text-sm mt-3 flex items-center justify-center gap-1">Next: Build your custom plan <span>→</span></p>}
       </div>
     </div>
   );
