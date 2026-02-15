@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import type { VariantContent } from '@/hooks/useFunnelVariants';
 import { z } from 'zod';
+import { V3Button } from '@/components/v3';
+import { FUNNEL_INPUT } from '@/components/funnel/funnelTheme';
 
 interface QualificationStepProps {
   content?: VariantContent;
@@ -109,29 +111,27 @@ export default function QualificationStep({
     });
   };
 
-  const inputClass = "w-full h-14 px-4 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-base";
-
   return (
-    <div className="w-full max-w-lg mx-auto space-y-6 overflow-y-auto max-h-[calc(100vh-120px)] pb-20 px-1 scrollbar-thin scrollbar-thumb-white/10">
+    <div className="w-full max-w-lg mx-auto space-y-6 overflow-y-auto max-h-[calc(100vh-120px)] pb-20 px-1 scrollbar-thin scrollbar-thumb-[#1e2a45]">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-2">
-        <h2 className="text-3xl font-bold text-white">{headline}</h2>
+        <h2 className="text-3xl font-bold text-[#e2e8f0]">{headline}</h2>
       </motion.div>
 
       <div className="space-y-4">
         <div>
-          <input type="text" placeholder="Full name" value={name} onChange={e => setName(e.target.value)} className={inputClass} />
+          <input type="text" placeholder="Full name" value={name} onChange={e => setName(e.target.value)} className={FUNNEL_INPUT} />
           {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
         </div>
         <div>
-          <input type="email" placeholder="Work email" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} />
+          <input type="email" placeholder="Work email" value={email} onChange={e => setEmail(e.target.value)} className={FUNNEL_INPUT} />
           {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
         </div>
         <div>
-          <input type="text" placeholder="Organization" value={organization} onChange={e => setOrganization(e.target.value)} className={inputClass} />
+          <input type="text" placeholder="Organization" value={organization} onChange={e => setOrganization(e.target.value)} className={FUNNEL_INPUT} />
           {errors.organization && <p className="text-red-400 text-xs mt-1">{errors.organization}</p>}
         </div>
         <div>
-          <input type="text" placeholder="Your role" value={role} onChange={e => setRole(e.target.value)} className={inputClass} />
+          <input type="text" placeholder="Your role" value={role} onChange={e => setRole(e.target.value)} className={FUNNEL_INPUT} />
           {errors.role && <p className="text-red-400 text-xs mt-1">{errors.role}</p>}
         </div>
 
@@ -139,11 +139,11 @@ export default function QualificationStep({
         <button
           onClick={() => setIsDecisionMaker(!isDecisionMaker)}
           className={`w-full min-h-[48px] p-4 rounded-xl border transition-all flex items-center justify-between ${
-            isDecisionMaker ? 'border-blue-500/50 bg-blue-500/10' : 'border-white/15 bg-white/5'
+            isDecisionMaker ? 'border-blue-500/50 bg-blue-500/10' : 'border-[#1e2a45] bg-[#141b2d]'
           }`}
         >
-          <span className="text-white text-base">Are you a decision maker?</span>
-          <div className={`w-12 h-7 rounded-full transition-all relative ${isDecisionMaker ? 'bg-blue-500' : 'bg-white/20'}`}>
+          <span className="text-[#e2e8f0] text-base">Are you a decision maker?</span>
+          <div className={`w-12 h-7 rounded-full transition-all relative ${isDecisionMaker ? 'bg-blue-500' : 'bg-[#1e2a45]'}`}>
             <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${isDecisionMaker ? 'left-6' : 'left-1'}`} />
           </div>
         </button>
@@ -154,23 +154,23 @@ export default function QualificationStep({
             placeholder="Who else is involved in decisions?"
             value={buyingAuthority}
             onChange={e => setBuyingAuthority(e.target.value)}
-            className={inputClass}
+            className={FUNNEL_INPUT}
           />
         </div>
 
         {/* KPI Multi-select */}
         <div className="space-y-2">
-          <p className="text-white/70 text-sm font-medium">Primary performance KPI(s)</p>
+          <p className="text-[#94a3b8] text-sm font-medium">Primary performance KPI(s)</p>
           {kpiOptions.map(kpi => (
             <button
               key={kpi}
               onClick={() => toggleKpi(kpi)}
               className={`w-full min-h-[48px] p-3 rounded-xl border text-left transition-all flex items-center gap-3 ${
-                kpis.includes(kpi) ? 'border-blue-500/50 bg-blue-500/10 text-white' : 'border-white/15 bg-white/5 text-white/70'
+                kpis.includes(kpi) ? 'border-blue-500/50 bg-blue-500/10 text-[#e2e8f0]' : 'border-[#1e2a45] bg-[#141b2d] text-[#94a3b8]'
               }`}
             >
               <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${
-                kpis.includes(kpi) ? 'border-blue-500 bg-blue-500' : 'border-white/30'
+                kpis.includes(kpi) ? 'border-blue-500 bg-blue-500' : 'border-[#1e2a45]'
               }`}>
                 {kpis.includes(kpi) && (
                   <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -185,7 +185,7 @@ export default function QualificationStep({
 
         {/* Budget Selection */}
         <div className="space-y-2">
-          <p className="text-white/70 text-sm font-medium">Budget range</p>
+          <p className="text-[#94a3b8] text-sm font-medium">Budget range</p>
           <div className="space-y-3">
             {BUDGET_OPTIONS.map(opt => (
               <button
@@ -194,7 +194,7 @@ export default function QualificationStep({
                 className={`w-full h-16 min-h-[48px] rounded-xl font-semibold text-lg text-white transition-all active:scale-[0.98] ${
                   budget === opt.value
                     ? `bg-gradient-to-r ${opt.color} ring-2 ${opt.ring}`
-                    : 'bg-white/10 border border-white/20 hover:border-white/40'
+                    : 'bg-[#141b2d] border border-[#1e2a45] hover:border-[#2d3b55]'
                 }`}
               >
                 {opt.label}
@@ -205,12 +205,9 @@ export default function QualificationStep({
         </div>
       </div>
 
-      <button
-        onClick={handleSubmit}
-        className="w-full h-14 min-h-[48px] rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold text-lg active:scale-[0.98] transition-all"
-      >
+      <V3Button variant="primary" size="xl" className="w-full min-h-[48px]" onClick={handleSubmit}>
         {cta}
-      </button>
+      </V3Button>
     </div>
   );
 }

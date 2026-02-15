@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { VariantContent } from '@/hooks/useFunnelVariants';
 import { Building2, Vote } from 'lucide-react';
+import { V3Button } from '@/components/v3';
 
 interface SegmentChannelStepProps {
   content?: VariantContent;
@@ -54,8 +55,8 @@ export default function SegmentChannelStep({
   return (
     <div className="w-full max-w-lg mx-auto text-center space-y-8 pb-8">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-        <h2 className="text-3xl font-bold text-white">{headline}</h2>
-        <p className="text-white/60 text-lg">{subheadline}</p>
+        <h2 className="text-3xl font-bold text-[#e2e8f0]">{headline}</h2>
+        <p className="text-[#94a3b8] text-lg">{subheadline}</p>
       </motion.div>
 
       {/* Segment Cards */}
@@ -64,14 +65,14 @@ export default function SegmentChannelStep({
           onClick={() => handleSegment('commercial')}
           className={`w-full min-h-[72px] p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left ${
             localSegment === 'commercial'
-              ? 'border-blue-500 bg-blue-500/10'
-              : 'border-white/20 bg-white/5 hover:border-white/40'
+              ? 'border-blue-500/50 bg-blue-500/10'
+              : 'border-[#1e2a45] bg-[#141b2d] hover:border-[#2d3b55]'
           }`}
         >
           <Building2 className="w-8 h-8 text-blue-400 shrink-0" />
           <div>
-            <p className="text-white font-semibold text-lg">Commercial Brand / Retailer</p>
-            <p className="text-white/50 text-sm">CPG, Healthcare, Finance, Retail</p>
+            <p className="text-[#e2e8f0] font-semibold text-lg">Commercial Brand / Retailer</p>
+            <p className="text-[#64748b] text-sm">CPG, Healthcare, Finance, Retail</p>
           </div>
         </button>
 
@@ -79,14 +80,14 @@ export default function SegmentChannelStep({
           onClick={() => handleSegment('political')}
           className={`w-full min-h-[72px] p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left ${
             localSegment === 'political'
-              ? 'border-emerald-500 bg-emerald-500/10'
-              : 'border-white/20 bg-white/5 hover:border-white/40'
+              ? 'border-emerald-500/50 bg-emerald-500/10'
+              : 'border-[#1e2a45] bg-[#141b2d] hover:border-[#2d3b55]'
           }`}
         >
           <Vote className="w-8 h-8 text-emerald-400 shrink-0" />
           <div>
-            <p className="text-white font-semibold text-lg">Political Campaign / Non-Profit</p>
-            <p className="text-white/50 text-sm">Campaigns, PACs, Advocacy, 501(c)</p>
+            <p className="text-[#e2e8f0] font-semibold text-lg">Political Campaign / Non-Profit</p>
+            <p className="text-[#64748b] text-sm">Campaigns, PACs, Advocacy, 501(c)</p>
           </div>
         </button>
       </div>
@@ -100,7 +101,7 @@ export default function SegmentChannelStep({
             exit={{ opacity: 0, height: 0 }}
             className="space-y-3 overflow-hidden"
           >
-            <p className="text-white/80 font-medium text-left">
+            <p className="text-[#94a3b8] font-medium text-left">
               Which pillars are in your 2026 work plan?
             </p>
             {channels.map(ch => (
@@ -109,13 +110,13 @@ export default function SegmentChannelStep({
                 onClick={() => toggleChannel(ch.id)}
                 className={`w-full min-h-[48px] p-4 rounded-xl border transition-all flex items-center gap-3 text-left ${
                   selectedChannels.includes(ch.id)
-                    ? 'border-blue-500/50 bg-blue-500/10 text-white'
-                    : 'border-white/15 bg-white/5 text-white/70 hover:border-white/30'
+                    ? 'border-blue-500/50 bg-blue-500/10 text-[#e2e8f0]'
+                    : 'border-[#1e2a45] bg-[#141b2d] text-[#94a3b8] hover:border-[#2d3b55]'
                 }`}
               >
                 <div
                   className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
-                    selectedChannels.includes(ch.id) ? 'border-blue-500 bg-blue-500' : 'border-white/30'
+                    selectedChannels.includes(ch.id) ? 'border-blue-500 bg-blue-500' : 'border-[#1e2a45]'
                   }`}
                 >
                   {selectedChannels.includes(ch.id) && (
@@ -133,12 +134,14 @@ export default function SegmentChannelStep({
 
       {localSegment && selectedChannels.length > 0 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <button
+          <V3Button
+            variant="primary"
+            size="xl"
+            className="w-full min-h-[48px]"
             onClick={onNext}
-            className="w-full h-14 min-h-[48px] rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold text-lg active:scale-[0.98] transition-all"
           >
             {cta}
-          </button>
+          </V3Button>
         </motion.div>
       )}
     </div>

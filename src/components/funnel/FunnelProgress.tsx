@@ -11,10 +11,10 @@ export default function FunnelProgress({ currentStep, totalSteps }: FunnelProgre
           key={i}
           className={`w-2 h-2 rounded-full transition-all duration-300 ${
             i === currentStep
-              ? 'bg-white scale-125'
+              ? 'bg-blue-500 scale-125 shadow-[0_0_8px_rgba(59,130,246,0.5)]'
               : i < currentStep
-              ? 'bg-white/60'
-              : 'bg-white/20'
+              ? 'bg-[#94a3b8]'
+              : 'bg-[#1e2a45]'
           }`}
         />
       ))}

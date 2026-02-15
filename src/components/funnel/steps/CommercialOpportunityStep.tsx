@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import type { VariantContent } from '@/hooks/useFunnelVariants';
 import { Tv, Mail, MapPin } from 'lucide-react';
+import { V3Button } from '@/components/v3';
 
 interface CommercialOpportunityStepProps {
   content?: VariantContent;
@@ -20,11 +21,10 @@ export default function CommercialOpportunityStep({ content, onNext }: Commercia
   return (
     <div className="w-full max-w-lg mx-auto text-center space-y-8">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-        <h2 className="text-3xl font-bold text-white">{headline}</h2>
-        <p className="text-white/60 text-lg">{subheadline}</p>
+        <h2 className="text-3xl font-bold text-[#e2e8f0]">{headline}</h2>
+        <p className="text-[#94a3b8] text-lg">{subheadline}</p>
       </motion.div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-3 gap-4">
         {stats.map((stat: any, i: number) => (
           <motion.div
@@ -32,44 +32,40 @@ export default function CommercialOpportunityStep({ content, onNext }: Commercia
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2 + i * 0.1 }}
-            className="p-4 rounded-2xl bg-white/5 border border-white/10"
+            className="p-4 rounded-xl bg-[#141b2d] border border-[#1e2a45]"
           >
             <p className="text-2xl font-bold text-blue-400">{stat.value}</p>
-            <p className="text-white/50 text-xs mt-1">{stat.label}</p>
+            <p className="text-[#94a3b8] text-xs mt-1">{stat.label}</p>
           </motion.div>
         ))}
       </div>
 
-      {/* Omnichannel Coverage */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
         className="space-y-3"
       >
-        <p className="text-white/40 text-sm uppercase tracking-widest">Total Coverage</p>
+        <p className="text-[#64748b] text-sm uppercase tracking-widest">Total Coverage</p>
         <div className="flex justify-center gap-8">
           <div className="text-center">
             <Tv className="w-8 h-8 text-blue-400 mx-auto mb-1" />
-            <p className="text-white/60 text-xs">TV Screen</p>
+            <p className="text-[#94a3b8] text-xs">TV Screen</p>
           </div>
           <div className="text-center">
             <Mail className="w-8 h-8 text-emerald-400 mx-auto mb-1" />
-            <p className="text-white/60 text-xs">Mailbox</p>
+            <p className="text-[#94a3b8] text-xs">Mailbox</p>
           </div>
           <div className="text-center">
             <MapPin className="w-8 h-8 text-amber-400 mx-auto mb-1" />
-            <p className="text-white/60 text-xs">Commute</p>
+            <p className="text-[#94a3b8] text-xs">Commute</p>
           </div>
         </div>
       </motion.div>
 
-      <button
-        onClick={onNext}
-        className="w-full h-14 min-h-[48px] rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold text-lg active:scale-[0.98] transition-all"
-      >
+      <V3Button variant="primary" size="xl" className="w-full min-h-[48px]" onClick={onNext}>
         {cta}
-      </button>
+      </V3Button>
     </div>
   );
 }
