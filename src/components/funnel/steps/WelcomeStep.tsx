@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import type { VariantContent } from '@/hooks/useFunnelVariants';
 import { V3Button } from '@/components/v3';
-import { FUNNEL_INPUT } from '@/components/funnel/funnelTheme';
+import FunnelInput from '@/components/funnel/FunnelInput';
+import { Check } from 'lucide-react';
 
 interface WelcomeStepProps {
   content?: VariantContent;
@@ -10,47 +11,50 @@ interface WelcomeStepProps {
   onEmailBlur: (email: string, organization: string) => void;
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function WelcomeStep({ content, onNext, onEmailBlur }: WelcomeStepProps) {
   const [email, setEmail] = useState('');
   const [organization, setOrganization] = useState('');
-  const emailRef = useRef<HTMLInputElement>(null);
+  const [emailError, setEmailError] = useState('');
+  const [emailTouched, setEmailTouched] = useState(false);
 
   const headline = content?.headline || '$170.8 Billion. One Platform.';
   const subheadline = content?.subheadline || 'Reach the fastest-growing consumer market in America.';
   const cta = content?.cta || 'Get Started';
 
-  const handleSubmit = () => {
-    if (email.trim()) {
+  const validateEmail = useCallback((val: string) => {
+    if (!val.trim()) return '';
+    return EMAIL_REGEX.test(val.trim()) ? '' : 'Enter a valid work email';
+  }, []);
+
+  const handleEmailBlur = () => {
+    setEmailTouched(true);
+    const err = validateEmail(email);
+    setEmailError(err);
+    if (!err && email.trim()) {
+      onEmailBlur(email, organization);
+    }
+  };
+
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const err = validateEmail(email);
+    setEmailError(err);
+    setEmailTouched(true);
+    if (!err && email.trim()) {
       onNext(email.trim(), organization.trim());
     }
   };
 
-  return (
-    <div className="w-full max-w-lg mx-auto text-center space-y-8">
-      {/* Video hero placeholder */}
-      <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-[#141b2d] border border-[#1e2a45]">
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="w-full h-full object-cover"
-          poster=""
-        >
-          {/* Add video source when available */}
-        </video>
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0f1a] via-transparent to-transparent" />
-        <div className="absolute bottom-4 left-4 right-4">
-          <p className="text-[#e2e8f0] text-sm font-medium bg-[#141b2d]/90 border border-[#1e2a45] px-3 py-1 rounded inline-block">
-            Precision Audience Intelligence
-          </p>
-        </div>
-      </div>
+  const isValid = email.trim() && !validateEmail(email);
 
+  return (
+    <div className="w-full max-w-lg mx-auto text-center space-y-5">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
+        transition={{ delay: 0.1 }}
         className="space-y-3"
       >
         <h1 className="text-3xl md:text-4xl font-bold text-[#e2e8f0] tracking-tight">
@@ -63,8 +67,8 @@ export default function WelcomeStep({ content, onNext, onEmailBlur }: WelcomeSte
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="flex items-center justify-center gap-2 text-[#64748b] text-sm"
+        transition={{ delay: 0.2 }}
+        className="flex items-center justify-center gap-2 text-[#7c8ba3] text-sm"
       >
         <span className="inline-flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -72,43 +76,63 @@ export default function WelcomeStep({ content, onNext, onEmailBlur }: WelcomeSte
         </span>
       </motion.div>
 
+      {/* Value proposition checklist */}
       <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+        className="flex flex-col items-start gap-2 max-w-xs mx-auto"
+      >
+        {[
+          'Custom audience intelligence report',
+          'Channel-specific recommendations',
+          'ROI projection for your market',
+        ].map((item) => (
+          <div key={item} className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-blue-400 shrink-0" />
+            <span className="text-[#94a3b8] text-sm text-left">{item}</span>
+          </div>
+        ))}
+      </motion.div>
+
+      <motion.form
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="space-y-4"
+        transition={{ delay: 0.3 }}
+        className="space-y-3"
+        onSubmit={handleSubmit}
       >
-        <input
-          ref={emailRef}
+        <FunnelInput
           type="email"
           inputMode="email"
           autoComplete="email"
           enterKeyHint="next"
-          placeholder="Work email"
+          label="Work email"
           value={email}
           onChange={e => setEmail(e.target.value)}
-          onBlur={() => onEmailBlur(email, organization)}
-          className={FUNNEL_INPUT}
+          onBlur={handleEmailBlur}
+          error={emailTouched ? emailError : undefined}
+          showValid={emailTouched && !emailError && !!email.trim()}
         />
-        <input
+        <FunnelInput
           type="text"
           autoComplete="organization"
           enterKeyHint="done"
-          placeholder="Organization name"
+          label="Organization name"
           value={organization}
           onChange={e => setOrganization(e.target.value)}
-          className={FUNNEL_INPUT}
         />
         <V3Button
+          type="submit"
           variant="primary"
           size="xl"
           className="w-full min-h-[48px]"
-          onClick={handleSubmit}
-          disabled={!email.trim()}
+          disabled={!isValid}
         >
           {cta}
         </V3Button>
-      </motion.div>
+        <p className="text-[#7c8ba3] text-xs">Next: Choose your path</p>
+      </motion.form>
     </div>
   );
 }

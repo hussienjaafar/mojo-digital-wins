@@ -20,6 +20,15 @@ export default function CommercialOpportunityStep({ content, onNext }: Commercia
 
   return (
     <div className="w-full max-w-lg mx-auto text-center space-y-8">
+      {/* Transition micro-copy */}
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="text-[#7c8ba3] text-sm"
+      >
+        Based on your selection, here's your market opportunity...
+      </motion.p>
+
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
         <h2 className="text-3xl font-bold text-[#e2e8f0]">{headline}</h2>
         <p className="text-[#94a3b8] text-lg">{subheadline}</p>
@@ -46,7 +55,7 @@ export default function CommercialOpportunityStep({ content, onNext }: Commercia
         transition={{ delay: 0.5 }}
         className="space-y-3"
       >
-        <p className="text-[#64748b] text-sm uppercase tracking-widest">Total Coverage</p>
+        <p className="text-[#7c8ba3] text-sm uppercase tracking-widest">Total Coverage</p>
         <div className="flex justify-center gap-8">
           <div className="text-center">
             <Tv className="w-8 h-8 text-blue-400 mx-auto mb-1" />
@@ -63,9 +72,12 @@ export default function CommercialOpportunityStep({ content, onNext }: Commercia
         </div>
       </motion.div>
 
-      <V3Button variant="primary" size="xl" className="w-full min-h-[48px]" onClick={onNext}>
-        {cta}
-      </V3Button>
+      <div>
+        <V3Button variant="primary" size="xl" className="w-full min-h-[48px]" onClick={onNext}>
+          {cta}
+        </V3Button>
+        <p className="text-[#7c8ba3] text-xs mt-2">Next: See the proof</p>
+      </div>
     </div>
   );
 }
