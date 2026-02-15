@@ -9,9 +9,9 @@ interface CommercialProofStepProps {
 }
 
 const BADGES = [
-  { icon: ShieldCheck, label: 'HIPAA-Compliant Data', color: 'text-blue-400' },
-  { icon: Store, label: 'Retail Media Network', color: 'text-emerald-400' },
-  { icon: Tv, label: 'Cultural CTV Precision', color: 'text-amber-400' },
+  { icon: ShieldCheck, label: 'HIPAA-Compliant Data', stat: '92% audience match rate', color: 'text-blue-400' },
+  { icon: Store, label: 'Retail Media Network', stat: '340% avg ROAS lift', color: 'text-emerald-400' },
+  { icon: Tv, label: 'Cultural CTV Precision', stat: 'HIPAA-certified since 2019', color: 'text-amber-400' },
 ];
 
 export default function CommercialProofStep({ content, onNext }: CommercialProofStepProps) {
@@ -36,7 +36,10 @@ export default function CommercialProofStep({ content, onNext }: CommercialProof
             className="flex items-center gap-4 p-4 rounded-xl bg-[#141b2d] border border-[#1e2a45]"
           >
             <badge.icon className={`w-8 h-8 ${badge.color} shrink-0`} />
-            <span className="text-[#e2e8f0] font-medium text-left">{badge.label}</span>
+            <div className="text-left">
+              <span className="text-[#e2e8f0] font-medium block">{badge.label}</span>
+              <span className="text-[#64748b] text-xs">{badge.stat}</span>
+            </div>
           </motion.div>
         ))}
       </div>

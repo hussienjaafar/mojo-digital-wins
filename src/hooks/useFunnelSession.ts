@@ -23,12 +23,42 @@ export interface FunnelSessionData {
   utmParams: Record<string, string | null>;
 }
 
+async function selectWeightedVariant(searchParams: URLSearchParams): Promise<string> {
+  // Allow forced variant via URL
+  const v = searchParams.get('variant');
+  if (v === 'A' || v === 'B') return v;
+
+  try {
+    // Fetch traffic weights from bandit state
+    const { data: weights } = await supabase
+      .from('funnel_variant_performance')
+      .select('variant_label, traffic_weight')
+      .eq('step_key', 'welcome')
+      .eq('is_active', true);
+
+    if (weights && weights.length >= 2) {
+      const totalWeight = weights.reduce((sum, w) => sum + Number(w.traffic_weight), 0);
+      const roll = Math.random() * totalWeight;
+      let cumulative = 0;
+      for (const w of weights) {
+        cumulative += Number(w.traffic_weight);
+        if (roll <= cumulative) return w.variant_label;
+      }
+      return weights[0].variant_label;
+    }
+  } catch {
+    // Fall through to random
+  }
+
+  return Math.random() < 0.5 ? 'A' : 'B';
+}
+
 export function useFunnelSession(): FunnelSessionData {
   const [searchParams] = useSearchParams();
   const initialized = useRef(false);
 
   const [sessionId] = useState(() => crypto.randomUUID());
-  const [variant] = useState<string>(() => {
+  const [variant, setVariant] = useState<string>(() => {
     const v = searchParams.get('variant');
     return v === 'A' || v === 'B' ? v : Math.random() < 0.5 ? 'A' : 'B';
   });
@@ -47,9 +77,13 @@ export function useFunnelSession(): FunnelSessionData {
     if (initialized.current) return;
     initialized.current = true;
 
+    // Async weighted variant selection
+    selectWeightedVariant(searchParams).then(v => {
+      if (v !== variant) setVariant(v);
+    });
+
     const fbPixelId = getCookie('_fbp') || null;
 
-    // Fire-and-forget session insert
     supabase.from('funnel_sessions').insert({
       session_id: sessionId,
       variant_label: variant,
@@ -83,7 +117,6 @@ export function useFunnelSession(): FunnelSessionData {
     }
   }, []);
 
-  // Update session when segment/channels change
   const updateSegment = useCallback((s: string) => {
     setSegment(s);
     supabase.from('funnel_sessions')

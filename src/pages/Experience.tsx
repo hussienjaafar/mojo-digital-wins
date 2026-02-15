@@ -1,4 +1,4 @@
-import { useState, useCallback, startTransition } from 'react';
+import { useState, useCallback, startTransition, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import FunnelContainer from '@/components/funnel/FunnelContainer';
 import FunnelProgress from '@/components/funnel/FunnelProgress';
@@ -14,8 +14,10 @@ import { useFunnelSession } from '@/hooks/useFunnelSession';
 import { useAbandonedLeadCapture } from '@/hooks/useAbandonedLeadCapture';
 import { useFunnelAnalytics } from '@/hooks/useFunnelAnalytics';
 import { useFunnelVariants } from '@/hooks/useFunnelVariants';
+import { useFieldTracking } from '@/hooks/useFieldTracking';
 import { supabase } from '@/integrations/supabase/client';
 import { trackCustomEvent } from '@/components/MetaPixel';
+import { toast } from '@/hooks/use-toast';
 
 const TOTAL_STEPS = 6;
 
@@ -33,6 +35,7 @@ export default function Experience() {
     variant: session.variant,
     segment: session.segment,
   });
+  const fieldTracking = useFieldTracking({ sessionId: session.sessionId });
   const { data: variants } = useFunnelVariants(session.variant);
 
   const [currentStep, setCurrentStep] = useState(0);
@@ -41,6 +44,7 @@ export default function Experience() {
   const [prefillOrg, setPrefillOrg] = useState('');
   const [redirectToCalendar, setRedirectToCalendar] = useState(false);
   const [leadScore, setLeadScore] = useState(0);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
 
   const goTo = useCallback((step: number) => {
     startTransition(() => {
@@ -64,7 +68,7 @@ export default function Experience() {
     });
   }, [currentStep]);
 
-  // Track step views
+  // Track step views and impressions
   const getStepKey = (step: number): string => {
     if (step === 0) return 'welcome';
     if (step === 1) return 'segment_select';
@@ -74,12 +78,36 @@ export default function Experience() {
     return 'thank_you';
   };
 
+  // Track conversions when step changes (previous step was completed)
+  useEffect(() => {
+    if (currentStep > 0) {
+      const prevStepKey = getStepKey(currentStep - 1);
+      analytics.trackConversion(prevStepKey, currentStep - 1);
+    }
+    const stepKey = getStepKey(currentStep);
+    analytics.trackImpression(stepKey);
+    analytics.trackStepView(stepKey, currentStep);
+  }, [currentStep]);
+
+  // Exit-intent soft recovery
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && prefillEmail && !hasSubmitted && currentStep > 0) {
+        toast({
+          title: "Progress saved",
+          description: "Your progress has been saved. We'll follow up shortly.",
+        });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [prefillEmail, hasSubmitted, currentStep]);
+
   // Step 0 handlers
   const handleWelcomeNext = (email: string, org: string) => {
     setPrefillEmail(email);
     setPrefillOrg(org);
     captureEmail(email, org);
-    analytics.trackStepView('welcome', 0);
     goNext();
   };
 
@@ -99,6 +127,7 @@ export default function Experience() {
 
   // Step 4 handler
   const handleQualificationSubmit = async (data: QualificationData) => {
+    setHasSubmitted(true);
     analytics.trackLeadSubmitted(data.budgetRange);
 
     // Upsert lead
@@ -205,6 +234,8 @@ export default function Experience() {
             prefillEmail={prefillEmail}
             prefillOrg={prefillOrg}
             onSubmit={handleQualificationSubmit}
+            onFieldFocus={fieldTracking.trackFieldFocus}
+            onFieldBlur={fieldTracking.trackFieldBlur}
           />
         );
       case 5:

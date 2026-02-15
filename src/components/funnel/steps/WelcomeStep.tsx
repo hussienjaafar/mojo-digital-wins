@@ -59,6 +59,19 @@ export default function WelcomeStep({ content, onNext, onEmailBlur }: WelcomeSte
         <p className="text-[#94a3b8] text-lg">{subheadline}</p>
       </motion.div>
 
+      {/* Social proof counter */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className="flex items-center justify-center gap-2 text-[#64748b] text-sm"
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>50+ organizations already onboarded</span>
+        </span>
+      </motion.div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -68,6 +81,9 @@ export default function WelcomeStep({ content, onNext, onEmailBlur }: WelcomeSte
         <input
           ref={emailRef}
           type="email"
+          inputMode="email"
+          autoComplete="email"
+          enterKeyHint="next"
           placeholder="Work email"
           value={email}
           onChange={e => setEmail(e.target.value)}
@@ -76,6 +92,8 @@ export default function WelcomeStep({ content, onNext, onEmailBlur }: WelcomeSte
         />
         <input
           type="text"
+          autoComplete="organization"
+          enterKeyHint="done"
           placeholder="Organization name"
           value={organization}
           onChange={e => setOrganization(e.target.value)}

@@ -549,3 +549,13 @@ verify_jwt = true
 # --- FUNNEL LEAD ALERT ---
 [functions.funnel-lead-alert]
 verify_jwt = false
+
+# --- FUNNEL SELF-LEARNING ENGINE ---
+[functions.funnel-compute-metrics]
+verify_jwt = false
+
+[functions.funnel-bandit-update]
+verify_jwt = false
+
+[functions.funnel-generate-challenger]
+verify_jwt = false
