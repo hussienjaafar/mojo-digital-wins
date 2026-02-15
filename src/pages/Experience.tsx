@@ -215,9 +215,9 @@ export default function Experience() {
         );
       case 2:
         return session.segment === 'commercial' ? (
-          <CommercialOpportunityStep content={variants?.commercial_opportunity} onNext={goNext} />
+          <CommercialOpportunityStep content={variants?.commercial_opportunity} selectedChannels={session.selectedChannels} onNext={goNext} />
         ) : (
-          <PoliticalOpportunityStep content={variants?.political_opportunity} onNext={goNext} />
+          <PoliticalOpportunityStep content={variants?.political_opportunity} selectedChannels={session.selectedChannels} onNext={goNext} />
         );
       case 3:
         return session.segment === 'commercial' ? (
@@ -258,6 +258,7 @@ export default function Experience() {
         direction={direction}
         onNext={currentStep < TOTAL_STEPS - 1 ? goNext : undefined}
         onBack={currentStep > 0 ? goBack : undefined}
+        disableGestures={currentStep === 4}
       >
         {renderStep()}
       </FunnelContainer>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import type { VariantContent } from '@/hooks/useFunnelVariants';
 import { CalendarClock, FileText, Phone, BookOpen } from 'lucide-react';
@@ -9,7 +9,8 @@ interface ThankYouStepProps {
   leadScore: number;
 }
 
-const CALENDLY_URL = 'https://calendly.com'; // Replace with actual Calendly URL
+// TODO: Replace with actual Calendly booking page URL
+const CALENDLY_URL = 'https://calendly.com';
 
 export default function ThankYouStep({ content, redirectToCalendar, leadScore }: ThankYouStepProps) {
   const headline = redirectToCalendar
@@ -30,7 +31,7 @@ export default function ThankYouStep({ content, redirectToCalendar, leadScore }:
   const NEXT_STEPS = [
     { icon: FileText, time: 'Within 24 hours', label: 'Your custom audience report', color: 'text-blue-400' },
     { icon: Phone, time: 'Within 48 hours', label: 'Strategy call with our team', color: 'text-emerald-400' },
-    { icon: BookOpen, time: 'Right now', label: 'Explore our case studies', color: 'text-amber-400', href: '#' },
+    { icon: BookOpen, time: 'Coming soon', label: 'Explore our case studies', color: 'text-amber-400' },
   ];
 
   return (
@@ -77,15 +78,7 @@ export default function ThankYouStep({ content, redirectToCalendar, leadScore }:
                 <step.icon className={`w-6 h-6 ${step.color} shrink-0`} />
                 <div className="flex-1">
                   <p className="text-[#7c8ba3] text-xs">{step.time}</p>
-                  <p className="text-[#e2e8f0] text-sm font-medium">
-                    {step.href ? (
-                      <a href={step.href} className="hover:text-blue-400 transition-colors underline underline-offset-2">
-                        {step.label} →
-                      </a>
-                    ) : (
-                      step.label
-                    )}
-                  </p>
+                  <p className="text-[#e2e8f0] text-sm font-medium">{step.label}</p>
                 </div>
               </motion.div>
             ))}

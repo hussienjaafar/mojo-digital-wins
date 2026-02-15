@@ -1,14 +1,22 @@
 import { motion } from 'framer-motion';
 import type { VariantContent } from '@/hooks/useFunnelVariants';
-import { Tv, Mail, MapPin } from 'lucide-react';
+import { Tv, Mail, MapPin, Monitor, Smartphone } from 'lucide-react';
 import { V3Button } from '@/components/v3';
 
 interface CommercialOpportunityStepProps {
   content?: VariantContent;
+  selectedChannels: string[];
   onNext: () => void;
 }
 
-export default function CommercialOpportunityStep({ content, onNext }: CommercialOpportunityStepProps) {
+const CHANNEL_ICONS = [
+  { id: 'ctv', icon: Tv, label: 'Streaming', color: 'text-blue-400' },
+  { id: 'digital', icon: Monitor, label: 'Digital', color: 'text-purple-400' },
+  { id: 'direct_mail', icon: Mail, label: 'Mailbox', color: 'text-emerald-400' },
+  { id: 'ooh', icon: MapPin, label: 'Outdoor', color: 'text-amber-400' },
+];
+
+export default function CommercialOpportunityStep({ content, selectedChannels, onNext }: CommercialOpportunityStepProps) {
   const headline = content?.headline || 'Generation M Meets Total Market Saturation';
   const subheadline = content?.subheadline || '26% are aged 18–24. 92% say cultural relevance drives purchase decisions.';
   const cta = content?.cta || 'See the Proof';
@@ -20,13 +28,12 @@ export default function CommercialOpportunityStep({ content, onNext }: Commercia
 
   return (
     <div className="w-full max-w-lg mx-auto text-center space-y-8">
-      {/* Transition micro-copy */}
       <motion.p
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         className="text-[#7c8ba3] text-sm"
       >
-        Based on your selection, here's your market opportunity...
+        Great choice. Here's your commercial market opportunity...
       </motion.p>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
@@ -55,20 +62,17 @@ export default function CommercialOpportunityStep({ content, onNext }: Commercia
         transition={{ delay: 0.5 }}
         className="space-y-3"
       >
-        <p className="text-[#7c8ba3] text-sm uppercase tracking-widest">Total Coverage</p>
+        <p className="text-[#7c8ba3] text-sm uppercase tracking-widest">Your Coverage</p>
         <div className="flex justify-center gap-8">
-          <div className="text-center">
-            <Tv className="w-8 h-8 text-blue-400 mx-auto mb-1" />
-            <p className="text-[#94a3b8] text-xs">TV Screen</p>
-          </div>
-          <div className="text-center">
-            <Mail className="w-8 h-8 text-emerald-400 mx-auto mb-1" />
-            <p className="text-[#94a3b8] text-xs">Mailbox</p>
-          </div>
-          <div className="text-center">
-            <MapPin className="w-8 h-8 text-amber-400 mx-auto mb-1" />
-            <p className="text-[#94a3b8] text-xs">Commute</p>
-          </div>
+          {CHANNEL_ICONS.map(ch => {
+            const isSelected = selectedChannels.includes(ch.id);
+            return (
+              <div key={ch.id} className={`text-center transition-opacity ${isSelected ? 'opacity-100' : 'opacity-25'}`}>
+                <ch.icon className={`w-8 h-8 ${ch.color} mx-auto mb-1`} />
+                <p className="text-[#94a3b8] text-xs">{ch.label}</p>
+              </div>
+            );
+          })}
         </div>
       </motion.div>
 

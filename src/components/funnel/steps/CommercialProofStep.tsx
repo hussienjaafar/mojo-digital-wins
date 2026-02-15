@@ -11,7 +11,7 @@ interface CommercialProofStepProps {
 const BADGES = [
   { icon: ShieldCheck, label: 'HIPAA-Compliant Data', stat: '92% audience match rate', color: 'text-blue-400' },
   { icon: Store, label: 'Retail Media Network', stat: '340% avg ROAS lift', color: 'text-emerald-400' },
-  { icon: Tv, label: 'Cultural CTV Precision', stat: 'HIPAA-certified since 2019', color: 'text-amber-400' },
+  { icon: Tv, label: 'Cultural CTV Precision', stat: '3x engagement vs. linear TV', color: 'text-amber-400' },
 ];
 
 export default function CommercialProofStep({ content, onNext }: CommercialProofStepProps) {
