@@ -37,17 +37,19 @@ const schema = z.object({
 });
 
 const COMMERCIAL_KPIS = [
-  'ROAS',
+  'ROAS (Return on Ad Spend)',
   'Cost Per Acquisition',
-  'Cost Per Verified Patient',
-  'Brand Lift',
+  'Brand Awareness / Lift',
+  'Website Traffic / Conversions',
+  'Audience Reach & Frequency',
 ];
 
 const POLITICAL_KPIS = [
-  'Voter Persuasion Lift',
-  'Donor Lifetime Value',
-  'Cost Per Acquisition',
-  'Voter Registration Rate',
+  'Voter Awareness / Persuasion',
+  'Donor Acquisition Cost',
+  'Fundraising ROI',
+  'Volunteer / Supporter Sign-ups',
+  'Audience Reach & Frequency',
 ];
 
 const BUDGET_OPTIONS = [
@@ -81,6 +83,7 @@ export default function QualificationStep({
   const [isDecisionMaker, setIsDecisionMaker] = useState(false);
   const [buyingAuthority, setBuyingAuthority] = useState('');
   const [kpis, setKpis] = useState<string[]>([]);
+  const [customKpi, setCustomKpi] = useState('');
   const [budget, setBudget] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -158,7 +161,9 @@ export default function QualificationStep({
         role: role.trim(),
         isDecisionMaker,
         buyingAuthorityInfo: buyingAuthority.trim(),
-        performanceKpis: kpis,
+        performanceKpis: kpis.includes('Other') && customKpi.trim()
+          ? [...kpis.filter(k => k !== 'Other'), `Other: ${customKpi.trim()}`]
+          : kpis.filter(k => k !== 'Other'),
         budgetRange: budget,
       });
     } finally {
@@ -169,7 +174,7 @@ export default function QualificationStep({
   const channelLabels = selectedChannels.map(id => CHANNEL_LABELS[id] || id).join(', ');
 
   return (
-    <div className="w-full max-w-lg mx-auto space-y-5 overflow-y-auto max-h-[calc(100vh-120px)] pb-20 px-1 scrollbar-thin scrollbar-thumb-[#1e2a45]">
+    <div className="w-full max-w-lg mx-auto space-y-5 overflow-y-auto max-h-[calc(100vh-120px)] pb-20 px-4 scrollbar-thin scrollbar-thumb-[#1e2a45]">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-2">
         <h2 className="text-3xl font-bold text-[#e2e8f0]">{headline}</h2>
       </motion.div>
@@ -344,12 +349,12 @@ export default function QualificationStep({
                 {/* KPI Multi-select */}
                 <div className="space-y-2">
                   <p className="text-[#94a3b8] text-sm font-medium">Primary performance KPI(s)</p>
-                  {kpiOptions.map(kpi => (
+                {kpiOptions.map(kpi => (
                     <motion.button
                       key={kpi}
                       onClick={() => toggleKpi(kpi)}
                       whileTap={{ scale: 0.98 }}
-                      className={`w-full min-h-[48px] p-3 rounded-xl border text-left transition-all flex items-center gap-3 ${
+                      className={`w-full min-h-[48px] p-3 pl-4 rounded-xl border text-left transition-all flex items-center gap-3 ${
                         kpis.includes(kpi) ? `${accentBorder} ${accentBg} text-[#e2e8f0]` : 'border-[#1e2a45] bg-[#141b2d] text-[#94a3b8]'
                       }`}
                     >
@@ -369,6 +374,40 @@ export default function QualificationStep({
                       <span className="text-sm">{kpi}</span>
                     </motion.button>
                   ))}
+                  {/* Other KPI option */}
+                  <motion.button
+                    onClick={() => toggleKpi('Other')}
+                    whileTap={{ scale: 0.98 }}
+                    className={`w-full min-h-[48px] p-3 pl-4 rounded-xl border text-left transition-all flex items-center gap-3 ${
+                      kpis.includes('Other') ? `${accentBorder} ${accentBg} text-[#e2e8f0]` : 'border-[#1e2a45] bg-[#141b2d] text-[#94a3b8]'
+                    }`}
+                  >
+                    <motion.div
+                      animate={kpis.includes('Other') ? { scale: [1, 1.2, 1] } : {}}
+                      transition={{ duration: 0.2 }}
+                      className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${
+                        kpis.includes('Other') ? accentCheckBg : 'border-[#1e2a45]'
+                      }`}
+                    >
+                      {kpis.includes('Other') && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </motion.div>
+                    <span className="text-sm">Other</span>
+                  </motion.button>
+                  {kpis.includes('Other') && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                      <FunnelInput
+                        type="text"
+                        label="Describe your KPI"
+                        value={customKpi}
+                        onChange={e => setCustomKpi(e.target.value)}
+                        enterKeyHint="done"
+                      />
+                    </motion.div>
+                  )}
                 </div>
 
                 {/* Budget Selection */}

@@ -38,7 +38,7 @@ export default function PoliticalOpportunityStep({ content, selectedChannels, on
       </motion.p>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-        <h2 className="text-3xl font-bold text-[#e2e8f0]">{headline}</h2>
+        <h2 className="text-3xl font-bold text-[#e2e8f0] font-sans">{headline}</h2>
         <p className="text-[#94a3b8] text-lg">{subheadline}</p>
       </motion.div>
 
@@ -49,10 +49,10 @@ export default function PoliticalOpportunityStep({ content, selectedChannels, on
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2 + i * 0.1 }}
-            className="p-4 rounded-xl bg-[#141b2d] border border-[#1e2a45]"
+            className="p-3 rounded-xl bg-[#141b2d] border border-[#1e2a45] min-h-[80px] flex flex-col items-center justify-center"
           >
-            <p className="text-2xl font-bold text-emerald-400">{stat.value}</p>
-            <p className="text-[#94a3b8] text-xs mt-1">{stat.label}</p>
+            <p className="text-xl font-bold text-emerald-400">{stat.value}</p>
+            <p className="text-[#94a3b8] text-[11px] mt-1 leading-tight text-center">{stat.label}</p>
           </motion.div>
         ))}
       </div>
@@ -64,13 +64,13 @@ export default function PoliticalOpportunityStep({ content, selectedChannels, on
         className="space-y-3"
       >
         <p className="text-[#7c8ba3] text-sm uppercase tracking-widest">Your Precision Stack</p>
-        <div className="flex justify-center gap-6">
+        <div className="flex justify-center gap-4">
           {CHANNEL_ICONS.map(ch => {
             const isSelected = selectedChannels.includes(ch.id);
             return (
               <div key={ch.id} className={`text-center transition-opacity ${isSelected ? 'opacity-100' : 'opacity-25'}`}>
                 <ch.icon className={`w-8 h-8 ${ch.color} mx-auto mb-1`} />
-                <p className="text-[#94a3b8] text-xs">{ch.label}</p>
+                <p className="text-[#94a3b8] text-[11px]">{ch.label}</p>
               </div>
             );
           })}
