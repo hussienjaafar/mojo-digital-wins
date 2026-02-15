@@ -126,12 +126,12 @@ export default function WelcomeStep({ content, onNext, onEmailBlur }: WelcomeSte
           type="submit"
           variant="primary"
           size="xl"
-          className="w-full min-h-[48px]"
+          className="w-full min-h-[48px] !bg-blue-600 hover:!bg-blue-500 !text-white font-semibold rounded-lg shadow-lg shadow-blue-500/25"
           disabled={!isValid}
         >
           {cta}
         </V3Button>
-        <p className="text-[#7c8ba3] text-xs">Next: Choose your path</p>
+        <p className="text-[#94a3b8] text-sm mt-3 flex items-center justify-center gap-1">Next: Choose your path <span className="inline-block">→</span></p>
       </motion.form>
     </div>
   );

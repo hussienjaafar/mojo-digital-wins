@@ -1,6 +1,6 @@
 import { ReactNode, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronUp } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 interface FunnelContainerProps {
   currentStep: number;
@@ -84,10 +84,11 @@ export default function FunnelContainer({
       {currentStep > 0 && onBack && (
         <button
           onClick={onBack}
-          className="fixed top-4 left-4 z-50 w-10 h-10 rounded-full bg-[#141b2d]/80 border border-[#1e2a45] flex items-center justify-center text-[#7c8ba3] hover:text-[#e2e8f0] hover:border-[#2d3b55] transition-colors backdrop-blur-sm"
+          className="fixed top-4 left-4 z-50 h-10 px-3 rounded-full bg-[#141b2d]/90 border border-[#1e2a45] flex items-center gap-1.5 text-[#94a3b8] hover:text-[#e2e8f0] hover:border-[#2d3b55] transition-colors backdrop-blur-sm"
           aria-label="Go back"
         >
-          <ChevronUp className="w-5 h-5" />
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-sm font-medium">Back</span>
         </button>
       )}
 

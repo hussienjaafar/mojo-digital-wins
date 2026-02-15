@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { VariantContent } from '@/hooks/useFunnelVariants';
-import { Building2, Vote } from 'lucide-react';
+import { Building2, Vote, Check } from 'lucide-react';
 import { V3Button } from '@/components/v3';
 
 interface SegmentChannelStepProps {
@@ -63,7 +63,7 @@ export default function SegmentChannelStep({
       <div className="space-y-4">
         <button
           onClick={() => handleSegment('commercial')}
-          className={`w-full min-h-[72px] p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left ${
+          className={`w-full min-h-[72px] p-5 rounded-2xl border-2 transition-all flex items-center gap-4 text-left relative ${
             localSegment === 'commercial'
               ? 'border-blue-500/50 bg-blue-500/10'
               : 'border-[#1e2a45] bg-[#141b2d] hover:border-[#2d3b55]'
@@ -74,6 +74,11 @@ export default function SegmentChannelStep({
             <p className="text-[#e2e8f0] font-semibold text-lg">Commercial Brand / Retailer</p>
             <p className="text-[#7c8ba3] text-sm">CPG, Healthcare, Finance, Retail</p>
           </div>
+          {localSegment === 'commercial' && (
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute top-3 right-3 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
+              <Check className="w-4 h-4 text-white" />
+            </motion.div>
+          )}
         </button>
 
         <button
@@ -89,6 +94,11 @@ export default function SegmentChannelStep({
             <p className="text-[#e2e8f0] font-semibold text-lg">Political Campaign / Non-Profit</p>
             <p className="text-[#7c8ba3] text-sm">Campaigns, PACs, Advocacy, 501(c)</p>
           </div>
+          {localSegment === 'political' && (
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute top-3 right-3 w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
+              <Check className="w-4 h-4 text-white" />
+            </motion.div>
+          )}
         </button>
       </div>
 
@@ -135,17 +145,21 @@ export default function SegmentChannelStep({
         )}
       </AnimatePresence>
 
-      {localSegment && selectedChannels.length > 0 && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      {localSegment && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
+          {selectedChannels.length > 0 && (
+            <p className="text-[#94a3b8] text-sm text-center">{selectedChannels.length} of {channels.length} channels selected</p>
+          )}
           <V3Button
             variant="primary"
             size="xl"
-            className="w-full min-h-[48px]"
+            className="w-full min-h-[48px] !bg-blue-600 hover:!bg-blue-500 !text-white font-semibold rounded-lg shadow-lg shadow-blue-500/25"
             onClick={onNext}
+            disabled={selectedChannels.length === 0}
           >
             {cta}
           </V3Button>
-          <p className="text-[#7c8ba3] text-xs mt-2">Next: See your opportunity</p>
+          <p className="text-[#94a3b8] text-sm mt-3 flex items-center justify-center gap-1">Next: See your opportunity <span>→</span></p>
         </motion.div>
       )}
     </div>

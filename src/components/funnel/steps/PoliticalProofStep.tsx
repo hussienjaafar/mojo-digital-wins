@@ -76,13 +76,13 @@ export default function PoliticalProofStep({ content, onNext }: PoliticalProofSt
         <V3Button
           variant="success"
           size="xl"
-          className="w-full min-h-[48px]"
+          className="w-full min-h-[48px] !bg-emerald-600 hover:!bg-emerald-500 !text-white font-semibold rounded-lg shadow-lg shadow-emerald-500/25"
           onClick={onNext}
           disabled={!canProceed}
         >
           {canProceed ? cta : `Please review disclaimer (${disclaimerSeconds}s)`}
         </V3Button>
-        {canProceed && <p className="text-[#7c8ba3] text-xs mt-2">Next: Qualify your campaign</p>}
+        {canProceed && <p className="text-[#94a3b8] text-sm mt-3 flex items-center justify-center gap-1">Next: Qualify your campaign <span>→</span></p>}
       </div>
     </div>
   );
