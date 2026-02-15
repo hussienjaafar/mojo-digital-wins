@@ -1,87 +1,78 @@
 
-# Fix: KPI Options & Padding/Overflow Issues Across Funnel
 
-## Problem 1: KPI Options Too Restrictive & Industry-Specific
+# Fix: QualificationStep Layout -- Remove Nested Scroll, Inline Into Page
 
-The current KPIs are narrowly scoped:
+## Problem
 
-**Commercial** (current): ROAS, Cost Per Acquisition, Cost Per Verified Patient, Brand Lift
-- "Cost Per Verified Patient" is healthcare-only -- irrelevant for CPG, Finance, or Retail users
+The QualificationStep is rendered inside FunnelContainer's animated `motion.div` which uses `absolute inset-0` positioning. This creates:
+1. A visible scrollbar from the nested `overflow-y-auto` + `max-h-[calc(100vh-120px)]` on the step itself
+2. Content getting cut off at the bottom (budget options, submit button)
+3. The fixed "Back" button overlapping the headline text
 
-**Political** (current): Voter Persuasion Lift, Donor Lifetime Value, Cost Per Acquisition, Voter Registration Rate
-- "Voter Registration Rate" and "Voter Persuasion Lift" are very niche -- many political orgs care about broader awareness or fundraising ROI
+## Solution
 
-### Fix
+Make the QualificationStep (step 4) render as a **full-page inline layout** that owns its own scrolling, bypassing the FunnelContainer's animated wrapper entirely. The step will use the full viewport height, have its own back button integrated into the layout (not fixed/overlapping), and scroll naturally without a nested scroll container.
 
-Replace both lists with broader, universally applicable KPIs. Keep them relevant to each segment but not locked to one industry vertical.
+## Changes
 
-**Commercial KPIs (new):**
-- ROAS (Return on Ad Spend)
-- Cost Per Acquisition
-- Brand Awareness / Lift
-- Website Traffic / Conversions
-- Audience Reach & Frequency
+### 1. Experience.tsx -- Render QualificationStep outside FunnelContainer
 
-**Political KPIs (new):**
-- Voter Awareness / Persuasion
-- Donor Acquisition Cost
-- Fundraising ROI
-- Volunteer / Supporter Sign-ups
-- Audience Reach & Frequency
+When `currentStep === 4`, render the QualificationStep directly in the page div instead of inside FunnelContainer. This removes the `absolute inset-0` wrapper and its competing scroll context.
 
-Also add an "Other" option with a small text input so users with unique KPIs aren't boxed out.
+The FunnelContainer will still be used for steps 0-3 and step 5 (ThankYou). Step 4 gets its own full-page treatment.
 
----
+Similarly, when `currentStep === 5` (ThankYou), keep it in FunnelContainer as-is since it's a short page.
 
-## Problem 2: Padding & Overflow Issues
+### 2. QualificationStep.tsx -- Remove scroll constraints, add integrated back button
 
-Visible in the screenshots:
+- Remove `overflow-y-auto max-h-[calc(100vh-120px)]` from the root div -- the page itself will scroll naturally via `overflow-y-auto` on the parent
+- Change root container to `min-h-screen` with proper top/bottom padding (`pt-6 pb-10`) so content flows naturally
+- Add an inline back button at the top of the component (not fixed/overlapping) that calls `onBack`
+- Add `onBack` to the component's props
 
-1. **Stat cards on Opportunity steps (image 66)**: The 3-column grid with `p-4` and `text-2xl` values causes label text ("Annual Spending Power", "Cultural Relevance Factor") to wrap awkwardly in small cards. The `text-xs` labels don't have enough room.
-   - Fix: Reduce stat value font size from `text-2xl` to `text-xl`, reduce card padding from `p-4` to `p-3`, and add `min-h-[80px]` for consistent card heights.
+### 3. FunnelContainer.tsx -- Hide back button when step is rendered outside
 
-2. **Headline font (image 66)**: The "GENERATION M MEETS TOTAL MARKET SATURATION" headline is still rendering in a condensed/novelty font despite the earlier `font-sans` fix on the WelcomeStep. The Opportunity steps were not updated.
-   - Fix: Add `font-sans` to the h2 in both CommercialOpportunityStep and PoliticalOpportunityStep.
-
-3. **Coverage/Precision icons spacing (image 66)**: With 4-5 icons in a `flex gap-8`, the row is cramped on mobile. Labels truncate.
-   - Fix: Reduce gap from `gap-8`/`gap-6` to `gap-4`, and use `text-[11px]` for icon labels to prevent wrapping.
-
-4. **KPI checkbox buttons (images 65, 67)**: The KPI buttons span full width with `min-h-[48px]` and `p-3` which is fine, but on narrower screens the text can feel cramped against the checkbox.
-   - Fix: Add `pl-4` to give the text more breathing room from the checkbox icon.
-
-5. **QualificationStep container (images 65, 67)**: The `px-1` on the scrollable container gives almost no horizontal padding, causing content to sit flush against screen edges on mobile.
-   - Fix: Change `px-1` to `px-4` for proper mobile margins.
+The back button in FunnelContainer won't show for step 4 since the QualificationStep won't be rendered inside it. No change needed to FunnelContainer itself.
 
 ---
 
 ## Technical Details
 
+### Experience.tsx Changes
+
+Replace the current single-render approach with conditional rendering:
+
+```text
+currentStep === 4:
+  Render QualificationStep directly in the page div (not inside FunnelContainer)
+  with its own onBack handler and full-viewport scrolling
+
+all other steps:
+  Render inside FunnelContainer as before
+```
+
+The QualificationStep will be wrapped in a simple `div` with `overflow-y-auto h-full` so the entire page scrolls as one document, not a nested iframe-like box.
+
+### QualificationStep.tsx Changes
+
+- Add `onBack?: () => void` to props
+- Root div: change from `overflow-y-auto max-h-[calc(100vh-120px)] pb-20 px-4` to `min-h-full pb-10 px-4 pt-6`
+- Add an inline back button at the very top (before the headline), styled consistently with the rest of the funnel but not fixed-position:
+  ```text
+  <button onClick={onBack}>
+    <ArrowLeft /> Back
+  </button>
+  ```
+- This button sits in the document flow, so it never overlaps the headline
+
 ### Files Modified
 
 | File | Changes |
 |------|---------|
-| `src/components/funnel/steps/QualificationStep.tsx` | New KPI lists, add "Other" KPI option with text input, fix container `px-1` to `px-4` |
-| `src/components/funnel/steps/CommercialOpportunityStep.tsx` | Reduce stat card padding/font, add `font-sans` to headline, tighten icon gap |
-| `src/components/funnel/steps/PoliticalOpportunityStep.tsx` | Same stat card and icon gap fixes |
+| `src/pages/Experience.tsx` | Render step 4 outside FunnelContainer; pass `onBack` to QualificationStep |
+| `src/components/funnel/steps/QualificationStep.tsx` | Accept `onBack` prop, add inline back button, remove nested scroll constraints |
 
-### KPI "Other" Option Implementation
+### No Backend Changes
 
-Add a special "Other" entry at the end of both KPI lists. When selected, a small `FunnelInput` appears below the KPI list for the user to type their custom KPI. Store the custom value in a `customKpi` state variable, and include it in the submitted `performanceKpis` array as `"Other: [user input]"`.
+Purely layout/CSS changes. All analytics, database, and edge function logic remains untouched.
 
-### Stat Card Overflow Fix
-
-Current:
-```
-className="p-4 rounded-xl bg-[#141b2d] border border-[#1e2a45]"
-<p className="text-2xl font-bold ...">
-<p className="text-[#94a3b8] text-xs mt-1">
-```
-
-Proposed:
-```
-className="p-3 rounded-xl bg-[#141b2d] border border-[#1e2a45] min-h-[80px] flex flex-col items-center justify-center"
-<p className="text-xl font-bold ...">
-<p className="text-[#94a3b8] text-[11px] mt-1 leading-tight text-center">
-```
-
-This ensures labels like "Annual Spending Power" and "Cultural Relevance Factor" wrap gracefully within the card without overflowing.
