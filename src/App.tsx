@@ -44,6 +44,7 @@ const Redirect = lazy(() => import("./pages/Redirect"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Login = lazy(() => import("./pages/Login"));
+const Experience = lazy(() => import("./pages/Experience"));
 
 // Admin pages (lazy loaded - larger bundle)
 const Admin = lazy(() => import("./pages/Admin"));
@@ -109,7 +110,7 @@ const DomainRouter = () => {
   
   // Marketing routes (public pages) - note: '/' handled separately on portal
   const marketingRoutes = ['/about', '/services', '/case-studies', 
-    '/blog', '/contact', '/privacy-policy', '/creative-showcase', '/bills'];
+    '/blog', '/contact', '/privacy-policy', '/creative-showcase', '/bills', '/experience', '/get-started'];
   
   // Portal route prefixes (app pages)
   const portalPrefixes = ['/client', '/admin', '/accept-invite', 
@@ -156,7 +157,7 @@ const DomainRouter = () => {
 const AppContent = () => {
   useSmoothScroll();
   const location = useLocation();
-  const isPublicPage = !location.pathname.startsWith('/admin') && !location.pathname.startsWith('/client');
+  const isPublicPage = !location.pathname.startsWith('/admin') && !location.pathname.startsWith('/client') && location.pathname !== '/experience';
   
   return (
     <>
@@ -182,6 +183,8 @@ const AppContent = () => {
             <Route path="/creative-showcase" element={<CreativeShowcase />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/experience" element={<Experience />} />
+            <Route path="/get-started" element={<Navigate to="/experience" replace />} />
             <Route path="/bills/:billNumber" element={<BillDetail />} />
             <Route path="/meta-oauth-callback" element={<MetaOAuthCallback />} />
             <Route path="/settings" element={<Settings />} />

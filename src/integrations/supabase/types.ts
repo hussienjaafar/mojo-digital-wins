@@ -3128,6 +3128,42 @@ export type Database = {
           },
         ]
       }
+      content_optimization: {
+        Row: {
+          body_content: Json | null
+          created_at: string
+          cta_text: string
+          headline_text: string
+          id: string
+          is_active: boolean
+          step_key: string
+          subheadline_text: string | null
+          variant_label: string
+        }
+        Insert: {
+          body_content?: Json | null
+          created_at?: string
+          cta_text: string
+          headline_text: string
+          id?: string
+          is_active?: boolean
+          step_key: string
+          subheadline_text?: string | null
+          variant_label: string
+        }
+        Update: {
+          body_content?: Json | null
+          created_at?: string
+          cta_text?: string
+          headline_text?: string
+          id?: string
+          is_active?: boolean
+          step_key?: string
+          subheadline_text?: string | null
+          variant_label?: string
+        }
+        Relationships: []
+      }
       creative_performance_correlations: {
         Row: {
           attribute_name: string
@@ -5089,6 +5125,162 @@ export type Database = {
             referencedColumns: ["organization_id"]
           },
         ]
+      }
+      funnel_analytics: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          segment: string | null
+          session_id: string
+          step_key: string
+          step_number: number
+          variant_label: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          segment?: string | null
+          session_id: string
+          step_key: string
+          step_number: number
+          variant_label: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          segment?: string | null
+          session_id?: string
+          step_key?: string
+          step_number?: number
+          variant_label?: string
+        }
+        Relationships: []
+      }
+      funnel_leads: {
+        Row: {
+          budget_range: string | null
+          buying_authority_info: string | null
+          created_at: string
+          email: string | null
+          email_hash: string | null
+          id: string
+          is_decision_maker: boolean
+          lead_score: number
+          name: string | null
+          organization: string | null
+          performance_kpis: string[] | null
+          role: string | null
+          segment: string | null
+          selected_channels: string[] | null
+          session_id: string
+          status: string
+          utm_campaign: string | null
+          utm_source: string | null
+          variant_label: string | null
+        }
+        Insert: {
+          budget_range?: string | null
+          buying_authority_info?: string | null
+          created_at?: string
+          email?: string | null
+          email_hash?: string | null
+          id?: string
+          is_decision_maker?: boolean
+          lead_score?: number
+          name?: string | null
+          organization?: string | null
+          performance_kpis?: string[] | null
+          role?: string | null
+          segment?: string | null
+          selected_channels?: string[] | null
+          session_id: string
+          status?: string
+          utm_campaign?: string | null
+          utm_source?: string | null
+          variant_label?: string | null
+        }
+        Update: {
+          budget_range?: string | null
+          buying_authority_info?: string | null
+          created_at?: string
+          email?: string | null
+          email_hash?: string | null
+          id?: string
+          is_decision_maker?: boolean
+          lead_score?: number
+          name?: string | null
+          organization?: string | null
+          performance_kpis?: string[] | null
+          role?: string | null
+          segment?: string | null
+          selected_channels?: string[] | null
+          session_id?: string
+          status?: string
+          utm_campaign?: string | null
+          utm_source?: string | null
+          variant_label?: string | null
+        }
+        Relationships: []
+      }
+      funnel_sessions: {
+        Row: {
+          completed_at: string | null
+          device_type: string
+          fb_pixel_id: string | null
+          id: string
+          ip_address: string | null
+          lead_id: string | null
+          segment: string | null
+          selected_channels: string[] | null
+          session_id: string
+          started_at: string
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          variant_label: string
+        }
+        Insert: {
+          completed_at?: string | null
+          device_type?: string
+          fb_pixel_id?: string | null
+          id?: string
+          ip_address?: string | null
+          lead_id?: string | null
+          segment?: string | null
+          selected_channels?: string[] | null
+          session_id: string
+          started_at?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          variant_label: string
+        }
+        Update: {
+          completed_at?: string | null
+          device_type?: string
+          fb_pixel_id?: string | null
+          id?: string
+          ip_address?: string | null
+          lead_id?: string | null
+          segment?: string | null
+          selected_channels?: string[] | null
+          session_id?: string
+          started_at?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          variant_label?: string
+        }
+        Relationships: []
       }
       generated_campaign_messages: {
         Row: {
