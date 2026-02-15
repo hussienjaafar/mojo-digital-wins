@@ -253,15 +253,31 @@ export default function Experience() {
 
   return (
     <div className="fixed inset-0 bg-[#0a0f1a] text-white overflow-hidden portal-theme dark">
-      <FunnelContainer
-        currentStep={currentStep}
-        direction={direction}
-        onNext={currentStep < TOTAL_STEPS - 1 ? goNext : undefined}
-        onBack={currentStep > 0 ? goBack : undefined}
-        disableGestures={currentStep === 4}
-      >
-        {renderStep()}
-      </FunnelContainer>
+      {currentStep === 4 ? (
+        <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-[#1e2a45]">
+          <QualificationStep
+            content={variants?.qualification}
+            segment={session.segment}
+            selectedChannels={session.selectedChannels}
+            prefillEmail={prefillEmail}
+            prefillOrg={prefillOrg}
+            onSubmit={handleQualificationSubmit}
+            onFieldFocus={fieldTracking.trackFieldFocus}
+            onFieldBlur={fieldTracking.trackFieldBlur}
+            onBack={goBack}
+          />
+        </div>
+      ) : (
+        <FunnelContainer
+          currentStep={currentStep}
+          direction={direction}
+          onNext={currentStep < TOTAL_STEPS - 1 ? goNext : undefined}
+          onBack={currentStep > 0 ? goBack : undefined}
+          disableGestures={false}
+        >
+          {renderStep()}
+        </FunnelContainer>
+      )}
       <FunnelProgress currentStep={currentStep} totalSteps={TOTAL_STEPS} />
     </div>
   );
