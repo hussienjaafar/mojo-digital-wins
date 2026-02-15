@@ -36,7 +36,9 @@ export default function SegmentChannelStep({
   const subheadline = content?.subheadline || 'Choose your path to precision audience engagement.';
   const cta = content?.cta || 'Continue';
 
-  const channels = localSegment === 'political'
+  const isPolitical = localSegment === 'political';
+
+  const channels = isPolitical
     ? [...CHANNELS_BASE, SMS_CHANNEL]
     : CHANNELS_BASE;
 
@@ -52,6 +54,12 @@ export default function SegmentChannelStep({
     onChannelsChange(next);
   };
 
+  // Segment-aware accent colors
+  const accentBorder = isPolitical ? 'border-emerald-500/50' : 'border-blue-500/50';
+  const accentBg = isPolitical ? 'bg-emerald-500/10' : 'bg-blue-500/10';
+  const accentCheck = isPolitical ? 'border-emerald-500 bg-emerald-500' : 'border-blue-500 bg-blue-500';
+  const ctaBg = isPolitical ? '!bg-emerald-600 hover:!bg-emerald-500 shadow-emerald-500/25' : '!bg-blue-600 hover:!bg-blue-500 shadow-blue-500/25';
+
   return (
     <div className="w-full max-w-lg mx-auto text-center space-y-8 pb-8">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
@@ -59,7 +67,7 @@ export default function SegmentChannelStep({
         <p className="text-[#94a3b8] text-lg">{subheadline}</p>
       </motion.div>
 
-      {/* Segment Cards with benefit statements */}
+      {/* Segment Cards */}
       <div className="space-y-4">
         <button
           onClick={() => handleSegment('commercial')}
@@ -112,7 +120,7 @@ export default function SegmentChannelStep({
             className="space-y-3 overflow-hidden"
           >
             <p className="text-[#94a3b8] font-medium text-left">
-              Which pillars are in your 2026 work plan?
+              Which channels interest you?
             </p>
             {channels.map(ch => (
               <motion.button
@@ -121,7 +129,7 @@ export default function SegmentChannelStep({
                 whileTap={{ scale: 0.98 }}
                 className={`w-full min-h-[48px] p-4 rounded-xl border transition-all flex items-center gap-3 text-left ${
                   selectedChannels.includes(ch.id)
-                    ? 'border-blue-500/50 bg-blue-500/10 text-[#e2e8f0]'
+                    ? `${accentBorder} ${accentBg} text-[#e2e8f0]`
                     : 'border-[#1e2a45] bg-[#141b2d] text-[#94a3b8] hover:border-[#2d3b55]'
                 }`}
               >
@@ -129,7 +137,7 @@ export default function SegmentChannelStep({
                   animate={selectedChannels.includes(ch.id) ? { scale: [1, 1.2, 1] } : {}}
                   transition={{ duration: 0.2 }}
                   className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
-                    selectedChannels.includes(ch.id) ? 'border-blue-500 bg-blue-500' : 'border-[#1e2a45]'
+                    selectedChannels.includes(ch.id) ? accentCheck : 'border-[#1e2a45]'
                   }`}
                 >
                   {selectedChannels.includes(ch.id) && (
@@ -141,6 +149,9 @@ export default function SegmentChannelStep({
                 <span className="text-base">{ch.label}</span>
               </motion.button>
             ))}
+            {selectedChannels.length === 0 && (
+              <p className="text-[#7c8ba3] text-xs text-center mt-1">Select at least one channel to continue</p>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -151,9 +162,9 @@ export default function SegmentChannelStep({
             <p className="text-[#94a3b8] text-sm text-center">{selectedChannels.length} of {channels.length} channels selected</p>
           )}
           <V3Button
-            variant="primary"
+            variant={isPolitical ? 'success' : 'primary'}
             size="xl"
-            className="w-full min-h-[48px] !bg-blue-600 hover:!bg-blue-500 !text-white font-semibold rounded-lg shadow-lg shadow-blue-500/25"
+            className={`w-full min-h-[48px] ${ctaBg} !text-white font-semibold rounded-lg shadow-lg`}
             onClick={onNext}
             disabled={selectedChannels.length === 0}
           >

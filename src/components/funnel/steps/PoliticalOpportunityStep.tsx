@@ -1,14 +1,23 @@
 import { motion } from 'framer-motion';
 import type { VariantContent } from '@/hooks/useFunnelVariants';
-import { Target, Mail, Zap } from 'lucide-react';
+import { Target, Mail, Tv, Monitor, Smartphone } from 'lucide-react';
 import { V3Button } from '@/components/v3';
 
 interface PoliticalOpportunityStepProps {
   content?: VariantContent;
+  selectedChannels: string[];
   onNext: () => void;
 }
 
-export default function PoliticalOpportunityStep({ content, onNext }: PoliticalOpportunityStepProps) {
+const CHANNEL_ICONS = [
+  { id: 'ctv', icon: Tv, label: 'CTV Reach', color: 'text-emerald-400' },
+  { id: 'digital', icon: Monitor, label: 'Digital', color: 'text-blue-400' },
+  { id: 'direct_mail', icon: Mail, label: 'Tag 57 Mail', color: 'text-amber-400' },
+  { id: 'ooh', icon: Target, label: 'Outdoor', color: 'text-purple-400' },
+  { id: 'sms', icon: Smartphone, label: 'SMS', color: 'text-rose-400' },
+];
+
+export default function PoliticalOpportunityStep({ content, selectedChannels, onNext }: PoliticalOpportunityStepProps) {
   const headline = content?.headline || '1:1 Household Precision. Zero Guesswork.';
   const subheadline = content?.subheadline || 'Streaming reaches 33% more swing voters than linear TV.';
   const cta = content?.cta || 'See the Proof';
@@ -20,13 +29,12 @@ export default function PoliticalOpportunityStep({ content, onNext }: PoliticalO
 
   return (
     <div className="w-full max-w-lg mx-auto text-center space-y-8">
-      {/* Transition micro-copy */}
       <motion.p
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         className="text-[#7c8ba3] text-sm"
       >
-        Based on your selection, here's your precision advantage...
+        Here's your campaign's precision advantage...
       </motion.p>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
@@ -55,20 +63,17 @@ export default function PoliticalOpportunityStep({ content, onNext }: PoliticalO
         transition={{ delay: 0.5 }}
         className="space-y-3"
       >
-        <p className="text-[#7c8ba3] text-sm uppercase tracking-widest">Precision Stack</p>
-        <div className="flex justify-center gap-8">
-          <div className="text-center">
-            <Target className="w-8 h-8 text-emerald-400 mx-auto mb-1" />
-            <p className="text-[#94a3b8] text-xs">Voter File</p>
-          </div>
-          <div className="text-center">
-            <Mail className="w-8 h-8 text-blue-400 mx-auto mb-1" />
-            <p className="text-[#94a3b8] text-xs">Tag 57 Mail</p>
-          </div>
-          <div className="text-center">
-            <Zap className="w-8 h-8 text-amber-400 mx-auto mb-1" />
-            <p className="text-[#94a3b8] text-xs">CTV Reach</p>
-          </div>
+        <p className="text-[#7c8ba3] text-sm uppercase tracking-widest">Your Precision Stack</p>
+        <div className="flex justify-center gap-6">
+          {CHANNEL_ICONS.map(ch => {
+            const isSelected = selectedChannels.includes(ch.id);
+            return (
+              <div key={ch.id} className={`text-center transition-opacity ${isSelected ? 'opacity-100' : 'opacity-25'}`}>
+                <ch.icon className={`w-8 h-8 ${ch.color} mx-auto mb-1`} />
+                <p className="text-[#94a3b8] text-xs">{ch.label}</p>
+              </div>
+            );
+          })}
         </div>
       </motion.div>
 

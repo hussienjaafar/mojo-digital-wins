@@ -50,12 +50,19 @@ const POLITICAL_KPIS = [
   'Voter Registration Rate',
 ];
 
-// Reverse anchoring: highest first
 const BUDGET_OPTIONS = [
   { value: '$50k+', label: '$50k+', color: 'from-amber-600 to-amber-500', ring: 'ring-amber-500/50' },
   { value: '$10k-$50k', label: '$10k – $50k', color: 'from-emerald-600 to-emerald-500', ring: 'ring-emerald-500/50' },
   { value: '$5k-$10k', label: '$5k – $10k', color: 'from-blue-600 to-blue-500', ring: 'ring-blue-500/50' },
 ];
+
+const CHANNEL_LABELS: Record<string, string> = {
+  ctv: 'CTV / Streaming',
+  digital: 'Digital Ads',
+  direct_mail: 'Direct Mailers',
+  ooh: 'Billboards (OOH)',
+  sms: 'SMS Fundraising',
+};
 
 export default function QualificationStep({
   content,
@@ -78,15 +85,37 @@ export default function QualificationStep({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeSection, setActiveSection] = useState(0);
+  const [section2Visited, setSection2Visited] = useState(false);
+  const [section3Visited, setSection3Visited] = useState(false);
 
   useEffect(() => {
     if (prefillEmail && !email) setEmail(prefillEmail);
     if (prefillOrg && !organization) setOrganization(prefillOrg);
   }, [prefillEmail, prefillOrg]);
 
+  // Track section visits
+  useEffect(() => {
+    if (activeSection >= 1) setSection2Visited(true);
+    if (activeSection >= 2) setSection3Visited(true);
+  }, [activeSection]);
+
   const headline = content?.headline || "Let's Build Your Strategy";
   const cta = content?.cta || 'Submit & Connect';
   const kpiOptions = segment === 'political' ? POLITICAL_KPIS : COMMERCIAL_KPIS;
+  const isPolitical = segment === 'political';
+
+  // Segment-aware accent colors
+  const accentBorderActive = isPolitical ? 'border-emerald-500/40' : 'border-blue-500/40';
+  const accentBg = isPolitical ? 'bg-emerald-500/10' : 'bg-blue-500/10';
+  const accentBorder = isPolitical ? 'border-emerald-500/50' : 'border-blue-500/50';
+  const accentCheckBg = isPolitical ? 'border-emerald-500 bg-emerald-500' : 'border-blue-500 bg-blue-500';
+  const accentToggle = isPolitical ? 'bg-emerald-500' : 'bg-blue-500';
+  const ctaClasses = isPolitical
+    ? '!bg-emerald-600 hover:!bg-emerald-500 shadow-emerald-500/25'
+    : '!bg-blue-600 hover:!bg-blue-500 shadow-blue-500/25';
+  const continueClasses = isPolitical
+    ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20'
+    : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/20';
 
   const toggleKpi = (kpi: string) => {
     setKpis(prev => prev.includes(kpi) ? prev.filter(k => k !== kpi) : [...prev, kpi]);
@@ -97,9 +126,9 @@ export default function QualificationStep({
     onFieldBlur?.(fieldName, hasError);
   };
 
-  // Progressive reveal: check section completion
   const section1Complete = name.trim() && email.trim() && organization.trim() && role.trim();
-  const section2Complete = true; // Decision maker is always answered (toggle defaults false)
+  const section2Complete = section2Visited;
+  const allSectionsReady = section1Complete && section2Visited && section3Visited;
 
   const handleSubmit = async () => {
     const result = schema.safeParse({ name, email, organization, role, buyingAuthorityInfo: buyingAuthority });
@@ -109,7 +138,6 @@ export default function QualificationStep({
         fieldErrors[issue.path[0] as string] = issue.message;
       });
       setErrors(fieldErrors);
-      // Open the section with errors
       if (fieldErrors.name || fieldErrors.email || fieldErrors.organization || fieldErrors.role) {
         setActiveSection(0);
       }
@@ -138,6 +166,8 @@ export default function QualificationStep({
     }
   };
 
+  const channelLabels = selectedChannels.map(id => CHANNEL_LABELS[id] || id).join(', ');
+
   return (
     <div className="w-full max-w-lg mx-auto space-y-5 overflow-y-auto max-h-[calc(100vh-120px)] pb-20 px-1 scrollbar-thin scrollbar-thumb-[#1e2a45]">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-2">
@@ -145,7 +175,7 @@ export default function QualificationStep({
       </motion.div>
 
       {/* Section 1: About You */}
-      <div className={`rounded-xl border overflow-hidden transition-colors ${activeSection === 0 ? 'border-blue-500/40' : 'border-[#1e2a45]'}`}>
+      <div className={`rounded-xl border overflow-hidden transition-colors ${activeSection === 0 ? accentBorderActive : 'border-[#1e2a45]'}`}>
         <button
           onClick={() => setActiveSection(activeSection === 0 ? -1 : 0)}
           className="w-full flex items-center justify-between p-4 bg-[#141b2d] text-left hover:bg-[#182036] transition-colors"
@@ -206,7 +236,7 @@ export default function QualificationStep({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     onClick={() => setActiveSection(1)}
-                    className="w-full mt-2 py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors shadow-md shadow-blue-500/20"
+                    className={`w-full mt-2 py-2.5 px-4 rounded-lg ${continueClasses} text-white text-sm font-semibold transition-colors shadow-md`}
                   >
                     Continue to Decision Making →
                   </motion.button>
@@ -218,13 +248,13 @@ export default function QualificationStep({
       </div>
 
       {/* Section 2: Decision Making */}
-      <div className={`rounded-xl border overflow-hidden transition-all ${section1Complete ? 'opacity-100' : 'opacity-40 pointer-events-none'} ${activeSection === 1 ? 'border-blue-500/40' : 'border-[#1e2a45]'}`}>
+      <div className={`rounded-xl border overflow-hidden transition-all ${section1Complete ? 'opacity-100' : 'opacity-40 pointer-events-none'} ${activeSection === 1 ? accentBorderActive : 'border-[#1e2a45]'}`}>
         <button
           onClick={() => setActiveSection(activeSection === 1 ? -1 : 1)}
           className="w-full flex items-center justify-between p-4 bg-[#141b2d] text-left hover:bg-[#182036] transition-colors"
         >
           <div className="flex items-center gap-3">
-            {section2Complete && activeSection > 1 ? (
+            {section2Complete && activeSection !== 1 ? (
               <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
                 <Check className="w-3 h-3 text-white" />
               </motion.div>
@@ -249,11 +279,11 @@ export default function QualificationStep({
                 <button
                   onClick={() => setIsDecisionMaker(!isDecisionMaker)}
                   className={`w-full min-h-[48px] p-4 rounded-xl border transition-all flex items-center justify-between ${
-                    isDecisionMaker ? 'border-blue-500/50 bg-blue-500/10' : 'border-[#1e2a45] bg-[#141b2d]'
+                    isDecisionMaker ? `${accentBorder} ${accentBg}` : 'border-[#1e2a45] bg-[#141b2d]'
                   }`}
                 >
                   <span className="text-[#e2e8f0] text-base">Are you a decision maker?</span>
-                  <div className={`w-12 h-7 rounded-full transition-all relative ${isDecisionMaker ? 'bg-blue-500' : 'bg-[#1e2a45]'}`}>
+                  <div className={`w-12 h-7 rounded-full transition-all relative ${isDecisionMaker ? accentToggle : 'bg-[#1e2a45]'}`}>
                     <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${isDecisionMaker ? 'left-6' : 'left-1'}`} />
                   </div>
                 </button>
@@ -267,7 +297,7 @@ export default function QualificationStep({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   onClick={() => setActiveSection(2)}
-                  className="w-full mt-2 py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors shadow-md shadow-blue-500/20"
+                  className={`w-full mt-2 py-2.5 px-4 rounded-lg ${continueClasses} text-white text-sm font-semibold transition-colors shadow-md`}
                 >
                   Continue to Goals & Budget →
                 </motion.button>
@@ -278,15 +308,21 @@ export default function QualificationStep({
       </div>
 
       {/* Section 3: Goals & Budget */}
-      <div className={`rounded-xl border overflow-hidden transition-all ${section1Complete ? 'opacity-100' : 'opacity-40 pointer-events-none'} ${activeSection === 2 ? 'border-blue-500/40' : 'border-[#1e2a45]'}`}>
+      <div className={`rounded-xl border overflow-hidden transition-all ${section1Complete ? 'opacity-100' : 'opacity-40 pointer-events-none'} ${activeSection === 2 ? accentBorderActive : 'border-[#1e2a45]'}`}>
         <button
           onClick={() => setActiveSection(activeSection === 2 ? -1 : 2)}
           className="w-full flex items-center justify-between p-4 bg-[#141b2d] text-left hover:bg-[#182036] transition-colors"
         >
           <div className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full border-2 border-[#1e2a45] flex items-center justify-center">
-              <span className="text-[10px] text-[#7c8ba3]">3</span>
-            </div>
+            {section3Visited && budget ? (
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                <Check className="w-3 h-3 text-white" />
+              </motion.div>
+            ) : (
+              <div className="w-5 h-5 rounded-full border-2 border-[#1e2a45] flex items-center justify-center">
+                <span className="text-[10px] text-[#7c8ba3]">3</span>
+              </div>
+            )}
             <span className="text-[#e2e8f0] font-medium text-sm">Goals & Budget</span>
           </div>
           <ChevronDown className={`w-4 h-4 text-[#7c8ba3] transition-transform ${activeSection === 2 ? 'rotate-180' : ''}`} />
@@ -300,6 +336,11 @@ export default function QualificationStep({
               className="overflow-hidden"
             >
               <div className="p-4 space-y-4 bg-[#0d1321]">
+                {/* Channel context */}
+                {channelLabels && (
+                  <p className="text-[#7c8ba3] text-xs">Based on your channels: {channelLabels}</p>
+                )}
+
                 {/* KPI Multi-select */}
                 <div className="space-y-2">
                   <p className="text-[#94a3b8] text-sm font-medium">Primary performance KPI(s)</p>
@@ -309,14 +350,14 @@ export default function QualificationStep({
                       onClick={() => toggleKpi(kpi)}
                       whileTap={{ scale: 0.98 }}
                       className={`w-full min-h-[48px] p-3 rounded-xl border text-left transition-all flex items-center gap-3 ${
-                        kpis.includes(kpi) ? 'border-blue-500/50 bg-blue-500/10 text-[#e2e8f0]' : 'border-[#1e2a45] bg-[#141b2d] text-[#94a3b8]'
+                        kpis.includes(kpi) ? `${accentBorder} ${accentBg} text-[#e2e8f0]` : 'border-[#1e2a45] bg-[#141b2d] text-[#94a3b8]'
                       }`}
                     >
                       <motion.div
                         animate={kpis.includes(kpi) ? { scale: [1, 1.2, 1] } : {}}
                         transition={{ duration: 0.2 }}
                         className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${
-                          kpis.includes(kpi) ? 'border-blue-500 bg-blue-500' : 'border-[#1e2a45]'
+                          kpis.includes(kpi) ? accentCheckBg : 'border-[#1e2a45]'
                         }`}
                       >
                         {kpis.includes(kpi) && (
@@ -330,7 +371,7 @@ export default function QualificationStep({
                   ))}
                 </div>
 
-                {/* Budget Selection with radio indicators */}
+                {/* Budget Selection */}
                 <div className="space-y-2">
                   <p className="text-[#94a3b8] text-sm font-medium">Budget range</p>
                   <div className="space-y-3">
@@ -344,7 +385,6 @@ export default function QualificationStep({
                             : 'bg-[#141b2d] border border-[#1e2a45] hover:border-[#2d3b55]'
                         }`}
                       >
-                        {/* Radio indicator */}
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
                           budget === opt.value ? 'border-white' : 'border-[#7c8ba3]'
                         }`}>
@@ -371,16 +411,21 @@ export default function QualificationStep({
         </AnimatePresence>
       </div>
 
-      <V3Button
-        variant="primary"
-        size="xl"
-        className="w-full min-h-[48px] !bg-blue-600 hover:!bg-blue-500 !text-white font-semibold rounded-lg shadow-lg shadow-blue-500/25"
-        onClick={handleSubmit}
-        isLoading={isSubmitting}
-        loadingText="Submitting..."
-      >
-        {cta}
-      </V3Button>
+      {/* Submit - only show when all sections visited */}
+      {allSectionsReady ? (
+        <V3Button
+          variant={isPolitical ? 'success' : 'primary'}
+          size="xl"
+          className={`w-full min-h-[48px] ${ctaClasses} !text-white font-semibold rounded-lg shadow-lg`}
+          onClick={handleSubmit}
+          isLoading={isSubmitting}
+          loadingText="Submitting..."
+        >
+          {cta}
+        </V3Button>
+      ) : (
+        <p className="text-[#7c8ba3] text-xs text-center">Complete all sections above to submit</p>
+      )}
     </div>
   );
 }

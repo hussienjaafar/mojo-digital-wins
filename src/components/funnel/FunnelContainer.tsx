@@ -8,6 +8,7 @@ interface FunnelContainerProps {
   children: ReactNode;
   onNext?: () => void;
   onBack?: () => void;
+  disableGestures?: boolean;
 }
 
 const variants = {
@@ -31,16 +32,18 @@ export default function FunnelContainer({
   children,
   onNext,
   onBack,
+  disableGestures = false,
 }: FunnelContainerProps) {
   const touchStart = useRef<number | null>(null);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      if (disableGestures) return;
+
       const tag = (e.target as HTMLElement)?.tagName;
       const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
       if (e.key === 'Enter' && isInput) {
-        // Let form onSubmit handle Enter in inputs
         return;
       }
 
@@ -52,7 +55,7 @@ export default function FunnelContainer({
         onBack?.();
       }
     },
-    [onNext, onBack]
+    [onNext, onBack, disableGestures]
   );
 
   useEffect(() => {
@@ -61,10 +64,12 @@ export default function FunnelContainer({
   }, [handleKeyDown]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (disableGestures) return;
     touchStart.current = e.touches[0].clientY;
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if (disableGestures) return;
     if (touchStart.current === null) return;
     const diff = touchStart.current - e.changedTouches[0].clientY;
     if (Math.abs(diff) > 50) {
@@ -80,7 +85,6 @@ export default function FunnelContainer({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Back button */}
       {currentStep > 0 && onBack && (
         <button
           onClick={onBack}

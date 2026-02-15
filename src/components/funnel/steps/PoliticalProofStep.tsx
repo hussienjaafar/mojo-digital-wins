@@ -72,7 +72,10 @@ export default function PoliticalProofStep({ content, onNext }: PoliticalProofSt
         <span>Cultural Authenticity & Privacy Guarantee</span>
       </motion.div>
 
-      <div>
+      <div className="space-y-2">
+        {!canProceed && (
+          <p className="text-[#94a3b8] text-xs text-center">Please review the FEC disclaimer above before proceeding.</p>
+        )}
         <V3Button
           variant="success"
           size="xl"
@@ -80,7 +83,7 @@ export default function PoliticalProofStep({ content, onNext }: PoliticalProofSt
           onClick={onNext}
           disabled={!canProceed}
         >
-          {canProceed ? cta : `Please review disclaimer (${disclaimerSeconds}s)`}
+          {canProceed ? cta : `Reviewing disclaimer... (${disclaimerSeconds}s)`}
         </V3Button>
         {canProceed && <p className="text-[#94a3b8] text-sm mt-3 flex items-center justify-center gap-1">Next: Build your custom plan <span>→</span></p>}
       </div>
