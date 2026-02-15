@@ -1,78 +1,126 @@
 
 
-# Fix: QualificationStep Layout -- Remove Nested Scroll, Inline Into Page
+# Google Calendar Booking Integration
 
-## Problem
+## What You Need To Set Up
 
-The QualificationStep is rendered inside FunnelContainer's animated `motion.div` which uses `absolute inset-0` positioning. This creates:
-1. A visible scrollbar from the nested `overflow-y-auto` + `max-h-[calc(100vh-120px)]` on the step itself
-2. Content getting cut off at the bottom (budget options, submit button)
-3. The fixed "Back" button overlapping the headline text
+To show your team's real-time availability and auto-create meetings with lead summaries, you'll need to create a **Google Cloud Service Account** with Calendar API access. Here's what to do:
 
-## Solution
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a project (or use an existing one)
+3. Enable the **Google Calendar API** (APIs & Services -> Enable APIs -> search "Google Calendar API")
+4. Create a **Service Account** (APIs & Services -> Credentials -> Create Credentials -> Service Account)
+5. Download the **JSON key file** for the service account
+6. In your team's Google Calendar settings, **share the calendar** with the service account's email address (it looks like `something@project-id.iam.gserviceaccount.com`) and give it "Make changes to events" permission
+7. Note the **Calendar ID** you want to use (usually your team email like `team@molitico.com`, or find it in Calendar Settings -> "Integrate calendar")
 
-Make the QualificationStep (step 4) render as a **full-page inline layout** that owns its own scrolling, bypassing the FunnelContainer's animated wrapper entirely. The step will use the full viewport height, have its own back button integrated into the layout (not fixed/overlapping), and scroll naturally without a nested scroll container.
+I'll need two pieces of information stored as secrets:
+- **GOOGLE_CALENDAR_SERVICE_ACCOUNT**: The full JSON key file contents
+- **GOOGLE_CALENDAR_ID**: The calendar ID to book meetings on (e.g. `team@molitico.com`)
 
-## Changes
+---
 
-### 1. Experience.tsx -- Render QualificationStep outside FunnelContainer
+## How It Will Work
 
-When `currentStep === 4`, render the QualificationStep directly in the page div instead of inside FunnelContainer. This removes the `absolute inset-0` wrapper and its competing scroll context.
+Instead of redirecting high-scoring leads away from the site, the ThankYou step will show an inline booking widget:
 
-The FunnelContainer will still be used for steps 0-3 and step 5 (ThankYou). Step 4 gets its own full-page treatment.
+1. Lead submits the qualification form
+2. If `redirect_to_calendar` is true (score >= 50), ThankYou shows a **date picker + time slot grid** instead of the redirect
+3. The time slots come from querying the Google Calendar API for free/busy data
+4. Lead picks a slot, and a 30-minute event is created on your calendar with:
+   - Title: "Intro Call - [Lead Name] ([Organization])"
+   - Attendees: Lead's email + your team calendar
+   - Description: A summary of all their funnel answers (segment, channels, KPIs, budget, role)
+5. Lead sees a confirmation with the meeting date/time
 
-Similarly, when `currentStep === 5` (ThankYou), keep it in FunnelContainer as-is since it's a short page.
+---
 
-### 2. QualificationStep.tsx -- Remove scroll constraints, add integrated back button
+## Architecture
 
-- Remove `overflow-y-auto max-h-[calc(100vh-120px)]` from the root div -- the page itself will scroll naturally via `overflow-y-auto` on the parent
-- Change root container to `min-h-screen` with proper top/bottom padding (`pt-6 pb-10`) so content flows naturally
-- Add an inline back button at the top of the component (not fixed/overlapping) that calls `onBack`
-- Add `onBack` to the component's props
+### New Edge Function: `google-calendar-booking`
 
-### 3. FunnelContainer.tsx -- Hide back button when step is rendered outside
+**GET** `/google-calendar-booking?date=2026-02-20`
+- Authenticates with Google using the service account
+- Queries `freeBusy` for the given date on your calendar
+- Returns available 30-minute slots (e.g. 9:00 AM - 5:00 PM, excluding busy times)
 
-The back button in FunnelContainer won't show for step 4 since the QualificationStep won't be rendered inside it. No change needed to FunnelContainer itself.
+**POST** `/google-calendar-booking`
+- Body: `{ date, time, name, email, organization, summary }`
+- Creates a Google Calendar event with the lead as an attendee
+- Returns confirmation details
+
+### Updated ThankYou Step
+
+When `redirectToCalendar` is true:
+- Instead of redirecting, show a 3-step inline booking flow:
+  1. **Date picker**: Next 14 business days
+  2. **Time slot grid**: Available 30-min slots for selected date
+  3. **Confirmation**: Meeting booked message with details
+
+When `redirectToCalendar` is false:
+- Keep existing "What Happens Next" cards (no change)
 
 ---
 
 ## Technical Details
 
-### Experience.tsx Changes
+### Edge Function: `supabase/functions/google-calendar-booking/index.ts`
 
-Replace the current single-render approach with conditional rendering:
+- Uses Google's REST API directly (no SDK needed -- just JWT auth via service account)
+- Generates a JWT signed with the service account private key to get an access token
+- Calls `calendar.googleapis.com/v3/freeBusy` for availability
+- Calls `calendar.googleapis.com/v3/calendars/{id}/events` to create events
+- Meeting description template:
 
 ```text
-currentStep === 4:
-  Render QualificationStep directly in the page div (not inside FunnelContainer)
-  with its own onBack handler and full-viewport scrolling
+Strategy Session - Booked via Molitico Funnel
 
-all other steps:
-  Render inside FunnelContainer as before
+Lead: [Name]
+Email: [Email]
+Organization: [Organization]
+Role: [Role]
+Segment: [Commercial/Political]
+Channels: [CTV, Digital Ads, ...]
+Budget: [$10k-$50k]
+KPIs: [ROAS, Brand Awareness, ...]
+Decision Maker: Yes/No
+Lead Score: [Score]
 ```
 
-The QualificationStep will be wrapped in a simple `div` with `overflow-y-auto h-full` so the entire page scrolls as one document, not a nested iframe-like box.
+### New Component: `src/components/funnel/CalendarBooking.tsx`
 
-### QualificationStep.tsx Changes
+- Date selector showing next 14 business days (Mon-Fri)
+- Time slot grid (9 AM - 5 PM in 30-min increments)
+- Loading states while fetching availability
+- Confirmation view after booking
+- Styled to match the dark funnel theme
 
-- Add `onBack?: () => void` to props
-- Root div: change from `overflow-y-auto max-h-[calc(100vh-120px)] pb-20 px-4` to `min-h-full pb-10 px-4 pt-6`
-- Add an inline back button at the very top (before the headline), styled consistently with the rest of the funnel but not fixed-position:
-  ```text
-  <button onClick={onBack}>
-    <ArrowLeft /> Back
-  </button>
-  ```
-- This button sits in the document flow, so it never overlaps the headline
+### ThankYou Step Changes
 
-### Files Modified
+- Accept new props: `qualificationData` (the full form submission) and `segment`
+- When `redirectToCalendar` is true, render `CalendarBooking` instead of the redirect timer
+- Pass lead details to CalendarBooking for the meeting description
 
-| File | Changes |
-|------|---------|
-| `src/pages/Experience.tsx` | Render step 4 outside FunnelContainer; pass `onBack` to QualificationStep |
-| `src/components/funnel/steps/QualificationStep.tsx` | Accept `onBack` prop, add inline back button, remove nested scroll constraints |
+### Experience.tsx Changes
 
-### No Backend Changes
+- Pass qualification data and segment to ThankYouStep
+- Remove the Calendly redirect logic
 
-Purely layout/CSS changes. All analytics, database, and edge function logic remains untouched.
+### Config Changes
+
+- Register `google-calendar-booking` in `supabase/config.toml` with `verify_jwt = false`
+
+### Files Modified/Created
+
+| File | Action |
+|------|--------|
+| `supabase/functions/google-calendar-booking/index.ts` | Create -- handles availability + booking |
+| `src/components/funnel/CalendarBooking.tsx` | Create -- inline booking UI component |
+| `src/components/funnel/steps/ThankYouStep.tsx` | Modify -- show CalendarBooking for high-score leads |
+| `src/pages/Experience.tsx` | Modify -- pass qualification data to ThankYou |
+| `supabase/config.toml` | Modify -- register new edge function |
+
+### Business Hours Configuration
+
+Default: Monday-Friday, 9:00 AM - 5:00 PM Eastern Time. The edge function will filter out weekends and slots outside business hours. This can be adjusted by changing constants in the edge function.
 
