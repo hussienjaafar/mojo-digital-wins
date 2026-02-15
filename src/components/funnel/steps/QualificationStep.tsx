@@ -4,7 +4,7 @@ import type { VariantContent } from '@/hooks/useFunnelVariants';
 import { z } from 'zod';
 import { V3Button } from '@/components/v3';
 import FunnelInput from '@/components/funnel/FunnelInput';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, ArrowLeft } from 'lucide-react';
 
 interface QualificationStepProps {
   content?: VariantContent;
@@ -15,6 +15,7 @@ interface QualificationStepProps {
   onSubmit: (data: QualificationData) => void;
   onFieldFocus?: (fieldName: string) => void;
   onFieldBlur?: (fieldName: string, hadError: boolean) => void;
+  onBack?: () => void;
 }
 
 export interface QualificationData {
@@ -75,6 +76,7 @@ export default function QualificationStep({
   onSubmit,
   onFieldFocus,
   onFieldBlur,
+  onBack,
 }: QualificationStepProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState(prefillEmail);
@@ -174,7 +176,16 @@ export default function QualificationStep({
   const channelLabels = selectedChannels.map(id => CHANNEL_LABELS[id] || id).join(', ');
 
   return (
-    <div className="w-full max-w-lg mx-auto space-y-5 overflow-y-auto max-h-[calc(100vh-120px)] pb-20 px-4 scrollbar-thin scrollbar-thumb-[#1e2a45]">
+    <div className="w-full max-w-lg mx-auto space-y-5 min-h-full pb-10 px-4 pt-6">
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-[#7c8ba3] hover:text-[#e2e8f0] transition-colors text-sm mb-2"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
+      )}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-2">
         <h2 className="text-3xl font-bold text-[#e2e8f0]">{headline}</h2>
       </motion.div>
