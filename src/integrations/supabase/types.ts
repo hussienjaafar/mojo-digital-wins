@@ -3587,6 +3587,47 @@ export type Database = {
         }
         Relationships: []
       }
+      data_cart_items: {
+        Row: {
+          created_at: string
+          geo_code: string
+          geo_name: string
+          geo_type: string
+          id: string
+          product_id: string
+          record_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          geo_code: string
+          geo_name: string
+          geo_type: string
+          id?: string
+          product_id: string
+          record_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          geo_code?: string
+          geo_name?: string
+          geo_type?: string
+          id?: string
+          product_id?: string
+          record_count?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_cart_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "data_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_deletion_requests: {
         Row: {
           cancelled_at: string | null
@@ -3874,6 +3915,132 @@ export type Database = {
             referencedColumns: ["organization_id"]
           },
         ]
+      }
+      data_order_items: {
+        Row: {
+          created_at: string
+          geo_code: string
+          geo_name: string
+          geo_type: string
+          id: string
+          line_total: number
+          order_id: string
+          product_id: string
+          record_count: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          geo_code: string
+          geo_name: string
+          geo_type: string
+          id?: string
+          line_total: number
+          order_id: string
+          product_id: string
+          record_count: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string
+          geo_code?: string
+          geo_name?: string
+          geo_type?: string
+          id?: string
+          line_total?: number
+          order_id?: string
+          product_id?: string
+          record_count?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "data_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "data_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_orders: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          status: string
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          total_amount?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      data_products: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          min_order_amount: number
+          name: string
+          price_per_record: number
+          slug: string
+          source_field: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          min_order_amount?: number
+          name: string
+          price_per_record?: number
+          slug: string
+          source_field: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          min_order_amount?: number
+          name?: string
+          price_per_record?: number
+          slug?: string
+          source_field?: string
+        }
+        Relationships: []
       }
       data_retention_policies: {
         Row: {
