@@ -5,7 +5,8 @@
  * Displays district or state information based on selection.
  */
 
-import { X, Plus, Trash2, MapPin } from "lucide-react";
+import { useState } from "react";
+import { X, Plus, Trash2, MapPin, ShoppingCart } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import type {
   VoterImpactDistrict,
 } from "@/queries/useVoterImpactQueries";
 import { calculateImpactScore, IMPACT_THRESHOLDS } from "@/types/voter-impact";
+import { DataProductSelector } from "./DataProductSelector";
 
 // ============================================================================
 // Types
@@ -490,6 +492,8 @@ export function RegionSidebar({
   onClearComparison,
   onDeselect,
 }: RegionSidebarProps) {
+  const [productSelectorOpen, setProductSelectorOpen] = useState(false);
+
   const canAddToCompare =
     selectedRegion !== null &&
     comparisonItems.length < 4 &&
@@ -528,13 +532,22 @@ export function RegionSidebar({
               <StateDetails state={selectedRegion.data as VoterImpactState} onDeselect={onDeselect} />
             )}
 
+            {/* Get This Data CTA */}
+            <Button
+              onClick={() => setProductSelectorOpen(true)}
+              className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium transition-all"
+            >
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Get This Data
+            </Button>
+
             {/* Add to Compare Button */}
             {canAddToCompare && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={onAddToCompare}
-                className="w-full mt-4 bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 hover:border-purple-500/50 transition-all"
+                className="w-full mt-2 bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 hover:border-purple-500/50 transition-all"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add to Compare
@@ -611,6 +624,15 @@ export function RegionSidebar({
             })}
           </div>
         </div>
+      )}
+
+      {/* Data Product Selector Drawer */}
+      {selectedRegion && (
+        <DataProductSelector
+          open={productSelectorOpen}
+          onOpenChange={setProductSelectorOpen}
+          region={selectedRegion}
+        />
       )}
     </div>
   );
