@@ -11,6 +11,8 @@ import { ArrowLeft } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
+import { DataCartIcon } from '@/components/voter-impact/DataCartIcon';
+import { DataCart } from '@/components/voter-impact/DataCart';
 import {
   useVoterImpactStates,
   useVoterImpactDistricts,
@@ -38,6 +40,7 @@ export default function VoterImpactMap() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
+  const [cartOpen, setCartOpen] = useState(false);
 
   const initialRegionId = useMemo<string | null>(() => {
     return searchParams.get('region') || null;
@@ -259,6 +262,7 @@ export default function VoterImpactMap() {
             </h1>
           </div>
         </div>
+        <DataCartIcon onClick={() => setCartOpen(true)} />
       </header>
 
       {/* Controls Bar */}
@@ -322,6 +326,7 @@ export default function VoterImpactMap() {
         />
         </div>
       </div>
+      <DataCart open={cartOpen} onOpenChange={setCartOpen} />
     </div>
   );
 }
