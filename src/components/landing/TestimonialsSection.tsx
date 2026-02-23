@@ -1,24 +1,17 @@
 import { motion } from "framer-motion";
 import { Quote } from "lucide-react";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
+import { caseStudies } from "@/data/caseStudies";
 
-const testimonials = [
-  {
-    quote: "The audience intelligence report completely changed our media strategy. We saw a 3x improvement in ROAS within the first quarter.",
-    name: "Campaign Director",
-    title: "National Political Campaign",
-  },
-  {
-    quote: "Being able to activate across CTV, digital, and direct mail from one dataset gave us consistency we never had before.",
-    name: "VP of Marketing",
-    title: "Consumer Packaged Goods Brand",
-  },
-  {
-    quote: "The match rates are genuinely best-in-class. We're reaching more of our target universe than with any other vendor.",
-    name: "Media Buyer",
-    title: "Issue Advocacy Organization",
-  },
-];
+const testimonials = caseStudies
+  .filter((s) => s.testimonial)
+  .slice(0, 3)
+  .map((s) => ({
+    quote: s.testimonial!.quote,
+    name: s.testimonial!.author,
+    title: s.testimonial!.role,
+    stat: s.stat,
+  }));
 
 const TestimonialsSection = () => {
   const { ref, isVisible } = useScrollAnimation({ startVisible: false });
@@ -48,6 +41,7 @@ const TestimonialsSection = () => {
               <div>
                 <div className="text-[#e2e8f0] font-semibold text-sm">{t.name}</div>
                 <div className="text-[#64748b] text-xs">{t.title}</div>
+                <div className="text-emerald-400 text-xs font-semibold mt-1">{t.stat}</div>
               </div>
             </motion.div>
           ))}

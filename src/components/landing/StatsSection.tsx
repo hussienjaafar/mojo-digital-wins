@@ -2,10 +2,10 @@ import { motion } from "framer-motion";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
 const stats = [
-  { value: "500M+", label: "Data Records", description: "Voter & consumer profiles" },
-  { value: "50+", label: "Organizations", description: "Served nationwide" },
-  { value: "5", label: "Channels", description: "Omnichannel reach" },
-  { value: "92%", label: "Match Rate", description: "Industry-leading accuracy" },
+  { value: "$2.7M+", label: "Raised", description: "Across campaigns" },
+  { value: "13,500+", label: "New Donors", description: "Acquired for clients" },
+  { value: "5+", label: "Channels", description: "Omnichannel reach" },
+  { value: "947%", label: "Peak ROI", description: "Unity & Justice Fund" },
 ];
 
 const StatsSection = () => {
