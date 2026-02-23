@@ -3068,6 +3068,30 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_notification_recipients: {
+        Row: {
+          added_by: string | null
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean
+        }
+        Insert: {
+          added_by?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          is_active?: boolean
+        }
+        Update: {
+          added_by?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+        }
+        Relationships: []
+      }
       contact_submissions: {
         Row: {
           assigned_to: string | null
