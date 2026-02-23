@@ -1,65 +1,63 @@
 
-# Molitico Branding Integration and Visual Gap Fix
 
-## Problem
+# Hero Animation: Replace Photo with Interactive Particle Network
 
-The landing page currently uses **"Mojo"** as the brand name in 6 places, but the actual organization is **Molitico**. Additionally, 3 sections (CTV, Digital, Direct Mail channels and the SegmentPreview cards) have no supporting images -- they only show Lucide icons. The page also doesn't use the main site's signature Bebas Neue typography for the brand wordmark.
+## The Approach
 
-## Branding Fixes (Mojo to Molitico)
+No, the hero image is not necessary. We'll replace it with a **canvas-based interactive particle network animation** -- floating nodes connected by lines that react to mouse movement. This is the most widely used premium hero animation pattern in 2025 SaaS/B2B landing pages (used by Vercel, Linear, Stripe, and countless high-end sites). It's performant, looks striking on the dark `#0a0f1a` background, and reinforces the "data network / audience intelligence" brand metaphor.
 
-Every instance of "Mojo" will be replaced with "Molitico":
+## Why a Canvas Particle Network (Not Three.js)
 
-| Location | Current | Updated |
-|----------|---------|---------|
-| `LandingNav.tsx` line 13 | "Mojo" | "MOLITICO" (using `font-bebas` to match main site nav) |
-| `LandingFooter.tsx` line 5 | "Mojo. All rights reserved." | "Molitico. All rights reserved." |
-| `ProblemSection.tsx` line 67 | "With Mojo" | "With Molitico" |
-| `ProblemSection.tsx` comment line 38 | "Without Mojo" | (comment only, but will fix for consistency) |
-| `ReportPreview.tsx` line 41 | "app.mojo.co/report/your-organization" | "app.molitico.com/report/your-organization" |
-| `GetStarted.tsx` line 30 | Helmet title contains "Mojo" | Replace with "Molitico" |
+Three options were considered:
 
-## Visual Gaps -- Missing Images
+| Option | Pros | Cons |
+|--------|------|------|
+| **Three.js / R3F 3D scene** | Impressive 3D globe or mesh | Heavy bundle (~150KB+), GPU-intensive on mobile, complex to maintain |
+| **tsParticles library** | Easy config, lots of presets | Large dependency (~80KB), adds npm bloat, limited customization |
+| **Custom Canvas2D particle system** | Zero dependencies, tiny (~3KB), full control, perfect performance | Needs to be written from scratch |
 
-Three channel cards (CTV, Digital, Direct Mail) in `ChannelShowcase.tsx` and both segment cards in `SegmentPreview.tsx` currently show only icons with no supporting imagery. The existing assets in the project don't cover these specific use cases.
+**Recommendation: Custom Canvas2D** -- zero new dependencies (the project already has enough), complete creative control over colors/density/behavior, and the best mobile performance. It will render 80-120 floating nodes with connecting lines, subtle mouse repulsion/attraction, and a blue-to-emerald gradient glow -- all matching the existing page palette.
 
-### Solution: Generate images using AI
+## What It Will Look Like
 
-Use the Lovable AI image generation API (google/gemini-2.5-flash-image) via an edge function to create dark-themed, cinematic visuals that match the page aesthetic (dark navy `#0a0f1a` background, blue/emerald accent tones):
+- **Dark navy background** (`#0a0f1a`) with no photo
+- **60-100 floating particles** (small circles, 1-3px) in blue (`#3b82f6`) and emerald (`#34d399`) tones at low opacity
+- **Connecting lines** between nearby particles (within ~150px), creating a network/constellation effect
+- **Mouse interaction**: particles gently drift away from the cursor, creating a "parting" effect
+- **Gradient glow orbs**: 2-3 large soft radial gradients (blue/emerald) floating slowly in the background for depth
+- **Reduced motion support**: respects `prefers-reduced-motion` -- shows static dots only, no animation
+- **Mobile optimization**: reduces particle count to 30-40 on screens under 768px
 
-| Image | Description | Used In |
-|-------|-------------|---------|
-| CTV channel thumbnail | A living room with a large screen showing a streaming ad, dark cinematic lighting | `ChannelShowcase.tsx` CTV card |
-| Digital channel thumbnail | A laptop/phone showing programmatic display ads, dark tech aesthetic | `ChannelShowcase.tsx` Digital card |
-| Direct Mail thumbnail | A stylized direct mail piece on a dark surface, premium feel | `ChannelShowcase.tsx` Direct Mail card |
+## Technical Plan
 
-These will be generated once, saved to storage, and referenced as static URLs -- no runtime image generation.
+### New File: `src/components/landing/HeroParticleBackground.tsx`
 
-For the `SegmentPreview.tsx` cards, instead of adding photos, we'll enhance them with subtle background imagery using existing assets:
-- **Commercial card**: Use a subtle, darkened crop of the Times Square billboard (`billboard-times-square-wide.jpg`) as a background
-- **Political card**: Use a subtle, darkened crop of the rally photo (`hero-movement-rally.jpg`) as a background
+A self-contained React component using a `<canvas>` element with `requestAnimationFrame` for smooth 60fps animation:
 
-## Files to Modify
+- Uses `useRef` for canvas element and animation state
+- Uses `useEffect` for setup/teardown and resize handling
+- Uses `useReducedMotion` hook (already exists in project) to disable animation for accessibility
+- Mouse position tracked via `mousemove` event on the canvas
+- Particles stored as a simple array of `{x, y, vx, vy, radius, opacity}` objects
+- Each frame: update positions, check distances, draw connections, draw particles
+- Colors pulled from the existing palette constants (blue-400, emerald-400)
 
-| File | Changes |
-|------|---------|
-| `src/components/landing/LandingNav.tsx` | Replace "Mojo" with "MOLITICO" using `font-bebas` class |
-| `src/components/landing/LandingFooter.tsx` | Replace "Mojo" with "Molitico" |
-| `src/components/landing/ProblemSection.tsx` | Replace "With Mojo" with "With Molitico" |
-| `src/components/landing/ReportPreview.tsx` | Replace "app.mojo.co" with "app.molitico.com" |
-| `src/pages/GetStarted.tsx` | Update Helmet title from "Mojo" to "Molitico" |
-| `src/components/landing/ChannelShowcase.tsx` | Add generated images for CTV, Digital, and Direct Mail cards |
-| `src/components/landing/SegmentPreview.tsx` | Add subtle background images to Commercial and Political cards using existing assets |
+### Modified File: `src/components/landing/HeroSection.tsx`
 
-## Files to Create
+- Remove the `heroRally` image import and the `<img>` tag
+- Replace the background `<div>` with `<HeroParticleBackground />`
+- Keep the gradient overlay divs for the soft glow orbs (they complement the particles)
+- All text content, CTA, risk reversal, and social proof remain unchanged
 
-| File | Purpose |
-|------|---------|
-| `supabase/functions/generate-landing-images/index.ts` | One-time edge function to generate the 3 missing channel images using AI and save them to storage |
+### No Other Files Affected
 
-## Technical Approach
+The particle background is entirely self-contained. No new npm dependencies. No changes to `tailwind.config.ts` or any other component.
 
-1. Brand text replacements are straightforward string changes
-2. Nav wordmark will use `font-bebas` class (already available globally via `index.css`) with uppercase tracking to match the main site's `Navigation.tsx` styling
-3. For the 3 missing channel images, create a one-time edge function that generates them via the AI image API, saves to a storage bucket, and returns public URLs. Then hardcode those URLs into the channel cards
-4. SegmentPreview backgrounds will use the existing imported images with a heavy dark overlay (opacity ~10-15%) so text remains readable
-5. All new images use `loading="lazy"` for performance
+## Performance Considerations
+
+- Canvas is GPU-accelerated and far lighter than DOM-based particle solutions
+- `requestAnimationFrame` ensures no unnecessary rendering
+- Particle count scales down on mobile via `window.innerWidth` check
+- Canvas resizes on window resize with proper `devicePixelRatio` handling for sharp rendering on Retina displays
+- Animation pauses when tab is not visible (automatic with `requestAnimationFrame`)
+
