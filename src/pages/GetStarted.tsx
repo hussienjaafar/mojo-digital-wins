@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Helmet } from "react-helmet";
 import LandingNav from "@/components/landing/LandingNav";
@@ -17,6 +18,11 @@ import StickyMobileCTA from "@/components/landing/StickyMobileCTA";
 const GetStarted = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Prefetch Experience chunk so it's cached before user clicks CTA
+  useEffect(() => {
+    import("./Experience");
+  }, []);
 
   const handleCTA = () => {
     const searchParams = new URLSearchParams(location.search);

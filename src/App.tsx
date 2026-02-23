@@ -91,6 +91,11 @@ const PageLoader = () => (
   </div>
 );
 
+// Lightweight skeleton for Experience route — matches dark page aesthetic for seamless transition
+const ExperienceSkeleton = () => (
+  <div className="min-h-screen bg-[#0a0f1a]" />
+);
+
 // Domain-aware router for subdomain architecture
 // Handles redirects between molitico.com (marketing) and portal.molitico.com (app)
 const DomainRouter = () => {
@@ -171,7 +176,7 @@ const AppContent = () => {
       <MetaPixel />
       {isPublicPage && <ExitIntentPopup />}
       <PageTransition>
-        <Suspense fallback={<PageLoader />}>
+        <Suspense fallback={location.pathname === "/experience" ? <ExperienceSkeleton /> : <PageLoader />}>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/r/:org/:form" element={<Redirect />} />
