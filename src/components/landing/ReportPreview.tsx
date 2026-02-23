@@ -38,7 +38,7 @@ const ReportPreview = () => {
               </div>
               <div className="flex-1 mx-4">
                 <div className="bg-[#1e2a45] rounded-md px-3 py-1 text-[10px] text-[#64748b] text-center">
-                  app.mojo.co/report/your-organization
+                  app.molitico.com/report/your-organization
                 </div>
               </div>
             </div>

@@ -27,7 +27,7 @@ const GetStarted = () => {
   return (
     <>
       <Helmet>
-        <title>Stop Wasting Ad Spend | Free Audience Report | Mojo</title>
+        <title>Stop Wasting Ad Spend | Free Audience Report | Molitico</title>
         <meta
           name="description"
           content="Get a free audience opportunity report showing exactly who to target across CTV, digital, direct mail, OOH, and SMS. Trusted by 50+ campaigns."
