@@ -4,11 +4,14 @@ import { Button } from "@/components/ui/button";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import billboardWide from "@/assets/billboard-times-square-wide.jpg";
 import smsMockup from "@/assets/sms-mockup.jpg";
+import channelCtv from "@/assets/channel-ctv.jpg";
+import channelDigital from "@/assets/channel-digital.jpg";
+import channelDirectMail from "@/assets/channel-direct-mail.jpg";
 
 const channels = [
-  { icon: Tv, name: "CTV", desc: "Precision streaming ads across 100+ platforms", image: null },
-  { icon: Globe, name: "Digital", desc: "Programmatic display, video & native", image: null },
-  { icon: Mail, name: "Direct Mail", desc: "Data-driven mail with household targeting", image: null },
+  { icon: Tv, name: "CTV", desc: "Precision streaming ads across 100+ platforms", image: channelCtv },
+  { icon: Globe, name: "Digital", desc: "Programmatic display, video & native", image: channelDigital },
+  { icon: Mail, name: "Direct Mail", desc: "Data-driven mail with household targeting", image: channelDirectMail },
   { icon: MapPin, name: "OOH", desc: "Out-of-home in high-impact locations", image: billboardWide },
   { icon: MessageSquare, name: "SMS", desc: "Compliant peer-to-peer & broadcast text", image: smsMockup },
 ];
@@ -43,20 +46,14 @@ const ChannelShowcase = ({ onCTA }: ChannelShowcaseProps) => {
               animate={isVisible ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.4, delay: i * 0.08 }}
             >
-              {ch.image ? (
-                <div className="w-full h-20 rounded-lg overflow-hidden mb-3">
-                  <img
-                    src={ch.image}
-                    alt={`${ch.name} example`}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-              ) : (
-                <div className="w-10 h-10 mx-auto rounded-lg bg-blue-500/10 flex items-center justify-center mb-3 group-hover:bg-blue-500/20 transition-colors">
-                  <ch.icon className="h-5 w-5 text-blue-400" />
-                </div>
-              )}
+              <div className="w-full h-20 rounded-lg overflow-hidden mb-3">
+                <img
+                  src={ch.image}
+                  alt={`${ch.name} channel example`}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
               <div className="text-[#e2e8f0] font-semibold text-sm mb-1">{ch.name}</div>
               <div className="text-[#64748b] text-xs leading-snug">{ch.desc}</div>
             </motion.div>

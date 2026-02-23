@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import { Building2, Landmark, ArrowRight } from "lucide-react";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
+import billboardWide from "@/assets/billboard-times-square-wide.jpg";
+import heroRally from "@/assets/hero-movement-rally.jpg";
 
 const segments = [
   {
@@ -14,6 +16,7 @@ const segments = [
       "Brand lift measurement",
     ],
     accent: "blue",
+    bgImage: billboardWide,
   },
   {
     icon: Landmark,
@@ -26,6 +29,7 @@ const segments = [
       "Real-time donation attribution",
     ],
     accent: "emerald",
+    bgImage: heroRally,
   },
 ];
 
@@ -56,24 +60,38 @@ const SegmentPreview = () => {
             return (
               <motion.div
                 key={seg.title}
-                className={`p-8 rounded-2xl border ${borderColor} bg-[#141b2d]/60 transition-colors duration-300`}
+                className={`relative p-8 rounded-2xl border ${borderColor} overflow-hidden transition-colors duration-300`}
                 initial={{ opacity: 0, y: 30 }}
                 animate={isVisible ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.5, delay: i * 0.15 }}
               >
-                <div className={`w-12 h-12 rounded-xl ${iconBg} flex items-center justify-center mb-5`}>
-                  <seg.icon className={`h-6 w-6 ${iconColor}`} />
+                {/* Background image with dark overlay */}
+                <div className="absolute inset-0">
+                  <img
+                    src={seg.bgImage}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-[#141b2d]/90" />
                 </div>
-                <h3 className="text-xl font-bold text-[#e2e8f0] mb-2">{seg.title}</h3>
-                <p className="text-[#64748b] text-sm mb-5">{seg.industries}</p>
-                <ul className="space-y-2.5">
-                  {seg.benefits.map((b) => (
-                    <li key={b} className="flex items-start gap-2.5 text-sm text-[#94a3b8]">
-                      <ArrowRight className={`h-4 w-4 mt-0.5 flex-shrink-0 ${bulletColor}`} />
-                      {b}
-                    </li>
-                  ))}
-                </ul>
+
+                {/* Content */}
+                <div className="relative z-10">
+                  <div className={`w-12 h-12 rounded-xl ${iconBg} flex items-center justify-center mb-5`}>
+                    <seg.icon className={`h-6 w-6 ${iconColor}`} />
+                  </div>
+                  <h3 className="text-xl font-bold text-[#e2e8f0] mb-2">{seg.title}</h3>
+                  <p className="text-[#64748b] text-sm mb-5">{seg.industries}</p>
+                  <ul className="space-y-2.5">
+                    {seg.benefits.map((b) => (
+                      <li key={b} className="flex items-start gap-2.5 text-sm text-[#94a3b8]">
+                        <ArrowRight className={`h-4 w-4 mt-0.5 flex-shrink-0 ${bulletColor}`} />
+                        {b}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </motion.div>
             );
           })}

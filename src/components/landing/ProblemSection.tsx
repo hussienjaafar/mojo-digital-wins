@@ -35,7 +35,7 @@ const ProblemSection = () => {
           transition={{ duration: 0.6, delay: 0.2 }}
         >
           <div className="grid grid-cols-2 gap-4">
-            {/* Without Mojo */}
+            {/* Without Molitico */}
             <div className="p-5 rounded-xl border border-red-500/20 bg-red-500/5">
               <div className="text-red-400 text-xs font-semibold uppercase tracking-wider mb-3">Without data</div>
               <div className="space-y-2">
@@ -62,9 +62,9 @@ const ProblemSection = () => {
               </div>
             </div>
 
-            {/* With Mojo */}
+            {/* With Molitico */}
             <div className="p-5 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
-              <div className="text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-3">With Mojo</div>
+              <div className="text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-3">With Molitico</div>
               <div className="space-y-2">
                 {[
                   { label: "Precise targeting", pct: 92, color: "bg-emerald-500/60" },
