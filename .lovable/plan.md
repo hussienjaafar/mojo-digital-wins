@@ -1,89 +1,65 @@
 
-# Visual Audit: Landing Page Graphics Gap Analysis
+# Molitico Branding Integration and Visual Gap Fix
 
-## Current State
+## Problem
 
-The `/get-started` landing page uses **zero photographs, zero screenshots, and zero product visuals**. Every section relies entirely on text, Lucide icons, and CSS gradients. This is a significant conversion weakness -- research consistently shows that pages with relevant imagery convert 40-65% better than text-only pages.
+The landing page currently uses **"Mojo"** as the brand name in 6 places, but the actual organization is **Molitico**. Additionally, 3 sections (CTV, Digital, Direct Mail channels and the SegmentPreview cards) have no supporting images -- they only show Lucide icons. The page also doesn't use the main site's signature Bebas Neue typography for the brand wordmark.
 
-## Available Assets (Already in the Project, Unused)
+## Branding Fixes (Mojo to Molitico)
 
-The project already contains substantial visual assets that are used on the main marketing site but completely absent from the landing page:
+Every instance of "Mojo" will be replaced with "Molitico":
 
-| Asset | File | Currently Used On |
-|-------|------|-------------------|
-| Hero rally photo | `hero-movement-rally.jpg` | Main site homepage |
-| Hero movement photo | `hero-movement.jpg` | Main site homepage |
-| Times Square billboard (wide) | `billboard-times-square-wide.jpg` | Services page |
-| Times Square billboard (medium) | `billboard-times-square-medium.jpg` | Services page |
-| Bus billboard (Mamdani) | `billboard-mamdani-bus.webp` | Services page |
-| SMS mockup | `sms-mockup.jpg` | Not used anywhere |
-| 7 campaign images | Various `.png/.webp/.jpg` | Case studies page |
+| Location | Current | Updated |
+|----------|---------|---------|
+| `LandingNav.tsx` line 13 | "Mojo" | "MOLITICO" (using `font-bebas` to match main site nav) |
+| `LandingFooter.tsx` line 5 | "Mojo. All rights reserved." | "Molitico. All rights reserved." |
+| `ProblemSection.tsx` line 67 | "With Mojo" | "With Molitico" |
+| `ProblemSection.tsx` comment line 38 | "Without Mojo" | (comment only, but will fix for consistency) |
+| `ReportPreview.tsx` line 41 | "app.mojo.co/report/your-organization" | "app.molitico.com/report/your-organization" |
+| `GetStarted.tsx` line 30 | Helmet title contains "Mojo" | Replace with "Molitico" |
 
-## What's Missing vs. What We Can Fix
+## Visual Gaps -- Missing Images
 
-### Fix Now (Using Existing Assets)
+Three channel cards (CTV, Digital, Direct Mail) in `ChannelShowcase.tsx` and both segment cards in `SegmentPreview.tsx` currently show only icons with no supporting imagery. The existing assets in the project don't cover these specific use cases.
 
-**1. Hero Section -- Add a Background or Side Image**
-The hero is pure dark gradient. Adding the `hero-movement-rally.jpg` as a subtle background with a dark overlay would immediately add emotional weight and visual interest without needing new photography.
+### Solution: Generate images using AI
 
-**2. Channel Showcase -- Add Real Creative Examples**
-The 5 channel cards (CTV, Digital, Mail, OOH, SMS) are icon-only. We already have:
-- **OOH**: Times Square billboard photo and bus wrap photo
-- **SMS**: SMS mockup screenshot
-- These can be added as small thumbnail previews inside or adjacent to the channel cards, turning abstract descriptions into concrete visual proof
+Use the Lovable AI image generation API (google/gemini-2.5-flash-image) via an edge function to create dark-themed, cinematic visuals that match the page aesthetic (dark navy `#0a0f1a` background, blue/emerald accent tones):
 
-**3. Testimonials -- Add Campaign Images**
-Each testimonial maps to a case study that already has a campaign image. Adding these as small thumbnails or background elements next to the quotes adds visual credibility and breaks up the text-heavy layout.
+| Image | Description | Used In |
+|-------|-------------|---------|
+| CTV channel thumbnail | A living room with a large screen showing a streaming ad, dark cinematic lighting | `ChannelShowcase.tsx` CTV card |
+| Digital channel thumbnail | A laptop/phone showing programmatic display ads, dark tech aesthetic | `ChannelShowcase.tsx` Digital card |
+| Direct Mail thumbnail | A stylized direct mail piece on a dark surface, premium feel | `ChannelShowcase.tsx` Direct Mail card |
 
-**4. Problem Section -- Add a Visual**
-The problem agitation section is text-only. A simple graphic (e.g., a stylized chart showing wasted spend vs. optimized spend) would reinforce the message visually. This can be built with CSS/SVG -- no photo needed.
+These will be generated once, saved to storage, and referenced as static URLs -- no runtime image generation.
 
-### Needs New Assets (Recommendations)
+For the `SegmentPreview.tsx` cards, instead of adding photos, we'll enhance them with subtle background imagery using existing assets:
+- **Commercial card**: Use a subtle, darkened crop of the Times Square billboard (`billboard-times-square-wide.jpg`) as a background
+- **Political card**: Use a subtle, darkened crop of the rally photo (`hero-movement-rally.jpg`) as a background
 
-**5. Product/Report Preview Mockup (HIGH PRIORITY)**
-The single most impactful missing visual is a preview of what the "free audience report" actually looks like. Every high-converting B2B landing page shows the deliverable. Currently there is no screenshot, mockup, or preview of the report anywhere. This could be:
-- A styled screenshot of the actual opportunity report from the funnel
-- A browser-frame mockup showing sample data
-- Generated using AI image generation as a placeholder
+## Files to Modify
 
-**6. Channel Creative Samples (MEDIUM PRIORITY)**  
-The `creative-examples/` directory exists but is empty. Real samples of SMS texts, email campaigns, display ads, and direct mail pieces would make the channel showcase section dramatically more persuasive.
+| File | Changes |
+|------|---------|
+| `src/components/landing/LandingNav.tsx` | Replace "Mojo" with "MOLITICO" using `font-bebas` class |
+| `src/components/landing/LandingFooter.tsx` | Replace "Mojo" with "Molitico" |
+| `src/components/landing/ProblemSection.tsx` | Replace "With Mojo" with "With Molitico" |
+| `src/components/landing/ReportPreview.tsx` | Replace "app.mojo.co" with "app.molitico.com" |
+| `src/pages/GetStarted.tsx` | Update Helmet title from "Mojo" to "Molitico" |
+| `src/components/landing/ChannelShowcase.tsx` | Add generated images for CTV, Digital, and Direct Mail cards |
+| `src/components/landing/SegmentPreview.tsx` | Add subtle background images to Commercial and Political cards using existing assets |
 
-## Proposed Changes
-
-### Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/landing/HeroSection.tsx` | Add `hero-movement-rally.jpg` as a background image with dark gradient overlay |
-| `src/components/landing/ChannelShowcase.tsx` | Add thumbnail images for OOH (billboard photos) and SMS (mockup) channels |
-| `src/components/landing/TestimonialsSection.tsx` | Add campaign images from case studies alongside testimonial quotes |
-| `src/components/landing/ProblemSection.tsx` | Add a simple CSS/SVG visual illustrating wasted spend |
-
-### Files to Create
+## Files to Create
 
 | File | Purpose |
 |------|---------|
-| `src/components/landing/ReportPreview.tsx` | A mockup component showing what the free audience report looks like -- styled as a browser frame with sample data pulled from the existing funnel UI patterns |
-
-### Page Assembly Update
-
-| File | Change |
-|------|--------|
-| `src/pages/GetStarted.tsx` | Add `ReportPreview` component between HowItWorks and SegmentPreview sections |
-
-## Impact Summary
-
-- **Hero background image**: Adds emotional resonance and professional feel (existing asset, low effort)
-- **Channel thumbnails**: Transforms abstract descriptions into concrete visual proof (existing assets, medium effort)  
-- **Testimonial images**: Adds faces/campaigns to quotes for 35%+ higher trust (existing assets, low effort)
-- **Report preview mockup**: The single highest-impact addition -- shows the deliverable before asking for conversion (new component, medium effort)
-- **Problem section graphic**: Minor visual polish to break up text (CSS-only, low effort)
+| `supabase/functions/generate-landing-images/index.ts` | One-time edge function to generate the 3 missing channel images using AI and save them to storage |
 
 ## Technical Approach
 
-- All existing images will use lazy loading via standard `loading="lazy"` attributes
-- Hero background will use CSS `background-image` with a gradient overlay for text readability on the dark theme
-- Channel thumbnails will use `object-fit: cover` with rounded corners to match the existing card design
-- Report preview will be a styled component reusing design patterns from the existing funnel UI (dark cards, blue/emerald accents)
-- No new dependencies needed -- all work uses existing imports and Framer Motion for animations
+1. Brand text replacements are straightforward string changes
+2. Nav wordmark will use `font-bebas` class (already available globally via `index.css`) with uppercase tracking to match the main site's `Navigation.tsx` styling
+3. For the 3 missing channel images, create a one-time edge function that generates them via the AI image API, saves to a storage bucket, and returns public URLs. Then hardcode those URLs into the channel cards
+4. SegmentPreview backgrounds will use the existing imported images with a heavy dark overlay (opacity ~10-15%) so text remains readable
+5. All new images use `loading="lazy"` for performance
