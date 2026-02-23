@@ -6,6 +6,7 @@ import LogoBar from "@/components/landing/LogoBar";
 import ProblemSection from "@/components/landing/ProblemSection";
 import StatsSection from "@/components/landing/StatsSection";
 import HowItWorks from "@/components/landing/HowItWorks";
+import ReportPreview from "@/components/landing/ReportPreview";
 import SegmentPreview from "@/components/landing/SegmentPreview";
 import ChannelShowcase from "@/components/landing/ChannelShowcase";
 import TestimonialsSection from "@/components/landing/TestimonialsSection";
@@ -41,6 +42,7 @@ const GetStarted = () => {
           <ProblemSection />
           <StatsSection />
           <HowItWorks onCTA={handleCTA} />
+          <ReportPreview />
           <SegmentPreview />
           <ChannelShowcase onCTA={handleCTA} />
           <TestimonialsSection />

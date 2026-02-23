@@ -11,6 +11,7 @@ const testimonials = caseStudies
     name: s.testimonial!.author,
     title: s.testimonial!.role,
     stat: s.stat,
+    image: s.image,
   }));
 
 const TestimonialsSection = () => {
@@ -36,7 +37,12 @@ const TestimonialsSection = () => {
               animate={isVisible ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: i * 0.12 }}
             >
-              <Quote className="h-8 w-8 text-blue-500/20 mb-4 flex-shrink-0" />
+              {t.image && (
+                <div className="w-full h-28 rounded-lg overflow-hidden mb-4">
+                  <img src={t.image} alt={t.title} className="w-full h-full object-cover" loading="lazy" />
+                </div>
+              )}
+              <Quote className="h-6 w-6 text-blue-500/20 mb-3 flex-shrink-0" />
               <p className="text-[#94a3b8] text-sm leading-relaxed mb-6 flex-grow">"{t.quote}"</p>
               <div>
                 <div className="text-[#e2e8f0] font-semibold text-sm">{t.name}</div>
