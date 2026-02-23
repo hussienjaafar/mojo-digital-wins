@@ -1,119 +1,65 @@
 
 
-# Add a Landing/Sales Page Before the Intake Funnel
+# Integrate Real Case Studies, Logos, and Testimonials into the Landing Page
 
-## Why This Change
-
-Research and competitive analysis show that cold Meta ad traffic converts significantly better when they see a value-driven landing page before being asked for personal information. Your current funnel (email capture on step 1) is optimized for warm traffic but creates friction for users who just clicked an ad and don't yet understand the offering.
-
-MNTN (mountain.com) and other high-performing B2B ad funnels follow a consistent pattern: **sell first, capture second**.
+## Problem
+The `/get-started` landing page currently uses placeholder content:
+- **LogoBar**: Generic text labels like "National Campaigns", "CPG Brands" instead of real client logos
+- **TestimonialsSection**: Fabricated quotes from unnamed sources instead of the real testimonials already in `src/data/caseStudies.ts`
+- **StatsSection**: Placeholder numbers instead of proven metrics from actual case studies
 
 ## What Changes
 
-### 1. New Landing Page Component (`src/pages/GetStarted.tsx`)
+### 1. LogoBar -- Real Client Logos (Scrolling Marquee)
 
-A scrollable, single-page sales/landing page that Meta ads will link to. Sections:
+Replace the generic text pills with actual client logo images already imported in `src/components/ClientLogos.tsx`:
 
-- **Hero**: Bold headline + subheadline + primary CTA ("Get Your Free Report") + optional short video or animated visual
-- **Logo Bar**: Client/partner logos for instant credibility (scrolling marquee)
-- **Stats Section**: Key numbers (e.g., "500M+ records," "50+ organizations served," audience reach metrics)
-- **How It Works**: 3-step visual breakdown (Choose your channels -> Get audience intelligence -> Launch campaigns)
-- **Segment Cards**: Preview of Commercial vs. Political paths with brief value props for each
-- **Testimonials**: Named quotes from real clients with titles and organizations (or placeholder structure for adding them)
-- **Channel Showcase**: Brief cards for each channel (CTV, Digital, Direct Mail, OOH, SMS) with a one-liner benefit
-- **Bottom CTA**: Repeated call-to-action that navigates to `/experience` (the existing funnel)
+- Abdul for U.S. Senate
+- Unity & Justice Fund
+- Nasser for Michigan
+- Preston For PA
+- Rashid for Illinois
+- CAIR Action
+- MPAC
+- The Truth Project
+- A New Policy
 
-### 2. Route Updates (`src/App.tsx`)
+Each logo will be rendered as an image (with a brightness/invert filter for dark background visibility), scrolling in the existing marquee animation.
 
-- `/get-started` -> New landing page (currently redirects to `/experience`)
-- `/experience` -> Existing multi-step funnel (unchanged)
-- Meta ads link to `/get-started`; the CTA on that page links to `/experience`
+### 2. TestimonialsSection -- Real Client Testimonials
 
-### 3. Welcome Step Simplification (Optional, Phase 2)
+Replace the 3 fabricated quotes with real testimonials from `caseStudies.ts`. There are 5 case studies with testimonials:
 
-Once the landing page handles persuasion, the Welcome Step can be simplified to focus purely on lead capture (email + org) without needing to re-sell the value proposition. This is a follow-up optimization, not part of the initial build.
+| Client | Quote Author | Stat |
+|--------|-------------|------|
+| Unity & Justice Fund | Campaign Leadership | 947% ROI |
+| Nasser for Michigan | Campaign Manager | 325% ROI |
+| Rashid for Illinois | State Rep. Rashid | 415% ROI |
+| Arab-American Non-profit | Executive Director | 304% ROI |
+| A New Policy | Founding Director | 289% ROI |
 
-## What Stays the Same
+The section will import from `caseStudies` and filter for entries that have a `testimonial` property, showing 3 featured ones.
 
-- The entire 6-step `/experience` funnel remains intact
-- All analytics, A/B testing, abandoned lead capture, and Meta CAPI tracking continue to work
-- The Qualification step, scoring, and calendar redirect are unchanged
+### 3. StatsSection -- Real Aggregate Numbers
 
-## Page Structure (Technical)
+Update stats to reflect actual proven results:
+- **$2.7M+** raised across campaigns (sum of documented raises)
+- **13,500+** new donors acquired (sum from case studies)
+- **5+** channels (CTV, Digital, Direct Mail, OOH, SMS)
+- **947%** peak ROI (Unity & Justice Fund)
 
-```text
-/get-started (NEW - Landing Page)
-+---------------------------------------+
-| Nav: Logo          [Get Started] btn  |
-+---------------------------------------+
-| HERO                                  |
-| Headline + Subheadline                |
-| [Get Your Free Report ->]             |
-| Trust badge: "No commitment required" |
-+---------------------------------------+
-| LOGO BAR (scrolling)                  |
-| [Client1] [Client2] [Client3] ...    |
-+---------------------------------------+
-| STATS                                 |
-| 500M+     50+        5          92%   |
-| Records   Orgs      Channels   Match |
-+---------------------------------------+
-| HOW IT WORKS                          |
-| 1. Choose  2. Get     3. Launch       |
-|    Path       Intel      Campaigns    |
-+---------------------------------------+
-| FOR COMMERCIAL  |  FOR POLITICAL      |
-| CPG, Retail...  |  Campaigns, PACs... |
-| Key benefits    |  Key benefits       |
-+---------------------------------------+
-| CHANNELS                              |
-| CTV | Digital | Mail | OOH | SMS     |
-+---------------------------------------+
-| TESTIMONIALS                          |
-| "Quote..." - Name, Title, Org        |
-| "Quote..." - Name, Title, Org        |
-+---------------------------------------+
-| FINAL CTA                            |
-| Ready to reach your audience?         |
-| [Start Your Free Report ->]           |
-+---------------------------------------+
-| FOOTER (minimal)                      |
-+---------------------------------------+
+## Files to Modify
 
-         |  CTA clicks navigate to  |
-         v                          v
+| File | Change |
+|------|--------|
+| `src/components/landing/LogoBar.tsx` | Import real logo assets, render as images in the scrolling marquee with dark-mode-compatible styling |
+| `src/components/landing/TestimonialsSection.tsx` | Import `caseStudies` data, use real testimonials instead of hardcoded placeholders |
+| `src/components/landing/StatsSection.tsx` | Update stat values to reflect real aggregate metrics from case studies |
 
-/experience (EXISTING - Multi-Step Funnel)
-+---------------------------------------+
-| Step 1: Email + Org capture           |
-| Step 2: Segment + Channel selection   |
-| Step 3: Opportunity stats             |
-| Step 4: Social proof                  |
-| Step 5: Qualification form            |
-| Step 6: Thank you / Calendar          |
-+---------------------------------------+
-```
+## Technical Details
 
-## Files to Create/Modify
-
-| File | Action | Description |
-|------|--------|-------------|
-| `src/pages/GetStarted.tsx` | Create | New landing page with hero, stats, testimonials, CTAs |
-| `src/App.tsx` | Modify | Change `/get-started` route from redirect to new page |
-| `src/components/landing/` | Create (multiple) | Reusable section components: HeroSection, LogoBar, StatsSection, HowItWorks, SegmentPreview, ChannelShowcase, TestimonialsSection, FinalCTA |
-
-## Design Approach
-
-- Matches the existing dark theme (`#0a0f1a` background, `#e2e8f0` text, blue/emerald accents)
-- Mobile-first responsive design consistent with the funnel
-- Smooth scroll animations using Framer Motion (already installed)
-- UTM parameters are preserved when navigating from landing page to `/experience`
-
-## Content Notes
-
-The landing page will use placeholder content that you can replace with real data:
-- Client logos (placeholder boxes until real logos are provided)
-- Testimonial quotes (template structure ready for real quotes)
-- Stats (using reasonable placeholders based on your data products)
-- You can update all content directly or via the existing `content_optimization` table
+- Logo images are already in `src/assets/` and imported in `ClientLogos.tsx` -- we reuse the same imports
+- Logos get a `brightness-0 invert` CSS filter so they display as white on the dark landing page background
+- Testimonials are pulled directly from the `caseStudies` array by filtering for `study.testimonial`
+- No new dependencies or database changes needed
 
