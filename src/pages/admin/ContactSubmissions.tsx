@@ -141,6 +141,7 @@ export default function ContactSubmissions() {
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [showNotesDialog, setShowNotesDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showMessageDialog, setShowMessageDialog] = useState(false);
   const [submissionToDelete, setSubmissionToDelete] = useState<string | null>(null);
 
   useEffect(() => {
@@ -717,6 +718,10 @@ export default function ContactSubmissions() {
           pageSize={25}
           defaultSortKey="date"
           defaultSortDirection="desc"
+          onRowClick={(row) => {
+            setSelectedSubmission(row);
+            setShowMessageDialog(true);
+          }}
         />
       </div>
 
@@ -784,6 +789,88 @@ export default function ContactSubmissions() {
             </V3Button>
             <V3Button onClick={addNote} disabled={!newNote.trim()}>
               Add Note
+            </V3Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Submission Detail Dialog */}
+      <Dialog open={showMessageDialog} onOpenChange={setShowMessageDialog}>
+        <DialogContent className="max-w-2xl bg-[hsl(var(--portal-bg-primary))] border-[hsl(var(--portal-border))]">
+          <DialogHeader>
+            <DialogTitle className="text-[hsl(var(--portal-text-primary))]">Submission Details</DialogTitle>
+            <DialogDescription className="text-[hsl(var(--portal-text-muted))]">
+              Full submission from {selectedSubmission?.name}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedSubmission && (
+            <div className="space-y-4">
+              {/* Contact info */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+                <div>
+                  <p className="text-xs font-medium text-[hsl(var(--portal-text-muted))] uppercase tracking-wide">Name</p>
+                  <p className="text-sm text-[hsl(var(--portal-text-primary))]">{selectedSubmission.name}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-[hsl(var(--portal-text-muted))] uppercase tracking-wide">Email</p>
+                  <p className="text-sm text-[hsl(var(--portal-text-primary))]">{selectedSubmission.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-[hsl(var(--portal-text-muted))] uppercase tracking-wide">Date</p>
+                  <p className="text-sm text-[hsl(var(--portal-text-primary))]">
+                    {format(new Date(selectedSubmission.created_at), "PPpp")}
+                  </p>
+                </div>
+              </div>
+
+              {/* Status & Priority */}
+              <div className="flex items-center gap-3">
+                <V3Badge variant={getStatusBadgeVariant(selectedSubmission.status)}>
+                  {selectedSubmission.status.replace("_", " ")}
+                </V3Badge>
+                <V3Badge variant={getPriorityBadgeVariant(selectedSubmission.priority)}>
+                  {selectedSubmission.priority}
+                </V3Badge>
+              </div>
+
+              {/* Campaign */}
+              {selectedSubmission.campaign && (
+                <div>
+                  <p className="text-xs font-medium text-[hsl(var(--portal-text-muted))] uppercase tracking-wide mb-1">Campaign</p>
+                  <p className="text-sm text-[hsl(var(--portal-text-secondary))]">{selectedSubmission.campaign}</p>
+                </div>
+              )}
+
+              {/* Full message */}
+              <div>
+                <p className="text-xs font-medium text-[hsl(var(--portal-text-muted))] uppercase tracking-wide mb-1">Message</p>
+                <div className="portal-card p-4 rounded-lg">
+                  <p className="text-sm text-[hsl(var(--portal-text-primary))] whitespace-pre-wrap break-words">
+                    {selectedSubmission.message}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <V3Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setShowMessageDialog(false);
+                if (selectedSubmission) {
+                  fetchNotes(selectedSubmission.id);
+                  setShowNotesDialog(true);
+                }
+              }}
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              View Notes ({selectedSubmission?.notes_count ?? 0})
+            </V3Button>
+            <V3Button variant="secondary" onClick={() => setShowMessageDialog(false)}>
+              Close
             </V3Button>
           </DialogFooter>
         </DialogContent>
