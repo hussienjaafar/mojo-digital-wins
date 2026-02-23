@@ -45,6 +45,7 @@ const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Login = lazy(() => import("./pages/Login"));
 const Experience = lazy(() => import("./pages/Experience"));
+const GetStarted = lazy(() => import("./pages/GetStarted"));
 
 // Admin pages (lazy loaded - larger bundle)
 const Admin = lazy(() => import("./pages/Admin"));
@@ -185,7 +186,7 @@ const AppContent = () => {
             <Route path="/contact" element={<Contact />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/experience" element={<Experience />} />
-            <Route path="/get-started" element={<Navigate to="/experience" replace />} />
+            <Route path="/get-started" element={<GetStarted />} />
             <Route path="/bills/:billNumber" element={<BillDetail />} />
             <Route path="/meta-oauth-callback" element={<MetaOAuthCallback />} />
             <Route path="/settings" element={<Settings />} />
