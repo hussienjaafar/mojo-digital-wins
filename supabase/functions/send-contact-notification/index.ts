@@ -1,8 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, checkRateLimit } from "../_shared/security.ts";
 import { contactForm } from "../_shared/email-templates/templates/transactional.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const corsHeaders = getCorsHeaders();
 
 interface ContactNotificationRequest {
@@ -95,6 +98,30 @@ const handler = async (req: Request): Promise<Response> => {
       submittedAt: timestamp,
     });
 
+    // Get recipients from database, fallback to env var
+    let recipients: string[] = [];
+    try {
+      const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const { data: dbRecipients } = await supabaseAdmin
+        .from("contact_notification_recipients")
+        .select("email")
+        .eq("is_active", true);
+      if (dbRecipients && dbRecipients.length > 0) {
+        recipients = dbRecipients.map((r: any) => r.email);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch DB recipients, falling back to env var:", e);
+    }
+
+    // Fallback to env var if no DB recipients
+    if (recipients.length === 0) {
+      recipients = (Deno.env.get('CONTACT_FORM_RECIPIENTS') || '').split(',').filter(Boolean);
+    }
+
+    if (recipients.length === 0) {
+      throw new Error("No notification recipients configured");
+    }
+
     const emailResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -103,7 +130,7 @@ const handler = async (req: Request): Promise<Response> => {
       },
       body: JSON.stringify({
         from: `Contact Form <${Deno.env.get('SENDER_EMAIL') || 'noreply@example.com'}>`,
-        to: (Deno.env.get('CONTACT_FORM_RECIPIENTS') || '').split(',').filter(Boolean),
+        to: recipients,
         subject: `New Contact Form Submission from ${name}`,
         html: htmlContent,
         reply_to: email,

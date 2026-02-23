@@ -16,6 +16,9 @@ import {
   Mail,
   RefreshCw,
   ArrowLeft,
+  Settings,
+  Plus,
+  X,
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 
@@ -28,8 +31,11 @@ import { V3Button } from "@/components/v3/V3Button";
 import { V3Badge } from "@/components/v3/V3Badge";
 import { V3DataTable, V3Column } from "@/components/v3/V3DataTable";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -88,6 +94,13 @@ type AdminProfile = {
   email: string;
 };
 
+type NotificationRecipient = {
+  id: string;
+  email: string;
+  is_active: boolean;
+  created_at: string;
+};
+
 const statusOptions = [
   { value: "all", label: "All Status" },
   { value: "new", label: "New" },
@@ -143,10 +156,17 @@ export default function ContactSubmissions() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showMessageDialog, setShowMessageDialog] = useState(false);
   const [submissionToDelete, setSubmissionToDelete] = useState<string | null>(null);
+  
+  // Notification recipients state
+  const [recipients, setRecipients] = useState<NotificationRecipient[]>([]);
+  const [newRecipientEmail, setNewRecipientEmail] = useState("");
+  const [isAddingRecipient, setIsAddingRecipient] = useState(false);
+  const [showRecipientsSection, setShowRecipientsSection] = useState(false);
 
   useEffect(() => {
     fetchSubmissions();
     fetchAdmins();
+    fetchRecipients();
   }, []);
 
   const fetchSubmissions = async () => {
@@ -185,6 +205,80 @@ export default function ContactSubmissions() {
       setAdmins(profiles || []);
     } catch (error) {
       logger.error("Failed to fetch admins", error);
+    }
+  };
+
+  const fetchRecipients = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("contact_notification_recipients")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      setRecipients((data as NotificationRecipient[]) || []);
+    } catch (error) {
+      logger.error("Failed to fetch recipients", error);
+    }
+  };
+
+  const addRecipient = async () => {
+    const email = newRecipientEmail.trim().toLowerCase();
+    if (!email) return;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({ title: "Invalid email", description: "Please enter a valid email address.", variant: "destructive" });
+      return;
+    }
+    setIsAddingRecipient(true);
+    try {
+      const { error } = await supabase
+        .from("contact_notification_recipients")
+        .insert({ email, added_by: (await supabase.auth.getSession()).data.session?.user?.id } as any);
+      if (error) {
+        if (error.code === "23505") {
+          toast({ title: "Duplicate", description: "This email is already a recipient.", variant: "destructive" });
+        } else {
+          throw error;
+        }
+      } else {
+        toast({ title: "Added", description: `${email} will now receive notifications.` });
+        setNewRecipientEmail("");
+        fetchRecipients();
+      }
+    } catch (error) {
+      logger.error("Failed to add recipient", error);
+      toast({ title: "Error", description: "Failed to add recipient.", variant: "destructive" });
+    } finally {
+      setIsAddingRecipient(false);
+    }
+  };
+
+  const toggleRecipientActive = async (id: string, isActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("contact_notification_recipients")
+        .update({ is_active: isActive } as any)
+        .eq("id", id);
+      if (error) throw error;
+      fetchRecipients();
+    } catch (error) {
+      logger.error("Failed to toggle recipient", error);
+      toast({ title: "Error", description: "Failed to update recipient.", variant: "destructive" });
+    }
+  };
+
+  const removeRecipient = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("contact_notification_recipients")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+      toast({ title: "Removed", description: "Recipient removed." });
+      fetchRecipients();
+    } catch (error) {
+      logger.error("Failed to remove recipient", error);
+      toast({ title: "Error", description: "Failed to remove recipient.", variant: "destructive" });
     }
   };
 
@@ -654,6 +748,69 @@ export default function ContactSubmissions() {
 
         {/* Stats Grid */}
         <AdminStatsGrid items={statItems} isLoading={isLoading} columns={4} />
+
+        {/* Notification Recipients */}
+        <Collapsible open={showRecipientsSection} onOpenChange={setShowRecipientsSection}>
+          <div className="portal-card p-4">
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center gap-2 w-full text-left">
+                <Settings className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" />
+                <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                  Notification Recipients
+                </span>
+                <span className="text-xs text-[hsl(var(--portal-text-muted))] ml-1">
+                  ({recipients.filter(r => r.is_active).length} active)
+                </span>
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-4 space-y-3">
+              {/* Add recipient */}
+              <div className="flex gap-2">
+                <Input
+                  type="email"
+                  placeholder="email@example.com"
+                  value={newRecipientEmail}
+                  onChange={(e) => setNewRecipientEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addRecipient()}
+                  className="flex-1"
+                />
+                <V3Button size="sm" onClick={addRecipient} disabled={isAddingRecipient || !newRecipientEmail.trim()}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </V3Button>
+              </div>
+
+              {/* Recipient list */}
+              {recipients.length === 0 ? (
+                <p className="text-sm text-[hsl(var(--portal-text-muted))] py-2">
+                  No recipients configured. Notifications will use the default environment variable.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {recipients.map((recipient) => (
+                    <div
+                      key={recipient.id}
+                      className="flex items-center justify-between gap-3 py-2 px-3 rounded-md bg-[hsl(var(--portal-bg-secondary))]"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Switch
+                          checked={recipient.is_active}
+                          onCheckedChange={(checked) => toggleRecipientActive(recipient.id, checked)}
+                        />
+                        <span className={`text-sm truncate ${recipient.is_active ? "text-[hsl(var(--portal-text-primary))]" : "text-[hsl(var(--portal-text-muted))] line-through"}`}>
+                          {recipient.email}
+                        </span>
+                      </div>
+                      <V3Button variant="ghost" size="sm" onClick={() => removeRecipient(recipient.id)}>
+                        <X className="h-4 w-4" />
+                      </V3Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
 
         {/* Filter Bar */}
         <div className="portal-card p-4">
