@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { Target, BarChart3, Rocket } from "lucide-react";
+import { Target, BarChart3, Rocket, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
 const steps = [
@@ -23,7 +24,11 @@ const steps = [
   },
 ];
 
-const HowItWorks = () => {
+interface HowItWorksProps {
+  onCTA: () => void;
+}
+
+const HowItWorks = ({ onCTA }: HowItWorksProps) => {
   const { ref, isVisible } = useScrollAnimation({ startVisible: false });
 
   return (
@@ -61,6 +66,22 @@ const HowItWorks = () => {
             </motion.div>
           ))}
         </div>
+
+        <motion.div
+          className="text-center mt-10"
+          initial={{ opacity: 0, y: 15 }}
+          animate={isVisible ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5, delay: 0.5 }}
+        >
+          <Button
+            size="lg"
+            onClick={onCTA}
+            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-500/25 transition-all duration-300 rounded-xl group"
+          >
+            Get My Free Report
+            <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+          </Button>
+        </motion.div>
       </div>
     </section>
   );

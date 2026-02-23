@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { Tv, Globe, Mail, MapPin, MessageSquare } from "lucide-react";
+import { Tv, Globe, Mail, MapPin, MessageSquare, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
 const channels = [
@@ -10,7 +11,11 @@ const channels = [
   { icon: MessageSquare, name: "SMS", desc: "Compliant peer-to-peer & broadcast text" },
 ];
 
-const ChannelShowcase = () => {
+interface ChannelShowcaseProps {
+  onCTA: () => void;
+}
+
+const ChannelShowcase = ({ onCTA }: ChannelShowcaseProps) => {
   const { ref, isVisible } = useScrollAnimation({ startVisible: false });
 
   return (
@@ -44,6 +49,22 @@ const ChannelShowcase = () => {
             </motion.div>
           ))}
         </div>
+
+        <motion.div
+          className="text-center mt-10"
+          initial={{ opacity: 0, y: 15 }}
+          animate={isVisible ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.4, delay: 0.5 }}
+        >
+          <Button
+            size="lg"
+            onClick={onCTA}
+            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-500/25 transition-all duration-300 rounded-xl group"
+          >
+            Get My Free Report
+            <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+          </Button>
+        </motion.div>
       </div>
     </section>
   );
