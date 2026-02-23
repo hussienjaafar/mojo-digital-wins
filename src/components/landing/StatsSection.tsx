@@ -2,9 +2,9 @@ import { motion } from "framer-motion";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
 const stats = [
-  { value: "$2.7M+", label: "Raised", description: "Across campaigns" },
-  { value: "13,500+", label: "New Donors", description: "Acquired for clients" },
-  { value: "5+", label: "Channels", description: "Omnichannel reach" },
+  { value: "$2.7M+", label: "Revenue Driven", description: "Across client campaigns" },
+  { value: "13,500+", label: "New Contacts", description: "Donors & customers acquired" },
+  { value: "50+", label: "Organizations", description: "Commercial & political" },
   { value: "947%", label: "Peak ROI", description: "Unity & Justice Fund" },
 ];
 

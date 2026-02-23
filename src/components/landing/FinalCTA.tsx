@@ -29,10 +29,10 @@ const FinalCTA = ({ onCTA }: FinalCTAProps) => {
           onClick={onCTA}
           className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 text-base px-10 py-6 h-auto rounded-xl group"
         >
-          Start Your Free Report
+          Get My Free Report
           <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
         </Button>
-        <p className="mt-4 text-[#64748b] text-sm">No credit card · No commitment · 2-minute setup</p>
+        <p className="mt-4 text-[#64748b] text-sm">No credit card · No commitment · Takes 2 minutes</p>
       </motion.div>
     </section>
   );

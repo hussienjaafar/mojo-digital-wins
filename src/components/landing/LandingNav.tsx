@@ -17,7 +17,7 @@ const LandingNav = ({ onCTA }: LandingNavProps) => {
           onClick={onCTA}
           className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm group"
         >
-          Get Started
+          Get Free Report
           <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
         </Button>
       </div>
