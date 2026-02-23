@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import heroRally from "@/assets/hero-movement-rally.jpg";
 
 interface HeroSectionProps {
   onCTA: () => void;
@@ -9,8 +10,16 @@ interface HeroSectionProps {
 const HeroSection = ({ onCTA }: HeroSectionProps) => {
   return (
     <section className="relative min-h-[90vh] flex items-center justify-center px-4 pt-20 pb-16 overflow-hidden">
-      {/* Background gradient effects */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0a0f1a] via-[#0f1629] to-[#0a0f1a]" />
+      {/* Background photo with dark overlay */}
+      <div className="absolute inset-0">
+        <img
+          src={heroRally}
+          alt=""
+          className="w-full h-full object-cover"
+          loading="eager"
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0a0f1a]/90 via-[#0f1629]/85 to-[#0a0f1a]/90" />
+      </div>
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl" />
 
