@@ -1,55 +1,119 @@
 
 
-# Manage Contact Form Notification Recipients from Admin UI
+# Add a Landing/Sales Page Before the Intake Funnel
 
-## Problem
-Currently, contact form notification emails are sent to addresses stored in the `CONTACT_FORM_RECIPIENTS` environment variable -- which can only be changed by editing secrets. There's no way to manage recipients from the admin interface.
+## Why This Change
 
-## Solution
-Store notification recipients in a new database table and provide a settings section on the Contact Submissions page where admins can add/remove email addresses. The edge function will read from the database instead of (or in addition to) the environment variable.
+Research and competitive analysis show that cold Meta ad traffic converts significantly better when they see a value-driven landing page before being asked for personal information. Your current funnel (email capture on step 1) is optimized for warm traffic but creates friction for users who just clicked an ad and don't yet understand the offering.
 
-## Database Changes
+MNTN (mountain.com) and other high-performing B2B ad funnels follow a consistent pattern: **sell first, capture second**.
 
-**New table: `contact_notification_recipients`**
+## What Changes
 
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid PK | Default `gen_random_uuid()` |
-| email | varchar NOT NULL | Recipient email address |
-| added_by | uuid FK auth.users | Who added this recipient |
-| is_active | boolean | Default `true`, allows disabling without deleting |
-| created_at | timestamptz | Default `now()` |
-| UNIQUE(email) | | Prevent duplicate emails |
+### 1. New Landing Page Component (`src/pages/GetStarted.tsx`)
 
-**RLS**: Only system admins can SELECT/INSERT/UPDATE/DELETE (using the existing `is_system_admin()` function).
+A scrollable, single-page sales/landing page that Meta ads will link to. Sections:
 
-## UI Changes
+- **Hero**: Bold headline + subheadline + primary CTA ("Get Your Free Report") + optional short video or animated visual
+- **Logo Bar**: Client/partner logos for instant credibility (scrolling marquee)
+- **Stats Section**: Key numbers (e.g., "500M+ records," "50+ organizations served," audience reach metrics)
+- **How It Works**: 3-step visual breakdown (Choose your channels -> Get audience intelligence -> Launch campaigns)
+- **Segment Cards**: Preview of Commercial vs. Political paths with brief value props for each
+- **Testimonials**: Named quotes from real clients with titles and organizations (or placeholder structure for adding them)
+- **Channel Showcase**: Brief cards for each channel (CTV, Digital, Direct Mail, OOH, SMS) with a one-liner benefit
+- **Bottom CTA**: Repeated call-to-action that navigates to `/experience` (the existing funnel)
 
-**File: `src/pages/admin/ContactSubmissions.tsx`**
+### 2. Route Updates (`src/App.tsx`)
 
-Add a "Notification Recipients" section (collapsible or as a settings icon/drawer) near the top of the page:
-- Shows a list of current recipient emails with an active/inactive toggle and a remove button
-- An input field + "Add" button to add new email addresses (with email format validation)
-- Visual feedback via toast on add/remove
+- `/get-started` -> New landing page (currently redirects to `/experience`)
+- `/experience` -> Existing multi-step funnel (unchanged)
+- Meta ads link to `/get-started`; the CTA on that page links to `/experience`
 
-## Edge Function Changes
+### 3. Welcome Step Simplification (Optional, Phase 2)
 
-**File: `supabase/functions/send-contact-notification/index.ts`**
+Once the landing page handles persuasion, the Welcome Step can be simplified to focus purely on lead capture (email + org) without needing to re-sell the value proposition. This is a follow-up optimization, not part of the initial build.
 
-Update to query `contact_notification_recipients` (where `is_active = true`) for the recipient list. Falls back to `CONTACT_FORM_RECIPIENTS` env var if the table is empty, ensuring backward compatibility.
+## What Stays the Same
+
+- The entire 6-step `/experience` funnel remains intact
+- All analytics, A/B testing, abandoned lead capture, and Meta CAPI tracking continue to work
+- The Qualification step, scoring, and calendar redirect are unchanged
+
+## Page Structure (Technical)
+
+```text
+/get-started (NEW - Landing Page)
++---------------------------------------+
+| Nav: Logo          [Get Started] btn  |
++---------------------------------------+
+| HERO                                  |
+| Headline + Subheadline                |
+| [Get Your Free Report ->]             |
+| Trust badge: "No commitment required" |
++---------------------------------------+
+| LOGO BAR (scrolling)                  |
+| [Client1] [Client2] [Client3] ...    |
++---------------------------------------+
+| STATS                                 |
+| 500M+     50+        5          92%   |
+| Records   Orgs      Channels   Match |
++---------------------------------------+
+| HOW IT WORKS                          |
+| 1. Choose  2. Get     3. Launch       |
+|    Path       Intel      Campaigns    |
++---------------------------------------+
+| FOR COMMERCIAL  |  FOR POLITICAL      |
+| CPG, Retail...  |  Campaigns, PACs... |
+| Key benefits    |  Key benefits       |
++---------------------------------------+
+| CHANNELS                              |
+| CTV | Digital | Mail | OOH | SMS     |
++---------------------------------------+
+| TESTIMONIALS                          |
+| "Quote..." - Name, Title, Org        |
+| "Quote..." - Name, Title, Org        |
++---------------------------------------+
+| FINAL CTA                            |
+| Ready to reach your audience?         |
+| [Start Your Free Report ->]           |
++---------------------------------------+
+| FOOTER (minimal)                      |
++---------------------------------------+
+
+         |  CTA clicks navigate to  |
+         v                          v
+
+/experience (EXISTING - Multi-Step Funnel)
++---------------------------------------+
+| Step 1: Email + Org capture           |
+| Step 2: Segment + Channel selection   |
+| Step 3: Opportunity stats             |
+| Step 4: Social proof                  |
+| Step 5: Qualification form            |
+| Step 6: Thank you / Calendar          |
++---------------------------------------+
+```
 
 ## Files to Create/Modify
 
-| File | Action |
-|------|--------|
-| Database migration | Create `contact_notification_recipients` table with RLS |
-| `src/pages/admin/ContactSubmissions.tsx` | Add notification recipients management UI section |
-| `supabase/functions/send-contact-notification/index.ts` | Read recipients from database, fallback to env var |
+| File | Action | Description |
+|------|--------|-------------|
+| `src/pages/GetStarted.tsx` | Create | New landing page with hero, stats, testimonials, CTAs |
+| `src/App.tsx` | Modify | Change `/get-started` route from redirect to new page |
+| `src/components/landing/` | Create (multiple) | Reusable section components: HeroSection, LogoBar, StatsSection, HowItWorks, SegmentPreview, ChannelShowcase, TestimonialsSection, FinalCTA |
 
-## Implementation Sequence
+## Design Approach
 
-1. Create the database table with RLS policies
-2. Add the recipients management UI to the Contact Submissions page
-3. Update the edge function to query recipients from the database
-4. Deploy and test end-to-end
+- Matches the existing dark theme (`#0a0f1a` background, `#e2e8f0` text, blue/emerald accents)
+- Mobile-first responsive design consistent with the funnel
+- Smooth scroll animations using Framer Motion (already installed)
+- UTM parameters are preserved when navigating from landing page to `/experience`
+
+## Content Notes
+
+The landing page will use placeholder content that you can replace with real data:
+- Client logos (placeholder boxes until real logos are provided)
+- Testimonial quotes (template structure ready for real quotes)
+- Stats (using reasonable placeholders based on your data products)
+- You can update all content directly or via the existing `content_optimization` table
 
