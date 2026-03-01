@@ -267,7 +267,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
             `,
             axisPointer: disableHoverEmphasis
               ? { type: "none" as const }
-              : { type: "shadow" as const },
+              : { type: horizontal ? "none" as const : "shadow" as const },
             formatter: (params: unknown) => {
               const items = Array.isArray(params) ? params : [params];
               const typedItems = items as EChartsBarParams[];
