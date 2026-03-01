@@ -110,7 +110,9 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
 
   const option = React.useMemo<EChartsOption>(() => {
     const innerRadius = variant === "donut" ? "50%" : 0;
-    const outerRadius = showLegend && legendPosition === "right" ? "55%" : "60%";
+    const outerRadius = showLabels
+      ? (showLegend && legendPosition === "right" ? "55%" : "65%")
+      : (showLegend && legendPosition === "right" ? "65%" : "75%");
     const centerX = showLegend && legendPosition === "right" ? "35%" : "50%";
 
     return {
@@ -190,24 +192,31 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
             ? {
                 show: true,
                 position: "outside",
-                alignTo: "edge",
-                edgeDistance: 10,
-                overflow: "break",
                 formatter: (params: any) => {
                   const percent = ((params.value / total) * 100);
                   if (percent < labelThreshold) return "";
-                  return `${params.name}\n${percent.toFixed(1)}%`;
+                  return `{name|${params.name}}\n{value|${percent.toFixed(1)}%}`;
                 },
-                color: "hsl(var(--portal-text-secondary))",
-                fontSize: 11,
-                lineHeight: 16,
+                rich: {
+                  name: {
+                    fontSize: 11,
+                    color: "hsl(var(--portal-text-secondary))",
+                    lineHeight: 16,
+                  },
+                  value: {
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "hsl(var(--portal-text-primary))",
+                    lineHeight: 18,
+                  },
+                },
               }
             : { show: false },
           labelLine: showLabels
             ? {
                 show: true,
-                length: 15,
-                length2: 10,
+                length: 20,
+                length2: 15,
                 lineStyle: {
                   color: "hsl(var(--portal-border))",
                 },

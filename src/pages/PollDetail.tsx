@@ -126,8 +126,8 @@ const Donut = ({ section, isMobile }: { section: DonutSection; isMobile: boolean
     <EChartsPieChart
       data={section.data}
       variant="donut"
-      height={isMobile ? 320 : 360}
-      showLabels
+      height={isMobile ? 280 : 340}
+      showLabels={!isMobile}
       showLegend
       valueType="percent"
       showPercentage
