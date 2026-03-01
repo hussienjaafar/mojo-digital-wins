@@ -1,56 +1,89 @@
 
 
-# Fix: Bars Are Tiny Stubs Due to Double Label Spacing
+# Fix Pie/Donut Chart Label Clipping and Visual Upgrades
 
-## Root Cause
+## Problems
 
-The `EChartsBarChart` has `containLabel: true` in its grid config (line 298). This tells ECharts to automatically reserve space for axis labels inside the grid boundaries. 
+1. **Labels cut off**: The outer labels extend beyond the chart container because the pie `outerRadius` is "75%" -- too large, leaving insufficient room for "outside" labels and their connector lines.
+2. **Label percentages lack precision**: The formatter uses `toFixed(0)`, showing "59%" instead of "59.3%".
+3. **No label overflow handling**: ECharts clips labels that extend beyond the chart boundary. There is no `alignTo` or `overflow` config to manage long label text.
 
-**However**, `PollDetail.tsx` is also passing large `gridLeft` values (90-160px) which act as ADDITIONAL padding before labels start. The result: on a 390px mobile screen, ~90px of dead padding + ~150px of label width = only ~100px left for actual bars. That's why they appear as tiny stubs.
+## Solution
 
-## The Fix
+### File 1: `src/components/charts/echarts/EChartsPieChart.tsx`
 
-**Stop passing large `gridLeft` values.** Since `containLabel: true` already handles label space, `gridLeft` should only be a small margin (8-12px). The labels will size themselves correctly.
+**Reduce pie radius to make room for labels:**
+- Change `outerRadius` from `"75%"` to `"60%"` (or `"65%"` when legend is on the right)
+- This gives labels ~35% of the container width on each side
 
-### File 1: `src/pages/PollDetail.tsx`
+**Use `alignTo: 'edge'` for label positioning:**
+- ECharts supports `label.alignTo = 'edge'` which forces labels to align to the left/right edges of the chart container instead of floating freely. This prevents clipping.
+- Add `label.edgeDistance: 10` for a small margin from the container edge
 
-**GroupedBar renderer (line 58):**
-- Remove `gridLeft={isMobile ? 100 : 160}` -- let containLabel handle it
-- Or set `gridLeft={8}` for a minimal outer margin
+**Add `overflow: 'break'` to labels:**
+- Long label names (like "Less Likely") will wrap instead of clipping
 
-**HorizontalBar renderer (line 156):**
-- Remove `gridLeft={isMobile ? 90 : 160}` -- same fix
-- Or set `gridLeft={8}`
+**Increase label precision:**
+- Change `percent.toFixed(0)` to `percent.toFixed(1)` in the label formatter so "59%" becomes "59.3%"
 
-**Also increase `gridRight` to `50-60`** to ensure right-side bar labels ("41.4%") don't clip, since bars will now be wider and labels may extend further.
+**Increase label line length:**
+- Set `labelLine.length: 15` and `labelLine.length2: 10` so connector lines reach the edge-aligned labels cleanly
 
-### File 2: `src/components/charts/echarts/EChartsBarChart.tsx`
+**Specific code changes in the `option` useMemo (series[0]):**
 
-**No structural changes needed.** The component is correct -- `containLabel: true` is the right approach. The bug was in the caller passing unnecessarily large `gridLeft` values.
+```typescript
+label: showLabels ? {
+  show: true,
+  position: "outside",
+  alignTo: "edge",        // NEW: align to container edges
+  edgeDistance: 10,        // NEW: margin from edge
+  overflow: "break",      // NEW: wrap long names
+  formatter: (params: any) => {
+    const percent = ((params.value / total) * 100);
+    if (percent < labelThreshold) return "";
+    return `${params.name}\n${percent.toFixed(1)}%`;  // CHANGED: 1 decimal
+  },
+  color: "hsl(var(--portal-text-secondary))",
+  fontSize: 11,
+  lineHeight: 16,
+} : { show: false },
 
-**Optional improvement:** Change the default `gridLeft` from `12` to `8` for slightly tighter margins, and increase default `gridRight` from `40` to `55` when `showBarLabels` is true.
+labelLine: showLabels ? {
+  show: true,
+  length: 15,             // NEW: first segment length
+  length2: 10,            // NEW: second segment length
+  lineStyle: {
+    color: "hsl(var(--portal-border))",
+  },
+} : { show: false },
+```
 
-## Summary
+**Update radius values:**
+```typescript
+const outerRadius = showLegend && legendPosition === "right" ? "55%" : "60%";
+```
+
+### File 2: `src/pages/PollDetail.tsx`
+
+**Increase donut chart height to give labels more vertical room:**
+- Change `height={isMobile ? 280 : 320}` to `height={isMobile ? 320 : 360}`
+
+## Summary of Changes
 
 | Change | Before | After |
 |--------|--------|-------|
-| HorizontalBar gridLeft (mobile) | 90px + containLabel padding | 8px + containLabel (auto) |
-| HorizontalBar gridLeft (desktop) | 160px + containLabel padding | 8px + containLabel (auto) |
-| GroupedBar gridLeft (mobile) | 100px + containLabel padding | 8px + containLabel (auto) |
-| GroupedBar gridLeft (desktop) | 160px + containLabel padding | 8px + containLabel (auto) |
-| gridRight with bar labels | 40px | 55px |
-
-## Expected Result
-
-- Bars will occupy ~60-70% of chart width instead of ~25%
-- Labels still have adequate space (managed by ECharts containLabel)
-- Percentage values ("41.4%") won't clip on the right
-- Both mobile and desktop will look proportional
+| outerRadius | 75% | 60% (65% with right legend) |
+| Label alignment | Free-floating (clips) | `alignTo: 'edge'` with 10px margin |
+| Label overflow | Clipped | `overflow: 'break'` (wraps) |
+| Label precision | 59% | 59.3% |
+| Label line lengths | Default | `length: 15`, `length2: 10` |
+| Donut height (mobile) | 280px | 320px |
+| Donut height (desktop) | 320px | 360px |
 
 ## Files Modified
 
 | File | Changes |
 |------|---------|
-| `src/pages/PollDetail.tsx` | Remove large gridLeft overrides from GroupedBar and HorizontalBar renderers; increase gridRight |
-| `src/components/charts/echarts/EChartsBarChart.tsx` | Increase default gridRight for showBarLabels from 40 to 55 |
+| `src/components/charts/echarts/EChartsPieChart.tsx` | Smaller radius, edge-aligned labels, overflow wrap, 1-decimal precision, explicit label line lengths |
+| `src/pages/PollDetail.tsx` | Taller donut chart heights |
 
