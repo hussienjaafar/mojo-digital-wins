@@ -55,10 +55,17 @@ const GroupedBar = ({ section, isMobile }: { section: GroupedBarSection; isMobil
       valueType={section.valueType}
       height={Math.max(240, section.data.length * 56)}
       showLegend
-      gridLeft={isMobile ? 120 : 180}
+      gridLeft={isMobile ? 100 : 160}
       showBarLabels
+      hideValueAxis
       inverseCategoryAxis
-      xAxisLabelFormatter={isMobile ? (v: string) => v.length > 20 ? v.slice(0, 18) + "…" : v : undefined}
+      xAxisLabelFormatter={(v: string) => {
+        const max = isMobile ? 20 : 30;
+        if (v.length <= max) return v;
+        const mid = v.lastIndexOf(' ', max);
+        if (mid === -1) return v.slice(0, max - 2) + '…';
+        return v.slice(0, mid) + '\n' + v.slice(mid + 1);
+      }}
     />
     {section.shifts && (
       <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -146,11 +153,17 @@ const HorizontalBar = ({ section, isMobile }: { section: HorizontalBarSection; i
       valueType={section.valueType}
       height={Math.max(200, section.data.length * 36)}
       showLegend={false}
-      gridLeft={isMobile ? 100 : 180}
+      gridLeft={isMobile ? 90 : 160}
       showBarLabels
       inverseCategoryAxis
-      hideValueAxis={isMobile}
-      xAxisLabelFormatter={isMobile ? (v: string) => v.length > 20 ? v.slice(0, 18) + "…" : v : undefined}
+      hideValueAxis
+      xAxisLabelFormatter={(v: string) => {
+        const max = isMobile ? 20 : 30;
+        if (v.length <= max) return v;
+        const mid = v.lastIndexOf(' ', max);
+        if (mid === -1) return v.slice(0, max - 2) + '…';
+        return v.slice(0, mid) + '\n' + v.slice(mid + 1);
+      }}
     />
   </V3ChartWrapper>
 );

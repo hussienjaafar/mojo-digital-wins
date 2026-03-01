@@ -172,7 +172,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
         label: {
           show: true,
           position: (horizontal ? 'right' : 'top') as 'right' | 'top',
-          formatter: (params: any) => formatAxisValue(typeof params.value === 'object' ? params.value.value : params.value),
+          formatter: (params: any) => formatTooltipValue(typeof params.value === 'object' ? params.value.value : params.value),
           color: 'hsl(var(--portal-text-primary))',
           fontSize: 11,
         },
@@ -291,7 +291,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
         : undefined,
       grid: {
         left: gridLeft ?? 12,
-        right: 12,
+        right: showBarLabels ? 40 : 12,
         top: 20,
         // Increase bottom padding for rotated labels
         bottom: showLegend ? 60 : (xAxisLabelRotate > 0 ? 60 : 20),
