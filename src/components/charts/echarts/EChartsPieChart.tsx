@@ -110,7 +110,7 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
 
   const option = React.useMemo<EChartsOption>(() => {
     const innerRadius = variant === "donut" ? "50%" : 0;
-    const outerRadius = showLegend && legendPosition === "right" ? "70%" : "75%";
+    const outerRadius = showLegend && legendPosition === "right" ? "55%" : "60%";
     const centerX = showLegend && legendPosition === "right" ? "35%" : "50%";
 
     return {
@@ -190,10 +190,13 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
             ? {
                 show: true,
                 position: "outside",
+                alignTo: "edge",
+                edgeDistance: 10,
+                overflow: "break",
                 formatter: (params: any) => {
                   const percent = ((params.value / total) * 100);
                   if (percent < labelThreshold) return "";
-                  return `${params.name}\n${percent.toFixed(0)}%`;
+                  return `${params.name}\n${percent.toFixed(1)}%`;
                 },
                 color: "hsl(var(--portal-text-secondary))",
                 fontSize: 11,
@@ -203,6 +206,8 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
           labelLine: showLabels
             ? {
                 show: true,
+                length: 15,
+                length2: 10,
                 lineStyle: {
                   color: "hsl(var(--portal-border))",
                 },
