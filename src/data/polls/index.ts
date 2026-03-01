@@ -42,6 +42,7 @@ export interface HorizontalBarSection {
   xAxisKey: string;
   series: { dataKey: string; name: string; color?: string }[];
   data: Record<string, unknown>[];
+  netLabel?: string;
   valueType?: "percent" | "number";
 }
 
