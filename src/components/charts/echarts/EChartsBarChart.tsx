@@ -160,10 +160,13 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
       emphasis: disableHoverEmphasis
         ? { disabled: true }
         : {
-            focus: "self" as const,
+            focus: "none" as const,
             itemStyle: {
-              shadowBlur: 10,
-              shadowColor: "rgba(0, 0, 0, 0.3)",
+              color: "inherit",
+              borderColor: "rgba(255, 255, 255, 0.3)",
+              borderWidth: 1,
+              shadowBlur: 8,
+              shadowColor: "rgba(0, 0, 0, 0.2)",
             },
           },
       // Prevent bars from dimming when other bars are hovered
