@@ -1,143 +1,66 @@
 
-# Poll Results Page -- Multi-Poll Architecture
+# Audit: Poll Results Page Mobile & Desktop Optimization
 
-## Overview
+## Issues Found
 
-Create a `/polls` index page that lists all published polls as cards, with each poll linking to a detail page at `/polls/:slug`. The first entry will be the VA-6 Congressional District poll. This architecture ensures future polls are added by simply creating a new data file and registering it in a central array -- no page component changes needed.
+### Critical -- Mobile
+1. **Bar label truncation**: Long y-axis labels (e.g., "President has too much unchecked power", "Palestinian movement part of larger freedom movement") are cut off at `fontSize: 10` on 390px screens
+2. **Value axis overlap**: Percentage axis ticks (`0% 5% 10% 15%...`) overlap and become unreadable on small screens
+3. **Fixed chart heights ignore data count**: `HorizontalBar` uses `height={220}` for all charts regardless of how many data items exist -- the IL-9 vote choice has 10 items crammed into 220px, causing bars to overlap
+4. **Section descriptions outside chart cards**: The `section.description` text renders outside the `V3ChartWrapper`, creating a visual disconnect between the description and its chart
 
-## Page Structure
+### Moderate -- Desktop
+5. **Charts span full 1200px width needlessly**: Horizontal bar charts stretch across the full container but data only occupies a fraction of the space, leaving dead space on the right
+6. **No max-width constraint on chart sections**: The layout would benefit from a `max-w-4xl` or similar constraint to keep charts scannable
 
-### `/polls` -- Index Page
-A grid of poll summary cards showing title, date, sample size, and a one-line key finding. Clicking a card navigates to the detail page. Uses `Navigation` + `Footer` from the main marketing site.
+### Minor -- Both Viewports
+7. **Donut chart legend can collide with labels on small screens**: The bottom legend and outside labels compete for space at 320px height on mobile
 
-```text
-+--------------------------------------------------+
-|  Navigation                                       |
-+--------------------------------------------------+
-|  Hero: "Community Pulse Polling"                  |
-|  Subtitle: "Data-driven insights from Molitico"  |
-+--------------------------------------------------+
-|  Poll Card Grid                                   |
-|  +--------------------+  +--------------------+   |
-|  | VA-6 Congressional |  | (future poll)      |   |
-|  | Feb 18-22, 2026    |  |                    |   |
-|  | 1,031 LV | +/-3%   |  |                    |   |
-|  | Key finding...     |  |                    |   |
-|  +--------------------+  +--------------------+   |
-+--------------------------------------------------+
-|  Footer                                           |
-+--------------------------------------------------+
-```
+## Proposed Fixes
 
-### `/polls/:slug` -- Detail Page
-Full visualization of a single poll's results. Loads data from a typed data file keyed by slug.
+### 1. Dynamic chart heights based on data count
+Instead of fixed heights, calculate height from the number of data items so each bar gets adequate space.
 
-```text
-+--------------------------------------------------+
-|  Navigation                                       |
-+--------------------------------------------------+
-|  Poll Header (title, date, methodology badge)     |
-|  Key Finding callout card                         |
-+--------------------------------------------------+
-|  Section 1: Ballot Test                           |
-|  Grouped horizontal bar (EChartsBarChart)         |
-|  Initial vs Post-Info side by side                |
-+--------------------------------------------------+
-|  Section 2: Rasoul Favorability                   |
-|  Stacked horizontal bar (EChartsBarChart)         |
-|  Net favorability: +47%                           |
-+--------------------------------------------------+
-|  Section 3: Candidate Type Preference             |
-|  Donut chart (EChartsPieChart variant="donut")    |
-+--------------------------------------------------+
-|  Section 4: Progressive Figure Favorability       |
-|  Horizontal bar chart (EChartsBarChart)           |
-+--------------------------------------------------+
-|  Section 5: Methodology                           |
-|  V3DataTable with demographics + geography note   |
-+--------------------------------------------------+
-|  Footer                                           |
-+--------------------------------------------------+
-```
+**File: `src/pages/PollDetail.tsx`**
+- `HorizontalBar`: Change `height={220}` to `height={Math.max(200, section.data.length * 36)}` -- gives each bar ~36px (room for bar + gap)
+- `GroupedBar`: Change `height={280}` to `height={Math.max(240, section.data.length * 56)}` -- grouped bars need more space per item
+- `StackedBar`: Keep `height={140}` (typically 1 row)
 
-## Data Architecture
+### 2. Responsive y-axis label handling for long text
+**File: `src/pages/PollDetail.tsx`**
+- Pass a custom `xAxisLabelFormatter` that truncates labels beyond 30 chars on mobile (using `useIsMobile` hook)
+- Increase `gridLeft` for horizontal bars with long labels to prevent clipping
+- Use `fontSize: 11` on desktop, `fontSize: 9` on mobile for category labels
 
-Instead of hardcoding data inside a page component, create a typed data module that exports an array of poll objects. Each poll contains all its data sections. Adding a future poll means adding a new object to this array.
+### 3. Move section descriptions inside chart wrappers
+**File: `src/pages/PollDetail.tsx`**
+- Remove the standalone `<p>` that renders `section.description` before `<SectionRenderer>`
+- The descriptions are already passed into `V3ChartWrapper` via the `description` prop (used for `aria-describedby`) -- but they're currently only used as screen-reader text
+- Add a visible subtitle below the chart title inside each section renderer, or add a `subtitle` slot to `V3ChartWrapper`
 
-```text
-src/data/polls/
-  index.ts          -- exports the polls array and types
-  va6-2026.ts       -- VA-6 poll data
-```
+### 4. Add max-width constraint for readability on desktop
+**File: `src/pages/PollDetail.tsx`**
+- Add `max-w-5xl mx-auto` to the chart sections container so charts don't stretch to 1200px on ultrawide screens
 
-### Poll Data Shape (TypeScript)
+### 5. Responsive donut chart sizing
+**File: `src/pages/PollDetail.tsx`**
+- Reduce donut `height` from 320 to 280 on mobile
+- Switch legend to bottom position (already default) and reduce `labelThreshold` so fewer labels show on small screens
 
-```typescript
-interface PollData {
-  slug: string;                    // URL slug
-  title: string;                   // "VA-6 Congressional District Poll"
-  subtitle: string;                // "Proposed VA-6 Democratic Primary"
-  date: string;                    // "February 18-22, 2026"
-  sponsor: string;                 // "Unity & Justice Fund"
-  sampleSize: number;              // 1031
-  marginOfError: number;           // 3
-  population: string;              // "Likely Democratic Primary Voters"
-  keyFinding: string;              // One-line summary
-  sections: PollSection[];         // Chart sections
-  methodology: MethodologyData;    // Demographics table
-}
-```
+### 6. Fix value axis tick density on mobile
+**File: `src/pages/PollDetail.tsx`**
+- The `EChartsBarChart` already handles this via `containLabel: true`, but the issue is too many ticks. Pass a custom axis interval or reduce tick density by adjusting the chart's `splitNumber` -- this requires a small enhancement to `EChartsBarChart` or using ECharts option overrides
 
-Each `PollSection` has a `type` field ("grouped-bar", "stacked-bar", "donut", "horizontal-bar") that the detail page component uses to render the correct chart.
-
-## Visualization Choices
-
-| Data Set | Chart Type | Rationale |
-|----------|-----------|-----------|
-| Ballot Test (Initial vs Post-Info) | Grouped horizontal bar | Gold standard for comparing two measurements per candidate; shift values shown as annotations |
-| Rasoul Favorability | Stacked horizontal bar | Shows full opinion spectrum; midpoint clearly separates favorable/unfavorable |
-| Candidate Type Preference | Donut chart | Three clean categories; percentages prominent in center |
-| Progressive Figure Favorability | Horizontal bar | Simple ranked comparison; descending sort for scannability |
-| Methodology Demographics | V3DataTable | Tabular data is clearest as a table |
-
-### Color Choices (Non-Partisan)
-
-- Blue (`--portal-accent-blue`) for Rasoul
-- Slate/gray for Perriello
-- Purple (`--portal-accent-purple`) for Macy
-- Muted gray for Undecided
-- Green (`--portal-success`) for favorable ratings
-- Amber (`--portal-warning`) for neutral
-- Red (`--portal-error`) for unfavorable
-
-This avoids red/blue partisan framing while staying within the V3 design system palette.
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/data/polls/index.ts` | Poll type definitions and registry array |
-| `src/data/polls/va6-2026.ts` | VA-6 poll data (all 5 sections + methodology) |
-| `src/pages/Polls.tsx` | Index page -- grid of poll cards |
-| `src/pages/PollDetail.tsx` | Detail page -- renders sections based on data type |
+Since the chart components don't expose `splitNumber`, the practical fix is to ensure adequate `gridLeft`/`gridRight` so labels have room, which `containLabel: true` should handle. The real fix is giving charts enough height so the axis doesn't compress.
 
 ## Files to Modify
 
-| File | Change |
+| File | Changes |
 |------|---------|
-| `src/App.tsx` | Add lazy imports for `Polls` and `PollDetail`, add routes `/polls` and `/polls/:slug`, add to `marketingRoutes` array |
-| `src/components/Footer.tsx` | Add "Polling" link to Quick Links section |
-| `src/components/landing/LandingFooter.tsx` | Add "Polling" link |
+| `src/pages/PollDetail.tsx` | Dynamic heights, move descriptions inside cards, responsive label formatting, max-width container, mobile-aware donut sizing |
 
-## Technical Details
+## Summary of Visual Impact
 
-- Both pages use `Navigation` + `Footer` (matching `Index.tsx` pattern)
-- Chart sections wrapped in `portal-theme dark` div so V3 ECharts components render with dark tokens
-- All charts use `V3ChartWrapper` for accessibility (ariaLabel, dataSummary)
-- `EChartsBarChart` with `horizontal={true}` for all bar charts
-- `EChartsPieChart` with `variant="donut"` for candidate type preference
-- `V3DataTable` for methodology demographics
-- `AnimateOnScroll` for scroll-triggered section reveals
-- Helmet SEO tags on both pages
-- Responsive: single column on mobile, side-by-side methodology cards on desktop
-- Future polls: just create a new data file in `src/data/polls/`, add it to the registry array, and it automatically appears on the index page and gets its own detail route
+- **Mobile**: Charts will be taller to accommodate all data items without overlap; labels will be readable; descriptions will be visually connected to their charts
+- **Desktop**: Charts will be constrained to a comfortable reading width (~1024px) instead of stretching to full container width; descriptions will be inside chart cards
+- **Both**: Better spacing, no truncated labels, professional polling-report appearance
