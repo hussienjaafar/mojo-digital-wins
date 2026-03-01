@@ -1,67 +1,75 @@
 
 
-# Fix Unreadable Stacked Bar Chart Labels
+# Fix Unreadable Favorability Chart
 
 ## Problem
 
-The stacked horizontal bar chart ("Sam Rasoul Favorability") has `showBarLabels` enabled with `position: 'right'`. For stacked bars, this places every segment's label at the right edge of that segment, causing all labels to overlap into an unreadable mess (visible in the screenshot: "27.0% 22.0% 10.0% ...%" all crammed together).
+The "Sam Rasoul Favorability" chart uses a stacked horizontal bar for a **single data row** with 5 segments (27%, 22%, 10%, 1%, 1%). On mobile, all segment labels pile up on one bar, making it unreadable. A stacked bar is simply the wrong chart type for single-entity favorability data.
 
-## Root Cause
+## Best Visualization: Individual Horizontal Bars
 
-In `EChartsBarChart.tsx` (lines 174-182), the label config applies uniformly:
+The most readable way to show a favorability breakdown for one candidate is to give **each favorability level its own horizontal bar row**. This is how polling firms (Gallup, Pew, FiveThirtyEight) present single-candidate favorability data. Each row gets clear space for its label and value.
+
+```text
+Very Favorable         |████████████████████████████| 27%
+Somewhat Favorable     |██████████████████████|       22%
+Neutral                |██████████|                   10%
+Somewhat Unfavorable   |█|                             1%
+Very Unfavorable       |█|                             1%
+```
+
+## Implementation
+
+### File: `src/data/polls/va6-2026.ts`
+
+Transform the favorability section from `stacked-bar` to `horizontal-bar` type with one series and multiple data rows:
 
 ```typescript
-label: {
-  show: true,
-  position: horizontal ? 'right' : 'top',  // All labels go to 'right'
-  formatter: (params) => formatTooltipValue(params.value),
+{
+  type: "horizontal-bar",
+  title: "Sam Rasoul Favorability",
+  description: "Nearly 60% of voters in the district are familiar with Rasoul...",
+  xAxisKey: "level",
+  series: [
+    { dataKey: "value", name: "Response %", color: "hsl(var(--portal-accent-blue))" },
+  ],
+  data: [
+    { level: "Very Favorable", value: 27 },
+    { level: "Somewhat Favorable", value: 22 },
+    { level: "Neutral", value: 10 },
+    { level: "Somewhat Unfavorable", value: 1 },
+    { level: "Very Unfavorable", value: 1 },
+  ],
+  netLabel: "Net Favorability: +47%",
+  valueType: "percent",
 }
 ```
 
-For stacked bars, each segment's label is placed at the right end of that segment. Since segments are adjacent, labels overlap.
+### File: `src/pages/PollDetail.tsx`
 
-## Solution
+Update the `HorizontalBar` component to support the `netLabel` property (currently only on `StackedBarSection`). Add the net favorability badge below the chart, same as the current stacked bar rendering.
 
-### File: `src/components/charts/echarts/EChartsBarChart.tsx`
+### File: `src/data/polls/types.ts`
 
-Detect stacked series and adjust label behavior:
+Add `netLabel?: string` to the `HorizontalBarSection` type so it can display the favorability summary badge.
 
-1. **Position labels inside the bar segment** (`position: 'inside'`) when the series has a `stack` property
-2. **Hide labels for small segments** -- if the segment value is below a threshold (e.g., less than 5% of the total or less than 8 units), return an empty string from the formatter to avoid cramming tiny labels
-3. **Keep `position: 'right'` only for non-stacked bars** (current behavior, works fine)
+### Color Treatment
 
-```typescript
-// In the showBarLabels block:
-const isStacked = !!s.stack;
-label: {
-  show: true,
-  position: isStacked
-    ? 'inside'                          // Inside the segment for stacked
-    : (horizontal ? 'right' : 'top'),   // Outside for non-stacked
-  formatter: (params) => {
-    const val = typeof params.value === 'object' ? params.value.value : params.value;
-    // Hide label if segment is too small to fit text
-    if (isStacked && val < 5) return '';
-    return formatTooltipValue(val, s.name);
-  },
-  color: isStacked ? '#fff' : 'hsl(var(--portal-text-primary))',
-  fontSize: 11,
-  fontWeight: isStacked ? 600 : undefined,
-}
-```
+Use a single consistent color (portal blue) for all bars. The favorability sentiment is conveyed by the category labels themselves ("Very Favorable" vs "Very Unfavorable"), so color-coding individual bars is unnecessary and would add visual noise. The relative bar lengths tell the story clearly.
 
-This means:
-- **27%** and **22%** segments: Labels show inside as white text (large enough)
-- **10%** segment: Shows inside (value >= 5)
-- **1%** segments: Labels hidden (too small to read anyway; data accessible via tooltip)
+## Result
 
-### No data file changes needed
-
-The poll data and component wiring in `PollDetail.tsx` are correct. The fix is entirely in the bar chart component's label positioning logic.
+- Each favorability level gets its own row with full label visibility
+- Values display cleanly at the end of each bar
+- The "Net Favorability: +47%" badge remains below the chart
+- Works perfectly on mobile -- no overlapping labels
+- Consistent with how the "Progressive Figure Favorability" chart already renders
 
 ## Files Modified
 
 | File | Change |
 |------|--------|
-| `src/components/charts/echarts/EChartsBarChart.tsx` | Use `position: 'inside'` for stacked bar labels; hide labels on small segments; white text for contrast against colored bars |
+| `src/data/polls/va6-2026.ts` | Convert favorability from stacked-bar to horizontal-bar with individual rows |
+| `src/data/polls/types.ts` | Add optional `netLabel` to `HorizontalBarSection` type |
+| `src/pages/PollDetail.tsx` | Render `netLabel` badge on horizontal bar sections |
 
