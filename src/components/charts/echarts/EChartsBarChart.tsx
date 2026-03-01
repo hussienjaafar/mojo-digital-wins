@@ -134,16 +134,19 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
   const option = React.useMemo(() => {
     const xAxisData = data.map((d) => d[xAxisKey]) as string[];
 
-    const seriesConfig = series.map((s, index) => ({
+    const seriesConfig = series.map((s, index) => {
+      const seriesColor = s.color || colorPalette[index % colorPalette.length];
+      return {
       name: s.name,
       type: "bar" as const,
+      color: seriesColor,
       data: data.map((d) => {
         const value = d[s.dataKey] as number;
         const isHighlighted = enableCrossHighlight && hoveredDataPoint?.date === d[xAxisKey];
         return {
           value,
           itemStyle: {
-            color: s.color || colorPalette[index % colorPalette.length],
+            color: seriesColor,
             opacity: enableCrossHighlight && hoveredDataPoint && !isHighlighted ? 0.4 : 1,
           },
         };
@@ -177,7 +180,8 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
           fontSize: 11,
         },
       }),
-    }));
+    };
+    });
 
     const axisConfig = {
       axisLine: {
