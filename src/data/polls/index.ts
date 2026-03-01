@@ -83,8 +83,9 @@ export interface PollData {
 // ---------- Registry ----------
 
 import { va6Poll } from "./va6-2026";
+import { il9Poll } from "./il9-2026";
 
-export const polls: PollData[] = [va6Poll];
+export const polls: PollData[] = [il9Poll, va6Poll];
 
 export function getPollBySlug(slug: string): PollData | undefined {
   return polls.find((p) => p.slug === slug);
