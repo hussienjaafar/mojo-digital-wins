@@ -55,8 +55,10 @@ const GroupedBar = ({ section, isMobile }: { section: GroupedBarSection; isMobil
       valueType={section.valueType}
       height={Math.max(240, section.data.length * 56)}
       showLegend
-      gridLeft={isMobile ? 160 : 180}
-      xAxisLabelFormatter={isMobile ? (v: string) => v.length > 25 ? v.slice(0, 23) + "…" : v : undefined}
+      gridLeft={isMobile ? 120 : 180}
+      showBarLabels
+      inverseCategoryAxis
+      xAxisLabelFormatter={isMobile ? (v: string) => v.length > 20 ? v.slice(0, 18) + "…" : v : undefined}
     />
     {section.shifts && (
       <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -93,6 +95,7 @@ const StackedBar = ({ section }: { section: StackedBarSection }) => (
       valueType={section.valueType}
       height={140}
       showLegend
+      showBarLabels
     />
     {section.netLabel && (
       <div className="mt-3 text-center">
@@ -117,10 +120,11 @@ const Donut = ({ section, isMobile }: { section: DonutSection; isMobile: boolean
       data={section.data}
       variant="donut"
       height={isMobile ? 280 : 320}
-      showLabels={!isMobile}
+      showLabels
       showLegend
       valueType="percent"
       showPercentage
+      labelThreshold={5}
     />
   </V3ChartWrapper>
 );
@@ -142,8 +146,11 @@ const HorizontalBar = ({ section, isMobile }: { section: HorizontalBarSection; i
       valueType={section.valueType}
       height={Math.max(200, section.data.length * 36)}
       showLegend={false}
-      gridLeft={isMobile ? 140 : 180}
-      xAxisLabelFormatter={isMobile ? (v: string) => v.length > 25 ? v.slice(0, 23) + "…" : v : undefined}
+      gridLeft={isMobile ? 100 : 180}
+      showBarLabels
+      inverseCategoryAxis
+      hideValueAxis={isMobile}
+      xAxisLabelFormatter={isMobile ? (v: string) => v.length > 20 ? v.slice(0, 18) + "…" : v : undefined}
     />
   </V3ChartWrapper>
 );
