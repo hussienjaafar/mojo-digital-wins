@@ -160,7 +160,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
       emphasis: disableHoverEmphasis
         ? { disabled: true }
         : {
-            focus: "series" as const,
+            focus: "self" as const,
             itemStyle: {
               shadowBlur: 10,
               shadowColor: "rgba(0, 0, 0, 0.3)",
