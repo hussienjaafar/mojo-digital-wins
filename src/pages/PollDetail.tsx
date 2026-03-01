@@ -55,7 +55,7 @@ const GroupedBar = ({ section, isMobile }: { section: GroupedBarSection; isMobil
       valueType={section.valueType}
       height={Math.max(240, section.data.length * 56)}
       showLegend
-      gridLeft={isMobile ? 100 : 160}
+      gridLeft={8}
       showBarLabels
       hideValueAxis
       inverseCategoryAxis
@@ -153,7 +153,7 @@ const HorizontalBar = ({ section, isMobile }: { section: HorizontalBarSection; i
       valueType={section.valueType}
       height={Math.max(200, section.data.length * 36)}
       showLegend={false}
-      gridLeft={isMobile ? 90 : 160}
+      gridLeft={8}
       showBarLabels
       inverseCategoryAxis
       hideValueAxis
