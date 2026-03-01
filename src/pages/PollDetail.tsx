@@ -16,6 +16,7 @@ import { V3ChartWrapper } from "@/components/v3/V3ChartWrapper";
 import { EChartsBarChart } from "@/components/charts/echarts";
 import { EChartsPieChart } from "@/components/charts/echarts";
 import { AnimateOnScroll } from "@/hooks/useIntersectionObserver";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   BarChart3,
   Users,
@@ -25,9 +26,19 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+// ─── Visible description subtitle inside chart cards ─────────
+const SectionDescription = ({ text }: { text?: string }) => {
+  if (!text) return null;
+  return (
+    <p className="text-xs sm:text-sm text-[hsl(var(--portal-text-secondary))] mb-4 leading-relaxed">
+      {text}
+    </p>
+  );
+};
+
 // ─── Section Renderers ───────────────────────────────────────
 
-const GroupedBar = ({ section }: { section: GroupedBarSection }) => (
+const GroupedBar = ({ section, isMobile }: { section: GroupedBarSection; isMobile: boolean }) => (
   <V3ChartWrapper
     title={section.title}
     icon={BarChart3}
@@ -35,14 +46,17 @@ const GroupedBar = ({ section }: { section: GroupedBarSection }) => (
     description={section.description}
     accent="blue"
   >
+    <SectionDescription text={section.description} />
     <EChartsBarChart
       data={section.data}
       xAxisKey={section.xAxisKey}
       series={section.series}
       horizontal
       valueType={section.valueType}
-      height={280}
+      height={Math.max(240, section.data.length * 56)}
       showLegend
+      gridLeft={isMobile ? 160 : 180}
+      xAxisLabelFormatter={isMobile ? (v: string) => v.length > 25 ? v.slice(0, 23) + "…" : v : undefined}
     />
     {section.shifts && (
       <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -70,6 +84,7 @@ const StackedBar = ({ section }: { section: StackedBarSection }) => (
     description={section.description}
     accent="green"
   >
+    <SectionDescription text={section.description} />
     <EChartsBarChart
       data={section.data}
       xAxisKey={section.xAxisKey}
@@ -89,7 +104,7 @@ const StackedBar = ({ section }: { section: StackedBarSection }) => (
   </V3ChartWrapper>
 );
 
-const Donut = ({ section }: { section: DonutSection }) => (
+const Donut = ({ section, isMobile }: { section: DonutSection; isMobile: boolean }) => (
   <V3ChartWrapper
     title={section.title}
     icon={Users}
@@ -97,11 +112,12 @@ const Donut = ({ section }: { section: DonutSection }) => (
     description={section.description}
     accent="purple"
   >
+    <SectionDescription text={section.description} />
     <EChartsPieChart
       data={section.data}
       variant="donut"
-      height={320}
-      showLabels
+      height={isMobile ? 280 : 320}
+      showLabels={!isMobile}
       showLegend
       valueType="percent"
       showPercentage
@@ -109,7 +125,7 @@ const Donut = ({ section }: { section: DonutSection }) => (
   </V3ChartWrapper>
 );
 
-const HorizontalBar = ({ section }: { section: HorizontalBarSection }) => (
+const HorizontalBar = ({ section, isMobile }: { section: HorizontalBarSection; isMobile: boolean }) => (
   <V3ChartWrapper
     title={section.title}
     icon={BarChart3}
@@ -117,28 +133,31 @@ const HorizontalBar = ({ section }: { section: HorizontalBarSection }) => (
     description={section.description}
     accent="blue"
   >
+    <SectionDescription text={section.description} />
     <EChartsBarChart
       data={section.data}
       xAxisKey={section.xAxisKey}
       series={section.series}
       horizontal
       valueType={section.valueType}
-      height={220}
+      height={Math.max(200, section.data.length * 36)}
       showLegend={false}
+      gridLeft={isMobile ? 140 : 180}
+      xAxisLabelFormatter={isMobile ? (v: string) => v.length > 25 ? v.slice(0, 23) + "…" : v : undefined}
     />
   </V3ChartWrapper>
 );
 
-const SectionRenderer = ({ section }: { section: PollSection }) => {
+const SectionRenderer = ({ section, isMobile }: { section: PollSection; isMobile: boolean }) => {
   switch (section.type) {
     case "grouped-bar":
-      return <GroupedBar section={section} />;
+      return <GroupedBar section={section} isMobile={isMobile} />;
     case "stacked-bar":
       return <StackedBar section={section} />;
     case "donut":
-      return <Donut section={section} />;
+      return <Donut section={section} isMobile={isMobile} />;
     case "horizontal-bar":
-      return <HorizontalBar section={section} />;
+      return <HorizontalBar section={section} isMobile={isMobile} />;
     default:
       return null;
   }
@@ -193,6 +212,7 @@ const MethodologySection = ({ methodology }: { methodology: MethodologyData }) =
 const PollDetail = () => {
   const { slug } = useParams<{ slug: string }>();
   const poll = slug ? getPollBySlug(slug) : undefined;
+  const isMobile = useIsMobile();
 
   if (!poll) {
     return <Navigate to="/polls" replace />;
@@ -280,15 +300,10 @@ const PollDetail = () => {
         {/* Chart Sections — wrapped in portal-theme dark for V3 tokens */}
         <section className="pb-16 sm:pb-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="portal-theme dark space-y-8">
+            <div className="portal-theme dark space-y-8 max-w-5xl mx-auto">
               {poll.sections.map((section, i) => (
                 <AnimateOnScroll key={i} animation="slide-up">
-                  {section.description && (
-                    <p className="text-sm text-[hsl(var(--portal-text-secondary))] mb-3 max-w-3xl">
-                      {section.description}
-                    </p>
-                  )}
-                  <SectionRenderer section={section} />
+                  <SectionRenderer section={section} isMobile={isMobile} />
                 </AnimateOnScroll>
               ))}
 
