@@ -1,61 +1,143 @@
 
+# Poll Results Page -- Multi-Poll Architecture
 
-# Fix: Eliminate /experience Navigation Delay
+## Overview
 
-## Root Cause Analysis
+Create a `/polls` index page that lists all published polls as cards, with each poll linking to a detail page at `/polls/:slug`. The first entry will be the VA-6 Congressional District poll. This architecture ensures future polls are added by simply creating a new data file and registering it in a central array -- no page component changes needed.
 
-Three things happen sequentially when a user clicks "Get My Free Report":
+## Page Structure
 
-1. `navigate("/experience")` fires
-2. React unmounts GetStarted, the `PageTransition` wrapper re-keys and triggers an **0.8s fade-in-up animation**
-3. Since Experience is `React.lazy()`, a **Suspense fallback (full-screen spinner)** shows while the browser downloads the Experience JS chunk over the network
-4. Only after the chunk loads does the Experience page mount and initialize its **6+ hooks** (session, analytics, variants, etc.)
+### `/polls` -- Index Page
+A grid of poll summary cards showing title, date, sample size, and a one-line key finding. Clicking a card navigates to the detail page. Uses `Navigation` + `Footer` from the main marketing site.
 
-Total perceived delay: network latency + 0.8s animation + hook initialization = easily 1-2+ seconds of friction.
+```text
++--------------------------------------------------+
+|  Navigation                                       |
++--------------------------------------------------+
+|  Hero: "Community Pulse Polling"                  |
+|  Subtitle: "Data-driven insights from Molitico"  |
++--------------------------------------------------+
+|  Poll Card Grid                                   |
+|  +--------------------+  +--------------------+   |
+|  | VA-6 Congressional |  | (future poll)      |   |
+|  | Feb 18-22, 2026    |  |                    |   |
+|  | 1,031 LV | +/-3%   |  |                    |   |
+|  | Key finding...     |  |                    |   |
+|  +--------------------+  +--------------------+   |
++--------------------------------------------------+
+|  Footer                                           |
++--------------------------------------------------+
+```
 
-## Solution: Three Changes, Zero New Dependencies
+### `/polls/:slug` -- Detail Page
+Full visualization of a single poll's results. Loads data from a typed data file keyed by slug.
 
-### 1. Prefetch the Experience chunk on GetStarted mount
+```text
++--------------------------------------------------+
+|  Navigation                                       |
++--------------------------------------------------+
+|  Poll Header (title, date, methodology badge)     |
+|  Key Finding callout card                         |
++--------------------------------------------------+
+|  Section 1: Ballot Test                           |
+|  Grouped horizontal bar (EChartsBarChart)         |
+|  Initial vs Post-Info side by side                |
++--------------------------------------------------+
+|  Section 2: Rasoul Favorability                   |
+|  Stacked horizontal bar (EChartsBarChart)         |
+|  Net favorability: +47%                           |
++--------------------------------------------------+
+|  Section 3: Candidate Type Preference             |
+|  Donut chart (EChartsPieChart variant="donut")    |
++--------------------------------------------------+
+|  Section 4: Progressive Figure Favorability       |
+|  Horizontal bar chart (EChartsBarChart)           |
++--------------------------------------------------+
+|  Section 5: Methodology                           |
+|  V3DataTable with demographics + geography note   |
++--------------------------------------------------+
+|  Footer                                           |
++--------------------------------------------------+
+```
 
-Instead of waiting for the click, start downloading the Experience JS bundle as soon as the landing page loads. By the time the user scrolls and clicks the CTA, the chunk is already cached.
+## Data Architecture
 
-**File: `src/pages/GetStarted.tsx`**
-- Add a `useEffect` that calls `import("./Experience")` on mount (fire-and-forget)
-- This silently downloads and caches the chunk in the background
-- Zero visual impact, the user never sees anything
+Instead of hardcoding data inside a page component, create a typed data module that exports an array of poll objects. Each poll contains all its data sections. Adding a future poll means adding a new object to this array.
 
-### 2. Skip the page transition for /experience navigation
+```text
+src/data/polls/
+  index.ts          -- exports the polls array and types
+  va6-2026.ts       -- VA-6 poll data
+```
 
-The 0.8s fade-in-up animation adds unnecessary delay for a high-intent conversion click.
+### Poll Data Shape (TypeScript)
 
-**File: `src/components/PageTransition.tsx`**
-- Check if the current path is `/experience`
-- If so, skip the animation (render children directly without the `animate-fade-in-up` class)
-- All other routes keep their existing transition
+```typescript
+interface PollData {
+  slug: string;                    // URL slug
+  title: string;                   // "VA-6 Congressional District Poll"
+  subtitle: string;                // "Proposed VA-6 Democratic Primary"
+  date: string;                    // "February 18-22, 2026"
+  sponsor: string;                 // "Unity & Justice Fund"
+  sampleSize: number;              // 1031
+  marginOfError: number;           // 3
+  population: string;              // "Likely Democratic Primary Voters"
+  keyFinding: string;              // One-line summary
+  sections: PollSection[];         // Chart sections
+  methodology: MethodologyData;    // Demographics table
+}
+```
 
-### 3. Replace the heavy Suspense spinner with an instant skeleton
+Each `PollSection` has a `type` field ("grouped-bar", "stacked-bar", "donut", "horizontal-bar") that the detail page component uses to render the correct chart.
 
-Instead of a full-screen spinner that feels like "loading", show a minimal dark background that matches the Experience page aesthetic so the transition feels seamless.
+## Visualization Choices
 
-**File: `src/App.tsx`**
-- Create a lightweight `ExperienceSkeleton` component (just a dark `#0a0f1a` background div with a subtle progress bar)
-- Use a route-aware Suspense fallback: if navigating to `/experience`, use the skeleton; otherwise use the existing `PageLoader`
+| Data Set | Chart Type | Rationale |
+|----------|-----------|-----------|
+| Ballot Test (Initial vs Post-Info) | Grouped horizontal bar | Gold standard for comparing two measurements per candidate; shift values shown as annotations |
+| Rasoul Favorability | Stacked horizontal bar | Shows full opinion spectrum; midpoint clearly separates favorable/unfavorable |
+| Candidate Type Preference | Donut chart | Three clean categories; percentages prominent in center |
+| Progressive Figure Favorability | Horizontal bar | Simple ranked comparison; descending sort for scannability |
+| Methodology Demographics | V3DataTable | Tabular data is clearest as a table |
+
+### Color Choices (Non-Partisan)
+
+- Blue (`--portal-accent-blue`) for Rasoul
+- Slate/gray for Perriello
+- Purple (`--portal-accent-purple`) for Macy
+- Muted gray for Undecided
+- Green (`--portal-success`) for favorable ratings
+- Amber (`--portal-warning`) for neutral
+- Red (`--portal-error`) for unfavorable
+
+This avoids red/blue partisan framing while staying within the V3 design system palette.
+
+## Files to Create
+
+| File | Purpose |
+|------|---------|
+| `src/data/polls/index.ts` | Poll type definitions and registry array |
+| `src/data/polls/va6-2026.ts` | VA-6 poll data (all 5 sections + methodology) |
+| `src/pages/Polls.tsx` | Index page -- grid of poll cards |
+| `src/pages/PollDetail.tsx` | Detail page -- renders sections based on data type |
 
 ## Files to Modify
 
 | File | Change |
-|------|--------|
-| `src/pages/GetStarted.tsx` | Add `useEffect(() => { import("./Experience"); }, [])` to prefetch the chunk |
-| `src/components/PageTransition.tsx` | Skip animation for `/experience` route |
-| `src/App.tsx` | Add a lightweight dark skeleton fallback for the Experience route, replacing the generic spinner |
-
-## Expected Result
-
-- **Before**: Click CTA, see spinner for 0.5-2s, then 0.8s animation, then page appears
-- **After**: Click CTA, page appears almost instantly (chunk already cached, no animation delay, seamless dark background transition)
+|------|---------|
+| `src/App.tsx` | Add lazy imports for `Polls` and `PollDetail`, add routes `/polls` and `/polls/:slug`, add to `marketingRoutes` array |
+| `src/components/Footer.tsx` | Add "Polling" link to Quick Links section |
+| `src/components/landing/LandingFooter.tsx` | Add "Polling" link |
 
 ## Technical Details
 
-The prefetch pattern `import("./Experience")` works because Vite/webpack returns the same promise for repeated dynamic imports -- the module is fetched once and cached. When React.lazy later resolves the same import, it hits the cache instantly.
-
-No new dependencies are needed. All changes use existing React and router APIs.
+- Both pages use `Navigation` + `Footer` (matching `Index.tsx` pattern)
+- Chart sections wrapped in `portal-theme dark` div so V3 ECharts components render with dark tokens
+- All charts use `V3ChartWrapper` for accessibility (ariaLabel, dataSummary)
+- `EChartsBarChart` with `horizontal={true}` for all bar charts
+- `EChartsPieChart` with `variant="donut"` for candidate type preference
+- `V3DataTable` for methodology demographics
+- `AnimateOnScroll` for scroll-triggered section reveals
+- Helmet SEO tags on both pages
+- Responsive: single column on mobile, side-by-side methodology cards on desktop
+- Future polls: just create a new data file in `src/data/polls/`, add it to the registry array, and it automatically appears on the index page and gets its own detail route
