@@ -5,6 +5,7 @@ const LandingFooter = () => {
         <span>© {new Date().getFullYear()} Molitico. All rights reserved.</span>
         <div className="flex gap-6">
           <a href="/privacy-policy" className="hover:text-[#94a3b8] transition-colors">Privacy Policy</a>
+          <a href="/polls" className="hover:text-[#94a3b8] transition-colors">Polling</a>
           <a href="/contact" className="hover:text-[#94a3b8] transition-colors">Contact</a>
         </div>
       </div>

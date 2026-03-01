@@ -46,6 +46,8 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Login = lazy(() => import("./pages/Login"));
 const Experience = lazy(() => import("./pages/Experience"));
 const GetStarted = lazy(() => import("./pages/GetStarted"));
+const Polls = lazy(() => import("./pages/Polls"));
+const PollDetail = lazy(() => import("./pages/PollDetail"));
 
 // Admin pages (lazy loaded - larger bundle)
 const Admin = lazy(() => import("./pages/Admin"));
@@ -117,7 +119,7 @@ const DomainRouter = () => {
   
   // Marketing routes (public pages) - note: '/' handled separately on portal
   const marketingRoutes = ['/about', '/services', '/case-studies', 
-    '/blog', '/contact', '/privacy-policy', '/creative-showcase', '/bills', '/experience', '/get-started'];
+    '/blog', '/contact', '/privacy-policy', '/creative-showcase', '/bills', '/experience', '/get-started', '/polls'];
   
   // Portal route prefixes (app pages)
   const portalPrefixes = ['/client', '/admin', '/accept-invite', 
@@ -128,7 +130,8 @@ const DomainRouter = () => {
     location.pathname === route || 
     location.pathname.startsWith('/case-studies/') ||
     location.pathname.startsWith('/blog/') ||
-    location.pathname.startsWith('/bills/')
+    location.pathname.startsWith('/bills/') ||
+    location.pathname.startsWith('/polls/')
   );
   
   const isPortalRoute = portalPrefixes.some(prefix => 
@@ -192,6 +195,8 @@ const AppContent = () => {
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/experience" element={<Experience />} />
             <Route path="/get-started" element={<GetStarted />} />
+            <Route path="/polls" element={<Polls />} />
+            <Route path="/polls/:slug" element={<PollDetail />} />
             <Route path="/bills/:billNumber" element={<BillDetail />} />
             <Route path="/meta-oauth-callback" element={<MetaOAuthCallback />} />
             <Route path="/settings" element={<Settings />} />
