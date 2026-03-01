@@ -165,6 +165,13 @@ const HorizontalBar = ({ section, isMobile }: { section: HorizontalBarSection; i
         return v.slice(0, mid) + '\n' + v.slice(mid + 1);
       }}
     />
+    {section.netLabel && (
+      <div className="mt-3 text-center">
+        <span className="inline-block rounded-full bg-[hsl(var(--portal-accent-blue)/0.12)] px-4 py-1.5 text-sm font-bold text-[hsl(var(--portal-accent-blue))]">
+          {section.netLabel}
+        </span>
+      </div>
+    )}
   </V3ChartWrapper>
 );
 

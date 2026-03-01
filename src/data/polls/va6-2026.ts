@@ -41,27 +41,20 @@ export const va6Poll: PollData = {
 
     // 2. Rasoul Favorability — Stacked bar
     {
-      type: "stacked-bar",
+      type: "horizontal-bar",
       title: "Sam Rasoul Favorability",
       description:
         "Nearly 60% of voters in the district are familiar with Rasoul and he has an impressive +47% net favorability.",
-      xAxisKey: "candidate",
+      xAxisKey: "level",
       series: [
-        { dataKey: "veryFavorable", name: "Very Favorable", color: "#22c55e", stack: "fav" },
-        { dataKey: "somewhatFavorable", name: "Somewhat Favorable", color: "#86efac", stack: "fav" },
-        { dataKey: "neutral", name: "Neutral", color: "#fbbf24", stack: "fav" },
-        { dataKey: "somewhatUnfavorable", name: "Somewhat Unfavorable", color: "#fb923c", stack: "fav" },
-        { dataKey: "veryUnfavorable", name: "Very Unfavorable", color: "#ef4444", stack: "fav" },
+        { dataKey: "value", name: "Response %", color: "hsl(var(--portal-accent-blue))" },
       ],
       data: [
-        {
-          candidate: "Sam Rasoul",
-          veryFavorable: 27,
-          somewhatFavorable: 22,
-          neutral: 10,
-          somewhatUnfavorable: 1,
-          veryUnfavorable: 1,
-        },
+        { level: "Very Favorable", value: 27 },
+        { level: "Somewhat Favorable", value: 22 },
+        { level: "Neutral", value: 10 },
+        { level: "Somewhat Unfavorable", value: 1 },
+        { level: "Very Unfavorable", value: 1 },
       ],
       netLabel: "Net Favorability: +47%",
       valueType: "percent",
