@@ -1,48 +1,40 @@
 
-# Fix: Bars Disappearing on Hover
+
+# Fix: Bars Appearing to Disappear on Hover
 
 ## Problem
 
-When hovering over a bar in any bar chart, other bars fade out dramatically due to ECharts' `emphasis.focus: "series"` setting. For single-series charts (most poll charts), this makes non-hovered bars appear to vanish since ECharts blurs sibling data points.
+When hovering over a horizontal bar, the tooltip's `axisPointer` with `type: "shadow"` draws a dark semi-transparent rectangle across the entire row. This shadow overlays the bar itself, causing it to appear gray/faded (visible in the screenshot where "Daniel Biss" bar turns gray). The previous fix (`emphasis.focus: "self"`) addressed one layer of the problem but not this one.
 
 ## Root Cause
 
-In `EChartsBarChart.tsx` (lines 160-168), the emphasis config uses `focus: "series"`:
+In `EChartsBarChart.tsx` line 270, the tooltip axis pointer is configured as:
 
 ```typescript
-emphasis: {
-  focus: "series",       // <-- tells ECharts to blur everything except the hovered series
-  itemStyle: {
-    shadowBlur: 10,
-    shadowColor: "rgba(0, 0, 0, 0.3)",
-  },
-},
+axisPointer: { type: "shadow" as const }
 ```
 
-Per ECharts docs, `focus: "series"` means: "when one element is hovered, fade out all other series." For multi-series grouped bars this can work, but for single-series charts it creates confusing visual behavior where bars seem to disappear.
+For horizontal bar charts, this shadow fills the entire y-axis band behind the hovered category row, which visually covers and darkens the bar.
 
 ## Fix
 
 **File: `src/components/charts/echarts/EChartsBarChart.tsx`**
 
-Change `focus: "series"` to `focus: "self"` (or remove it entirely). With `focus: "self"`, only the hovered bar gets the emphasis highlight effect, while all other bars remain at full opacity -- no blurring or fading.
+Change the axis pointer type from `"shadow"` to `"line"` for horizontal bar charts. For vertical bars, `"shadow"` is acceptable since the shadow sits behind the bar. For horizontal bars, a vertical line indicator (or `"none"`) avoids obscuring the data.
 
 ```typescript
-emphasis: disableHoverEmphasis
-  ? { disabled: true }
-  : {
-      focus: "self",   // Only highlight the hovered bar, don't blur others
-      itemStyle: {
-        shadowBlur: 10,
-        shadowColor: "rgba(0, 0, 0, 0.3)",
-      },
-    },
+axisPointer: disableHoverEmphasis
+  ? { type: "none" as const }
+  : { type: horizontal ? "line" as const : "shadow" as const }
 ```
 
-This is a one-line change (`"series"` to `"self"`) that fixes all bar charts using this component.
+Alternatively, if the line looks too noisy, use `"none"` universally since the tooltip itself provides enough context.
+
+This is a single-line change in the tooltip configuration block.
 
 ## Files Modified
 
 | File | Change |
 |------|--------|
-| `src/components/charts/echarts/EChartsBarChart.tsx` | Change `emphasis.focus` from `"series"` to `"self"` |
+| `src/components/charts/echarts/EChartsBarChart.tsx` | Change axisPointer type to `"line"` (or `"none"`) for horizontal bars to prevent shadow from obscuring bars on hover |
+
