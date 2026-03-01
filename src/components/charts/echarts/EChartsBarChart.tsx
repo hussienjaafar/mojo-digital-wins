@@ -174,10 +174,17 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
       ...(showBarLabels && {
         label: {
           show: true,
-          position: (horizontal ? 'right' : 'top') as 'right' | 'top',
-          formatter: (params: any) => formatTooltipValue(typeof params.value === 'object' ? params.value.value : params.value),
-          color: 'hsl(var(--portal-text-primary))',
+          position: (s.stack
+            ? 'inside'
+            : (horizontal ? 'right' : 'top')) as 'inside' | 'right' | 'top',
+          formatter: (params: any) => {
+            const val = typeof params.value === 'object' ? params.value.value : params.value;
+            if (s.stack && val < 5) return '';
+            return formatTooltipValue(val, s.name);
+          },
+          color: s.stack ? '#fff' : 'hsl(var(--portal-text-primary))',
           fontSize: 11,
+          fontWeight: s.stack ? 600 : undefined,
         },
       }),
     };
