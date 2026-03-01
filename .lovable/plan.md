@@ -1,81 +1,67 @@
 
-# Audit: Fix Legend-to-Bar Color Mismatch Across All Charts
+
+# Fix Unreadable Stacked Bar Chart Labels
 
 ## Problem
 
-In `EChartsBarChart.tsx`, bar colors are set **only** at the per-data-point level inside each series' `data` array. The ECharts legend component does not read per-item colors -- it reads the series-level `color` or `itemStyle.color` property. When these are missing, the legend falls back to ECharts' built-in default palette, causing mismatches.
-
-**Visible bug (screenshot):** "Post-Info Ballot" legend icon shows GREEN, but bars are PURPLE.
+The stacked horizontal bar chart ("Sam Rasoul Favorability") has `showBarLabels` enabled with `position: 'right'`. For stacked bars, this places every segment's label at the right edge of that segment, causing all labels to overlap into an unreadable mess (visible in the screenshot: "27.0% 22.0% 10.0% ...%" all crammed together).
 
 ## Root Cause
 
+In `EChartsBarChart.tsx` (lines 174-182), the label config applies uniformly:
+
 ```typescript
-// Current code (line 137-149) - color only on per-item itemStyle
-seriesConfig = series.map((s, index) => ({
-  name: s.name,
-  data: data.map((d) => ({
-    value,
-    itemStyle: {
-      color: s.color || colorPalette[index % colorPalette.length],  // per-item only
-    },
-  })),
-  // NO series-level color property -- legend can't find it
-}));
+label: {
+  show: true,
+  position: horizontal ? 'right' : 'top',  // All labels go to 'right'
+  formatter: (params) => formatTooltipValue(params.value),
+}
 ```
 
-## Fix
+For stacked bars, each segment's label is placed at the right end of that segment. Since segments are adjacent, labels overlap.
+
+## Solution
 
 ### File: `src/components/charts/echarts/EChartsBarChart.tsx`
 
-Add a top-level `color` (or `itemStyle.color`) property to each series config so the legend picks up the correct color:
+Detect stacked series and adjust label behavior:
+
+1. **Position labels inside the bar segment** (`position: 'inside'`) when the series has a `stack` property
+2. **Hide labels for small segments** -- if the segment value is below a threshold (e.g., less than 5% of the total or less than 8 units), return an empty string from the formatter to avoid cramming tiny labels
+3. **Keep `position: 'right'` only for non-stacked bars** (current behavior, works fine)
 
 ```typescript
-const seriesConfig = series.map((s, index) => {
-  const seriesColor = s.color || colorPalette[index % colorPalette.length];
-  return {
-    name: s.name,
-    type: "bar",
-    color: seriesColor,   // <-- ADD THIS: series-level color for legend
-    data: data.map((d) => {
-      const value = d[s.dataKey] as number;
-      const isHighlighted = enableCrossHighlight && hoveredDataPoint?.date === d[xAxisKey];
-      return {
-        value,
-        itemStyle: {
-          color: seriesColor,
-          opacity: enableCrossHighlight && hoveredDataPoint && !isHighlighted ? 0.4 : 1,
-        },
-      };
-    }),
-    // ... rest unchanged
-  };
-});
+// In the showBarLabels block:
+const isStacked = !!s.stack;
+label: {
+  show: true,
+  position: isStacked
+    ? 'inside'                          // Inside the segment for stacked
+    : (horizontal ? 'right' : 'top'),   // Outside for non-stacked
+  formatter: (params) => {
+    const val = typeof params.value === 'object' ? params.value.value : params.value;
+    // Hide label if segment is too small to fit text
+    if (isStacked && val < 5) return '';
+    return formatTooltipValue(val, s.name);
+  },
+  color: isStacked ? '#fff' : 'hsl(var(--portal-text-primary))',
+  fontSize: 11,
+  fontWeight: isStacked ? 600 : undefined,
+}
 ```
 
-### Pie Chart (`EChartsPieChart.tsx`) -- No Change Needed
+This means:
+- **27%** and **22%** segments: Labels show inside as white text (large enough)
+- **10%** segment: Shows inside (value >= 5)
+- **1%** segments: Labels hidden (too small to read anyway; data accessible via tooltip)
 
-Pie charts handle legend colors correctly because ECharts pie series use per-item colors for legend icons (each data point is its own legend entry). Verified the donut data in both polls:
+### No data file changes needed
 
-- **VA-6 Candidate Type**: Progressive (blue), Experienced Leader (purple), Political Outsider (gray) -- colors are explicit in data
-- **IL-9 AIPAC Impact**: Less Likely (red), Neither (gray), More Likely (green) -- colors are explicit in data
-
-Both use `itemStyle.color` per data item, which ECharts pie legend reads correctly.
-
-### Stacked Bar -- Same Fix Applies
-
-The stacked bar (Rasoul Favorability) uses the same `EChartsBarChart` component, so the series-level color fix covers it too. Its series define explicit colors (`#22c55e`, `#86efac`, `#fbbf24`, `#fb923c`, `#ef4444`), which will now also appear correctly in the legend.
-
-## Summary
-
-| Chart Type | Issue | Fix |
-|-----------|-------|-----|
-| Grouped Bar (VA-6 Ballot Test) | Legend green, bars purple | Add series-level `color` property |
-| Stacked Bar (Rasoul Favorability) | Same potential mismatch | Same fix (shared component) |
-| Horizontal Bar (all) | Same potential mismatch | Same fix (shared component) |
-| Donut/Pie (all) | No issue | No change needed |
+The poll data and component wiring in `PollDetail.tsx` are correct. The fix is entirely in the bar chart component's label positioning logic.
 
 ## Files Modified
 
 | File | Change |
 |------|--------|
-| `src/components/charts/echarts/EChartsBarChart.tsx` | Add series-level `color` property so legend icons match bar colors |
+| `src/components/charts/echarts/EChartsBarChart.tsx` | Use `position: 'inside'` for stacked bar labels; hide labels on small segments; white text for contrast against colored bars |
+
