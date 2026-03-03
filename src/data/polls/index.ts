@@ -77,6 +77,7 @@ export interface PollData {
   marginOfError: number;
   population: string;
   keyFinding: string;
+  downloadUrl?: string;
   sections: PollSection[];
   methodology: MethodologyData;
 }

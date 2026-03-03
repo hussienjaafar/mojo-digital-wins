@@ -11,6 +11,7 @@ export const il9Poll: PollData = {
   population: "IL-09 Democratic Primary Electorate",
   keyFinding:
     "Daniel Biss leads with 31% but 21% remain undecided — turnout among low-propensity voters is the key variable, with accountability and ICE oversight driving engagement.",
+  downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx",
 
   sections: [
     // 1. Vote Choice — Horizontal bar
