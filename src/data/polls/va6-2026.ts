@@ -11,6 +11,7 @@ export const va6Poll: PollData = {
   population: "Likely Democratic Primary Voters",
   keyFinding:
     "Wide open race — Rasoul gains +12.3 pts after voters learn about the candidates, closing the gap with Perriello while 20% remain undecided.",
+  downloadUrl: "/downloads/VA-6_Memo-2.docx",
 
   sections: [
     // 1. Ballot Test — Grouped horizontal bar

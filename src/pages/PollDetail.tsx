@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ChevronRight,
+  Download,
 } from "lucide-react";
 
 // ─── Visible description subtitle inside chart cards ─────────
@@ -299,6 +300,16 @@ const PollDetail = () => {
               <p className="text-sm text-primary-foreground/60">
                 Sponsored by {poll.sponsor}
               </p>
+              {poll.downloadUrl && (
+                <a
+                  href={poll.downloadUrl}
+                  download
+                  className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-lg bg-accent text-accent-foreground font-semibold text-sm hover:bg-accent/90 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Full Results
+                </a>
+              )}
             </AnimateOnScroll>
           </div>
         </section>
