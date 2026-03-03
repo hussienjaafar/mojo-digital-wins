@@ -1,38 +1,44 @@
 
-# Fix: Bar Graying Out on Hover
 
-## Problem
+# Add "Download Full Results" Button to Poll Detail Pages
 
-Even after changing `focus` to `"self"` and removing the axis pointer shadow, hovering a bar still causes it to appear grayed out. This is ECharts' default emphasis behavior -- it applies a built-in color shift (desaturation/lightening) to the hovered item.
+## Overview
 
-## Fix
+Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
 
-**File: `src/components/charts/echarts/EChartsBarChart.tsx`**
+## Changes
 
-Update the `emphasis.itemStyle` to explicitly preserve the bar's original color and add a subtle brightness boost instead of the default gray shift. The key is adding `color: "inherit"` (which tells ECharts to keep the series color) and using `opacity` or `shadowBlur` for the hover indicator instead of letting ECharts apply its default color transformation.
+### 1. Copy uploaded files to `public/downloads/`
+- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
+- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
 
-```typescript
-emphasis: disableHoverEmphasis
-  ? { disabled: true }
-  : {
-      focus: "none" as const,
-      itemStyle: {
-        color: "inherit",
-        borderColor: "rgba(255, 255, 255, 0.3)",
-        borderWidth: 1,
-        shadowBlur: 8,
-        shadowColor: "rgba(0, 0, 0, 0.2)",
-      },
-    },
+Using `public/` so they're served as static files at known URLs.
+
+### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
+Add an optional `downloadUrl?: string` field to the `PollData` interface.
+
+### 3. Set download URLs in poll data files
+- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
+- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
+
+### 4. Add download button to `src/pages/PollDetail.tsx`
+Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
+
+```text
+[← All Polls]
+[Date | Sample | MOE]
+VA-6 Congressional District Poll.
+Sponsored by Unity & Justice Fund
+
+[⬇ Download Full Results]     ← new button here
 ```
-
-Changes:
-- `focus: "none"` -- no blur/fade effect on any elements
-- `color: "inherit"` -- keeps the bar's original color on hover instead of ECharts applying a gray tint
-- Subtle white border and shadow provide hover feedback without changing the bar color
-
-## Files Modified
 
 | File | Change |
 |------|--------|
-| `src/components/charts/echarts/EChartsBarChart.tsx` | Update emphasis itemStyle to preserve bar color on hover |
+| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
+| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
+| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
+| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
+| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
+| `src/pages/PollDetail.tsx` | Add download button in header section |
+
