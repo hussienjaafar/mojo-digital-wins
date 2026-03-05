@@ -15959,7 +15959,7 @@ export type Database = {
       compute_donor_key: { Args: { email: string }; Returns: string }
       cosine_similarity: { Args: { a: string; b: string }; Returns: number }
       count_keyword_mentions: {
-        Args: { search_keyword: string; time_window?: unknown }
+        Args: { search_keyword: string; time_window?: string }
         Returns: {
           bluesky_count: number
           news_count: number
@@ -15968,7 +15968,7 @@ export type Database = {
         }[]
       }
       count_posts_with_topic: {
-        Args: { time_window?: unknown; topic_name: string }
+        Args: { time_window?: string; topic_name: string }
         Returns: number
       }
       create_user_session: {
@@ -16017,7 +16017,7 @@ export type Database = {
         }[]
       }
       discover_trending_keywords: {
-        Args: { min_frequency?: number; time_window?: unknown }
+        Args: { min_frequency?: number; time_window?: string }
         Returns: {
           frequency: number
           keyword: string
