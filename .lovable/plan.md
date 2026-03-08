@@ -1,44 +1,96 @@
 
 
-# Add "Download Full Results" Button to Poll Detail Pages
+# Fix Meta Ads Sync Failures for Abdul & Rashid
 
-## Overview
+## Root Cause Analysis
 
-Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
+Both "Abdul For Senate" and "Rashid For Illinois" have been failing since ~Feb 20 with 192 consecutive errors. The error message stored is the generic `"Edge Function returned a non-2xx status code"` — this is **not** the actual error.
 
-## Changes
+**The problem is in the call chain:**
+1. `run-scheduled-jobs` → calls `tiered-meta-sync`
+2. `tiered-meta-sync` → calls `admin-sync-meta` via `supabase.functions.invoke()`
+3. When `admin-sync-meta` returns a non-2xx (400/401/404), `supabase.functions.invoke()` puts a generic error in `syncError` and the **actual error body** (e.g. "Meta API Error: (#100) Missing permissions") is discarded
+4. `tiered-meta-sync` stores only the generic message, masking the real issue
 
-### 1. Copy uploaded files to `public/downloads/`
-- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
-- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
+**Key facts:**
+- Tokens are NOT expired (expire Mar 23 & Mar 29)
+- Both use the same Meta user (Mohammed Maraqa)
+- Both stopped working on the same day (Feb 20)
+- The `last_sync_status` in `client_api_credentials` is `failed`, NOT `api_error` or `token_expired` — meaning `admin-sync-meta` itself is either crashing or its error-specific status updates aren't running
 
-Using `public/` so they're served as static files at known URLs.
+This strongly suggests `admin-sync-meta` is returning a non-2xx status **before** it gets to the Meta API call — likely a **404** from the credentials lookup or a parsing error. Or the Meta API is returning a permissions error that gets returned as 400.
 
-### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
-Add an optional `downloadUrl?: string` field to the `PollData` interface.
+## Fix Plan (2 changes)
 
-### 3. Set download URLs in poll data files
-- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
-- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
+### 1. Fix error capture in `tiered-meta-sync` (the critical fix)
 
-### 4. Add download button to `src/pages/PollDetail.tsx`
-Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
+When `supabase.functions.invoke()` returns an error, the response body is available in `syncError.context?.body` or by reading the response. Update the error handling to extract the actual error message:
 
-```text
-[← All Polls]
-[Date | Sample | MOE]
-VA-6 Congressional District Poll.
-Sponsored by Unity & Justice Fund
+**File:** `supabase/functions/tiered-meta-sync/index.ts` (lines 229-243)
 
-[⬇ Download Full Results]     ← new button here
+```typescript
+// Instead of just throwing syncError.message, extract the actual response body
+const { data: syncData, error: syncError } = await supabase.functions.invoke('admin-sync-meta', { ... });
+
+if (syncError) {
+  // Try to get actual error from response body
+  let actualError = syncError.message;
+  try {
+    // syncData may contain the error body even when syncError exists
+    if (syncData?.error) {
+      actualError = syncData.error;
+    } else if (typeof syncData === 'string') {
+      const parsed = JSON.parse(syncData);
+      actualError = parsed.error || actualError;
+    }
+  } catch {}
+  throw new Error(actualError);
+}
 ```
 
-| File | Change |
-|------|--------|
-| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
-| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
-| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
-| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
-| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
-| `src/pages/PollDetail.tsx` | Add download button in header section |
+### 2. Store the actual Meta API error in `admin-sync-meta`
+
+When `admin-sync-meta` encounters a Meta API error, it updates `last_sync_status` to `api_error` but does NOT update `last_sync_error` with the actual message. AND the `tiered-meta-sync` caller overwrites this with its own generic error via `update_meta_sync_status`.
+
+**File:** `supabase/functions/admin-sync-meta/index.ts` (lines 186-204)
+
+Update the error path to also store the actual error message in `last_sync_error`:
+
+```typescript
+if (campaignsData.error) {
+  const errorMsg = `Meta API Error: ${campaignsData.error.message} (code: ${campaignsData.error.code})`;
+  await supabase
+    .from('client_api_credentials')
+    .update({ 
+      last_sync_at: new Date().toISOString(), 
+      last_sync_status: 'api_error',
+      last_sync_error: errorMsg,
+      sync_error_count: supabase.rpc ? undefined : undefined // keep existing
+    })
+    .eq('organization_id', organization_id)
+    .eq('platform', 'meta');
+  // ... return with actual error in body
+}
+```
+
+### 3. Reset error counts and trigger manual sync
+
+After deploying the fixes, reset the error counts for both orgs and trigger a manual sync to capture the actual Meta API error:
+
+```sql
+UPDATE client_api_credentials 
+SET sync_error_count = 0, last_sync_error = NULL
+WHERE platform = 'meta' 
+AND organization_id IN ('8ba98ab9-e079-4e93-90dc-269cd384e99b', 'd2a7a38c-c60d-4ee1-b8b4-1eb4af6fcfa9');
+```
+
+Then invoke `tiered-meta-sync` with each org to get the real error surfaced.
+
+## Summary
+
+| Change | File | Purpose |
+|--------|------|---------|
+| Better error extraction | `tiered-meta-sync/index.ts` | Capture actual error body instead of generic message |
+| Store error details | `admin-sync-meta/index.ts` | Write actual Meta API error to `last_sync_error` |
+| Reset + re-trigger | Database migration | Clear stale error counts, re-test sync |
 
