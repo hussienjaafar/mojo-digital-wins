@@ -1,55 +1,44 @@
 
 
-# Implement Meta Sync Error Fix (Previously Approved)
+# Add "Download Full Results" Button to Poll Detail Pages
 
-The approved plan was not yet executed. Here are the three changes to implement:
+## Overview
 
-## 1. Fix error capture in `tiered-meta-sync/index.ts` (lines 241-243)
+Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
 
-Replace the generic error throw with logic that extracts the actual error from `syncData`:
+## Changes
 
-```typescript
-if (syncError) {
-  let actualError = syncError.message || 'Sync function failed';
-  try {
-    if (syncData && typeof syncData === 'object' && syncData.error) {
-      actualError = syncData.error;
-    } else if (typeof syncData === 'string') {
-      const parsed = JSON.parse(syncData);
-      actualError = parsed.error || actualError;
-    }
-  } catch {}
-  throw new Error(actualError);
-}
-```
+### 1. Copy uploaded files to `public/downloads/`
+- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
+- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
 
-## 2. Store actual error in `admin-sync-meta/index.ts` (lines 189-193)
+Using `public/` so they're served as static files at known URLs.
 
-Update the `client_api_credentials` update to include `last_sync_error`:
+### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
+Add an optional `downloadUrl?: string` field to the `PollData` interface.
 
-```typescript
-.update({ 
-  last_sync_at: new Date().toISOString(), 
-  last_sync_status: 'api_error',
-  last_sync_error: `Meta API Error: ${campaignsData.error.message} (code: ${campaignsData.error.code})`
-})
-```
+### 3. Set download URLs in poll data files
+- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
+- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
 
-## 3. Database: Reset error counts for Abdul & Rashid
+### 4. Add download button to `src/pages/PollDetail.tsx`
+Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
 
-```sql
-UPDATE client_api_credentials 
-SET sync_error_count = 0, last_sync_error = NULL
-WHERE platform = 'meta' 
-AND organization_id IN (
-  '8ba98ab9-e079-4e93-90dc-269cd384e99b',
-  'd2a7a38c-c60d-4ee1-b8b4-1eb4af6fcfa9'
-);
+```text
+[← All Polls]
+[Date | Sample | MOE]
+VA-6 Congressional District Poll.
+Sponsored by Unity & Justice Fund
+
+[⬇ Download Full Results]     ← new button here
 ```
 
 | File | Change |
 |------|--------|
-| `supabase/functions/tiered-meta-sync/index.ts` | Extract actual error body from syncData |
-| `supabase/functions/admin-sync-meta/index.ts` | Store error detail in `last_sync_error` |
-| Database migration | Reset error counts for 2 orgs |
+| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
+| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
+| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
+| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
+| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
+| `src/pages/PollDetail.tsx` | Add download button in header section |
 

@@ -239,7 +239,16 @@ serve(async (req) => {
         });
 
         if (syncError) {
-          throw new Error(syncError.message || 'Sync function failed');
+          let actualError = syncError.message || 'Sync function failed';
+          try {
+            if (syncData && typeof syncData === 'object' && syncData.error) {
+              actualError = syncData.error;
+            } else if (typeof syncData === 'string') {
+              const parsed = JSON.parse(syncData);
+              actualError = parsed.error || actualError;
+            }
+          } catch {}
+          throw new Error(actualError);
         }
 
         if (syncData?.error?.includes('rate limit') || syncData?.error?.includes('429')) {
