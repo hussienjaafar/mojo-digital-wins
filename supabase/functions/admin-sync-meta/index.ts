@@ -186,9 +186,14 @@ serve(async (req) => {
     if (campaignsData.error) {
       console.error('[META SYNC] Meta API error:', campaignsData.error);
       
+      const metaErrorMsg = `Meta API Error: ${campaignsData.error.message || 'Unknown'} (code: ${campaignsData.error.code || 'N/A'})`;
       await supabase
         .from('client_api_credentials')
-        .update({ last_sync_at: new Date().toISOString(), last_sync_status: 'api_error' })
+        .update({ 
+          last_sync_at: new Date().toISOString(), 
+          last_sync_status: 'api_error',
+          last_sync_error: metaErrorMsg
+        })
         .eq('organization_id', organization_id)
         .eq('platform', 'meta');
       
