@@ -35,6 +35,8 @@ export function MetaCredentialAuth({
   const [authMethod, setAuthMethod] = useState<'oauth' | 'manual'>('oauth');
   const [isConnecting, setIsConnecting] = useState(false);
   const [oauthStep, setOauthStep] = useState<'idle' | 'authenticating' | 'selecting' | 'saving'>('idle');
+  const [authStartTime, setAuthStartTime] = useState<number | null>(null);
+  const [showTimeoutHelp, setShowTimeoutHelp] = useState(false);
   
   // OAuth state
   const [accessToken, setAccessToken] = useState('');
@@ -62,7 +64,7 @@ export function MetaCredentialAuth({
   }, [adAccounts, accountSearch]);
   const [showManualToken, setShowManualToken] = useState(false);
 
-  // Listen for OAuth callback
+  // Listen for OAuth callback via postMessage
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
@@ -84,6 +86,30 @@ export function MetaCredentialAuth({
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
+  }, [organizationId]);
+
+  // Listen for OAuth callback via localStorage (fallback when window.opener is lost)
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'meta_oauth_result' && e.newValue) {
+        try {
+          const result = JSON.parse(e.newValue);
+          localStorage.removeItem('meta_oauth_result');
+          if (result.error) {
+            toast.error(result.errorDescription || 'OAuth authentication failed');
+            setOauthStep('idle');
+            setIsConnecting(false);
+          } else if (result.code && result.state) {
+            handleOAuthCallback(result.code, result.state);
+          }
+        } catch (err) {
+          console.error('Failed to parse OAuth result from storage:', err);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, [organizationId]);
 
   const handleOAuthCallback = async (code: string, state: string) => {
@@ -119,6 +145,13 @@ export function MetaCredentialAuth({
   const handleStartOAuth = async () => {
     setIsConnecting(true);
     setOauthStep('authenticating');
+    setShowTimeoutHelp(false);
+
+    // Show timeout help after 30 seconds
+    setTimeout(() => setShowTimeoutHelp(true), 30000);
+
+    // Clear any stale result
+    localStorage.removeItem('meta_oauth_result');
 
     try {
       const redirectUri = `${window.location.origin}/meta-oauth-callback`;
@@ -145,6 +178,30 @@ export function MetaCredentialAuth({
         'meta-oauth',
         `width=${width},height=${height},left=${left},top=${top},popup=1`
       );
+
+      // Poll localStorage as safety fallback (storage events may not fire in all scenarios)
+      const pollInterval = setInterval(() => {
+        const result = localStorage.getItem('meta_oauth_result');
+        if (result) {
+          clearInterval(pollInterval);
+          try {
+            const parsed = JSON.parse(result);
+            localStorage.removeItem('meta_oauth_result');
+            if (parsed.error) {
+              toast.error(parsed.errorDescription || 'OAuth authentication failed');
+              setOauthStep('idle');
+              setIsConnecting(false);
+            } else if (parsed.code && parsed.state) {
+              handleOAuthCallback(parsed.code, parsed.state);
+            }
+          } catch (e) {
+            console.error('Failed to parse OAuth result:', e);
+          }
+        }
+      }, 500);
+
+      // Stop polling after 5 minutes
+      setTimeout(() => clearInterval(pollInterval), 5 * 60 * 1000);
     } catch (err: any) {
       console.error('OAuth init error:', err);
       toast.error(err.message || 'Failed to start OAuth flow');
@@ -254,6 +311,27 @@ export function MetaCredentialAuth({
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
               <p className="text-muted-foreground">Authenticating with Facebook...</p>
               <p className="text-sm text-muted-foreground mt-2">Complete login in the popup window</p>
+              {showTimeoutHelp && (
+                <div className="mt-4 space-y-2">
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Taking longer than expected? The popup may have closed. Try again or use manual entry.
+                    </AlertDescription>
+                  </Alert>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setOauthStep('idle');
+                      setIsConnecting(false);
+                      setShowTimeoutHelp(false);
+                    }}
+                  >
+                    Try Again
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 

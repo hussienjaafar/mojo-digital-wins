@@ -1,85 +1,44 @@
 
 
-# Fix: Meta OAuth Popup Communication Failure
+# Add "Download Full Results" Button to Poll Detail Pages
 
-## Root Cause
+## Overview
 
-The edge function logs confirm the OAuth flow **succeeds on the backend** — credentials are stored, 37 ad accounts fetched, token expires May 9. The issue is purely frontend: **the popup cannot communicate back to the parent window**.
+Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
 
-When the popup navigates through `facebook.com` and back, modern browsers clear `window.opener` for security (cross-origin navigation). In `MetaOAuthCallback.tsx`, when `window.opener` is null, the popup falls into the redirect-mode fallback and navigates *itself* to the admin page — but the parent window never receives the callback data, so it stays stuck on "Authenticating with Facebook..."
+## Changes
+
+### 1. Copy uploaded files to `public/downloads/`
+- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
+- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
+
+Using `public/` so they're served as static files at known URLs.
+
+### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
+Add an optional `downloadUrl?: string` field to the `PollData` interface.
+
+### 3. Set download URLs in poll data files
+- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
+- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
+
+### 4. Add download button to `src/pages/PollDetail.tsx`
+Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
 
 ```text
-Parent window                          Popup window
-─────────────                          ────────────
-opens popup ──────────────────────────► /meta-oauth-callback redirect
-oauthStep = 'authenticating'           ↓
-waiting for postMessage...             facebook.com/dialog/oauth
-  ↓                                    ↓ (cross-origin nav clears window.opener)
-  ↓                                    /meta-oauth-callback?code=X&state=Y
-  ↓                                    window.opener === null ✗
-  ↓                                    falls into redirect fallback
-  ↓                                    navigates popup to /admin (wrong!)
-  ↓
-  spinner forever ✗
+[← All Polls]
+[Date | Sample | MOE]
+VA-6 Congressional District Poll.
+Sponsored by Unity & Justice Fund
+
+[⬇ Download Full Results]     ← new button here
 ```
 
-## Fix: Use `localStorage` as Cross-Window Communication Fallback
-
-This is the standard pattern for OAuth popup flows when `window.opener` is lost.
-
-### 1. `src/pages/MetaOAuthCallback.tsx`
-After attempting `postMessage`, ALSO write to `localStorage` as a fallback:
-```typescript
-// Always write to localStorage as fallback
-localStorage.setItem('meta_oauth_result', JSON.stringify({ code, state, timestamp: Date.now() }));
-
-if (window.opener) {
-  // Try postMessage (may work in some browsers)
-  window.opener.postMessage({ type: 'META_OAUTH_CALLBACK', code, state }, window.location.origin);
-}
-
-setStatus('success');
-setTimeout(() => window.close(), 1500);
-```
-
-Remove the `else` branch that redirects the popup to the admin page — it serves no purpose and creates confusion.
-
-### 2. `src/components/admin/integrations/MetaCredentialAuth.tsx`
-Add a `storage` event listener alongside the existing `message` listener:
-```typescript
-useEffect(() => {
-  const handleStorage = (e: StorageEvent) => {
-    if (e.key === 'meta_oauth_result' && e.newValue) {
-      const { code, state } = JSON.parse(e.newValue);
-      localStorage.removeItem('meta_oauth_result');
-      handleOAuthCallback(code, state);
-    }
-  };
-  window.addEventListener('storage', handleStorage);
-  return () => window.removeEventListener('storage', handleStorage);
-}, [organizationId]);
-```
-
-Also add a polling fallback (storage events only fire in *other* tabs, not the same tab that wrote the value — but since this is a popup→parent scenario, it should fire; still, add a poll as safety):
-```typescript
-// Inside handleStartOAuth, after window.open:
-const pollInterval = setInterval(() => {
-  const result = localStorage.getItem('meta_oauth_result');
-  if (result) {
-    clearInterval(pollInterval);
-    const { code, state } = JSON.parse(result);
-    localStorage.removeItem('meta_oauth_result');
-    handleOAuthCallback(code, state);
-  }
-}, 500);
-
-// Clear after 5 minutes
-setTimeout(() => clearInterval(pollInterval), 5 * 60 * 1000);
-```
-
-### 3. Add a timeout with user guidance
-If stuck for 30+ seconds, show a message with a manual retry option instead of spinning forever.
-
-## Summary
-Two files changed, no backend changes needed. The credentials are already being stored successfully — this fix just ensures the frontend learns about it.
+| File | Change |
+|------|--------|
+| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
+| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
+| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
+| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
+| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
+| `src/pages/PollDetail.tsx` | Add download button in header section |
 
