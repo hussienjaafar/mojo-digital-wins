@@ -1,73 +1,44 @@
 
 
-# Root Cause: Meta Ad Spend Not Populating on Client Dashboard
+# Add "Download Full Results" Button to Poll Detail Pages
 
-## The Problem
+## Overview
 
-The client dashboard shows zero Meta ad spend because it queries the wrong table.
+Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
 
-## Data Flow (Current — Broken)
+## Changes
+
+### 1. Copy uploaded files to `public/downloads/`
+- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
+- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
+
+Using `public/` so they're served as static files at known URLs.
+
+### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
+Add an optional `downloadUrl?: string` field to the `PollData` interface.
+
+### 3. Set download URLs in poll data files
+- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
+- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
+
+### 4. Add download button to `src/pages/PollDetail.tsx`
+Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
 
 ```text
-admin-sync-meta (runs every 30 min)
-  └─► meta_ad_metrics          ← HAS data through March 10 ✓
-  └─► meta_creative_insights   ← HAS data ✓
-  └─► meta_campaigns           ← HAS data ✓
-  ╳   meta_ad_metrics_daily    ← NOT written to ✗
+[← All Polls]
+[Date | Sample | MOE]
+VA-6 Congressional District Poll.
+Sponsored by Unity & Justice Fund
 
-sync-meta-ads (NOT scheduled — manual only)
-  └─► meta_ad_metrics          ← writes here too
-  └─► meta_ad_metrics_daily    ← ONLY source for this table
-        │
-        ▼
-meta_fundraising_metrics_daily (VIEW)
-  = meta_ad_metrics_daily JOIN meta_campaigns
-  WHERE objective IN ('OUTCOME_SALES', 'CONVERSIONS')
-        │
-        ▼
-useDashboardMetricsV2 → fetchChannelSpend()
-  └─► queries meta_fundraising_metrics_daily
-  └─► Returns $0 spend for any date after Jan 30 ✗
+[⬇ Download Full Results]     ← new button here
 ```
 
-**Result**: `meta_ad_metrics_daily` has no data after Jan 30, 2026. Every dashboard metric that depends on Meta spend (ROI, ROAS, total spend, channel breakdown, time series) shows zero.
-
-## Cascading Impact
-
-All of these are broken because they depend on `meta_fundraising_metrics_daily` or `meta_ad_metrics_daily`:
-- Hero KPIs: ROI, Total Spend, Attributed ROI all show $0
-- Performance chart: Meta spend line is flat at zero
-- Channel breakdown: Meta Ads shows 0 donations attributed
-- Creative Intelligence: DataFreshnessIndicator queries `meta_ad_metrics_daily`
-- KPI drilldowns, channel summaries
-
-## Fix Options
-
-### Option A: Make `admin-sync-meta` also write to `meta_ad_metrics_daily` (Recommended)
-
-Add ad-level insights fetching to the `admin-sync-meta` function — the same logic that `sync-meta-ads` uses (lines 1493-1665). This means the scheduled job populates BOTH tables every 30 minutes.
-
-**Changes:**
-1. **`supabase/functions/admin-sync-meta/index.ts`**: After the campaign-level insights loop (line 293), add an ad-level insights fetch per campaign that upserts to `meta_ad_metrics_daily` with the same fields (ad_id, link_clicks, link_ctr, etc.)
-2. **Run a one-time backfill**: Invoke `sync-meta-ads` or `backfill-meta-ads` for the gap period (Jan 31 – Mar 10) to fill in the missing data
-
-### Option B: Switch dashboard to query `meta_ad_metrics` instead
-
-Change `fetchChannelSpend()` to query `meta_ad_metrics` (which has current data) instead of `meta_fundraising_metrics_daily`. This is faster to implement but loses the fundraising-only objective filtering and ad-level granularity.
-
-**Changes:**
-1. **`src/hooks/useDashboardMetricsV2.ts`** line 73-79: Replace `meta_fundraising_metrics_daily` with `meta_ad_metrics`, adding a JOIN or subquery filter for fundraising objectives
-2. Update any other hooks that depend on `meta_ad_metrics_daily`
-
-### Option C: Schedule `sync-meta-ads` alongside `admin-sync-meta`
-
-Add `sync-meta-ads` as a scheduled job. This is the simplest fix but `sync-meta-ads` is a 2000+ line function with heavy API usage that may timeout or hit rate limits when run for all orgs.
-
-## Recommended Approach: Option A + Immediate Backfill
-
-1. Update `admin-sync-meta` to write ad-level data to `meta_ad_metrics_daily`
-2. Trigger a backfill for the Jan 31 – Mar 10 gap
-3. Dashboard immediately starts showing correct data going forward
-
-This aligns with the existing architecture where `admin-sync-meta` is the scheduled workhorse, and ensures both tables stay in sync.
+| File | Change |
+|------|--------|
+| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
+| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
+| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
+| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
+| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
+| `src/pages/PollDetail.tsx` | Add download button in header section |
 

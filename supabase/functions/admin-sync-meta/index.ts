@@ -292,6 +292,112 @@ serve(async (req) => {
         }
       }
 
+      // ========== AD-LEVEL DAILY METRICS (for meta_ad_metrics_daily) ==========
+      try {
+        const adInsightsUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?` +
+          `level=ad&` +
+          `fields=ad_id,ad_name,campaign_id,adset_id,impressions,clicks,spend,reach,cpc,cpm,ctr,frequency,` +
+          `inline_link_clicks,outbound_clicks,inline_link_click_ctr,` +
+          `actions,action_values,cost_per_action_type,purchase_roas,quality_ranking,engagement_rate_ranking,conversion_rate_ranking&` +
+          `time_range={"since":"${dateRange.since}","until":"${dateRange.until}"}&` +
+          `time_increment=1&limit=500&access_token=${access_token}`;
+
+        let adNextUrl: string | null = adInsightsUrl;
+        while (adNextUrl) {
+          const adRes = await fetch(adNextUrl);
+          const adData = await adRes.json();
+          if (adData.error) {
+            console.error(`[META SYNC] Ad-level insights error for campaign ${campaign.id}:`, adData.error);
+            break;
+          }
+          for (const ins of (adData.data || [])) {
+            if (!ins.ad_id) continue;
+
+            let adConversions = 0, adConversionValue = 0, adCostPerResult = 0;
+            if (ins.actions) {
+              const ca = ins.actions.find((a: any) => a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase');
+              if (ca) adConversions = parseInt(ca.value) || 0;
+            }
+            if (ins.action_values) {
+              const va = ins.action_values.find((a: any) => a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase');
+              if (va) adConversionValue = parseFloat(va.value) || 0;
+            }
+            if (ins.cost_per_action_type) {
+              const cp = ins.cost_per_action_type.find((a: any) => a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase');
+              if (cp) adCostPerResult = parseFloat(cp.value) || 0;
+            }
+
+            const adMetaRoas = ins.purchase_roas?.[0]?.value ? parseFloat(ins.purchase_roas[0].value) : null;
+            const adNormalizedCtr = (parseFloat(ins.ctr) || 0) / 100;
+
+            // Link clicks: inline_link_clicks → outbound_clicks → actions:link_click
+            let adLinkClicks = 0;
+            if (ins.inline_link_clicks) adLinkClicks = parseInt(ins.inline_link_clicks) || 0;
+            if (adLinkClicks === 0 && ins.outbound_clicks) {
+              const oc = ins.outbound_clicks.find((a: any) => a.action_type === 'outbound_click');
+              if (oc) adLinkClicks = parseInt(oc.value) || 0;
+            }
+            if (adLinkClicks === 0 && ins.actions) {
+              const lc = ins.actions.find((a: any) => a.action_type === 'link_click');
+              if (lc) adLinkClicks = parseInt(lc.value) || 0;
+            }
+
+            const adLinkCtr = ins.inline_link_click_ctr
+              ? parseFloat(ins.inline_link_click_ctr) / 100
+              : (parseInt(ins.impressions) > 0 && adLinkClicks > 0 ? adLinkClicks / parseInt(ins.impressions) : null);
+
+            // Look up creative_id
+            let adCreativeId: string | null = null;
+            const { data: cm } = await supabase
+              .from('meta_creative_insights')
+              .select('creative_id')
+              .eq('organization_id', organization_id)
+              .eq('ad_id', ins.ad_id)
+              .limit(1)
+              .maybeSingle();
+            if (cm?.creative_id) adCreativeId = cm.creative_id;
+
+            const { error: dailyErr } = await supabase
+              .from('meta_ad_metrics_daily')
+              .upsert({
+                organization_id,
+                ad_account_id: ad_account_id.replace('act_', ''),
+                date: ins.date_start,
+                ad_id: ins.ad_id,
+                campaign_id: ins.campaign_id || campaign.id,
+                adset_id: ins.adset_id || null,
+                creative_id: adCreativeId,
+                ad_name: ins.ad_name || null,
+                spend: parseFloat(ins.spend) || 0,
+                impressions: parseInt(ins.impressions) || 0,
+                clicks: parseInt(ins.clicks) || 0,
+                reach: parseInt(ins.reach) || 0,
+                cpc: parseFloat(ins.cpc) || null,
+                cpm: parseFloat(ins.cpm) || null,
+                ctr: adNormalizedCtr || null,
+                link_clicks: adLinkClicks,
+                link_ctr: adLinkCtr,
+                frequency: parseFloat(ins.frequency) || null,
+                conversions: adConversions,
+                conversion_value: adConversionValue,
+                cost_per_result: adCostPerResult || null,
+                meta_roas: adMetaRoas,
+                quality_ranking: ins.quality_ranking || null,
+                engagement_ranking: ins.engagement_rate_ranking || null,
+                conversion_ranking: ins.conversion_rate_ranking || null,
+                synced_at: new Date().toISOString(),
+              }, { onConflict: 'organization_id,ad_account_id,date,ad_id' });
+
+            if (dailyErr) {
+              console.error(`[META SYNC] Ad-level daily error for ad ${ins.ad_id}:`, dailyErr);
+            }
+          }
+          adNextUrl = adData.paging?.next || null;
+        }
+      } catch (adLevelErr) {
+        console.error(`[META SYNC] Ad-level fetch error for campaign ${campaign.id}:`, adLevelErr);
+      }
+
       // Fetch ads with creatives
       const adsUrl = `https://graph.facebook.com/v22.0/${campaign.id}/ads?fields=id,name,creative{id,name,object_story_spec,asset_feed_spec,video_id,thumbnail_url}&access_token=${access_token}`;
       const adsResponse = await fetch(adsUrl);
