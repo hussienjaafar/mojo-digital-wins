@@ -91,7 +91,7 @@ export function MetaCredentialAuth({
       setOauthStep('authenticating');
 
       const { data, error } = await supabase.functions.invoke('meta-oauth-callback', {
-        body: { code, state, organizationId }
+        body: { code, state, redirectUri: `${window.location.origin}/meta-oauth-callback` }
       });
 
       if (error) throw error;
