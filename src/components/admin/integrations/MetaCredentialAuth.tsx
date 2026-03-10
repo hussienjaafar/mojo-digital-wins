@@ -35,6 +35,8 @@ export function MetaCredentialAuth({
   const [authMethod, setAuthMethod] = useState<'oauth' | 'manual'>('oauth');
   const [isConnecting, setIsConnecting] = useState(false);
   const [oauthStep, setOauthStep] = useState<'idle' | 'authenticating' | 'selecting' | 'saving'>('idle');
+  const [authStartTime, setAuthStartTime] = useState<number | null>(null);
+  const [showTimeoutHelp, setShowTimeoutHelp] = useState(false);
   
   // OAuth state
   const [accessToken, setAccessToken] = useState('');
