@@ -151,7 +151,11 @@ export function CreativeIntelligenceDashboard({
       toast.info("Syncing performance data from Meta Ads...");
 
       const { data: syncResult, error: syncError } = await supabase.functions.invoke("sync-meta-ads", {
-        body: { organization_id: organizationId },
+        body: { 
+          organization_id: organizationId,
+          start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          end_date: new Date().toISOString().split('T')[0],
+        },
       });
       if (syncError) throw syncError;
 

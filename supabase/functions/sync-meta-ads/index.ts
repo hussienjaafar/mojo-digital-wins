@@ -385,12 +385,19 @@ serve(async (req) => {
     const credentials = credData.encrypted_credentials as unknown as MetaCredentials;
     const { access_token } = credentials;
     
-    // Resolve ad_account_id: direct field, or fallback to first in ad_accounts list
-    let ad_account_id = credentials.ad_account_id 
-      || (credentials as any).ad_accounts?.[0]?.account_id;
+    // Resolve ad_account_id: direct field, or fallback only if single account
+    let ad_account_id = credentials.ad_account_id;
 
     if (!ad_account_id) {
-      throw new Error('No ad_account_id configured. Please re-connect Meta and select an ad account.');
+      const accounts = (credentials as any).ad_accounts;
+      if (accounts?.length === 1) {
+        ad_account_id = accounts[0].account_id;
+        console.log(`[sync-meta-ads] Auto-selected single ad account: ${ad_account_id}`);
+      } else if (accounts?.length > 1) {
+        throw new Error(`Multiple ad accounts available (${accounts.length}). Please select one in Settings > Integrations.`);
+      } else {
+        throw new Error('No ad_account_id configured. Please re-connect Meta and select an ad account.');
+      }
     }
 
     if (!ad_account_id.startsWith('act_')) {

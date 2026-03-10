@@ -51,6 +51,7 @@ export function MetaCredentialAuth({
   
   // Search state
   const [accountSearch, setAccountSearch] = useState('');
+  const [needsAccountSelection, setNeedsAccountSelection] = useState(false);
   
   // Filter accounts based on search
   const filteredAccounts = useMemo(() => {
@@ -63,6 +64,35 @@ export function MetaCredentialAuth({
     );
   }, [adAccounts, accountSearch]);
   const [showManualToken, setShowManualToken] = useState(false);
+
+  // Check if credentials exist but no ad_account_id is selected
+  useEffect(() => {
+    const checkExistingCredentials = async () => {
+      try {
+        const { data } = await supabase
+          .from('client_api_credentials')
+          .select('encrypted_credentials')
+          .eq('organization_id', organizationId)
+          .eq('platform', 'meta')
+          .single();
+
+        if (!data) return;
+
+        const creds = data.encrypted_credentials as Record<string, any>;
+        if (creds?.access_token && !creds?.ad_account_id && creds?.ad_accounts?.length > 0) {
+          // Connected but no account selected — show selection UI
+          setAccessToken(creds.access_token);
+          setAdAccounts(creds.ad_accounts);
+          setMetaUserInfo(creds.meta_user_name ? { name: creds.meta_user_name, id: creds.meta_user_id } : null);
+          setOauthStep('selecting');
+          setNeedsAccountSelection(true);
+        }
+      } catch (err) {
+        // Ignore — not connected yet
+      }
+    };
+    checkExistingCredentials();
+  }, [organizationId]);
 
   // Listen for OAuth callback via postMessage
   useEffect(() => {
