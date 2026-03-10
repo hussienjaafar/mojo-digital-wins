@@ -210,20 +210,56 @@ export function MetaCredentialAuth({
     }
   };
 
-  const handleSelectAccount = () => {
+  const handleSelectAccount = async () => {
     if (!selectedAccountId || !accessToken) return;
 
     const account = adAccounts.find(a => a.id === selectedAccountId);
     if (!account) return;
 
-    onSuccess({
-      access_token: accessToken,
-      ad_account_id: account.account_id,
-      business_manager_id: account.business_name || undefined
-    });
+    try {
+      // Persist ad_account_id to DB immediately so sync functions can use it
+      const { data: existing } = await supabase
+        .from('client_api_credentials')
+        .select('encrypted_credentials')
+        .eq('organization_id', organizationId)
+        .eq('platform', 'meta')
+        .single();
 
-    toast.success(`Connected to ${account.name}`);
-    setOauthStep('idle');
+      const existingCreds = (existing?.encrypted_credentials as Record<string, any>) || {};
+
+      const { error } = await supabase
+        .from('client_api_credentials')
+        .update({
+          encrypted_credentials: {
+            ...existingCreds,
+            ad_account_id: account.account_id,
+            ad_account_name: account.name,
+            business_manager_id: account.business_name || existingCreds.business_manager_id,
+          },
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('organization_id', organizationId)
+        .eq('platform', 'meta');
+
+      if (error) {
+        console.error('Failed to save ad account selection:', error);
+        toast.error('Failed to save ad account selection');
+        return;
+      }
+
+      onSuccess({
+        access_token: accessToken,
+        ad_account_id: account.account_id,
+        business_manager_id: account.business_name || undefined,
+      });
+
+      toast.success(`Connected to ${account.name}`);
+      setOauthStep('idle');
+    } catch (err) {
+      console.error('Error saving ad account:', err);
+      toast.error('Failed to save ad account selection');
+    }
   };
 
   const handleManualSubmit = () => {

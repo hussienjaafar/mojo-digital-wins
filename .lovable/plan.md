@@ -1,69 +1,44 @@
 
 
-# Fix: Meta Sync Fails — `ad_account_id` Not Saved to Database
+# Add "Download Full Results" Button to Poll Detail Pages
 
-## Problem
+## Overview
 
-The edge function logs show the exact error:
-```
-Meta API Error: Object with ID 'undefined' does not exist
-```
+Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
 
-The `sync-meta-ads` function reads `credentials.ad_account_id` from the database, but it's **never stored there**.
+## Changes
 
-### What happens today:
+### 1. Copy uploaded files to `public/downloads/`
+- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
+- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
 
-1. **OAuth callback** stores credentials in DB with `ad_accounts` (full list) but **no `ad_account_id`**
-2. User selects an ad account in the UI → `handleSelectAccount()` calls `onSuccess()` which updates **form state only**
-3. The user would need to click a separate "Save" button to persist this to the DB — but the flow doesn't make this obvious
-4. **Result**: DB credentials have no `ad_account_id`, sync calls fail
+Using `public/` so they're served as static files at known URLs.
 
-## Fix
+### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
+Add an optional `downloadUrl?: string` field to the `PollData` interface.
 
-**File: `src/components/admin/integrations/MetaCredentialAuth.tsx`** — `handleSelectAccount()` (line 213)
+### 3. Set download URLs in poll data files
+- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
+- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
 
-When the user selects an ad account, **immediately update the database** to merge `ad_account_id` into the existing stored credentials:
+### 4. Add download button to `src/pages/PollDetail.tsx`
+Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
 
-```typescript
-const handleSelectAccount = async () => {
-  if (!selectedAccountId || !accessToken) return;
-  const account = adAccounts.find(a => a.id === selectedAccountId);
-  if (!account) return;
+```text
+[← All Polls]
+[Date | Sample | MOE]
+VA-6 Congressional District Poll.
+Sponsored by Unity & Justice Fund
 
-  // Update DB directly — merge ad_account_id into existing credentials
-  const { data: existing } = await supabase
-    .from('client_api_credentials')
-    .select('encrypted_credentials')
-    .eq('organization_id', organizationId)
-    .eq('platform', 'meta')
-    .single();
-
-  const existingCreds = (existing?.encrypted_credentials as Record<string, any>) || {};
-  
-  await supabase
-    .from('client_api_credentials')
-    .upsert({
-      organization_id: organizationId,
-      platform: 'meta',
-      encrypted_credentials: {
-        ...existingCreds,
-        ad_account_id: account.account_id,
-        business_manager_id: account.business_name || existingCreds.business_manager_id,
-      },
-      is_active: true,
-    }, { onConflict: 'organization_id,platform' });
-
-  // Still call onSuccess for form state
-  onSuccess({
-    access_token: accessToken,
-    ad_account_id: account.account_id,
-    business_manager_id: account.business_name || undefined,
-  });
-
-  toast.success(`Connected to ${account.name}`);
-  setOauthStep('idle');
-};
+[⬇ Download Full Results]     ← new button here
 ```
 
-This is a single function change. The sync will immediately work after selecting an ad account.
+| File | Change |
+|------|--------|
+| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
+| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
+| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
+| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
+| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
+| `src/pages/PollDetail.tsx` | Add download button in header section |
 
