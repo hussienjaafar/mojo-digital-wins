@@ -144,6 +144,9 @@ export function MetaCredentialAuth({
     setIsConnecting(true);
     setOauthStep('authenticating');
 
+    // Clear any stale result
+    localStorage.removeItem('meta_oauth_result');
+
     try {
       const redirectUri = `${window.location.origin}/meta-oauth-callback`;
       
@@ -169,6 +172,30 @@ export function MetaCredentialAuth({
         'meta-oauth',
         `width=${width},height=${height},left=${left},top=${top},popup=1`
       );
+
+      // Poll localStorage as safety fallback (storage events may not fire in all scenarios)
+      const pollInterval = setInterval(() => {
+        const result = localStorage.getItem('meta_oauth_result');
+        if (result) {
+          clearInterval(pollInterval);
+          try {
+            const parsed = JSON.parse(result);
+            localStorage.removeItem('meta_oauth_result');
+            if (parsed.error) {
+              toast.error(parsed.errorDescription || 'OAuth authentication failed');
+              setOauthStep('idle');
+              setIsConnecting(false);
+            } else if (parsed.code && parsed.state) {
+              handleOAuthCallback(parsed.code, parsed.state);
+            }
+          } catch (e) {
+            console.error('Failed to parse OAuth result:', e);
+          }
+        }
+      }, 500);
+
+      // Stop polling after 5 minutes
+      setTimeout(() => clearInterval(pollInterval), 5 * 60 * 1000);
     } catch (err: any) {
       console.error('OAuth init error:', err);
       toast.error(err.message || 'Failed to start OAuth flow');
