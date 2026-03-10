@@ -1,35 +1,44 @@
 
 
-# Fix: Meta OAuth Spinner Stuck After Successful Auth
+# Add "Download Full Results" Button to Poll Detail Pages
 
-## Root Cause
+## Overview
 
-Field name mismatch between the `meta-oauth-callback` edge function response and `MetaCredentialAuth.tsx`:
+Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
 
-| Edge function returns | Component expects (line 99-101) |
-|---|---|
-| `data.accessToken` | `data.access_token` |
-| `data.metaUser` | `data.user` |
+## Changes
 
-Because `data.access_token` is always `undefined`, the `if` block on line 99 never executes. The `oauthStep` stays `'authenticating'` and the spinner runs forever.
+### 1. Copy uploaded files to `public/downloads/`
+- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
+- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
 
-## Fix
+Using `public/` so they're served as static files at known URLs.
 
-**File: `src/components/admin/integrations/MetaCredentialAuth.tsx`** lines 99-101
+### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
+Add an optional `downloadUrl?: string` field to the `PollData` interface.
 
-Change:
-```typescript
-if (data.access_token) {
-  setAccessToken(data.access_token);
-  setMetaUserInfo(data.user);
+### 3. Set download URLs in poll data files
+- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
+- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
+
+### 4. Add download button to `src/pages/PollDetail.tsx`
+Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
+
+```text
+[← All Polls]
+[Date | Sample | MOE]
+VA-6 Congressional District Poll.
+Sponsored by Unity & Justice Fund
+
+[⬇ Download Full Results]     ← new button here
 ```
 
-To:
-```typescript
-if (data.accessToken) {
-  setAccessToken(data.accessToken);
-  setMetaUserInfo(data.metaUser);
-```
-
-One-line property name fix. Everything else in the flow is correct.
+| File | Change |
+|------|--------|
+| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
+| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
+| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
+| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
+| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
+| `src/pages/PollDetail.tsx` | Add download button in header section |
 
