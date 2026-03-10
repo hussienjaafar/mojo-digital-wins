@@ -96,9 +96,9 @@ export function MetaCredentialAuth({
 
       if (error) throw error;
 
-      if (data.access_token) {
-        setAccessToken(data.access_token);
-        setMetaUserInfo(data.user);
+      if (data.accessToken) {
+        setAccessToken(data.accessToken);
+        setMetaUserInfo(data.metaUser);
         setAdAccounts(data.adAccounts || []);
         setOauthStep('selecting');
         
