@@ -307,6 +307,27 @@ export function MetaCredentialAuth({
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
               <p className="text-muted-foreground">Authenticating with Facebook...</p>
               <p className="text-sm text-muted-foreground mt-2">Complete login in the popup window</p>
+              {showTimeoutHelp && (
+                <div className="mt-4 space-y-2">
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Taking longer than expected? The popup may have closed. Try again or use manual entry.
+                    </AlertDescription>
+                  </Alert>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setOauthStep('idle');
+                      setIsConnecting(false);
+                      setShowTimeoutHelp(false);
+                    }}
+                  >
+                    Try Again
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
