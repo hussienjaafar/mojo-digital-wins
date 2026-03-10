@@ -62,7 +62,7 @@ export function MetaCredentialAuth({
   }, [adAccounts, accountSearch]);
   const [showManualToken, setShowManualToken] = useState(false);
 
-  // Listen for OAuth callback
+  // Listen for OAuth callback via postMessage
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
@@ -84,6 +84,30 @@ export function MetaCredentialAuth({
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
+  }, [organizationId]);
+
+  // Listen for OAuth callback via localStorage (fallback when window.opener is lost)
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'meta_oauth_result' && e.newValue) {
+        try {
+          const result = JSON.parse(e.newValue);
+          localStorage.removeItem('meta_oauth_result');
+          if (result.error) {
+            toast.error(result.errorDescription || 'OAuth authentication failed');
+            setOauthStep('idle');
+            setIsConnecting(false);
+          } else if (result.code && result.state) {
+            handleOAuthCallback(result.code, result.state);
+          }
+        } catch (err) {
+          console.error('Failed to parse OAuth result from storage:', err);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, [organizationId]);
 
   const handleOAuthCallback = async (code: string, state: string) => {
