@@ -385,9 +385,15 @@ serve(async (req) => {
     const credentials = credData.encrypted_credentials as unknown as MetaCredentials;
     const { access_token } = credentials;
     
-    // Auto-add act_ prefix if missing (users often copy just the numeric ID)
-    let ad_account_id = credentials.ad_account_id;
-    if (ad_account_id && !ad_account_id.startsWith('act_')) {
+    // Resolve ad_account_id: direct field, or fallback to first in ad_accounts list
+    let ad_account_id = credentials.ad_account_id 
+      || (credentials as any).ad_accounts?.[0]?.account_id;
+
+    if (!ad_account_id) {
+      throw new Error('No ad_account_id configured. Please re-connect Meta and select an ad account.');
+    }
+
+    if (!ad_account_id.startsWith('act_')) {
       ad_account_id = `act_${ad_account_id}`;
       console.log(`Added act_ prefix to ad_account_id: ${ad_account_id}`);
     }

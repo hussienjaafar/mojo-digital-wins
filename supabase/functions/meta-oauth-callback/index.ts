@@ -188,6 +188,11 @@ serve(async (req) => {
           meta_user_name: userInfo.name,
           meta_user_email: userInfo.email,
           ad_accounts: uniqueAccounts,
+          // Auto-select if only one account
+          ...(uniqueAccounts.length === 1 ? { 
+            ad_account_id: uniqueAccounts[0].account_id,
+            ad_account_name: uniqueAccounts[0].name,
+          } : {}),
         },
         token_expires_at: tokenExpiresAt.toISOString(),
         refresh_status: null,
