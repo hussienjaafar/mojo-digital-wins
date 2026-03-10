@@ -145,6 +145,10 @@ export function MetaCredentialAuth({
   const handleStartOAuth = async () => {
     setIsConnecting(true);
     setOauthStep('authenticating');
+    setShowTimeoutHelp(false);
+
+    // Show timeout help after 30 seconds
+    setTimeout(() => setShowTimeoutHelp(true), 30000);
 
     // Clear any stale result
     localStorage.removeItem('meta_oauth_result');
