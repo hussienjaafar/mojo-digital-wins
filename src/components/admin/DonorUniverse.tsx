@@ -306,7 +306,7 @@ export function DonorUniverse() {
                       </tr>
                       {isExpanded && (
                         <tr key={`${d.identity_key}-detail`}>
-                          <td colSpan={8} className="p-0">
+                          <td colSpan={9} className="p-0">
                             <DonorUniverseDetail donor={d} />
                           </td>
                         </tr>
