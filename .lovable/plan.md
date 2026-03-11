@@ -1,44 +1,39 @@
 
 
-# Add "Download Full Results" Button to Poll Detail Pages
+# Fix: Contact Form Email Notifications Blocked by CORS
 
-## Overview
+## Problem
+The `send-contact-notification` edge function works correctly when called directly, but **never executes from the browser** because of a CORS mismatch.
 
-Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
+**Root cause**: Line 9 calls `getCorsHeaders()` without passing the request object. This returns a static first origin (e.g. `https://portal.molitico.com`). When the browser preflight comes from `mojo-digital-wins.lovable.app`, CORS fails and the POST is never sent. The frontend silently swallows the error.
 
-## Changes
+Evidence:
+- Zero function logs from real user submissions (only my test just now)
+- Contact submissions ARE saved to the database (the insert happens before the notification call)
+- The function itself works perfectly (test returned `success: true`)
+- The CORS response header showed `portal.molitico.com` instead of matching the request origin
 
-### 1. Copy uploaded files to `public/downloads/`
-- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
-- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
+## Fix
 
-Using `public/` so they're served as static files at known URLs.
+**File: `supabase/functions/send-contact-notification/index.ts`**
 
-### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
-Add an optional `downloadUrl?: string` field to the `PollData` interface.
+1. Remove the module-level `const corsHeaders = getCorsHeaders();` (line 9)
+2. Inside the handler, compute CORS headers dynamically by passing `req`:
 
-### 3. Set download URLs in poll data files
-- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
-- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
+```typescript
+const handler = async (req: Request): Promise<Response> => {
+  const corsHeaders = getCorsHeaders(req);  // ← pass req for dynamic origin matching
 
-### 4. Add download button to `src/pages/PollDetail.tsx`
-Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
-
-```text
-[← All Polls]
-[Date | Sample | MOE]
-VA-6 Congressional District Poll.
-Sponsored by Unity & Justice Fund
-
-[⬇ Download Full Results]     ← new button here
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+  // ... rest unchanged
 ```
 
-| File | Change |
-|------|--------|
-| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
-| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
-| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
-| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
-| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
-| `src/pages/PollDetail.tsx` | Add download button in header section |
+This one-line change ensures the `getCorsHeaders(req)` function matches the requesting origin against the allowlist (which already includes Lovable domains via the `isLovableDomain` check in `security.ts`).
+
+3. Deploy the updated function.
+
+## Result
+After this fix, contact form submissions from any valid origin (published site, preview URLs) will successfully trigger email notifications to all 3 configured recipients.
 
