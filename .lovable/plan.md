@@ -1,65 +1,44 @@
 
 
-# Add Topic/Issue Motivation Data to Donor Universe
+# Add "Download Full Results" Button to Poll Detail Pages
 
 ## Overview
 
-Enrich the Donor Universe with motivation attribution — showing what topics, issues, and pain points drove each donor to give. This joins `actblue_transactions` → `refcode_mappings` → `meta_creative_insights` (and `sms_campaigns`) to aggregate the primary topics and donor motivations per identity.
+Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
 
 ## Changes
 
-### 1. Update `get_donor_universe` RPC (migration)
+### 1. Copy uploaded files to `public/downloads/`
+- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
+- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
 
-Add a new CTE `motivation_data` that joins transactions → refcode_mappings → meta_creative_insights + sms_campaigns to collect per-donor:
-- `topics` (text array) — aggregated from `topic` field
-- `issues` (text array) — from `issue_specifics` arrays
-- `pain_points` (text array) — from `donor_pain_points` arrays  
-- `values_appealed` (text array) — from `values_appealed` arrays
+Using `public/` so they're served as static files at known URLs.
+
+### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
+Add an optional `downloadUrl?: string` field to the `PollData` interface.
+
+### 3. Set download URLs in poll data files
+- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
+- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
+
+### 4. Add download button to `src/pages/PollDetail.tsx`
+Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
 
 ```text
-CTE flow:
-  tx_stats ──────────────┐
-  motivation_data ───────┤
-  donor_base ────────────┤──→ unified ──→ filtered ──→ result
+[← All Polls]
+[Date | Sample | MOE]
+VA-6 Congressional District Poll.
+Sponsored by Unity & Justice Fund
+
+[⬇ Download Full Results]     ← new button here
 ```
-
-The `motivation_data` CTE:
-- Joins `actblue_transactions` → `refcode_mappings` (on refcode + org) → `meta_creative_insights` (on creative_id + org)
-- Also unions with `sms_campaigns` matched via refcode
-- Aggregates distinct values per `lower(trim(donor_email))`
-- Left-joined into `unified` CTE
-
-Output columns added: `topics`, `issues`, `pain_points`, `values_appealed`
-
-### 2. Update `DonorRow` interface in `DonorUniverse.tsx` and `DonorUniverseDetail.tsx`
-
-Add optional array fields:
-```ts
-topics: string[] | null;
-issues: string[] | null;
-pain_points: string[] | null;
-values_appealed: string[] | null;
-```
-
-### 3. Update `DonorUniverseDetail.tsx` — display motivation section
-
-Add a fourth column (or a new row) in the detail panel titled "Motivation & Issues" showing:
-- **Topics** — badges for each topic
-- **Issues** — badges for each issue
-- **Pain Points** — bullet list
-- **Values** — badges
-
-Only rendered when at least one array has data. Uses `MessageSquare` and `Heart` icons from lucide-react.
-
-### 4. Update table columns in `DonorUniverse.tsx`
-
-Add a "Top Topic" column to the table showing the first topic as a badge (if available), keeping the table scannable without clutter.
-
-## Files Changed
 
 | File | Change |
 |------|--------|
-| New migration SQL | `CREATE OR REPLACE FUNCTION get_donor_universe` with motivation CTE |
-| `src/components/admin/DonorUniverse.tsx` | Add `topics/issues/pain_points/values_appealed` to `DonorRow`, add "Top Topic" column |
-| `src/components/admin/DonorUniverseDetail.tsx` | Add motivation section with topic/issue/pain point badges |
+| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
+| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
+| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
+| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
+| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
+| `src/pages/PollDetail.tsx` | Add download button in header section |
 

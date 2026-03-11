@@ -37,6 +37,10 @@ interface DonorRow {
   all_orgs: string[];
   crossover_count: number;
   channels: string[];
+  topics: string[] | null;
+  issues: string[] | null;
+  pain_points: string[] | null;
+  values_appealed: string[] | null;
 }
 
 interface DonorUniverseResult {
@@ -235,8 +239,9 @@ export function DonorUniverse() {
                   <th className="px-3 py-3 text-left font-medium text-muted-foreground">State</th>
                   <th className="px-3 py-3 text-right font-medium text-muted-foreground">Total</th>
                   <th className="px-3 py-3 text-right font-medium text-muted-foreground"># Dons</th>
-                  <th className="px-3 py-3 text-left font-medium text-muted-foreground">Channels</th>
-                  <th className="px-3 py-3 text-left font-medium text-muted-foreground">Orgs</th>
+                   <th className="px-3 py-3 text-left font-medium text-muted-foreground">Channels</th>
+                   <th className="px-3 py-3 text-left font-medium text-muted-foreground">Top Topic</th>
+                   <th className="px-3 py-3 text-left font-medium text-muted-foreground">Orgs</th>
                 </tr>
               </thead>
               <tbody>
@@ -277,6 +282,15 @@ export function DonorUniverse() {
                           </div>
                         </td>
                         <td className="px-3 py-2.5">
+                          {d.topics?.[0] ? (
+                            <Badge variant="outline" className="bg-accent/50 text-accent-foreground border-accent text-[10px] px-1.5 py-0 max-w-[120px] truncate">
+                              {d.topics[0]}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5">
                           <div className="flex items-center gap-1.5">
                             {d.crossover_count > 1 && (
                               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-[10px] px-1.5 py-0">
@@ -292,7 +306,7 @@ export function DonorUniverse() {
                       </tr>
                       {isExpanded && (
                         <tr key={`${d.identity_key}-detail`}>
-                          <td colSpan={8} className="p-0">
+                          <td colSpan={9} className="p-0">
                             <DonorUniverseDetail donor={d} />
                           </td>
                         </tr>
@@ -302,7 +316,7 @@ export function DonorUniverse() {
                 })}
                 {data?.donors?.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="text-center py-12 text-muted-foreground">
+                    <td colSpan={9} className="text-center py-12 text-muted-foreground">
                       No donors match your filters
                     </td>
                   </tr>
