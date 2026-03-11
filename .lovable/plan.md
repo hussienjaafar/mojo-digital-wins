@@ -1,44 +1,30 @@
 
+Root cause confirmed from the current backend + network logs:
 
-# Add "Download Full Results" Button to Poll Detail Pages
+1) The admin page calls `get_donor_universe` with params:
+`_page, _page_size, _crossover_only, _org_filter, _state_filter, ...`  
+2) There are two overloaded `get_donor_universe` functions in the database.
+3) The overload actually being called still has:
+- `COALESCE(ts.first_donation_date, dd.first_donation_date::text)`
+- `COALESCE(ts.last_donation_date, dd.last_donation_date::text)`
+This mixes `timestamptz` and `text`, which exactly matches the runtime error.
+4) The previous “fix” updated the other overload (different signature), so the live admin RPC stayed broken.
 
-## Overview
+Implementation plan (hotfix-first, minimal-risk):
 
-Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
+1) Create one new migration that `CREATE OR REPLACE`s the active RPC signature (`_org_filter ... _channel_filter`) and fixes both date expressions to type-safe form:
+- `COALESCE(ts.first_donation_date, dd.first_donation_date)`  
+- `COALESCE(ts.last_donation_date, dd.last_donation_date)`
+(keep as timestamps internally; cast only at final output if needed).
 
-## Changes
+2) Keep all existing filters, pagination, channel logic, and admin guard unchanged so behavior stays identical except for the crash fix.
 
-### 1. Copy uploaded files to `public/downloads/`
-- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
-- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
+3) Add a guardrail cleanup in the same migration:
+- either patch the legacy overload too, or explicitly deprecate/drop it after confirming no callers, to prevent future “fixed wrong overload” regressions.
 
-Using `public/` so they're served as static files at known URLs.
+Validation plan after applying migration:
 
-### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
-Add an optional `downloadUrl?: string` field to the `PollData` interface.
-
-### 3. Set download URLs in poll data files
-- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
-- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
-
-### 4. Add download button to `src/pages/PollDetail.tsx`
-Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
-
-```text
-[← All Polls]
-[Date | Sample | MOE]
-VA-6 Congressional District Poll.
-Sponsored by Unity & Justice Fund
-
-[⬇ Download Full Results]     ← new button here
-```
-
-| File | Change |
-|------|--------|
-| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
-| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
-| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
-| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
-| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
-| `src/pages/PollDetail.tsx` | Add download button in header section |
-
+1) Re-run the exact admin RPC call shape used by the UI (`_page=1, _page_size=100, _crossover_only=false`) and confirm no 400 error.
+2) Open `/admin` → Donor Universe and verify rows render.
+3) Confirm first/last donation date fields are populated and sorting/filtering still works.
+4) Re-check network: `rpc/get_donor_universe` returns 200 with JSON payload (`donors`, `total_count`, `crossover_count`).
