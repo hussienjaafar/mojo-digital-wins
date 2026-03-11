@@ -239,8 +239,9 @@ export function DonorUniverse() {
                   <th className="px-3 py-3 text-left font-medium text-muted-foreground">State</th>
                   <th className="px-3 py-3 text-right font-medium text-muted-foreground">Total</th>
                   <th className="px-3 py-3 text-right font-medium text-muted-foreground"># Dons</th>
-                  <th className="px-3 py-3 text-left font-medium text-muted-foreground">Channels</th>
-                  <th className="px-3 py-3 text-left font-medium text-muted-foreground">Orgs</th>
+                   <th className="px-3 py-3 text-left font-medium text-muted-foreground">Channels</th>
+                   <th className="px-3 py-3 text-left font-medium text-muted-foreground">Top Topic</th>
+                   <th className="px-3 py-3 text-left font-medium text-muted-foreground">Orgs</th>
                 </tr>
               </thead>
               <tbody>
