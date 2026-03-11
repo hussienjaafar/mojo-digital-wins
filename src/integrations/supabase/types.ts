@@ -16295,6 +16295,21 @@ export type Database = {
         }
         Returns: Json
       }
+      get_donor_universe: {
+        Args: {
+          _channel_filter?: string
+          _crossover_only?: boolean
+          _max_amount?: number
+          _min_amount?: number
+          _org_filter?: string[]
+          _page?: number
+          _page_size?: number
+          _recurring_filter?: boolean
+          _search?: string
+          _state_filter?: string
+        }
+        Returns: Json
+      }
       get_export_data: {
         Args: {
           p_end_date?: string
