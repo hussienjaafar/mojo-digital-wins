@@ -1,71 +1,44 @@
 
 
-# Donor Universe Data Accuracy Audit — Findings and Fix Plan
+# Add "Download Full Results" Button to Poll Detail Pages
 
-## Issues Found
+## Overview
 
-### Issue 1: RPC Double-Counting Bug (CRITICAL)
+Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
 
-The `get_donor_universe` RPC LEFT JOINs `donor_demographics` to `actblue_transactions` (one row per transaction), then SUMs `total_donated` across all joined rows. A donor with 112 transactions has their `$2,220` total summed 112 times, showing **$248,657** in the dashboard.
+## Changes
 
-This affects every donor with more than one transaction — essentially the entire dataset.
+### 1. Copy uploaded files to `public/downloads/`
+- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
+- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
 
-### Issue 2: Stale `total_donated` in `donor_demographics` (MODERATE)
+Using `public/` so they're served as static files at known URLs.
 
-There is no trigger syncing `total_donated` from actual transactions. The stored values are only set at initial ingestion/backfill time. Out of 47,457 donors:
-- **2,348 donors** have discrepancies > $1 vs actual transaction sums
-- **353 donors** are off by $100+
-- Average discrepancy: $7.33
+### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
+Add an optional `downloadUrl?: string` field to the `PollData` interface.
 
-## Fix Plan
+### 3. Set download URLs in poll data files
+- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
+- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
 
-### Step 1: Fix the RPC — Compute totals from transactions directly
-
-Rewrite `get_donor_universe` to compute donation totals from `actblue_transactions` instead of using the stale `donor_demographics.total_donated`. Structure:
+### 4. Add download button to `src/pages/PollDetail.tsx`
+Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
 
 ```text
-CTE 1: tx_stats — aggregate actblue_transactions per donor_email+org
-        (SUM amount, COUNT, MIN/MAX dates, channel detection)
-CTE 2: donor_base — donor_demographics fields joined to tx_stats
-        (use tx_stats totals, not dd.total_donated)
-CTE 3: unified — group by identity_key across orgs
-CTE 4: filtered — apply all filters
+[← All Polls]
+[Date | Sample | MOE]
+VA-6 Congressional District Poll.
+Sponsored by Unity & Justice Fund
+
+[⬇ Download Full Results]     ← new button here
 ```
-
-This eliminates the multiplication bug entirely since transactions are pre-aggregated before joining to demographics.
-
-### Step 2: Backfill `donor_demographics.total_donated`
-
-Create a one-time migration that recomputes and updates `total_donated`, `donation_count`, `first_donation_date`, and `last_donation_date` from actual `actblue_transactions` data. This fixes the stale values for other parts of the app that read from `donor_demographics` directly.
-
-```sql
-UPDATE donor_demographics dd SET
-  total_donated = sub.actual_total,
-  donation_count = sub.actual_count,
-  first_donation_date = sub.first_date,
-  last_donation_date = sub.last_date
-FROM (
-  SELECT donor_email, organization_id,
-    SUM(amount) FILTER (WHERE transaction_type='donation') as actual_total,
-    COUNT(*) FILTER (WHERE transaction_type='donation') as actual_count,
-    MIN(transaction_date) FILTER (WHERE transaction_type='donation') as first_date,
-    MAX(transaction_date) FILTER (WHERE transaction_type='donation') as last_date
-  FROM actblue_transactions
-  GROUP BY donor_email, organization_id
-) sub
-WHERE dd.donor_email = sub.donor_email
-  AND dd.organization_id = sub.organization_id;
-```
-
-### Step 3: Add a trigger to keep totals in sync going forward
-
-Create a trigger on `actblue_transactions` that updates the corresponding `donor_demographics` row whenever a transaction is inserted, updated, or deleted — preventing future staleness.
-
-## Files Changed
 
 | File | Change |
 |------|--------|
-| Migration SQL | Rewrite `get_donor_universe` RPC, backfill totals, add sync trigger |
-
-No frontend changes needed — the component already reads from the RPC correctly.
+| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
+| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
+| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
+| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
+| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
+| `src/pages/PollDetail.tsx` | Add download button in header section |
 
