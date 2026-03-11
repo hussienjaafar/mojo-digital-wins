@@ -37,6 +37,10 @@ interface DonorRow {
   all_orgs: string[];
   crossover_count: number;
   channels: string[];
+  topics: string[] | null;
+  issues: string[] | null;
+  pain_points: string[] | null;
+  values_appealed: string[] | null;
 }
 
 interface DonorUniverseResult {
