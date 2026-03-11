@@ -16295,21 +16295,62 @@ export type Database = {
         }
         Returns: Json
       }
-      get_donor_universe: {
-        Args: {
-          _channel_filter?: string
-          _crossover_only?: boolean
-          _max_amount?: number
-          _min_amount?: number
-          _org_filter?: string[]
-          _page?: number
-          _page_size?: number
-          _recurring_filter?: boolean
-          _search?: string
-          _state_filter?: string
-        }
-        Returns: Json
-      }
+      get_donor_universe:
+        | {
+            Args: {
+              _channels?: string[]
+              _is_recurring?: boolean
+              _max_donated?: number
+              _min_donated?: number
+              _org_id?: string
+              _page?: number
+              _page_size?: number
+              _party?: string
+              _search?: string
+              _sort_by?: string
+              _sort_dir?: string
+              _state?: string
+            }
+            Returns: {
+              age: number
+              channels: string[]
+              city: string
+              donation_count: number
+              donor_email: string
+              donor_name: string
+              employer: string
+              first_donation_date: string
+              gender: string
+              identity_key: string
+              is_recurring: boolean
+              last_donation_date: string
+              occupation: string
+              org_name: string
+              organization_id: string
+              party_affiliation: string
+              state: string
+              total_count: number
+              total_donated: number
+              voter_file_matched: boolean
+              voter_score: number
+              zip: string
+            }[]
+          }
+        | {
+            Args: {
+              _channel_filter?: string
+              _crossover_only?: boolean
+              _max_amount?: number
+              _min_amount?: number
+              _org_filter?: string[]
+              _page?: number
+              _page_size?: number
+              _recurring_filter?: boolean
+              _search?: string
+              _state_filter?: string
+            }
+            Returns: Json
+          }
       get_export_data: {
         Args: {
           p_end_date?: string
