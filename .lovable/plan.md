@@ -1,73 +1,44 @@
 
 
-# Donor Universe — Admin Dashboard Tab
+# Add "Download Full Results" Button to Poll Detail Pages
 
 ## Overview
 
-Build an admin-only "Donor Universe" tab that aggregates all ~47k donors across 8 organizations into a single filterable, exportable view with channel attribution and AI-analyzed motivation data.
+Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
 
-## What You'll Get
+## Changes
 
-- **Unified donor table** with all available fields (name, email, phone, address, employer, occupation, voter data, donation history)
-- **Channel attribution** column showing how each donor was acquired (SMS, Meta Ads, Organic, Email) using the existing multi-tier detection logic
-- **Motivation intelligence** — for SMS-sourced donors: topics, pain points, emotional triggers from `sms_creative_insights`; for Meta-sourced donors: same from `meta_creative_insights`
-- **Cross-org detection** using email + name + zip fuzzy matching, with a badge showing which orgs each donor has donated to
-- **Rich filtering** by: Organization, Channel (SMS/Meta/Organic), State, Amount range, Recurring status, Crossover-only toggle, Search (name/email)
-- **CSV export** of any filtered view
+### 1. Copy uploaded files to `public/downloads/`
+- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
+- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
 
-## Technical Plan
+Using `public/` so they're served as static files at known URLs.
 
-### Phase 1: Database — `get_donor_universe` RPC
+### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
+Add an optional `downloadUrl?: string` field to the `PollData` interface.
 
-A single `SECURITY DEFINER` function that:
+### 3. Set download URLs in poll data files
+- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
+- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
 
-1. Joins `donor_demographics` → `actblue_transactions` → `refcode_mappings` to determine channel per transaction
-2. Left-joins `sms_creative_insights` (via refcode pattern matching on `refcode_mappings`) and `meta_creative_insights` (via `ad_id`/`creative_id` on `refcode_mappings`) to pull motivation data
-3. Computes a `donor_identity_key` = `lower(trim(email))` as primary match, with `lower(trim(first_name)) || lower(trim(last_name)) || left(zip,5)` as secondary — groups donors appearing across multiple orgs
-4. Aggregates per unified donor: `all_orgs` array, `crossover_count`, `channels` array, `top_motivations` (aggregated pain points/topics/triggers across their transactions)
-5. Supports server-side pagination and all filter parameters
-6. Guarded by `has_role(auth.uid(), 'admin')` check — returns empty for non-admins
+### 4. Add download button to `src/pages/PollDetail.tsx`
+Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
 
-Channel detection logic (matching existing waterfall):
 ```text
-Priority 0: refcode_mappings.platform (if mapped)
-Priority 1: refcode2 starts with 'fb_' → 'meta'
-Priority 2: contribution_form ILIKE '%sms%' → 'sms'
-Priority 3: refcode prefix 'text-' or 'sms-' → 'sms'
-Priority 4: refcode prefix 'ads_' or 'fb-' → 'meta'
-Priority 5: Otherwise → 'organic'
+[← All Polls]
+[Date | Sample | MOE]
+VA-6 Congressional District Poll.
+Sponsored by Unity & Justice Fund
+
+[⬇ Download Full Results]     ← new button here
 ```
-
-### Phase 2: Frontend Components
-
-**New files:**
-
-| File | Purpose |
-|------|---------|
-| `src/components/admin/DonorUniverse.tsx` | Main tab component — filter bar + paginated table + export button |
-| `src/components/admin/DonorUniverseDetail.tsx` | Expandable row detail — all donor fields, org list, motivation breakdown, transaction history |
-
-- Uses V3/portal design system (consistent with existing admin tabs)
-- Server-side pagination (100 per page) with `@tanstack/react-virtual` for smooth scrolling
-- Expandable rows showing full donor detail + motivation attribution
-- Crossover donors get a badge with org count
-- Channel shown as colored pills (SMS=green, Meta=blue, Organic=gray)
-- "Export Filtered" button using existing `exportToCSV` utility
-
-**Modified files:**
 
 | File | Change |
 |------|--------|
-| `src/components/AdminSidebar.tsx` | Add "Donor Universe" item under Clients group with `Users` icon, `requiredRole: 'admin'` |
-| `src/pages/Admin.tsx` | Add `donor-universe` case in `renderContent()`, import `DonorUniverse` component |
-
-### Phase 3: SMS Campaign ID Backfill (deferred optimization)
-
-The initial implementation will use refcode pattern matching to link transactions → SMS insights (which works for the majority of campaigns). A future backfill can populate `refcode_mappings.sms_campaign_id` for even tighter joins, but is not a blocker.
-
-## Security
-
-- RPC uses `SECURITY DEFINER` + `has_role()` admin check — no RLS bypass risk
-- PII fully visible to admins (consistent with existing `actblue_pii` policy)
-- Navigation item has `requiredRole: 'admin'`
+| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
+| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
+| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
+| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
+| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
+| `src/pages/PollDetail.tsx` | Add download button in header section |
 
