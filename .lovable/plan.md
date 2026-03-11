@@ -1,44 +1,54 @@
 
+Root cause confirmed: the current active `get_donor_universe` RPC no longer fails on date `COALESCE`; it now fails in channel flattening with:
 
-# Add "Download Full Results" Button to Poll Detail Pages
+`(SELECT array_agg(DISTINCT ch) FROM unnest(array_agg(channels)) AS flattened(ch_arr), unnest(ch_arr) AS ch)`
 
-## Overview
+In Postgres, that inner `ch_arr` resolves as `text` in this context, so `unnest(ch_arr)` becomes `unnest(text)`, which throws the exact runtime error you’re seeing.
 
-Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
+## Plan
 
-## Changes
+1. Patch only the active admin RPC signature (`_page, _page_size, _org_filter, ... _channel_filter`) via one new migration.
+2. Replace the nested-`unnest` expression with a safe lateral unnest pattern:
+   - `FROM donor_base db LEFT JOIN LATERAL unnest(db.channels) AS ch(channel) ON true`
+   - Aggregate channels with:
+     - `array_agg(DISTINCT ch.channel) FILTER (WHERE ch.channel IS NOT NULL)`
+   - Keep a fallback to `ARRAY['organic']::text[]` if needed.
+3. Keep all existing behavior unchanged:
+   - Admin guard (`has_role`)
+   - Pagination
+   - Donor identity grouping
+   - Filter semantics (`_org_filter`, `_state_filter`, `_search`, `_channel_filter`, etc.)
+4. Do not touch frontend code and do not edit generated integration files.
 
-### 1. Copy uploaded files to `public/downloads/`
-- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
-- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
+## Technical details
 
-Using `public/` so they're served as static files at known URLs.
+- Scope of change is server-side SQL only.
+- The failure is not from the `_org_filter` argument type; it is from channel flattening in `unified`.
+- Expected SQL shape for fix:
 
-### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
-Add an optional `downloadUrl?: string` field to the `PollData` interface.
-
-### 3. Set download URLs in poll data files
-- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
-- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
-
-### 4. Add download button to `src/pages/PollDetail.tsx`
-Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
-
-```text
-[← All Polls]
-[Date | Sample | MOE]
-VA-6 Congressional District Poll.
-Sponsored by Unity & Justice Fund
-
-[⬇ Download Full Results]     ← new button here
+```sql
+unified AS (
+  SELECT
+    lower(trim(db.donor_email)) AS identity_key,
+    ...
+    COALESCE(
+      array_agg(DISTINCT ch.channel) FILTER (WHERE ch.channel IS NOT NULL),
+      ARRAY['organic']::text[]
+    ) AS channels
+  FROM donor_base db
+  LEFT JOIN LATERAL unnest(db.channels) AS ch(channel) ON true
+  GROUP BY lower(trim(db.donor_email))
+)
 ```
 
-| File | Change |
-|------|--------|
-| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
-| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
-| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
-| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
-| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
-| `src/pages/PollDetail.tsx` | Add download button in header section |
+## Validation after implementation
 
+1. Re-run the same admin page call (`_page=1`, `_page_size=100`, `_crossover_only=false`) and confirm RPC returns `200` with JSON payload.
+2. Confirm Donor Universe rows render on `/admin`.
+3. Verify channel filter still works (`sms`, `meta`, `organic`).
+4. Spot-check 2–3 donors to ensure totals and crossover counts remain correct.
+
+## Risk / rollback
+
+- Low-risk hotfix: isolated to one function body.
+- If needed, rollback is immediate by reapplying previous function version migration.
