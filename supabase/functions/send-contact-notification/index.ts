@@ -6,7 +6,7 @@ import { contactForm } from "../_shared/email-templates/templates/transactional.
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const corsHeaders = getCorsHeaders();
+// corsHeaders computed inside handler with req for dynamic origin matching
 
 interface ContactNotificationRequest {
   name: string;
@@ -55,6 +55,8 @@ function validateInput(data: any): { valid: boolean; errors: string[] } {
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
