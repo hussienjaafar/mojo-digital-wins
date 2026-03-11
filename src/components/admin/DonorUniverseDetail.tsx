@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { User, MapPin, Briefcase, Vote, Calendar, DollarSign, Phone, Mail } from "lucide-react";
+import { User, MapPin, Briefcase, Vote, Calendar, DollarSign, Phone, Mail, MessageSquare, Heart } from "lucide-react";
 
 interface DonorRow {
   identity_key: string;
@@ -26,6 +26,10 @@ interface DonorRow {
   all_orgs: string[];
   crossover_count: number;
   channels: string[];
+  topics: string[] | null;
+  issues: string[] | null;
+  pain_points: string[] | null;
+  values_appealed: string[] | null;
 }
 
 function Field({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string | null | undefined }) {
@@ -44,9 +48,11 @@ function Field({ icon: Icon, label, value }: { icon: React.ComponentType<{ class
 export function DonorUniverseDetail({ donor: d }: { donor: DonorRow }) {
   const formatDate = (v: string | null) => v ? new Date(v).toLocaleDateString() : null;
 
+  const hasMotivationData = (d.topics?.length || 0) > 0 || (d.issues?.length || 0) > 0 || (d.pain_points?.length || 0) > 0 || (d.values_appealed?.length || 0) > 0;
+
   return (
     <div className="bg-muted/20 border-t border-border px-6 py-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {/* Personal Info */}
         <div className="space-y-3">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Personal</h4>
@@ -96,6 +102,66 @@ export function DonorUniverseDetail({ donor: d }: { donor: DonorRow }) {
             </div>
           </div>
         </div>
+
+        {/* Motivation & Issues */}
+        {hasMotivationData && (
+          <div className="space-y-3">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Motivation & Issues</h4>
+
+            {(d.topics?.length || 0) > 0 && (
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Topics</p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {d.topics!.map((t) => (
+                    <Badge key={t} variant="outline" className="bg-accent/50 text-accent-foreground border-accent text-xs">{t}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(d.issues?.length || 0) > 0 && (
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Issues</p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {d.issues!.map((i) => (
+                    <Badge key={i} variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 text-xs">{i}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(d.pain_points?.length || 0) > 0 && (
+              <div>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Pain Points</p>
+                <ul className="text-xs text-foreground space-y-0.5 pl-3 list-disc">
+                  {d.pain_points!.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {(d.values_appealed?.length || 0) > 0 && (
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <Heart className="h-3.5 w-3.5 text-muted-foreground" />
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Values</p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {d.values_appealed!.map((v) => (
+                    <Badge key={v} variant="outline" className="bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30 text-xs">{v}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
