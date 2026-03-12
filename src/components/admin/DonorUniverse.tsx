@@ -76,6 +76,7 @@ export function DonorUniverse() {
   const [crossoverOnly, setCrossoverOnly] = useState(false);
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   // Debounce search
   useEffect(() => {
