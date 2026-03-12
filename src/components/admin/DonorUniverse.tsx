@@ -254,9 +254,9 @@ export function DonorUniverse() {
         <p className="text-sm text-muted-foreground">
           {data ? `Showing ${((page - 1) * PAGE_SIZE) + 1}–${Math.min(page * PAGE_SIZE, data.total_count)} of ${data.total_count.toLocaleString()}` : "Loading..."}
         </p>
-        <V3Button variant="secondary" size="sm" onClick={handleExport} disabled={!data?.donors?.length}>
+        <V3Button variant="secondary" size="sm" onClick={handleExport} disabled={!data?.total_count || exporting}>
           <Download className="h-4 w-4 mr-1.5" />
-          Export CSV
+          {exporting ? "Exporting..." : `Export All (${data?.total_count?.toLocaleString() || 0})`}
         </V3Button>
       </div>
 
