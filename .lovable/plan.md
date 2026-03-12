@@ -1,44 +1,47 @@
 
 
-# Add "Download Full Results" Button to Poll Detail Pages
+# Auto-Add New Donors on First Transaction
 
-## Overview
+## Problem
+The `sync_donor_demographics_totals` trigger only runs `UPDATE` on `donor_demographics`. If a brand-new donor's email doesn't already exist in that table, nothing happens — they're invisible until a manual backfill is run.
 
-Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
+## Plan
 
-## Changes
+### 1. Enhance the trigger function (migration)
 
-### 1. Copy uploaded files to `public/downloads/`
-- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
-- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
+Replace the `UPDATE`-only logic with an `INSERT ... ON CONFLICT UPDATE` (upsert) pattern. When a new transaction arrives:
 
-Using `public/` so they're served as static files at known URLs.
+- **If donor exists** → update totals (same as today)
+- **If donor is new** → insert a row with email, name, city, state, zip, and computed totals from their transactions
 
-### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
-Add an optional `downloadUrl?: string` field to the `PollData` interface.
+The upsert will populate PII fields (`first_name`, `last_name`, `city`, `state`, `zip`, `employer`, `occupation`) from the transaction row itself (available in `NEW`), so the donor record is useful immediately.
 
-### 3. Set download URLs in poll data files
-- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
-- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
-
-### 4. Add download button to `src/pages/PollDetail.tsx`
-Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
-
-```text
-[← All Polls]
-[Date | Sample | MOE]
-VA-6 Congressional District Poll.
-Sponsored by Unity & Justice Fund
-
-[⬇ Download Full Results]     ← new button here
+```sql
+INSERT INTO donor_demographics (
+  organization_id, donor_email, first_name, last_name,
+  city, state, zip, employer, occupation,
+  total_donated, donation_count, first_donation_date, last_donation_date, is_recurring
+)
+SELECT
+  _org_id, _email, NEW.donor_first_name, NEW.donor_last_name,
+  NEW.donor_city, NEW.donor_state, NEW.donor_zip,
+  NEW.donor_employer, NEW.donor_occupation,
+  sub.actual_total, sub.actual_count, sub.first_date, sub.last_date, sub.has_recurring
+FROM ( /* same aggregation subquery */ ) sub
+ON CONFLICT (organization_id, donor_email) DO UPDATE SET
+  total_donated = EXCLUDED.total_donated,
+  donation_count = EXCLUDED.donation_count,
+  first_donation_date = EXCLUDED.first_donation_date,
+  last_donation_date = EXCLUDED.last_donation_date,
+  is_recurring = EXCLUDED.is_recurring,
+  updated_at = now();
 ```
+
+### Files changed
 
 | File | Change |
 |------|--------|
-| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
-| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
-| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
-| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
-| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
-| `src/pages/PollDetail.tsx` | Add download button in header section |
+| New migration SQL | `CREATE OR REPLACE FUNCTION sync_donor_demographics_totals()` with upsert logic |
+
+No frontend changes needed — the Donor Universe RPC already reads from `donor_demographics`.
 
