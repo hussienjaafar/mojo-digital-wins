@@ -1,44 +1,31 @@
 
 
-# Add "Download Full Results" Button to Poll Detail Pages
+# Export All Filtered Donors (Not Just Current Page)
 
-## Overview
+## Problem
+The export currently dumps `data.donors` — which is only the 100 rows on the current page. Users need to export **all** donors matching the active filters.
 
-Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
+## Plan
 
-## Changes
+### 1. Add an export-specific RPC call in `handleExport` (`DonorUniverse.tsx`)
 
-### 1. Copy uploaded files to `public/downloads/`
-- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
-- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
+Instead of exporting `data.donors`, the export button will:
+1. Show a loading toast ("Exporting X donors...")
+2. Call `get_donor_universe` with the **same filters** but `_page: 1` and `_page_size: total_count` (or a large cap like 50,000)
+3. Use the returned full dataset for the CSV export
+4. Include the new motivation fields (`topics`, `pain_points`, `values_appealed`) in the export columns
 
-Using `public/` so they're served as static files at known URLs.
+This avoids needing a separate RPC — we reuse the existing one with a larger page size.
 
-### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
-Add an optional `downloadUrl?: string` field to the `PollData` interface.
+### 2. Add loading state for export
 
-### 3. Set download URLs in poll data files
-- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
-- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
+- Add `exporting` state boolean
+- Disable the export button while fetching
+- Show spinner or "Exporting..." label
 
-### 4. Add download button to `src/pages/PollDetail.tsx`
-Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
-
-```text
-[← All Polls]
-[Date | Sample | MOE]
-VA-6 Congressional District Poll.
-Sponsored by Unity & Justice Fund
-
-[⬇ Download Full Results]     ← new button here
-```
+### Files changed
 
 | File | Change |
 |------|--------|
-| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
-| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
-| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
-| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
-| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
-| `src/pages/PollDetail.tsx` | Add download button in header section |
+| `src/components/admin/DonorUniverse.tsx` | Refactor `handleExport` to fetch all filtered rows via RPC before exporting; add exporting state; add motivation columns to CSV |
 
