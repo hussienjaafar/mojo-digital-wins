@@ -282,9 +282,9 @@ export function DonorUniverse() {
                           </div>
                         </td>
                         <td className="px-3 py-2.5">
-                          {d.topics?.[0] ? (
-                            <Badge variant="outline" className="bg-accent/50 text-accent-foreground border-accent text-[10px] px-1.5 py-0 max-w-[120px] truncate">
-                              {d.topics[0]}
+                          {(d.pain_points?.[0] || d.topics?.[0]) ? (
+                            <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[10px] px-1.5 py-0 max-w-[160px] truncate">
+                              {d.pain_points?.[0] || d.topics?.[0]}
                             </Badge>
                           ) : (
                             <span className="text-muted-foreground text-xs">—</span>

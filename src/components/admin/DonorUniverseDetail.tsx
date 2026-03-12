@@ -108,15 +108,29 @@ export function DonorUniverseDetail({ donor: d }: { donor: DonorRow }) {
           <div className="space-y-3">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Motivation & Issues</h4>
 
-            {(d.topics?.length || 0) > 0 && (
+            {(d.pain_points?.length || 0) > 0 && (
               <div>
                 <div className="flex items-center gap-1 mb-1">
                   <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Topics</p>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Key Issues</p>
+                </div>
+                <ul className="text-xs text-foreground space-y-0.5 pl-3 list-disc">
+                  {d.pain_points!.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {(d.values_appealed?.length || 0) > 0 && (
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <Heart className="h-3.5 w-3.5 text-muted-foreground" />
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Values</p>
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {d.topics!.map((t) => (
-                    <Badge key={t} variant="outline" className="bg-accent/50 text-accent-foreground border-accent text-xs">{t}</Badge>
+                  {d.values_appealed!.map((v) => (
+                    <Badge key={v} variant="outline" className="bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30 text-xs">{v}</Badge>
                   ))}
                 </div>
               </div>
@@ -136,26 +150,15 @@ export function DonorUniverseDetail({ donor: d }: { donor: DonorRow }) {
               </div>
             )}
 
-            {(d.pain_points?.length || 0) > 0 && (
-              <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Pain Points</p>
-                <ul className="text-xs text-foreground space-y-0.5 pl-3 list-disc">
-                  {d.pain_points!.map((p) => (
-                    <li key={p}>{p}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {(d.values_appealed?.length || 0) > 0 && (
+            {(d.topics?.length || 0) > 0 && (
               <div>
                 <div className="flex items-center gap-1 mb-1">
-                  <Heart className="h-3.5 w-3.5 text-muted-foreground" />
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Values</p>
+                  <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Category</p>
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {d.values_appealed!.map((v) => (
-                    <Badge key={v} variant="outline" className="bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30 text-xs">{v}</Badge>
+                  {d.topics!.map((t) => (
+                    <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
                   ))}
                 </div>
               </div>
