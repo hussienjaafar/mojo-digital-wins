@@ -1,44 +1,53 @@
 
 
-# Add "Download Full Results" Button to Poll Detail Pages
+# Donor Demographics Table — Deep Audit Results and Fix Plan
 
-## Overview
+## Audit Findings
 
-Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
+### Summary
 
-## Changes
+| Issue | Count | Severity |
+|-------|-------|----------|
+| Missing donors (in transactions, not in demographics) | **1,870** | HIGH |
+| Orphan demographics (no matching transactions) | **1,439** | HIGH |
+| Total/count mismatches (all orphans, $128,910 discrepancy) | **1,442** | HIGH |
+| Date mismatches — time truncation only | 45,990 | LOW |
+| Date mismatches — actually wrong day | **2** | MEDIUM |
+| Recurring flag mismatches | **77** | MEDIUM |
+| Missing PII (fillable from transactions) | 70 of ~691 | LOW |
+| Duplicate demographics rows | 0 | None |
 
-### 1. Copy uploaded files to `public/downloads/`
-- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
-- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
+### Detail
 
-Using `public/` so they're served as static files at known URLs.
+**1. 1,870 missing donors** — These donors have transactions but were never added to `donor_demographics`. The new upsert trigger will prevent this going forward, but existing gaps need a one-time backfill.
 
-### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
-Add an optional `downloadUrl?: string` field to the `PollData` interface.
+**2. 1,439 orphan records** — Demographics rows (all in org `8ba98ab9`) that have totals cached but zero matching transactions. These are stale records from deleted/moved transactions and inflate donor counts.
 
-### 3. Set download URLs in poll data files
-- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
-- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
+**3. 45,990 date "mismatches"** — Almost all are just timestamp precision differences (`2025-09-04 00:00:00` vs `2025-09-04 21:49:56`). The original backfill stored date-only values. Only 2 records have genuinely wrong dates.
 
-### 4. Add download button to `src/pages/PollDetail.tsx`
-Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
+**4. 77 recurring flag mismatches** — Minor, will be corrected in the reconciliation.
 
-```text
-[← All Polls]
-[Date | Sample | MOE]
-VA-6 Congressional District Poll.
-Sponsored by Unity & Justice Fund
+---
 
-[⬇ Download Full Results]     ← new button here
-```
+## Fix Plan
+
+### Single migration that runs a full reconciliation
+
+One SQL migration with three steps:
+
+**Step 1: Insert missing donors** — `INSERT INTO donor_demographics ... SELECT` from `actblue_transactions` for the 1,870 donors not yet in the table, aggregating their totals.
+
+**Step 2: Reconcile all existing rows** — Update every row's `total_donated`, `donation_count`, `first_donation_date`, `last_donation_date`, and `is_recurring` from actual transaction data. This fixes the 1,442 total mismatches, 2 wrong dates, 77 recurring mismatches, and normalizes all timestamps.
+
+**Step 3: Clean orphans** — Delete the 1,439 demographics rows that have zero matching transactions (stale data from deleted transactions).
+
+**Step 4: Fill missing PII** — Update the ~70 rows where name/address is null but available in their transactions.
+
+### Files changed
 
 | File | Change |
 |------|--------|
-| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
-| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
-| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
-| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
-| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
-| `src/pages/PollDetail.tsx` | Add download button in header section |
+| New migration SQL | Full reconciliation: insert missing, update all totals/dates, delete orphans, fill PII |
+
+No frontend changes needed.
 
