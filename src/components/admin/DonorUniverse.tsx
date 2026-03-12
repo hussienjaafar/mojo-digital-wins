@@ -76,6 +76,7 @@ export function DonorUniverse() {
   const [crossoverOnly, setCrossoverOnly] = useState(false);
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -127,37 +128,72 @@ export function DonorUniverse() {
 
   const totalPages = data ? Math.ceil(data.total_count / PAGE_SIZE) : 0;
 
-  const handleExport = () => {
-    if (!data?.donors?.length) return;
-    exportToCSV(
-      data.donors.map((d) => ({
-        ...d,
-        all_orgs: d.all_orgs?.join("; ") || "",
-        channels: d.channels?.join("; ") || "",
-      })) as any,
-      `donor-universe-${new Date().toISOString().split("T")[0]}.csv`,
-      [
-        { key: "donor_email", label: "Email" },
-        { key: "first_name", label: "First Name" },
-        { key: "last_name", label: "Last Name" },
-        { key: "phone", label: "Phone" },
-        { key: "state", label: "State" },
-        { key: "zip", label: "Zip" },
-        { key: "employer", label: "Employer" },
-        { key: "occupation", label: "Occupation" },
-        { key: "total_donated", label: "Total Donated" },
-        { key: "donation_count", label: "# Donations" },
-        { key: "is_recurring", label: "Recurring" },
-        { key: "first_donation_date", label: "First Donation" },
-        { key: "last_donation_date", label: "Last Donation" },
-        { key: "all_orgs", label: "Organizations" },
-        { key: "crossover_count", label: "# Orgs" },
-        { key: "channels", label: "Channels" },
-        { key: "party_affiliation", label: "Party" },
-        { key: "voter_score", label: "Voter Score" },
-      ]
-    );
-    toast.success("Export started");
+  const handleExport = async () => {
+    if (!data?.total_count) return;
+    setExporting(true);
+    toast.info(`Exporting ${data.total_count.toLocaleString()} donors...`);
+
+    try {
+      const exportSize = Math.min(data.total_count, 50000);
+      const params: Record<string, any> = {
+        _page: 1,
+        _page_size: exportSize,
+        _crossover_only: crossoverOnly,
+      };
+      if (debouncedSearch) params._search = debouncedSearch;
+      if (stateFilter) params._state_filter = stateFilter;
+      if (channelFilter) params._channel_filter = channelFilter;
+      if (orgFilter) params._org_filter = [orgFilter];
+      if (recurringFilter === "yes") params._recurring_filter = true;
+      if (recurringFilter === "no") params._recurring_filter = false;
+
+      const { data: result, error } = await supabase.rpc("get_donor_universe", params);
+      if (error) throw error;
+
+      const allDonors = (result as unknown as DonorUniverseResult).donors;
+
+      exportToCSV(
+        allDonors.map((d) => ({
+          ...d,
+          all_orgs: d.all_orgs?.join("; ") || "",
+          channels: d.channels?.join("; ") || "",
+          topics: d.topics?.join("; ") || "",
+          pain_points: d.pain_points?.join("; ") || "",
+          values_appealed: d.values_appealed?.join("; ") || "",
+          issues: d.issues?.join("; ") || "",
+        })) as any,
+        `donor-universe-${new Date().toISOString().split("T")[0]}.csv`,
+        [
+          { key: "donor_email", label: "Email" },
+          { key: "first_name", label: "First Name" },
+          { key: "last_name", label: "Last Name" },
+          { key: "phone", label: "Phone" },
+          { key: "state", label: "State" },
+          { key: "zip", label: "Zip" },
+          { key: "employer", label: "Employer" },
+          { key: "occupation", label: "Occupation" },
+          { key: "total_donated", label: "Total Donated" },
+          { key: "donation_count", label: "# Donations" },
+          { key: "is_recurring", label: "Recurring" },
+          { key: "first_donation_date", label: "First Donation" },
+          { key: "last_donation_date", label: "Last Donation" },
+          { key: "all_orgs", label: "Organizations" },
+          { key: "crossover_count", label: "# Orgs" },
+          { key: "channels", label: "Channels" },
+          { key: "party_affiliation", label: "Party" },
+          { key: "voter_score", label: "Voter Score" },
+          { key: "pain_points", label: "Key Issues" },
+          { key: "values_appealed", label: "Values" },
+          { key: "topics", label: "Topics" },
+          { key: "issues", label: "Issues" },
+        ]
+      );
+      toast.success(`Exported ${allDonors.length.toLocaleString()} donors`);
+    } catch (err: any) {
+      toast.error("Export failed: " + err.message);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const formatCurrency = (val: number | null) =>
@@ -218,9 +254,9 @@ export function DonorUniverse() {
         <p className="text-sm text-muted-foreground">
           {data ? `Showing ${((page - 1) * PAGE_SIZE) + 1}–${Math.min(page * PAGE_SIZE, data.total_count)} of ${data.total_count.toLocaleString()}` : "Loading..."}
         </p>
-        <V3Button variant="secondary" size="sm" onClick={handleExport} disabled={!data?.donors?.length}>
+        <V3Button variant="secondary" size="sm" onClick={handleExport} disabled={!data?.total_count || exporting}>
           <Download className="h-4 w-4 mr-1.5" />
-          Export CSV
+          {exporting ? "Exporting..." : `Export All (${data?.total_count?.toLocaleString() || 0})`}
         </V3Button>
       </div>
 
