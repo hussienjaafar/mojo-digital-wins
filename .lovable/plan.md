@@ -1,44 +1,32 @@
 
 
-# Add "Download Full Results" Button to Poll Detail Pages
+# Fix: Show Detailed Pain Points Instead of Broad Topics
 
-## Overview
+## Problem
 
-Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
+The `topic` column in `meta_creative_insights` only has 6 broad categories ("foreign policy", "fundraising general", etc.), while `issue_specifics` is completely empty. However, `donor_pain_points` contains rich, specific data like "frustration with lobbyist influence (AIPAC)" and "belief that tax dollars are funding 'genocide'."
 
-## Changes
+Currently the UI shows the broad `topics` field as the "Top Topic" column — which is unhelpful.
 
-### 1. Copy uploaded files to `public/downloads/`
-- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
-- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
+## Plan
 
-Using `public/` so they're served as static files at known URLs.
+### 1. Change "Top Topic" column to "Top Issue" — show pain points instead
 
-### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
-Add an optional `downloadUrl?: string` field to the `PollData` interface.
+In `DonorUniverse.tsx`:
+- Rename column header from "Top Topic" to "Top Issue"
+- Display `pain_points[0]` (falling back to `topics[0]`) as the badge content
+- Truncate to fit the column
 
-### 3. Set download URLs in poll data files
-- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
-- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
+### 2. Update detail panel priority in `DonorUniverseDetail.tsx`
 
-### 4. Add download button to `src/pages/PollDetail.tsx`
-Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
+- Lead with **Pain Points** (most specific data) instead of topics
+- Show topics only as a secondary "Category" label
+- Reorder the motivation section: Pain Points → Values → Topics (as category tag)
 
-```text
-[← All Polls]
-[Date | Sample | MOE]
-VA-6 Congressional District Poll.
-Sponsored by Unity & Justice Fund
-
-[⬇ Download Full Results]     ← new button here
-```
+### Files changed
 
 | File | Change |
 |------|--------|
-| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
-| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
-| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
-| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
-| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
-| `src/pages/PollDetail.tsx` | Add download button in header section |
+| `src/components/admin/DonorUniverse.tsx` | Swap "Top Topic" column to show `pain_points[0]` with fallback to `topics[0]` |
+| `src/components/admin/DonorUniverseDetail.tsx` | Reorder motivation section to prioritize pain points over broad topics |
 
