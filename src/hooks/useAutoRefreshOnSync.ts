@@ -30,6 +30,8 @@ const SOURCE_QUERY_KEYS: Record<string, string[][]> = {
     ['actblue-metrics'],
     ['channel-spend'],
     ['dashboard-sparkline'],
+    ['sms'],
+    ['channels'],
   ],
   actblue_csv: [
     ['actblue'],

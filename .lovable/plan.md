@@ -1,44 +1,44 @@
 
 
-# Real-Time SMS Revenue on Dashboard
+# Add "Download Full Results" Button to Poll Detail Pages
 
-## Problem
+## Overview
 
-The SMS summary card reads `sms_campaigns.amount_raised` which is only updated by batch attribution jobs. Donations arrive in real-time via ActBlue webhooks but the SMS card stays stale.
+Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
 
-## Plan
+## Changes
 
-### 1. Hybrid SMS summary: cached + live donations
+### 1. Copy uploaded files to `public/downloads/`
+- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
+- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
 
-Update `useChannelSummaries` to supplement `sms_campaigns` data with a live query against `actblue_transactions` for donations matching known SMS refcodes. This way, even before the batch attribution runs, the SMS card shows live revenue.
+Using `public/` so they're served as static files at known URLs.
 
-**Logic:**
-- Query `refcode_mappings` where `platform = 'sms'` to get all SMS-attributed refcodes for the org
-- Query `actblue_transactions` for donations in the date range matching those refcodes
-- Merge: use the higher of `sms_campaigns.amount_raised` vs live-calculated revenue per campaign
+### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
+Add an optional `downloadUrl?: string` field to the `PollData` interface.
 
-### 2. Auto-refresh SMS on ActBlue webhook sync
+### 3. Set download URLs in poll data files
+- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
+- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
 
-In `useAutoRefreshOnSync`, add `['sms']` and `['channels']` to the `actblue_webhook` source's query keys so the SMS card also refreshes when new donations arrive.
+### 4. Add download button to `src/pages/PollDetail.tsx`
+Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
 
+```text
+[← All Polls]
+[Date | Sample | MOE]
+VA-6 Congressional District Poll.
+Sponsored by Unity & Justice Fund
+
+[⬇ Download Full Results]     ← new button here
 ```
-actblue_webhook: [
-  ...existing keys,
-  ['sms'],       // <-- new
-  ['channels'],  // <-- new
-]
-```
-
-### 3. Handle "unsynced" campaigns
-
-For today's case where the Switchboard campaign hasn't synced yet, show an "unattributed SMS donations" line when there are recent donations matching SMS refcodes that don't correspond to any `sms_campaigns` row. This ensures revenue is visible immediately.
-
-### Files changed
 
 | File | Change |
 |------|--------|
-| `src/hooks/useChannelSummaries.tsx` | Add live donation query against `actblue_transactions` using SMS refcodes from `refcode_mappings` |
-| `src/hooks/useAutoRefreshOnSync.ts` | Add `['sms']` and `['channels']` to `actblue_webhook` source keys |
-
-No database changes needed — all data already exists.
+| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
+| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
+| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
+| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
+| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
+| `src/pages/PollDetail.tsx` | Add download button in header section |
 
