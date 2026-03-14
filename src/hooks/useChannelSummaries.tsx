@@ -67,11 +67,12 @@ export function useChannelSummaries(organizationId: string, startDate: string, e
         setSummary(prev => ({ ...prev, meta: { ...prev.meta, isLoading: false } }));
       }
 
-      // Fetch SMS summary from sms_campaigns table (not sms_campaign_metrics)
+      // Fetch SMS summary from sms_campaigns + live ActBlue donations
       try {
+        // 1. Get cached campaign data
         const { data: smsData } = await (supabase as any)
           .from('sms_campaigns')
-          .select('messages_sent, amount_raised, cost, send_date, status')
+          .select('messages_sent, amount_raised, cost, send_date, status, actblue_refcode')
           .eq('organization_id', organizationId)
           .gte('send_date', startDate)
           .lte('send_date', `${endDate}T23:59:59`)
@@ -79,16 +80,51 @@ export function useChannelSummaries(organizationId: string, startDate: string, e
           .order('send_date', { ascending: false });
 
         const smsSent = smsData?.reduce((sum: number, m: any) => sum + (m.messages_sent || 0), 0) || 0;
-        const smsRaised = smsData?.reduce((sum: number, m: any) => sum + Number(m.amount_raised || 0), 0) || 0;
+        const cachedRaised = smsData?.reduce((sum: number, m: any) => sum + Number(m.amount_raised || 0), 0) || 0;
         const smsCost = smsData?.reduce((sum: number, m: any) => sum + Number(m.cost || 0), 0) || 0;
-        const smsRoi = smsCost > 0 ? smsRaised / smsCost : 0;
         const lastSmsDate = smsData?.[0]?.send_date?.split('T')[0] || null;
+
+        // 2. Get all SMS refcodes for this org (from campaigns in range + all known mappings)
+        const campaignRefcodes = (smsData || [])
+          .map((c: any) => c.actblue_refcode)
+          .filter(Boolean) as string[];
+        
+        // Also check refcode_mappings for SMS-platform refcodes
+        const { data: mappingData } = await (supabase as any)
+          .from('refcode_mappings')
+          .select('refcode')
+          .eq('organization_id', organizationId)
+          .eq('platform', 'sms');
+        
+        const mappingRefcodes = (mappingData || []).map((m: any) => m.refcode).filter(Boolean) as string[];
+        const allSmsRefcodes = [...new Set([...campaignRefcodes, ...mappingRefcodes])];
+
+        // 3. Query live donations matching SMS refcodes
+        let liveRaised = 0;
+        if (allSmsRefcodes.length > 0) {
+          const { data: liveDonations } = await (supabase as any)
+            .from('actblue_transactions')
+            .select('amount')
+            .eq('organization_id', organizationId)
+            .gte('transaction_date', startDate)
+            .lte('transaction_date', `${endDate}T23:59:59`)
+            .in('refcode', allSmsRefcodes);
+
+          liveRaised = (liveDonations || []).reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+        }
+
+        // 4. Use the higher of cached vs live revenue (live catches donations before attribution runs)
+        const smsRaised = Math.max(cachedRaised, liveRaised);
+        const smsRoi = smsCost > 0 ? smsRaised / smsCost : 0;
+
+        console.log('[useChannelSummaries] SMS revenue:', { cachedRaised, liveRaised, smsRaised, refcodeCount: allSmsRefcodes.length });
 
         setSummary(prev => ({
           ...prev,
           sms: { sent: smsSent, raised: smsRaised, roi: smsRoi, isLoading: false, lastDataDate: lastSmsDate, campaignCount: smsData?.length || 0 },
         }));
       } catch (error) {
+        console.error('[useChannelSummaries] SMS fetch error:', error);
         setSummary(prev => ({ ...prev, sms: { ...prev.sms, isLoading: false } }));
       }
 
