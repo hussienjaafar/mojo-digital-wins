@@ -190,11 +190,12 @@ export function CredentialForm({
 
   return (
     <Tabs value={platform} onValueChange={(v) => onPlatformChange(v as any)}>
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className="grid w-full grid-cols-5">
         <TabsTrigger value="meta" disabled={disabled}>Meta</TabsTrigger>
         <TabsTrigger value="switchboard" disabled={disabled}>Switchboard</TabsTrigger>
         <TabsTrigger value="actblue" disabled={disabled}>ActBlue</TabsTrigger>
         <TabsTrigger value="google_ads" disabled={disabled}>Google Ads</TabsTrigger>
+        <TabsTrigger value="every_action" disabled={disabled}>EveryAction</TabsTrigger>
       </TabsList>
 
       <TabsContent value="meta" className="space-y-4 pt-4">
