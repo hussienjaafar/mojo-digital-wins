@@ -100,3 +100,9 @@ export interface ActBlueWebhookCredentials {
 }
 
 export interface ActBlueCredentials extends ActBlueCSVCredentials, ActBlueWebhookCredentials {}
+
+// EveryAction credentials
+export interface EveryActionCredentials {
+  application_name?: string;
+  api_key?: string;
+}
