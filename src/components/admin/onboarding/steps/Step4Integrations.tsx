@@ -69,6 +69,12 @@ interface IntegrationFormState {
     showWebhookPassword: boolean;
     showCsvPassword: boolean;
   };
+  every_action: {
+    application_name: string;
+    api_key: string;
+    isOpen: boolean;
+    showKey: boolean;
+  };
 }
 
 export function Step4Integrations({ organizationId, stepData, onComplete, onBack, onDataChange }: Step4IntegrationsProps) {
@@ -85,14 +91,16 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
     (stepData.integrations as Record<string, IntegrationConfig>) || {
       meta: { platform: 'meta', is_enabled: false, is_tested: false, last_test_status: null },
       switchboard: { platform: 'switchboard', is_enabled: false, is_tested: false, last_test_status: null },
-      actblue: { platform: 'actblue', is_enabled: false, is_tested: false, last_test_status: null }
+      actblue: { platform: 'actblue', is_enabled: false, is_tested: false, last_test_status: null },
+      every_action: { platform: 'every_action', is_enabled: false, is_tested: false, last_test_status: null }
     }
   );
 
   const [formState, setFormState] = useState<IntegrationFormState>({
     meta: { access_token: '', ad_account_id: '', isOpen: false, showToken: false },
     switchboard: { api_key: '', account_id: '', isOpen: false, showKey: false },
-    actblue: { webhook_username: '', webhook_password: '', entity_id: '', csv_username: '', csv_password: '', isOpen: false, showWebhookPassword: false, showCsvPassword: false }
+    actblue: { webhook_username: '', webhook_password: '', entity_id: '', csv_username: '', csv_password: '', isOpen: false, showWebhookPassword: false, showCsvPassword: false },
+    every_action: { application_name: '', api_key: '', isOpen: false, showKey: false }
   });
 
   // Report data changes to parent for persistence on back navigation
