@@ -235,6 +235,7 @@ export function CredentialSlideOver({
         switchboard: 'sync-switchboard-sms',
         actblue: 'sync-actblue-csv',
         google_ads: 'sync-google-ads',
+        every_action: 'sync-everyaction',
       };
 
       const { data, error } = await supabase.functions.invoke(endpoints[platform], {

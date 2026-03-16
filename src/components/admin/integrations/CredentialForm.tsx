@@ -464,6 +464,36 @@ export function CredentialForm({
           />
         </div>
       </TabsContent>
+
+      <TabsContent value="every_action" className="space-y-4 pt-4">
+        {isEditing && credentialStatus && (
+          <CredentialStatusBanner status={credentialStatus} className="mb-4" />
+        )}
+        <Alert>
+          <AlertDescription className="text-sm">
+            EveryAction uses a poll-based sync (every 30 min) via the Changed Entity Export Jobs API. No webhooks needed.
+          </AlertDescription>
+        </Alert>
+        <div className="space-y-2">
+          <Label htmlFor="ea_application_name">Application Name</Label>
+          <Input
+            id="ea_application_name"
+            value={formData.every_action?.application_name || ''}
+            onChange={(e) => updateEveryAction('application_name', e.target.value)}
+            placeholder="Your EveryAction application name"
+            disabled={disabled}
+          />
+        </div>
+        <SecureInput
+          id="ea_api_key"
+          label="API Key"
+          value={formData.every_action?.api_key || ''}
+          onChange={(v) => updateEveryAction('api_key', v)}
+          required
+          disabled={disabled}
+          existingHint={existingCredentialMask.api_key}
+        />
+      </TabsContent>
     </Tabs>
   );
 }
