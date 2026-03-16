@@ -1,54 +1,44 @@
 
 
-# Sheri Maali Audit — Accurate, But Reveals Systemic Bug
+# Add "Download Full Results" Button to Poll Detail Pages
 
-## Sheri Maali: Verified Accurate ✓
+## Overview
 
-| Organization | Transactions | Raw Total | Demographics Cache | RPC Would Show |
-|---|---|---|---|---|
-| Rashid For Illinois | 2 ($250 + $500) | $750 | $750 ✓ | $750 ✓ |
-| Wesam Shahed | 1 ($7,300) | $7,300 | $7,300 ✓ | $7,300 ✓ |
-| Abdul For Senate | 5 ($1,500+$500+$200+$500+$7,000) | $9,700 | $9,700 ✓ | $9,700 ✓ |
-| **Grand Total** | **8 donations** | **$17,750** | **$17,750 ✓** | **$17,750 ✓** |
+Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
 
-Sheri Maali's record is correct — all her transaction emails are already lowercase, so the join works fine.
+## Changes
 
-## Critical Systemic Bug Found
+### 1. Copy uploaded files to `public/downloads/`
+- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
+- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
 
-However, your instinct was right to audit. The case-sensitivity migration only normalized `donor_demographics` emails to lowercase. The `actblue_transactions` table still has mixed-case emails. The RPC's `tx_stats` → `donor_base` join (line 93-94) is **case-sensitive**:
+Using `public/` so they're served as static files at known URLs.
 
-```sql
-LEFT JOIN tx_stats ts ON ts.donor_email = dd.donor_email  -- case-sensitive!
+### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
+Add an optional `downloadUrl?: string` field to the `PollData` interface.
+
+### 3. Set download URLs in poll data files
+- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
+- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
+
+### 4. Add download button to `src/pages/PollDetail.tsx`
+Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
+
+```text
+[← All Polls]
+[Date | Sample | MOE]
+VA-6 Congressional District Poll.
+Sponsored by Unity & Justice Fund
+
+[⬇ Download Full Results]     ← new button here
 ```
-
-This means when a transaction has email `Glass.M.Ashley@gmail.com` but demographics has `glass.m.ashley@gmail.com`, the join fails and that donor shows **$0 total** in the universe.
-
-### Impact
-
-- **2,413 donor-org pairs** have broken joins
-- **4,270 transactions** / **$251,887** in donations are invisible
-- These donors appear in the universe but with **$0 total donated**
-
-### Fix
-
-One change in the `get_donor_universe` RPC: normalize emails in the `tx_stats` CTE so the join always matches:
-
-```sql
--- In tx_stats CTE, change GROUP BY from:
-GROUP BY at.donor_email, at.organization_id
--- To:
-GROUP BY lower(trim(at.donor_email)), at.organization_id
-
--- And SELECT lower(trim(at.donor_email)) AS donor_email
-```
-
-This ensures `tx_stats` output is lowercase, matching the already-normalized `donor_demographics`. Same fix needed in the `motivation_data` join.
-
-### Files changed
 
 | File | Change |
-|---|---|
-| New migration SQL | Update `get_donor_universe` RPC to use `lower(trim())` in `tx_stats` and `donor_base` joins |
-
-No frontend changes needed.
+|------|--------|
+| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
+| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
+| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
+| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
+| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
+| `src/pages/PollDetail.tsx` | Add download button in header section |
 
