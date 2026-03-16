@@ -1,6 +1,6 @@
 // Shared types for integration management
 
-export type IntegrationPlatform = 'meta_ads' | 'switchboard' | 'actblue' | 'google_ads';
+export type IntegrationPlatform = 'meta_ads' | 'switchboard' | 'actblue' | 'google_ads' | 'every_action';
 
 export type IntegrationHealthStatus = 
   | 'healthy' 
@@ -73,6 +73,7 @@ export const PLATFORM_DISPLAY_NAMES: Record<IntegrationPlatform, string> = {
   switchboard: 'Switchboard',
   actblue: 'ActBlue',
   google_ads: 'Google Ads',
+  every_action: 'EveryAction',
 };
 
 export const PLATFORM_ICONS: Record<IntegrationPlatform, string> = {
@@ -80,6 +81,7 @@ export const PLATFORM_ICONS: Record<IntegrationPlatform, string> = {
   switchboard: '🔀',
   actblue: '💙',
   google_ads: '🔍',
+  every_action: '🟢',
 };
 
 // ActBlue credential sections
@@ -98,3 +100,9 @@ export interface ActBlueWebhookCredentials {
 }
 
 export interface ActBlueCredentials extends ActBlueCSVCredentials, ActBlueWebhookCredentials {}
+
+// EveryAction credentials
+export interface EveryActionCredentials {
+  application_name?: string;
+  api_key?: string;
+}

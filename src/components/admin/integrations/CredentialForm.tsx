@@ -35,15 +35,19 @@ export type CredentialFormData = {
     refresh_token: string;
     customer_id: string;
   };
+  every_action?: {
+    application_name: string;
+    api_key: string;
+  };
   // Track which sections are being updated for partial saves
   _actblue_section?: ActBlueCredentialSection;
 };
 
 interface CredentialFormProps {
-  platform: 'meta' | 'switchboard' | 'actblue' | 'google_ads';
+  platform: 'meta' | 'switchboard' | 'actblue' | 'google_ads' | 'every_action';
   formData: CredentialFormData;
   onFormDataChange: (data: CredentialFormData) => void;
-  onPlatformChange: (platform: 'meta' | 'switchboard' | 'actblue' | 'google_ads') => void;
+  onPlatformChange: (platform: 'meta' | 'switchboard' | 'actblue' | 'google_ads' | 'every_action') => void;
   organizationId?: string;
   disabled?: boolean;
   isEditing?: boolean; // True when editing existing credentials
@@ -168,6 +172,13 @@ export function CredentialForm({
     });
   };
 
+  const updateEveryAction = (field: keyof NonNullable<CredentialFormData['every_action']>, value: string) => {
+    onFormDataChange({
+      ...formData,
+      every_action: { ...formData.every_action!, [field]: value }
+    });
+  };
+
   // Handle ActBlue section change
   const handleActblueSectionChange = (section: ActBlueCredentialSection) => {
     setActblueSection(section);
@@ -179,11 +190,12 @@ export function CredentialForm({
 
   return (
     <Tabs value={platform} onValueChange={(v) => onPlatformChange(v as any)}>
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className="grid w-full grid-cols-5">
         <TabsTrigger value="meta" disabled={disabled}>Meta</TabsTrigger>
         <TabsTrigger value="switchboard" disabled={disabled}>Switchboard</TabsTrigger>
         <TabsTrigger value="actblue" disabled={disabled}>ActBlue</TabsTrigger>
         <TabsTrigger value="google_ads" disabled={disabled}>Google Ads</TabsTrigger>
+        <TabsTrigger value="every_action" disabled={disabled}>EveryAction</TabsTrigger>
       </TabsList>
 
       <TabsContent value="meta" className="space-y-4 pt-4">
@@ -451,6 +463,36 @@ export function CredentialForm({
             disabled={disabled}
           />
         </div>
+      </TabsContent>
+
+      <TabsContent value="every_action" className="space-y-4 pt-4">
+        {isEditing && credentialStatus && (
+          <CredentialStatusBanner status={credentialStatus} className="mb-4" />
+        )}
+        <Alert>
+          <AlertDescription className="text-sm">
+            EveryAction uses a poll-based sync (every 30 min) via the Changed Entity Export Jobs API. No webhooks needed.
+          </AlertDescription>
+        </Alert>
+        <div className="space-y-2">
+          <Label htmlFor="ea_application_name">Application Name</Label>
+          <Input
+            id="ea_application_name"
+            value={formData.every_action?.application_name || ''}
+            onChange={(e) => updateEveryAction('application_name', e.target.value)}
+            placeholder="Your EveryAction application name"
+            disabled={disabled}
+          />
+        </div>
+        <SecureInput
+          id="ea_api_key"
+          label="API Key"
+          value={formData.every_action?.api_key || ''}
+          onChange={(v) => updateEveryAction('api_key', v)}
+          required
+          disabled={disabled}
+          existingHint={existingCredentialMask.api_key}
+        />
       </TabsContent>
     </Tabs>
   );

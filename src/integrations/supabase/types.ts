@@ -5100,6 +5100,182 @@ export type Database = {
         }
         Relationships: []
       }
+      everyaction_sync_state: {
+        Row: {
+          created_at: string
+          id: string
+          last_export_job_id: number | null
+          last_sync_at: string | null
+          last_sync_cursor: string | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_export_job_id?: number | null
+          last_sync_at?: string | null
+          last_sync_cursor?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_export_job_id?: number | null
+          last_sync_at?: string | null
+          last_sync_cursor?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "everyaction_sync_state_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "everyaction_sync_state_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "everyaction_sync_state_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      everyaction_transactions: {
+        Row: {
+          addr1: string | null
+          amount: number
+          city: string | null
+          contribution_form: string | null
+          country: string | null
+          created_at: string
+          custom_fields: Json | null
+          designation: string | null
+          donor_email: string | null
+          donor_name: string | null
+          employer: string | null
+          first_name: string | null
+          id: string
+          is_recurring: boolean | null
+          last_name: string | null
+          occupation: string | null
+          organization_id: string
+          payment_method: string | null
+          phone: string | null
+          phone_hash: string | null
+          recurring_period: string | null
+          refcode: string | null
+          source_code: string | null
+          state: string | null
+          transaction_date: string
+          transaction_id: string
+          transaction_type: string | null
+          van_id: string | null
+          zip: string | null
+        }
+        Insert: {
+          addr1?: string | null
+          amount: number
+          city?: string | null
+          contribution_form?: string | null
+          country?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          designation?: string | null
+          donor_email?: string | null
+          donor_name?: string | null
+          employer?: string | null
+          first_name?: string | null
+          id?: string
+          is_recurring?: boolean | null
+          last_name?: string | null
+          occupation?: string | null
+          organization_id: string
+          payment_method?: string | null
+          phone?: string | null
+          phone_hash?: string | null
+          recurring_period?: string | null
+          refcode?: string | null
+          source_code?: string | null
+          state?: string | null
+          transaction_date: string
+          transaction_id: string
+          transaction_type?: string | null
+          van_id?: string | null
+          zip?: string | null
+        }
+        Update: {
+          addr1?: string | null
+          amount?: number
+          city?: string | null
+          contribution_form?: string | null
+          country?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          designation?: string | null
+          donor_email?: string | null
+          donor_name?: string | null
+          employer?: string | null
+          first_name?: string | null
+          id?: string
+          is_recurring?: boolean | null
+          last_name?: string | null
+          occupation?: string | null
+          organization_id?: string
+          payment_method?: string | null
+          phone?: string | null
+          phone_hash?: string | null
+          recurring_period?: string | null
+          refcode?: string | null
+          source_code?: string | null
+          state?: string | null
+          transaction_date?: string
+          transaction_id?: string
+          transaction_type?: string | null
+          van_id?: string | null
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "everyaction_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "everyaction_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "everyaction_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       executive_orders: {
         Row: {
           created_at: string

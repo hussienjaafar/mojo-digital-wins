@@ -594,7 +594,18 @@ serve(async (req) => {
             itemsCreated = result?.results?.reduce((sum: number, r: any) => sum + (r.inserted || 0), 0) || 0;
             break;
 
-          case 'sync_meta_ads':
+          case 'sync_everyaction':
+            console.log('[SCHEDULER] Running EveryAction sync');
+            const eaSyncResponse = await supabase.functions.invoke('sync-everyaction', { 
+              body: {},
+              headers: authHeaders
+            });
+            if (eaSyncResponse.error) throw new Error(eaSyncResponse.error.message);
+            result = eaSyncResponse.data;
+            itemsProcessed = result?.results?.length || 0;
+            itemsCreated = result?.results?.reduce((sum: number, r: any) => sum + (r.transactions_inserted || 0), 0) || 0;
+            break;
+
             console.log('[SCHEDULER] Running tiered Meta Ads sync');
             // CRITICAL: Pass the cron secret so tiered-meta-sync can authenticate
             const cronSecretForMeta = Deno.env.get('CRON_SECRET');

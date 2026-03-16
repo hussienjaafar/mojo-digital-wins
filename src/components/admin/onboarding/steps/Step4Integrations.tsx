@@ -69,6 +69,12 @@ interface IntegrationFormState {
     showWebhookPassword: boolean;
     showCsvPassword: boolean;
   };
+  every_action: {
+    application_name: string;
+    api_key: string;
+    isOpen: boolean;
+    showKey: boolean;
+  };
 }
 
 export function Step4Integrations({ organizationId, stepData, onComplete, onBack, onDataChange }: Step4IntegrationsProps) {
@@ -85,14 +91,16 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
     (stepData.integrations as Record<string, IntegrationConfig>) || {
       meta: { platform: 'meta', is_enabled: false, is_tested: false, last_test_status: null },
       switchboard: { platform: 'switchboard', is_enabled: false, is_tested: false, last_test_status: null },
-      actblue: { platform: 'actblue', is_enabled: false, is_tested: false, last_test_status: null }
+      actblue: { platform: 'actblue', is_enabled: false, is_tested: false, last_test_status: null },
+      every_action: { platform: 'every_action', is_enabled: false, is_tested: false, last_test_status: null }
     }
   );
 
   const [formState, setFormState] = useState<IntegrationFormState>({
     meta: { access_token: '', ad_account_id: '', isOpen: false, showToken: false },
     switchboard: { api_key: '', account_id: '', isOpen: false, showKey: false },
-    actblue: { webhook_username: '', webhook_password: '', entity_id: '', csv_username: '', csv_password: '', isOpen: false, showWebhookPassword: false, showCsvPassword: false }
+    actblue: { webhook_username: '', webhook_password: '', entity_id: '', csv_username: '', csv_password: '', isOpen: false, showWebhookPassword: false, showCsvPassword: false },
+    every_action: { application_name: '', api_key: '', isOpen: false, showKey: false }
   });
 
   // Report data changes to parent for persistence on back navigation
@@ -116,7 +124,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
     }));
   };
 
-  const testConnection = async (platform: 'meta' | 'switchboard' | 'actblue') => {
+  const testConnection = async (platform: 'meta' | 'switchboard' | 'actblue' | 'every_action') => {
     setTestingIntegration(platform);
     
     try {
@@ -144,6 +152,12 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
         }
         if (!csv_username || !csv_password) {
           throw new Error('Please enter CSV API username and password for reconciliation');
+        }
+        testResult = { success: true, error: '' };
+      } else if (platform === 'every_action') {
+        const { application_name, api_key } = formState.every_action;
+        if (!application_name || !api_key) {
+          throw new Error('Please enter application name and API key');
         }
         testResult = { success: true, error: '' };
       }
@@ -184,7 +198,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
     }
   };
 
-  const saveIntegration = async (platform: 'meta' | 'switchboard' | 'actblue') => {
+  const saveIntegration = async (platform: 'meta' | 'switchboard' | 'actblue' | 'every_action') => {
     const config = integrations[platform];
     if (!config.is_tested || config.last_test_status !== 'success') {
       toast({
@@ -230,6 +244,15 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
           webhook_username_hint: `****${formState.actblue.webhook_username.slice(-4)}`,
           entity_id: formState.actblue.entity_id,
           csv_username_hint: formState.actblue.csv_username
+        };
+      } else if (platform === 'every_action') {
+        credentials = {
+          application_name: formState.every_action.application_name,
+          api_key: formState.every_action.api_key
+        };
+        credentialMask = {
+          application_name: formState.every_action.application_name,
+          key_hint: `****${formState.every_action.api_key.slice(-4)}`
         };
       }
 
@@ -292,6 +315,8 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
         updateFormState('switchboard', { api_key: '', isOpen: false });
       } else if (platform === 'actblue') {
         updateFormState('actblue', { webhook_username: '', webhook_password: '', isOpen: false });
+      } else if (platform === 'every_action') {
+        updateFormState('every_action', { application_name: '', api_key: '', isOpen: false });
       }
 
       toast({
@@ -314,7 +339,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
     await onComplete(4, { integrations });
   };
 
-  const handleDisconnectIntegration = async (platform: 'meta' | 'switchboard' | 'actblue') => {
+  const handleDisconnectIntegration = async (platform: 'meta' | 'switchboard' | 'actblue' | 'every_action') => {
     setIsDisconnecting(true);
     try {
       const { error } = await supabase
@@ -337,7 +362,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
 
       toast({
         title: 'Integration disconnected',
-        description: `${platform === 'meta' ? 'Meta Ads' : platform === 'switchboard' ? 'Switchboard SMS' : 'ActBlue'} has been disconnected. You can now reconnect with a different account.`
+        description: `${platform === 'meta' ? 'Meta Ads' : platform === 'switchboard' ? 'Switchboard SMS' : platform === 'every_action' ? 'EveryAction' : 'ActBlue'} has been disconnected. You can now reconnect with a different account.`
       });
     } catch (error) {
       console.error('Error disconnecting integration:', error);
@@ -403,6 +428,13 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
       description: 'Donation and transaction data',
       color: 'red',
       letter: 'A'
+    },
+    {
+      key: 'every_action' as const,
+      name: 'EveryAction',
+      description: 'Donation & CRM data via EveryAction/VAN',
+      color: 'green',
+      letter: 'E'
     }
   ];
 
@@ -411,6 +443,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
       case 'blue': return 'bg-blue-500/10 text-blue-600';
       case 'purple': return 'bg-purple-500/10 text-purple-600';
       case 'red': return 'bg-red-500/10 text-red-600';
+      case 'green': return 'bg-green-500/10 text-green-600';
       default: return 'bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-muted))]';
     }
   };
@@ -830,6 +863,76 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
                             <Button
                               onClick={() => saveIntegration('actblue')}
                               disabled={!integrations.actblue.is_tested || integrations.actblue.last_test_status !== 'success'}
+                              className="h-10"
+                            >
+                              Save & Enable
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                      {key === 'every_action' && (
+                        <>
+                          {/* Info Box */}
+                          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-4">
+                            <div className="flex items-start gap-3">
+                              <Info className="h-5 w-5 text-green-400 mt-0.5 shrink-0" />
+                              <div className="text-[13px] text-[hsl(var(--portal-text-secondary))]">
+                                <p className="font-medium text-[hsl(var(--portal-text-primary))] mb-2">
+                                  Poll-based sync (every 30 minutes)
+                                </p>
+                                <p className="text-[12px]">
+                                  EveryAction uses Changed Entity Export Jobs to pull donation data on a schedule. No webhooks required.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">Application Name</Label>
+                            <Input
+                              placeholder="Enter EveryAction application name"
+                              value={formState.every_action.application_name}
+                              onChange={(e) => updateFormState('every_action', { application_name: e.target.value })}
+                              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">API Key</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                type={formState.every_action.showKey ? 'text' : 'password'}
+                                placeholder="Enter EveryAction API key"
+                                value={formState.every_action.api_key}
+                                onChange={(e) => updateFormState('every_action', { api_key: e.target.value })}
+                                className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => updateFormState('every_action', { showKey: !formState.every_action.showKey })}
+                                className="h-11 w-11"
+                              >
+                                {formState.every_action.showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 pt-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => testConnection('every_action')}
+                              disabled={testingIntegration === 'every_action'}
+                              className="h-10"
+                            >
+                              {testingIntegration === 'every_action' ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <TestTube className="h-4 w-4 mr-2" />
+                              )}
+                              Test Connection
+                            </Button>
+                            <Button
+                              onClick={() => saveIntegration('every_action')}
+                              disabled={!integrations.every_action?.is_tested || integrations.every_action?.last_test_status !== 'success'}
                               className="h-10"
                             >
                               Save & Enable

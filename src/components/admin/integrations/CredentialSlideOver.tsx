@@ -56,7 +56,7 @@ export function CredentialSlideOver({
 }: CredentialSlideOverProps) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrg, setSelectedOrg] = useState('');
-  const [platform, setPlatform] = useState<'meta' | 'switchboard' | 'actblue' | 'google_ads'>('meta');
+  const [platform, setPlatform] = useState<'meta' | 'switchboard' | 'actblue' | 'google_ads' | 'every_action'>('meta');
   const [formData, setFormData] = useState<CredentialFormData>({});
   const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -200,7 +200,6 @@ export function CredentialSlideOver({
     }
 
     if (platform === 'actblue') {
-      // For new ActBlue credentials, require at least CSV or webhook to be complete
       const csvComplete = formData.actblue?.entity_id && 
                           formData.actblue?.username && 
                           formData.actblue?.password;
@@ -218,6 +217,11 @@ export function CredentialSlideOver({
       return false;
     }
 
+    if (platform === 'every_action' && !formData.every_action?.api_key) {
+      toast.error('EveryAction API key is required');
+      return false;
+    }
+
     return true;
   };
 
@@ -231,6 +235,7 @@ export function CredentialSlideOver({
         switchboard: 'sync-switchboard-sms',
         actblue: 'sync-actblue-csv',
         google_ads: 'sync-google-ads',
+        every_action: 'sync-everyaction',
       };
 
       const { data, error } = await supabase.functions.invoke(endpoints[platform], {

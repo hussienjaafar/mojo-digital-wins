@@ -106,7 +106,7 @@ export interface UserInvite {
 
 // Step 4: Integrations
 export interface IntegrationConfig {
-  platform: 'meta' | 'switchboard' | 'actblue';
+  platform: 'meta' | 'switchboard' | 'actblue' | 'every_action';
   is_enabled: boolean;
   is_tested: boolean;
   last_test_status: 'success' | 'error' | null;
