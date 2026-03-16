@@ -339,7 +339,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
     await onComplete(4, { integrations });
   };
 
-  const handleDisconnectIntegration = async (platform: 'meta' | 'switchboard' | 'actblue') => {
+  const handleDisconnectIntegration = async (platform: 'meta' | 'switchboard' | 'actblue' | 'every_action') => {
     setIsDisconnecting(true);
     try {
       const { error } = await supabase
