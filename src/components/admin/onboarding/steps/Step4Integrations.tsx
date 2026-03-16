@@ -362,7 +362,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
 
       toast({
         title: 'Integration disconnected',
-        description: `${platform === 'meta' ? 'Meta Ads' : platform === 'switchboard' ? 'Switchboard SMS' : 'ActBlue'} has been disconnected. You can now reconnect with a different account.`
+        description: `${platform === 'meta' ? 'Meta Ads' : platform === 'switchboard' ? 'Switchboard SMS' : platform === 'every_action' ? 'EveryAction' : 'ActBlue'} has been disconnected. You can now reconnect with a different account.`
       });
     } catch (error) {
       console.error('Error disconnecting integration:', error);
