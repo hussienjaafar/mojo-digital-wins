@@ -245,6 +245,15 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
           entity_id: formState.actblue.entity_id,
           csv_username_hint: formState.actblue.csv_username
         };
+      } else if (platform === 'every_action') {
+        credentials = {
+          application_name: formState.every_action.application_name,
+          api_key: formState.every_action.api_key
+        };
+        credentialMask = {
+          application_name: formState.every_action.application_name,
+          key_hint: `****${formState.every_action.api_key.slice(-4)}`
+        };
       }
 
       const { error } = await supabase
