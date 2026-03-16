@@ -200,7 +200,6 @@ export function CredentialSlideOver({
     }
 
     if (platform === 'actblue') {
-      // For new ActBlue credentials, require at least CSV or webhook to be complete
       const csvComplete = formData.actblue?.entity_id && 
                           formData.actblue?.username && 
                           formData.actblue?.password;
@@ -215,6 +214,11 @@ export function CredentialSlideOver({
 
     if (platform === 'google_ads' && !formData.google_ads?.developer_token) {
       toast.error('Google Ads developer token is required');
+      return false;
+    }
+
+    if (platform === 'every_action' && !formData.every_action?.api_key) {
+      toast.error('EveryAction API key is required');
       return false;
     }
 
