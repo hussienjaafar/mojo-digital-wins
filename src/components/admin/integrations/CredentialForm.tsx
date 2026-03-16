@@ -172,6 +172,13 @@ export function CredentialForm({
     });
   };
 
+  const updateEveryAction = (field: keyof NonNullable<CredentialFormData['every_action']>, value: string) => {
+    onFormDataChange({
+      ...formData,
+      every_action: { ...formData.every_action!, [field]: value }
+    });
+  };
+
   // Handle ActBlue section change
   const handleActblueSectionChange = (section: ActBlueCredentialSection) => {
     setActblueSection(section);
