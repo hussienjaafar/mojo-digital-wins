@@ -315,6 +315,8 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
         updateFormState('switchboard', { api_key: '', isOpen: false });
       } else if (platform === 'actblue') {
         updateFormState('actblue', { webhook_username: '', webhook_password: '', isOpen: false });
+      } else if (platform === 'every_action') {
+        updateFormState('every_action', { application_name: '', api_key: '', isOpen: false });
       }
 
       toast({
