@@ -124,7 +124,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
     }));
   };
 
-  const testConnection = async (platform: 'meta' | 'switchboard' | 'actblue') => {
+  const testConnection = async (platform: 'meta' | 'switchboard' | 'actblue' | 'every_action') => {
     setTestingIntegration(platform);
     
     try {
@@ -152,6 +152,12 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
         }
         if (!csv_username || !csv_password) {
           throw new Error('Please enter CSV API username and password for reconciliation');
+        }
+        testResult = { success: true, error: '' };
+      } else if (platform === 'every_action') {
+        const { application_name, api_key } = formState.every_action;
+        if (!application_name || !api_key) {
+          throw new Error('Please enter application name and API key');
         }
         testResult = { success: true, error: '' };
       }
