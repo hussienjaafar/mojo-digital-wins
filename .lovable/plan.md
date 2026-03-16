@@ -1,63 +1,44 @@
 
 
-# Donor Universe Accuracy Audit — Findings & Fix Plan
+# Add "Download Full Results" Button to Poll Detail Pages
 
-## Audit Summary
+## Overview
 
-| Issue | Count | Severity | Impact on RPC Output |
-|-------|-------|----------|---------------------|
-| **Case-sensitive email duplicates in `donor_demographics`** | **243 donors, 246 extra rows** | **CRITICAL** | Currently masked by `lower(trim())` in unified CTE, but fragile |
-| **Case-sensitive email duplicates in `actblue_transactions`** | **265 donors, 269 variants** | HIGH | Causes fragmented demo rows via trigger |
-| **Stale demo totals (after case dedup)** | **18 donors, $789 discrepancy** | MEDIUM | Not visible in RPC (tx_stats overrides), but affects other systems |
-| **Recurring flag mismatches in demo cache** | **30** | LOW | Not visible in RPC (tx_stats overrides) |
-| **Date mismatches in demo cache** | **227 first / 241 last** | LOW | Not visible in RPC (tx_stats overrides) |
-| **Missing donors (no demo row)** | **0** | None | Fixed in prior audit |
-| **Orphan demo rows (no transactions)** | **0** | None | Fixed in prior audit |
-| **Motivation data sparsity** | 5/109 creatives have pain_points | INFO | Correct but sparse — data limitation |
-| **`issue_specifics` column always empty** | 0/109 creatives | INFO | RPC references it but no data exists |
-| **Two overloaded RPCs with different signatures** | 2 overloads | LOW | Old overload lacks admin check and motivation data |
+Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
 
-## Key Finding: Case-Sensitivity Bug
+## Changes
 
-The root cause of most remaining issues is that **email addresses are stored case-sensitively** throughout the system:
+### 1. Copy uploaded files to `public/downloads/`
+- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
+- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
 
-- The unique constraint on `donor_demographics` is `UNIQUE (organization_id, donor_email)` — case-sensitive
-- The sync trigger (`trg_sync_donor_totals`) uses `NEW.donor_email` as-is without normalizing
-- ActBlue sends the same donor with different capitalizations (`glass.m.ashley@gmail.com`, `Glass.M.Ashley@gmail.com`, `Glass.m.ashley@gmail.com`)
-- This creates **3 separate rows** for the same person, each with partial totals
+Using `public/` so they're served as static files at known URLs.
 
-The RPC currently produces **correct output** because `unified` groups by `lower(trim())` and sums across case variants. But this is fragile and wastes resources.
+### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
+Add an optional `downloadUrl?: string` field to the `PollData` interface.
 
-## Fix Plan
+### 3. Set download URLs in poll data files
+- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
+- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
 
-### Step 1: Normalize the sync trigger
+### 4. Add download button to `src/pages/PollDetail.tsx`
+Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
 
-Update `sync_donor_demographics_totals()` to normalize email with `lower(trim())` before the upsert. This prevents future duplicates.
+```text
+[← All Polls]
+[Date | Sample | MOE]
+VA-6 Congressional District Poll.
+Sponsored by Unity & Justice Fund
 
-### Step 2: Deduplicate existing `donor_demographics` rows
-
-Merge the 243 duplicate donor sets by:
-- Keeping the row with the most data (longest non-null PII)
-- Updating its email to `lower(trim())`
-- Deleting the duplicate rows
-
-### Step 3: Full reconciliation pass
-
-Re-sync all `total_donated`, `donation_count`, `first_donation_date`, `last_donation_date`, and `is_recurring` from `actblue_transactions` (using `lower(trim())` on the join). This fixes the 18 stale totals, 30 recurring mismatches, and 468 date mismatches in one pass.
-
-### Step 4: Replace case-sensitive unique constraint
-
-Drop the existing `UNIQUE (organization_id, donor_email)` and create a new one on `(organization_id, lower(trim(donor_email)))` to prevent future case-variant duplicates at the database level.
-
-### Step 5: Drop old RPC overload
-
-Remove the old `get_donor_universe` overload (the one returning TABLE with `_org_id`, `_sort_by` params) that lacks the admin check and motivation data. The frontend only uses the JSON-returning version.
-
-### Files changed
+[⬇ Download Full Results]     ← new button here
+```
 
 | File | Change |
 |------|--------|
-| New migration SQL | Steps 1-5: normalize trigger, deduplicate, reconcile, replace constraint, drop old RPC |
-
-No frontend changes needed — the RPC signature and output format remain identical.
+| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
+| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
+| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
+| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
+| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
+| `src/pages/PollDetail.tsx` | Add download button in header section |
 
