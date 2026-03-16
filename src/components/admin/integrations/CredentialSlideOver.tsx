@@ -56,7 +56,7 @@ export function CredentialSlideOver({
 }: CredentialSlideOverProps) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrg, setSelectedOrg] = useState('');
-  const [platform, setPlatform] = useState<'meta' | 'switchboard' | 'actblue' | 'google_ads'>('meta');
+  const [platform, setPlatform] = useState<'meta' | 'switchboard' | 'actblue' | 'google_ads' | 'every_action'>('meta');
   const [formData, setFormData] = useState<CredentialFormData>({});
   const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
