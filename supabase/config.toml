@@ -559,3 +559,7 @@ verify_jwt = false
 
 [functions.funnel-generate-challenger]
 verify_jwt = false
+
+# --- EVERYACTION SYNC ---
+[functions.sync-everyaction]
+verify_jwt = false
