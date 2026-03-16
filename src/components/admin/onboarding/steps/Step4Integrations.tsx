@@ -198,7 +198,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
     }
   };
 
-  const saveIntegration = async (platform: 'meta' | 'switchboard' | 'actblue') => {
+  const saveIntegration = async (platform: 'meta' | 'switchboard' | 'actblue' | 'every_action') => {
     const config = integrations[platform];
     if (!config.is_tested || config.last_test_status !== 'success') {
       toast({
