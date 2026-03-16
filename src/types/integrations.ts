@@ -73,6 +73,7 @@ export const PLATFORM_DISPLAY_NAMES: Record<IntegrationPlatform, string> = {
   switchboard: 'Switchboard',
   actblue: 'ActBlue',
   google_ads: 'Google Ads',
+  every_action: 'EveryAction',
 };
 
 export const PLATFORM_ICONS: Record<IntegrationPlatform, string> = {
@@ -80,6 +81,7 @@ export const PLATFORM_ICONS: Record<IntegrationPlatform, string> = {
   switchboard: '🔀',
   actblue: '💙',
   google_ads: '🔍',
+  every_action: '🟢',
 };
 
 // ActBlue credential sections
