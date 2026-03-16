@@ -870,6 +870,76 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
                           </div>
                         </>
                       )}
+                      {key === 'every_action' && (
+                        <>
+                          {/* Info Box */}
+                          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-4">
+                            <div className="flex items-start gap-3">
+                              <Info className="h-5 w-5 text-green-400 mt-0.5 shrink-0" />
+                              <div className="text-[13px] text-[hsl(var(--portal-text-secondary))]">
+                                <p className="font-medium text-[hsl(var(--portal-text-primary))] mb-2">
+                                  Poll-based sync (every 30 minutes)
+                                </p>
+                                <p className="text-[12px]">
+                                  EveryAction uses Changed Entity Export Jobs to pull donation data on a schedule. No webhooks required.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">Application Name</Label>
+                            <Input
+                              placeholder="Enter EveryAction application name"
+                              value={formState.every_action.application_name}
+                              onChange={(e) => updateFormState('every_action', { application_name: e.target.value })}
+                              className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-[13px] text-[hsl(var(--portal-text-secondary))]">API Key</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                type={formState.every_action.showKey ? 'text' : 'password'}
+                                placeholder="Enter EveryAction API key"
+                                value={formState.every_action.api_key}
+                                onChange={(e) => updateFormState('every_action', { api_key: e.target.value })}
+                                className="h-11 bg-[hsl(var(--portal-bg-tertiary))] border-[hsl(var(--portal-border))]"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => updateFormState('every_action', { showKey: !formState.every_action.showKey })}
+                                className="h-11 w-11"
+                              >
+                                {formState.every_action.showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 pt-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => testConnection('every_action')}
+                              disabled={testingIntegration === 'every_action'}
+                              className="h-10"
+                            >
+                              {testingIntegration === 'every_action' ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <TestTube className="h-4 w-4 mr-2" />
+                              )}
+                              Test Connection
+                            </Button>
+                            <Button
+                              onClick={() => saveIntegration('every_action')}
+                              disabled={!integrations.every_action?.is_tested || integrations.every_action?.last_test_status !== 'success'}
+                              className="h-10"
+                            >
+                              Save & Enable
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
