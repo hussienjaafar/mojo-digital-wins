@@ -1,6 +1,6 @@
 // Shared types for integration management
 
-export type IntegrationPlatform = 'meta_ads' | 'switchboard' | 'actblue' | 'google_ads';
+export type IntegrationPlatform = 'meta_ads' | 'switchboard' | 'actblue' | 'google_ads' | 'every_action';
 
 export type IntegrationHealthStatus = 
   | 'healthy' 
