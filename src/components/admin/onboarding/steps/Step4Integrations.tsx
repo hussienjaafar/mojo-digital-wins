@@ -443,6 +443,7 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
       case 'blue': return 'bg-blue-500/10 text-blue-600';
       case 'purple': return 'bg-purple-500/10 text-purple-600';
       case 'red': return 'bg-red-500/10 text-red-600';
+      case 'green': return 'bg-green-500/10 text-green-600';
       default: return 'bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-muted))]';
     }
   };
