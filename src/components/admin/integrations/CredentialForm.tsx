@@ -44,10 +44,10 @@ export type CredentialFormData = {
 };
 
 interface CredentialFormProps {
-  platform: 'meta' | 'switchboard' | 'actblue' | 'google_ads';
+  platform: 'meta' | 'switchboard' | 'actblue' | 'google_ads' | 'every_action';
   formData: CredentialFormData;
   onFormDataChange: (data: CredentialFormData) => void;
-  onPlatformChange: (platform: 'meta' | 'switchboard' | 'actblue' | 'google_ads') => void;
+  onPlatformChange: (platform: 'meta' | 'switchboard' | 'actblue' | 'google_ads' | 'every_action') => void;
   organizationId?: string;
   disabled?: boolean;
   isEditing?: boolean; // True when editing existing credentials
