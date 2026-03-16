@@ -428,6 +428,13 @@ export function Step4Integrations({ organizationId, stepData, onComplete, onBack
       description: 'Donation and transaction data',
       color: 'red',
       letter: 'A'
+    },
+    {
+      key: 'every_action' as const,
+      name: 'EveryAction',
+      description: 'Donation & CRM data via EveryAction/VAN',
+      color: 'green',
+      letter: 'E'
     }
   ];
 
