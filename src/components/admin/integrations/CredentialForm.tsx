@@ -35,6 +35,10 @@ export type CredentialFormData = {
     refresh_token: string;
     customer_id: string;
   };
+  every_action?: {
+    application_name: string;
+    api_key: string;
+  };
   // Track which sections are being updated for partial saves
   _actblue_section?: ActBlueCredentialSection;
 };
