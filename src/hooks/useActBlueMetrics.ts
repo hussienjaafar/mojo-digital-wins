@@ -141,6 +141,7 @@ interface RPCDaily {
 interface RPCChannel {
   channel: string;
   revenue: number;
+  net_revenue?: number;
   count: number;
   donors?: number;
 }
