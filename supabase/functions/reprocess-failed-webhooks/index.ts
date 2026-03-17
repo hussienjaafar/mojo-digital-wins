@@ -51,14 +51,15 @@ serve(async (req) => {
       organization_id,
       limit = 100,
       dry_run = false,
-      error_filter = 'Authentication failed'
+      error_filter = 'Authentication failed',
+      recover_null_org = false,
     } = body;
 
-    console.log(`[REPROCESS] Starting for org=${organization_id}, limit=${limit}, dry_run=${dry_run}`);
+    console.log(`[REPROCESS] Starting for org=${organization_id}, limit=${limit}, dry_run=${dry_run}, recover_null_org=${recover_null_org}`);
 
-    if (!organization_id) {
+    if (!organization_id && !recover_null_org) {
       return new Response(
-        JSON.stringify({ error: 'organization_id is required' }),
+        JSON.stringify({ error: 'organization_id is required (or set recover_null_org=true)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -67,12 +68,17 @@ serve(async (req) => {
     let query = supabase
       .from('webhook_logs')
       .select('*')
-      .eq('organization_id', organization_id)
       .eq('platform', 'actblue')
       .eq('processing_status', 'failed')
       .is('reprocessed_at', null)
       .order('received_at', { ascending: true })
       .limit(limit);
+
+    if (recover_null_org) {
+      query = query.is('organization_id', null);
+    } else {
+      query = query.eq('organization_id', organization_id);
+    }
 
     if (error_filter) {
       query = query.ilike('error_message', `%${error_filter}%`);
@@ -118,6 +124,20 @@ serve(async (req) => {
     let failed = 0;
     const errors: string[] = [];
 
+    // Pre-fetch credentials for org resolution when recover_null_org is true
+    let credData: any[] | null = null;
+    if (recover_null_org) {
+      const { data, error: credError } = await supabase
+        .from('client_api_credentials')
+        .select('organization_id, encrypted_credentials')
+        .eq('platform', 'actblue')
+        .eq('is_active', true);
+      if (credError || !data) {
+        throw new Error('Failed to fetch ActBlue credentials for org resolution');
+      }
+      credData = data;
+    }
+
     for (const webhook of failedWebhooks) {
       try {
         processed++;
@@ -133,6 +153,31 @@ serve(async (req) => {
         const lineitems = contribution.lineitems || [];
         const donor = contribution.donor || {};
         const refcodes = contribution.refcodes || {};
+
+        // Resolve organization_id: use provided one, or resolve from entity_id
+        let resolvedOrgId = organization_id;
+        if (recover_null_org && !resolvedOrgId && lineitems.length > 0) {
+          const entityId = safeString(lineitems[0].entityId);
+          if (entityId && credData) {
+            const match = credData.find((c: any) => c.encrypted_credentials?.entity_id === entityId);
+            if (match) {
+              resolvedOrgId = match.organization_id;
+              console.log(`[REPROCESS] Resolved org ${resolvedOrgId} from entityId ${entityId}`);
+            } else {
+              console.log(`[REPROCESS] No org found for entityId ${entityId}, skipping webhook ${webhook.id}`);
+              failed++;
+              errors.push(`No org for entityId ${entityId}`);
+              continue;
+            }
+          }
+        }
+
+        if (!resolvedOrgId) {
+          console.log(`[REPROCESS] No organization_id resolved for webhook ${webhook.id}, skipping`);
+          failed++;
+          errors.push(`No org_id for webhook ${webhook.id}`);
+          continue;
+        }
         
         // Get paidAt timestamp - normalize to UTC
         let paidAt = safeString(contribution.paidAt);
@@ -184,8 +229,8 @@ serve(async (req) => {
             recurringState = cancelledAt ? 'cancelled' : 'active';
           }
 
-          const transactionRecord = {
-            organization_id,
+           const transactionRecord = {
+            organization_id: resolvedOrgId,
             transaction_id: String(lineitemId),
             donor_email: safeString(donor.email),
             donor_name: donorName,
