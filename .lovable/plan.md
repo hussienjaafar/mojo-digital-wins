@@ -1,44 +1,44 @@
 
 
-# Add "Download Full Results" Button to Poll Detail Pages
+# MPAC Attributed ROI/Revenue: Root Cause Found
 
-## Overview
+## The Problem
 
-Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
+MPAC's 5 most recent donations (March 16-17) show $0 attributed revenue and 0.0x ROI despite ALL 5 having `refcode: MSLAD7` and `contributionForm: mpac-meta` in their webhook payloads.
 
-## Changes
+## Root Cause
 
-### 1. Copy uploaded files to `public/downloads/`
-- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
-- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
+When the ActBlue webhook system went down, 345 webhooks across multiple orgs were logged with `organization_id = NULL` and `processing_status = failed` — including 5 for MPAC. The "backfill" that recovered these donations inserted them into `actblue_transactions` **without using the webhook payloads**, so all attribution fields (`refcode`, `contribution_form`, `order_number`, `payment_method`) are NULL.
 
-Using `public/` so they're served as static files at known URLs.
+The proof:
 
-### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
-Add an optional `downloadUrl?: string` field to the `PollData` interface.
+| Source | refcode | contribution_form |
+|--------|---------|-------------------|
+| `webhook_logs` payload | `MSLAD7` | `mpac-meta` |
+| `actblue_transactions` (what dashboard reads) | `NULL` | `NULL` |
 
-### 3. Set download URLs in poll data files
-- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
-- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
+Because `refcode` is NULL, the RPC classifies all 5 as `channel: other`, yielding $0 meta-attributed revenue and 0.0x ROI.
 
-### 4. Add download button to `src/pages/PollDetail.tsx`
-Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
+## Scope: Systemic, Not Just MPAC
 
-```text
-[← All Polls]
-[Date | Sample | MOE]
-VA-6 Congressional District Poll.
-Sponsored by Unity & Justice Fund
+345 webhooks with `organization_id = NULL` exist since March 16, spanning at least 6 entity IDs (309 for one org, 11 for another, etc.). **All** of these have attribution data in their payloads but were backfilled without it.
 
-[⬇ Download Full Results]     ← new button here
-```
+## The Fix
 
-| File | Change |
-|------|--------|
-| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
-| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
-| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
-| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
-| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
-| `src/pages/PollDetail.tsx` | Add download button in header section |
+### Step 1: Reprocess the 345 NULL-org webhooks using the already-fixed reprocessor
+
+The `reprocess-failed-webhooks` function (which we already fixed to correctly read `payload.contribution`) supports `recover_null_org: true`. This will:
+- Resolve each webhook's org from `entityId` → `client_api_credentials`
+- Extract `refcode`, `contribution_form`, `order_number` from `payload.contribution`
+- Upsert into `actblue_transactions`, overwriting the NULL fields
+
+No code changes needed — just invoke the reprocessor with `recover_null_org: true` and `error_filter: ''` (empty to match all).
+
+### Step 2: Verify the fix
+
+After reprocessing, query the RPC again for MPAC to confirm meta channel revenue appears and ROI calculates correctly.
+
+## Files to Change
+
+None — this is a data recovery operation using the already-fixed reprocessor edge function.
 
