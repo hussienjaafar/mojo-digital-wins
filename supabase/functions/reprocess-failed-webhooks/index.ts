@@ -149,9 +149,9 @@ serve(async (req) => {
           continue;
         }
 
-        const contribution = payload;
-        const lineitems = contribution.lineitems || [];
-        const donor = contribution.donor || {};
+        const contribution = payload.contribution || payload;
+        const lineitems = payload.lineitems || contribution.lineitems || [];
+        const donor = payload.donor || {};
         const refcodes = contribution.refcodes || {};
 
         // Resolve organization_id: use provided one, or resolve from entity_id
