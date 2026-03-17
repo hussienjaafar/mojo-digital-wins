@@ -51,14 +51,15 @@ serve(async (req) => {
       organization_id,
       limit = 100,
       dry_run = false,
-      error_filter = 'Authentication failed'
+      error_filter = 'Authentication failed',
+      recover_null_org = false,
     } = body;
 
-    console.log(`[REPROCESS] Starting for org=${organization_id}, limit=${limit}, dry_run=${dry_run}`);
+    console.log(`[REPROCESS] Starting for org=${organization_id}, limit=${limit}, dry_run=${dry_run}, recover_null_org=${recover_null_org}`);
 
-    if (!organization_id) {
+    if (!organization_id && !recover_null_org) {
       return new Response(
-        JSON.stringify({ error: 'organization_id is required' }),
+        JSON.stringify({ error: 'organization_id is required (or set recover_null_org=true)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -67,12 +68,17 @@ serve(async (req) => {
     let query = supabase
       .from('webhook_logs')
       .select('*')
-      .eq('organization_id', organization_id)
       .eq('platform', 'actblue')
       .eq('processing_status', 'failed')
       .is('reprocessed_at', null)
       .order('received_at', { ascending: true })
       .limit(limit);
+
+    if (recover_null_org) {
+      query = query.is('organization_id', null);
+    } else {
+      query = query.eq('organization_id', organization_id);
+    }
 
     if (error_filter) {
       query = query.ilike('error_message', `%${error_filter}%`);
