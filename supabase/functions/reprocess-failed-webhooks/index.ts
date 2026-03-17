@@ -124,6 +124,20 @@ serve(async (req) => {
     let failed = 0;
     const errors: string[] = [];
 
+    // Pre-fetch credentials for org resolution when recover_null_org is true
+    let credData: any[] | null = null;
+    if (recover_null_org) {
+      const { data, error: credError } = await supabase
+        .from('client_api_credentials')
+        .select('organization_id, encrypted_credentials')
+        .eq('platform', 'actblue')
+        .eq('is_active', true);
+      if (credError || !data) {
+        throw new Error('Failed to fetch ActBlue credentials for org resolution');
+      }
+      credData = data;
+    }
+
     for (const webhook of failedWebhooks) {
       try {
         processed++;
@@ -139,6 +153,31 @@ serve(async (req) => {
         const lineitems = contribution.lineitems || [];
         const donor = contribution.donor || {};
         const refcodes = contribution.refcodes || {};
+
+        // Resolve organization_id: use provided one, or resolve from entity_id
+        let resolvedOrgId = organization_id;
+        if (recover_null_org && !resolvedOrgId && lineitems.length > 0) {
+          const entityId = safeString(lineitems[0].entityId);
+          if (entityId && credData) {
+            const match = credData.find((c: any) => c.encrypted_credentials?.entity_id === entityId);
+            if (match) {
+              resolvedOrgId = match.organization_id;
+              console.log(`[REPROCESS] Resolved org ${resolvedOrgId} from entityId ${entityId}`);
+            } else {
+              console.log(`[REPROCESS] No org found for entityId ${entityId}, skipping webhook ${webhook.id}`);
+              failed++;
+              errors.push(`No org for entityId ${entityId}`);
+              continue;
+            }
+          }
+        }
+
+        if (!resolvedOrgId) {
+          console.log(`[REPROCESS] No organization_id resolved for webhook ${webhook.id}, skipping`);
+          failed++;
+          errors.push(`No org_id for webhook ${webhook.id}`);
+          continue;
+        }
         
         // Get paidAt timestamp - normalize to UTC
         let paidAt = safeString(contribution.paidAt);
