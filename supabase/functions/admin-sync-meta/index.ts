@@ -140,8 +140,27 @@ serve(async (req) => {
       );
     }
 
-    const credentials = credData.encrypted_credentials as { access_token: string; ad_account_id: string };
-    let { access_token, ad_account_id } = credentials;
+    const credentials = credData.encrypted_credentials as { access_token?: string; ad_account_id?: string };
+    const access_token = credentials?.access_token;
+    let ad_account_id = credentials?.ad_account_id;
+
+    if (!access_token || !ad_account_id) {
+      console.error('[META SYNC] Invalid credentials: missing access_token or ad_account_id for org', organization_id);
+      // Update sync status so tiered-meta-sync knows this org failed gracefully
+      await supabase
+        .from('client_api_credentials')
+        .update({ 
+          last_sync_at: new Date().toISOString(), 
+          last_sync_status: 'failed',
+          last_sync_error: 'Meta credentials incomplete - missing access_token or ad_account_id'
+        })
+        .eq('organization_id', organization_id)
+        .eq('platform', 'meta');
+      return new Response(
+        JSON.stringify({ error: 'Meta credentials incomplete - missing access_token or ad_account_id' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (!ad_account_id.startsWith('act_')) {
       ad_account_id = `act_${ad_account_id}`;
