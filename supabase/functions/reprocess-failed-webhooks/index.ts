@@ -229,8 +229,8 @@ serve(async (req) => {
             recurringState = cancelledAt ? 'cancelled' : 'active';
           }
 
-          const transactionRecord = {
-            organization_id,
+           const transactionRecord = {
+            organization_id: resolvedOrgId,
             transaction_id: String(lineitemId),
             donor_email: safeString(donor.email),
             donor_name: donorName,
