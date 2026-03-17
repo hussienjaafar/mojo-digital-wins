@@ -1,44 +1,74 @@
 
 
-# Add "Download Full Results" Button to Poll Detail Pages
+# Fix: Reprocessed Donations Missing Attribution Data
 
-## Overview
+## Root Cause
 
-Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
-
-## Changes
-
-### 1. Copy uploaded files to `public/downloads/`
-- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
-- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
-
-Using `public/` so they're served as static files at known URLs.
-
-### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
-Add an optional `downloadUrl?: string` field to the `PollData` interface.
-
-### 3. Set download URLs in poll data files
-- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
-- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
-
-### 4. Add download button to `src/pages/PollDetail.tsx`
-Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
+The `reprocess-failed-webhooks` function has a payload parsing bug. The ActBlue webhook payload structure is:
 
 ```text
-[← All Polls]
-[Date | Sample | MOE]
-VA-6 Congressional District Poll.
-Sponsored by Unity & Justice Fund
-
-[⬇ Download Full Results]     ← new button here
+payload
+├── donor: { email, firstname, ... }
+├── lineitems: [...]
+└── contribution: { refcode, refcodes: {}, contributionForm, ... }
 ```
+
+The main `actblue-webhook` correctly reads `parsedPayload.contribution` (line 309). But the reprocessor at line 152 does:
+
+```ts
+const contribution = payload;        // BUG: should be payload.contribution
+const refcodes = contribution.refcodes || {};  // reads payload.refcodes → undefined
+```
+
+This means `refcode`, `refcode2`, `contributionForm`, `recurringPeriod`, `orderNumber`, `paymentMethod`, and all other contribution-level fields are NULL for all 344 reprocessed transactions.
+
+## Impact
+
+- **307 of 344** reprocessed donations had refcodes in their payloads — all lost
+- **344 of 344** had `contributionForm` — all lost
+- This kills channel attribution for the last ~24 hours across all affected orgs
+
+## The Fix (2 parts)
+
+### Part 1: Fix the reprocessor code
+
+In `supabase/functions/reprocess-failed-webhooks/index.ts`, change line 152 from:
+
+```ts
+const contribution = payload;
+```
+
+to:
+
+```ts
+const contribution = payload.contribution || payload;
+```
+
+This reads from the correct nested object while remaining backward-compatible with any payloads that might have been stored in a flat format.
+
+Also fix the `donor` extraction (line 154) — currently `contribution.donor` reads `payload.donor` by accident (works because `payload.donor` exists at top level), but should be explicit:
+
+```ts
+const donor = payload.donor || {};
+const refcodes = contribution.refcodes || {};
+```
+
+### Part 2: Re-run the reprocessor to update the 344 transactions
+
+After deploying the fix, re-invoke the reprocessor. Since the transactions already exist (upsert with `ignoreDuplicates: false`), the reprocessor will UPDATE them with the correct attribution fields.
+
+But first, we need to reset those webhook logs back to `reprocessed` → allow re-reprocessing. The current code skips webhooks where `reprocessed_at IS NOT NULL` (line 73). We have two options:
+
+- **Option A**: Temporarily NULL out `reprocessed_at` on the 344 webhooks, re-run the reprocessor, then it will re-upsert with correct data.
+- **Option B**: Add a `force_reprocess` parameter to the function that skips the `reprocessed_at IS NULL` filter.
+
+I recommend **Option A** (simpler, one-time fix) combined with the code fix.
+
+## Files to Change
 
 | File | Change |
 |------|--------|
-| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
-| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
-| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
-| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
-| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
-| `src/pages/PollDetail.tsx` | Add download button in header section |
+| `supabase/functions/reprocess-failed-webhooks/index.ts` | Fix `contribution` to read from `payload.contribution` |
+| Database (data update) | NULL out `reprocessed_at` on the 344 webhooks so they can be reprocessed |
+| Deploy + invoke | Re-run reprocessor for each affected org to restore attribution |
 
