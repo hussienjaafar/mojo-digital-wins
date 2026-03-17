@@ -141,6 +141,7 @@ interface RPCDaily {
 interface RPCChannel {
   channel: string;
   revenue: number;
+  net_revenue?: number;
   count: number;
   donors?: number;
 }
@@ -193,7 +194,7 @@ function transformRPCResponse(
     channel: c.channel as AttributionChannel,
     donations: c.count || 0,
     raised: c.revenue || 0,
-    net: c.revenue || 0, // Approximate - fees not broken down by channel
+    net: c.net_revenue || c.revenue || 0,
     donors: c.donors || 0,
   }));
 

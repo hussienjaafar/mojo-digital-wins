@@ -1,59 +1,44 @@
 
 
-# Investigation: Attributed ROI and Revenue Calculations
+# Add "Download Full Results" Button to Poll Detail Pages
 
-## Summary
+## Overview
 
-MPAC's attribution pipeline is actually **working correctly** — the RPC returns $3,384 meta-attributed revenue against $3,321 meta spend for March (ROI ≈ 1.0x). The issue is **systemic across other orgs** and has **two distinct root causes** plus a minor data accuracy bug.
+Copy the uploaded documents (DOCX for VA-6, PPTX for IL-09) into the `public/` directory and add a `downloadUrl` field to the poll data model. Then add a prominent "Download Full Results" button at the top of the poll detail page, right below the header metadata.
 
-## Root Cause 1 (CRITICAL): `admin-sync-meta` crashes on null credentials
+## Changes
 
-As identified in the prior investigation, the function crashes at line 146 (`ad_account_id.startsWith('act_')`) when credentials are missing. This blocks:
+### 1. Copy uploaded files to `public/downloads/`
+- `user-uploads://VA-6_Memo-2.docx` → `public/downloads/VA-6_Memo-2.docx`
+- `user-uploads://IL09_Poll_Presentation-2.pptx` → `public/downloads/IL09_Poll_Presentation-2.pptx`
 
-| Org | Donations | Impact |
-|-----|-----------|--------|
-| Abdul For Senate | 100,916 | Zero meta campaigns, zero spend — ROI always 0 |
-| Ali for Passaic County | 127 | Same |
-| Hamawy For New Jersey | 1,144 | Same |
+Using `public/` so they're served as static files at known URLs.
 
-**Fix**: Add null-safe credential validation in `admin-sync-meta/index.ts` (the plan you already approved but hasn't been implemented yet).
+### 2. Add `downloadUrl` to `PollData` type (`src/data/polls/index.ts`)
+Add an optional `downloadUrl?: string` field to the `PollData` interface.
 
-## Root Cause 2: Case-sensitive refcode JOIN loses attribution
+### 3. Set download URLs in poll data files
+- `src/data/polls/va6-2026.ts`: Add `downloadUrl: "/downloads/VA-6_Memo-2.docx"`
+- `src/data/polls/il9-2026.ts`: Add `downloadUrl: "/downloads/IL09_Poll_Presentation-2.pptx"`
 
-The `get_actblue_dashboard_metrics` RPC joins `actblue_transactions.refcode` to `refcode_mappings.refcode` with an **exact, case-sensitive match** (line 21: `AND t.refcode = rm.refcode`).
+### 4. Add download button to `src/pages/PollDetail.tsx`
+Insert a "Download Full Results" button inside the header section, after the sponsor line (~line 301). It will be an `<a>` tag styled as a button with `download` attribute, using the `Download` icon from lucide-react. Only rendered when `poll.downloadUrl` exists.
 
-For MPAC specifically:
-- `BLKadl` (20 donations, $843) → mapping exists only as `blkadl` → **not matched**
-- `HTapk` (13 donations, $330) → mapping exists only as `htapk` → **not matched**  
-- `HTinfstrctr` (26 donations, $650) → no mapping at all
+```text
+[← All Polls]
+[Date | Sample | MOE]
+VA-6 Congressional District Poll.
+Sponsored by Unity & Justice Fund
 
-This affects all orgs. For MPAC, 33 donations ($1,173) are lost to case mismatch alone.
-
-**Fix**: Change the JOIN in the RPC from `AND t.refcode = rm.refcode` to `AND LOWER(t.refcode) = LOWER(rm.refcode)`.
-
-## Root Cause 3: `net_revenue` field not read from RPC response
-
-The RPC returns both `revenue` (gross) and `net_revenue` (net after fees) per channel, but the frontend `RPCChannel` TypeScript interface omits `net_revenue`. Line 196 of `useActBlueMetrics.ts` sets:
-```ts
-net: c.revenue || 0, // Approximate - fees not broken down by channel
+[⬇ Download Full Results]     ← new button here
 ```
-
-This means the ROI breakdown shows gross revenue as "net" — a ~4% overstatement for most orgs. Not a zero-value bug, but inaccurate.
-
-**Fix**: Add `net_revenue` to the `RPCChannel` interface and use it.
-
-## Files to Change
 
 | File | Change |
 |------|--------|
-| `supabase/functions/admin-sync-meta/index.ts` | Add null-safe credential validation before `.startsWith()` call |
-| New migration SQL | Alter `get_actblue_dashboard_metrics` to use `LOWER()` on the refcode JOIN |
-| `src/hooks/useActBlueMetrics.ts` | Add `net_revenue` to `RPCChannel` interface; use `c.net_revenue` for `net` field |
-| Database: `client_api_credentials` | Deactivate dummy Meta credentials for 4 test orgs |
-
-## Priority Order
-
-1. **admin-sync-meta crash fix** — unblocks 3 orgs including the largest (Abdul, 100K donations)
-2. **Case-insensitive refcode JOIN** — recovers misattributed revenue across all orgs
-3. **net_revenue field fix** — corrects minor accuracy issue in ROI display
+| `public/downloads/VA-6_Memo-2.docx` | New file (copied from upload) |
+| `public/downloads/IL09_Poll_Presentation-2.pptx` | New file (copied from upload) |
+| `src/data/polls/index.ts` | Add `downloadUrl?` to `PollData` interface |
+| `src/data/polls/va6-2026.ts` | Add `downloadUrl` field |
+| `src/data/polls/il9-2026.ts` | Add `downloadUrl` field |
+| `src/pages/PollDetail.tsx` | Add download button in header section |
 
