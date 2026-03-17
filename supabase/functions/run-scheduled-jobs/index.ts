@@ -606,6 +606,7 @@ serve(async (req) => {
             itemsCreated = result?.results?.reduce((sum: number, r: any) => sum + (r.transactions_inserted || 0), 0) || 0;
             break;
 
+          case 'sync_meta_ads':
             console.log('[SCHEDULER] Running tiered Meta Ads sync');
             // CRITICAL: Pass the cron secret so tiered-meta-sync can authenticate
             const cronSecretForMeta = Deno.env.get('CRON_SECRET');
