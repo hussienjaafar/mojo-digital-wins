@@ -14,13 +14,15 @@ import {
   ChevronRight,
   Sparkles,
   Newspaper,
+  MousePointerClick,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu } from "lucide-react";
+import { useCAPIStatus } from "@/hooks/useCAPIStatus";
 
 interface NavigationSection {
   title: string;
@@ -34,61 +36,22 @@ interface NavigationItem {
   badge?: number;
 }
 
-const navigationSections: NavigationSection[] = [
-  {
-    title: "Overview",
-    items: [
-      { label: "Dashboard", path: "/client/dashboard", icon: Home },
-    ],
-  },
-  {
-    title: "Intelligence Hub",
-    items: [
-      { label: "News & Trends", path: "/client/news-trends", icon: Newspaper },
-      { label: "Entity Watchlist", path: "/client/watchlist", icon: Eye },
-      { label: "Polling Intelligence", path: "/client/polling", icon: BarChart3 },
-      { label: "Polling Alerts", path: "/client/polling-alerts", icon: Bell },
-    ],
-  },
-  {
-    title: "Alerts & Actions",
-    items: [
-      { label: "Critical Alerts", path: "/client/alerts", icon: Bell },
-      { label: "Suggested Actions", path: "/client/actions", icon: Target },
-      { label: "Opportunities", path: "/client/opportunities", icon: DollarSign },
-    ],
-  },
-  {
-    title: "Performance",
-    items: [
-      { label: "Creative Intelligence", path: "/client/creative-intelligence", icon: Sparkles },
-      { label: "Demographics", path: "/client/demographics", icon: UserCircle },
-      { label: "Donor Journey", path: "/client/journey", icon: TrendingUp },
-      { label: "A/B Tests", path: "/client/ab-tests", icon: Target },
-      { label: "Recurring Health", path: "/client/recurring-health", icon: DollarSign },
-    ],
-  },
-  {
-    title: "Settings",
-    items: [
-      { label: "Profile", path: "/client/profile", icon: Settings },
-    ],
-  },
-];
-
 interface ClientNavigationProps {
+  organizationId?: string;
   alertCount?: number;
   actionCount?: number;
   opportunityCount?: number;
 }
 
 export const ClientNavigation = ({ 
+  organizationId,
   alertCount = 0, 
   actionCount = 0, 
   opportunityCount = 0 
 }: ClientNavigationProps) => {
   const location = useLocation();
   const isMobile = useIsMobile();
+  const { data: capiStatus } = useCAPIStatus(organizationId || null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     "Intelligence Hub": true,
     "Alerts & Actions": true,
@@ -114,6 +77,62 @@ export const ClientNavigation = ({
         return undefined;
     }
   };
+
+  // Build navigation sections dynamically based on CAPI status
+  const navigationSections: NavigationSection[] = useMemo(() => {
+    const performanceItems: NavigationItem[] = [
+      { label: "Creative Intelligence", path: "/client/creative-intelligence", icon: Sparkles },
+      { label: "Demographics", path: "/client/demographics", icon: UserCircle },
+      { label: "Donor Journey", path: "/client/journey", icon: TrendingUp },
+      { label: "A/B Tests", path: "/client/ab-tests", icon: Target },
+      { label: "Recurring Health", path: "/client/recurring-health", icon: DollarSign },
+    ];
+
+    // Add Link Tracking if CAPI is enabled
+    if (capiStatus?.isConfigured && capiStatus?.isEnabled) {
+      performanceItems.push({
+        label: "Link Tracking",
+        path: "/client/link-tracking",
+        icon: MousePointerClick,
+      });
+    }
+
+    return [
+      {
+        title: "Overview",
+        items: [
+          { label: "Dashboard", path: "/client/dashboard", icon: Home },
+        ],
+      },
+      {
+        title: "Intelligence Hub",
+        items: [
+          { label: "News & Trends", path: "/client/news-trends", icon: Newspaper },
+          { label: "Entity Watchlist", path: "/client/watchlist", icon: Eye },
+          { label: "Polling Intelligence", path: "/client/polling", icon: BarChart3 },
+          { label: "Polling Alerts", path: "/client/polling-alerts", icon: Bell },
+        ],
+      },
+      {
+        title: "Alerts & Actions",
+        items: [
+          { label: "Critical Alerts", path: "/client/alerts", icon: Bell },
+          { label: "Suggested Actions", path: "/client/actions", icon: Target },
+          { label: "Opportunities", path: "/client/opportunities", icon: DollarSign },
+        ],
+      },
+      {
+        title: "Performance",
+        items: performanceItems,
+      },
+      {
+        title: "Settings",
+        items: [
+          { label: "Profile", path: "/client/profile", icon: Settings },
+        ],
+      },
+    ];
+  }, [capiStatus]);
 
   const NavigationContent = () => (
     <nav className="space-y-1">

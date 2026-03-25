@@ -308,17 +308,28 @@ export const zIndexVars = {
 
 /**
  * Chart-specific color tokens for consistent data visualization
- * Use chartColors for Recharts/ECharts series colors
+ * 
+ * V3.1 Upgrade: 10-color colorblind-safe categorical palette
+ * Based on Okabe-Ito + Tableau research for maximum visual distinction.
+ * Colors alternate warm/cool for adjacent-slice contrast.
  */
 export const chartColors = {
-  /** Primary series colors - use for pie charts, bar series, line series */
+  /** 
+   * 10-color categorical palette - colorblind safe, maximum adjacent contrast
+   * Order: blue → orange → teal → rose → violet → amber → emerald → fuchsia → cyan → lime
+   * Adjacent colors have maximum hue separation for visibility.
+   */
   series: [
-    colors.accent.blue,      // Primary - blue
-    colors.accent.purple,    // Secondary - purple
-    colors.status.success,   // Tertiary - green
-    colors.status.warning,   // Quaternary - amber
-    colors.status.error,     // Quinary - red
-    colors.status.info,      // Senary - cyan
+    'portal-chart-1',   // Sky Blue (primary)
+    'portal-chart-2',   // Orange (high contrast vs blue)
+    'portal-chart-3',   // Teal
+    'portal-chart-4',   // Rose
+    'portal-chart-5',   // Violet
+    'portal-chart-6',   // Amber
+    'portal-chart-7',   // Emerald
+    'portal-chart-8',   // Fuchsia
+    'portal-chart-9',   // Cyan
+    'portal-chart-10',  // Lime
   ],
   /** Grid line color */
   grid: colors.border.default,

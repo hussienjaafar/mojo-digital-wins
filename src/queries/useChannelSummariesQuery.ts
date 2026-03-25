@@ -9,6 +9,10 @@ import { channelKeys } from "./queryKeys";
 
 export interface MetaSummary {
   spend: number;
+  /** Total spend across ALL campaigns (including awareness) */
+  totalSpend: number;
+  /** Spend on non-fundraising campaigns (awareness, engagement, etc.) */
+  awarenessSpend: number;
   conversions: number;
   roas: number;
   hasConversionValueData: boolean;
@@ -129,34 +133,48 @@ async function fetchMetaSummary(
   startDate: string,
   endDate: string
 ): Promise<MetaSummary> {
-  const { data, error } = await supabase
-    .from("meta_ad_metrics")
-    .select("spend, conversions, conversion_value, date")
-    .eq("organization_id", organizationId)
-    .gte("date", startDate)
-    .lte("date", endDate)
-    .order("date", { ascending: false });
+  // Fetch fundraising-only metrics and total metrics in parallel
+  const [fundraisingResult, totalResult] = await Promise.all([
+    (supabase as any)
+      .from("meta_fundraising_metrics_daily")
+      .select("spend, conversions, conversion_value, date")
+      .eq("organization_id", organizationId)
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .order("date", { ascending: false }),
+    (supabase as any)
+      .from("meta_ad_metrics_daily")
+      .select("spend, date")
+      .eq("organization_id", organizationId)
+      .gte("date", startDate)
+      .lte("date", endDate),
+  ]);
 
-  if (error) {
-    console.error("[useChannelSummariesQuery] Meta fetch error:", error);
-    throw error;
+  if (fundraisingResult.error) {
+    console.error("[useChannelSummariesQuery] Meta fundraising fetch error:", fundraisingResult.error);
+    throw fundraisingResult.error;
   }
 
-  const metrics = data || [];
-  const spend = metrics.reduce((sum, m) => sum + Number(m.spend || 0), 0);
-  const conversions = metrics.reduce((sum, m) => sum + (m.conversions || 0), 0);
-  const conversionValue = metrics.reduce((sum, m) => sum + Number(m.conversion_value || 0), 0);
+  const metrics = fundraisingResult.data || [];
+  const spend = metrics.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0);
+  const conversions = metrics.reduce((sum: number, m: any) => sum + (m.conversions || 0), 0);
+  const conversionValue = metrics.reduce((sum: number, m: any) => sum + Number(m.conversion_value || 0), 0);
   const hasConversionValueData = conversionValue > 0;
   const roas = spend > 0 && conversionValue > 0 ? conversionValue / spend : 0;
   const lastDataDate = metrics[0]?.date || null;
 
+  const totalSpendAll = (totalResult.data || []).reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0);
+  const awarenessSpend = Math.max(0, totalSpendAll - spend);
+
   return {
     spend,
+    totalSpend: totalSpendAll,
+    awarenessSpend,
     conversions,
     roas,
     hasConversionValueData,
     lastDataDate,
-    hasData: metrics.length > 0,
+    hasData: metrics.length > 0 || (totalResult.data || []).length > 0,
   };
 }
 
@@ -165,25 +183,29 @@ async function fetchSmsSummary(
   startDate: string,
   endDate: string
 ): Promise<SmsSummary> {
-  const { data, error } = await supabase
-    .from("sms_campaigns")
-    .select("messages_sent, amount_raised, cost, send_date, status")
-    .eq("organization_id", organizationId)
-    .gte("send_date", startDate)
-    .lte("send_date", `${endDate}T23:59:59`)
-    .neq("status", "draft")
-    .order("send_date", { ascending: false });
+  // Use the get_sms_metrics RPC for accurate attribution-based metrics
+  // This calculates raised/conversions by matching ActBlue transactions to campaigns
+  const { data, error } = await (supabase as any).rpc('get_sms_metrics', {
+    p_organization_id: organizationId,
+    p_start_date: startDate,
+    p_end_date: endDate,
+  });
 
   if (error) {
-    console.error("[useChannelSummariesQuery] SMS fetch error:", error);
+    console.error("[useChannelSummariesQuery] SMS RPC error:", error);
     throw error;
   }
 
-  const campaigns = data || [];
-  const sent = campaigns.reduce((sum, c) => sum + (c.messages_sent || 0), 0);
-  const raised = campaigns.reduce((sum, c) => sum + Number(c.amount_raised || 0), 0);
-  const cost = campaigns.reduce((sum, c) => sum + Number(c.cost || 0), 0);
+  // Extract summary from the RPC response (not "totals")
+  const summary = data?.summary || {};
+  const campaigns = data?.campaigns || [];
+  
+  const sent = summary.totalSent || 0;
+  const raised = summary.totalRaised || 0;
+  const cost = summary.totalCost || 0;
   const roi = cost > 0 ? raised / cost : 0;
+  
+  // Get last data date from most recent campaign
   const lastDataDate = campaigns[0]?.send_date?.split("T")[0] || null;
 
   return {
@@ -191,9 +213,9 @@ async function fetchSmsSummary(
     raised,
     cost,
     roi,
-    campaignCount: campaigns.length,
+    campaignCount: summary.campaignCount || 0,
     lastDataDate,
-    hasData: campaigns.length > 0,
+    hasData: (summary.campaignCount || 0) > 0,
   };
 }
 
@@ -214,14 +236,15 @@ async function fetchDonationsSummary(
     throw error;
   }
 
+  // Map RPC field names (gross_raised, net_raised, transaction_count, etc.)
   const row = data?.[0] || {};
-  const grossDonations = Number(row.total_gross_donations) || 0;
-  const netDonations = Number(row.total_net_donations) || 0;
-  const donationCount = Number(row.total_donation_count) || 0;
-  const refundCount = Number(row.total_refund_count) || 0;
-  const refundAmount = Number(row.total_refunds) || 0;
-  const uniqueDonors = Number(row.total_unique_donors) || 0;
-  const avgDonation = Number(row.overall_avg_donation) || 0;
+  const grossDonations = Number(row.gross_raised) || 0;
+  const netDonations = Number(row.net_raised) || 0;
+  const donationCount = Number(row.transaction_count) || 0;
+  const refundCount = Number(row.refund_count) || 0;
+  const refundAmount = Number(row.refund_amount) || 0;
+  const uniqueDonors = Number(row.unique_donors) || 0;
+  const avgDonation = Number(row.avg_donation) || 0;
 
   // For lastDataDate, we need a separate lightweight query
   const { data: latestTxn } = await supabase
@@ -330,53 +353,4 @@ export function useChannelSummariesQuery(
   };
 }
 
-// ============================================================================
-// Legacy Compatibility Hook
-// ============================================================================
-
-/**
- * Legacy-compatible hook that matches the old useChannelSummaries interface.
- * Use useChannelSummariesQuery for new code.
- */
-export function useChannelSummariesLegacy(
-  organizationId: string,
-  startDate: string,
-  endDate: string
-) {
-  const { data, isLoading, error } = useChannelSummariesQuery(
-    organizationId,
-    startDate,
-    endDate
-  );
-
-  // Return structure matching old useChannelSummaries hook
-  return {
-    meta: {
-      spend: data?.meta.spend ?? 0,
-      conversions: data?.meta.conversions ?? 0,
-      roas: data?.meta.roas ?? 0,
-      hasConversionValueData: data?.meta.hasConversionValueData ?? false,
-      isLoading,
-      lastDataDate: data?.meta.lastDataDate ?? null,
-    },
-    sms: {
-      sent: data?.sms.sent ?? 0,
-      raised: data?.sms.raised ?? 0,
-      roi: data?.sms.roi ?? 0,
-      isLoading,
-      lastDataDate: data?.sms.lastDataDate ?? null,
-      campaignCount: data?.sms.campaignCount ?? 0,
-    },
-    donations: {
-      totalGross: data?.donations.totalGross ?? 0,
-      totalNet: data?.donations.totalNet ?? 0,
-      refundAmount: data?.donations.refundAmount ?? 0,
-      refundCount: data?.donations.refundCount ?? 0,
-      donors: data?.donations.donors ?? 0,
-      avgNet: data?.donations.avgNet ?? 0,
-      isLoading,
-      lastDataDate: data?.donations.lastDataDate ?? null,
-    },
-    error,
-  };
-}
+// useChannelSummariesLegacy REMOVED - was unused (verified via audit grep)

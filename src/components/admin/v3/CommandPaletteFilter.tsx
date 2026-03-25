@@ -126,6 +126,10 @@ export function CommandPaletteFilter({
       highConfidenceOnly: false,
       geography: 'all',
       topics: [],
+      policyDomains: [],
+      showNewOpportunities: false,
+      showProvenTopics: false,
+      minRelevance: 0,
     });
   };
 

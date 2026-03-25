@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -59,6 +59,7 @@ interface Step2OrgProfileProps {
   initialData?: Partial<OrgProfileData>;
   onComplete: (data: OrgProfileData) => void;
   onBack: () => void;
+  onDataChange?: (data: Record<string, unknown>) => void;
 }
 
 export function Step2OrgProfile({ 
@@ -66,7 +67,8 @@ export function Step2OrgProfile({
   websiteUrl,
   initialData, 
   onComplete, 
-  onBack 
+  onBack,
+  onDataChange
 }: Step2OrgProfileProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,6 +107,11 @@ export function Step2OrgProfile({
       geo_locations: [], // Reset locations when changing level
     }));
   };
+
+  // Report data changes to parent for persistence on back navigation
+  useEffect(() => {
+    onDataChange?.(formData as unknown as Record<string, unknown>);
+  }, [formData, onDataChange]);
 
   // Auto-scrape website on mount if URL provided
   useEffect(() => {

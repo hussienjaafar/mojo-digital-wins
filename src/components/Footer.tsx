@@ -115,6 +115,14 @@ const Footer = () => {
                   Contact
                 </Link>
               </li>
+              <li>
+                <Link
+                  to="/polls"
+                  className="text-primary-foreground/90 hover:text-accent transition-colors"
+                >
+                  Polling
+                </Link>
+              </li>
             </ul>
           </div>
 

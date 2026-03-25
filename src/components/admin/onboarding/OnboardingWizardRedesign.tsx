@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,9 @@ export function OnboardingWizardRedesign() {
   const [organizationSlug, setOrganizationSlug] = useState<string>('');
   const [websiteUrl, setWebsiteUrl] = useState<string>('');
   
+  // Track current step's unsaved data for persistence on back navigation
+  const [currentStepData, setCurrentStepData] = useState<Record<string, unknown>>({});
+  
   const {
     currentStep,
     completedSteps,
@@ -44,11 +47,17 @@ export function OnboardingWizardRedesign() {
     isLoading,
     goToStep,
     completeStep,
+    updateStepData,
     initializeOnboarding,
     loadOnboardingState,
     canNavigateToStep,
     getProgressPercentage,
   } = useOnboardingWizard({ organizationId: organizationId || undefined });
+
+  // Handler for steps to report their data changes
+  const handleStepDataChange = useCallback((data: Record<string, unknown>) => {
+    setCurrentStepData(data);
+  }, []);
 
   // Load organization info when we have an ID
   useEffect(() => {
@@ -83,9 +92,20 @@ export function OnboardingWizardRedesign() {
     await completeStep(step, data);
   };
 
-  const handleBack = () => {
+  // Enhanced back handler that saves data before navigating
+  const handleBack = async () => {
     if (currentStep > 1) {
+      // Save current step's data before navigating
+      if (Object.keys(currentStepData).length > 0) {
+        try {
+          await updateStepData(currentStep, currentStepData);
+        } catch (err) {
+          console.warn('Failed to save step data before navigation:', err);
+          // Continue with navigation anyway
+        }
+      }
       goToStep((currentStep - 1) as WizardStep);
+      setCurrentStepData({}); // Reset for new step
     }
   };
 
@@ -227,7 +247,8 @@ export function OnboardingWizardRedesign() {
                       websiteUrl={websiteUrl}
                       initialData={stepData.step2 as Partial<OrgProfileData>}
                       onComplete={handleStep2Complete} 
-                      onBack={handleBack} 
+                      onBack={handleBack}
+                      onDataChange={handleStepDataChange}
                     />
                   )}
                   {currentStep === 3 && organizationId && (
@@ -235,7 +256,8 @@ export function OnboardingWizardRedesign() {
                       organizationId={organizationId} 
                       stepData={stepData.step3 as Record<string, unknown> || {}} 
                       onComplete={handleStepComplete} 
-                      onBack={handleBack} 
+                      onBack={handleBack}
+                      onDataChange={handleStepDataChange}
                     />
                   )}
                   {currentStep === 4 && organizationId && (
@@ -243,7 +265,8 @@ export function OnboardingWizardRedesign() {
                       organizationId={organizationId} 
                       stepData={stepData.step4 as Record<string, unknown> || {}} 
                       onComplete={handleStepComplete} 
-                      onBack={handleBack} 
+                      onBack={handleBack}
+                      onDataChange={handleStepDataChange}
                     />
                   )}
                   {currentStep === 5 && organizationId && (
@@ -251,7 +274,8 @@ export function OnboardingWizardRedesign() {
                       organizationId={organizationId} 
                       stepData={stepData.step5 as Record<string, unknown> || {}} 
                       onComplete={handleStepComplete} 
-                      onBack={handleBack} 
+                      onBack={handleBack}
+                      onDataChange={handleStepDataChange}
                     />
                   )}
                   {currentStep === 6 && organizationId && (

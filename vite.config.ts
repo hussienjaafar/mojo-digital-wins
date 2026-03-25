@@ -10,6 +10,9 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  optimizeDeps: {
+    exclude: ["@ffmpeg/ffmpeg", "@ffmpeg/util"],
+  },
   plugins: [
     react(),
     mode === "development" && componentTagger(),
@@ -18,6 +21,10 @@ export default defineConfig(({ mode }) => ({
       includeAssets: ['favicon.png'],
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Ensure old caches are cleared and new builds activate immediately
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
         // Increase cache size limit to 5MB
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         // Don't precache very large images

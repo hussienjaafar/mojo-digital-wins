@@ -41,12 +41,24 @@ const BillDetail = lazy(() => import("./pages/BillDetail"));
 const MetaOAuthCallback = lazy(() => import("./pages/MetaOAuthCallback"));
 const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation"));
 const Redirect = lazy(() => import("./pages/Redirect"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Login = lazy(() => import("./pages/Login"));
+const Experience = lazy(() => import("./pages/Experience"));
+const GetStarted = lazy(() => import("./pages/GetStarted"));
+const Polls = lazy(() => import("./pages/Polls"));
+const PollDetail = lazy(() => import("./pages/PollDetail"));
 
 // Admin pages (lazy loaded - larger bundle)
 const Admin = lazy(() => import("./pages/Admin"));
 const AdminClientView = lazy(() => import("./pages/AdminClientView"));
 const UserDetail = lazy(() => import("./pages/admin/UserDetail"));
 const DashboardHealth = lazy(() => import("./pages/admin/DashboardHealth"));
+const OrganizationDetail = lazy(() => import("./pages/admin/OrganizationDetail"));
+const ContactSubmissions = lazy(() => import("./pages/admin/ContactSubmissions"));
+const VoterImpactMap = lazy(() => import("./pages/admin/VoterImpactMap"));
+const AdminAdCopyStudio = lazy(() => import("./pages/AdminAdCopyStudio"));
+const FunnelInsights = lazy(() => import("./pages/admin/FunnelInsights"));
 const Profile = lazy(() => import("./pages/Profile"));
 
 // Client portal pages (lazy loaded)
@@ -65,10 +77,12 @@ const ClientSettings = lazy(() => import("./pages/ClientSettings"));
 const ClientMediaIntelligence = lazy(() => import("./pages/ClientIntelligence"));
 const ClientDonorIntelligence = lazy(() => import("./pages/ClientDonorIntelligence"));
 const ClientCreativeIntelligence = lazy(() => import("./pages/ClientCreativeIntelligence"));
+const ClientCreativeIntelligenceV2 = lazy(() => import("./pages/ClientCreativeIntelligenceV2"));
 const ClientABTests = lazy(() => import("./pages/ClientABTests"));
 const ClientRecurringHealth = lazy(() => import("./pages/ClientRecurringHealth"));
 const ClientNewsTrends = lazy(() => import("./pages/ClientNewsTrends"));
 const ClientAdPerformance = lazy(() => import("./pages/ClientAdPerformance"));
+const ClientLinkTracking = lazy(() => import("./pages/ClientLinkTracking"));
 
 const queryClient = new QueryClient();
 
@@ -79,13 +93,85 @@ const PageLoader = () => (
   </div>
 );
 
+// Lightweight skeleton for Experience route — matches dark page aesthetic for seamless transition
+const ExperienceSkeleton = () => (
+  <div className="min-h-screen bg-[#0a0f1a]" />
+);
+
+// Domain-aware router for subdomain architecture
+// Handles redirects between molitico.com (marketing) and portal.molitico.com (app)
+const DomainRouter = () => {
+  const location = useLocation();
+  const hostname = window.location.hostname;
+  
+  const isPortalDomain = hostname === 'portal.molitico.com';
+  const isMarketingDomain = hostname === 'molitico.com' || 
+                            hostname === 'www.molitico.com';
+  
+  // For preview/localhost, allow all routes without redirects
+  const isDevelopment = hostname.includes('preview') || 
+                        hostname.includes('lovable.app') ||
+                        hostname === 'localhost';
+  
+  if (isDevelopment) {
+    return null; // No redirects in development/preview
+  }
+  
+  // Marketing routes (public pages) - note: '/' handled separately on portal
+  const marketingRoutes = ['/about', '/services', '/case-studies', 
+    '/blog', '/contact', '/privacy-policy', '/creative-showcase', '/bills', '/experience', '/get-started', '/polls'];
+  
+  // Portal route prefixes (app pages)
+  const portalPrefixes = ['/client', '/admin', '/accept-invite', 
+    '/reset-password', '/forgot-password', '/login', '/auth', '/profile', '/settings',
+    '/access-denied', '/client-login'];
+  
+  const isMarketingRoute = marketingRoutes.some(route => 
+    location.pathname === route || 
+    location.pathname.startsWith('/case-studies/') ||
+    location.pathname.startsWith('/blog/') ||
+    location.pathname.startsWith('/bills/') ||
+    location.pathname.startsWith('/polls/')
+  );
+  
+  const isPortalRoute = portalPrefixes.some(prefix => 
+    location.pathname.startsWith(prefix)
+  );
+
+  // PORTAL DOMAIN LOGIC - synchronous redirects
+  if (isPortalDomain) {
+    // Root path → redirect to client login immediately
+    if (location.pathname === '/') {
+      return <Navigate to="/client-login" replace />;
+    }
+    
+    // Marketing routes on portal → redirect to marketing domain
+    if (isMarketingRoute) {
+      window.location.replace(`https://molitico.com${location.pathname}`);
+      return null;
+    }
+  }
+  
+  // MARKETING DOMAIN LOGIC
+  if (isMarketingDomain) {
+    // Portal routes on marketing → redirect to portal subdomain
+    if (isPortalRoute) {
+      window.location.replace(`https://portal.molitico.com${location.pathname}${location.search}`);
+      return null;
+    }
+  }
+
+  return null;
+};
+
 const AppContent = () => {
   useSmoothScroll();
   const location = useLocation();
-  const isPublicPage = !location.pathname.startsWith('/admin') && !location.pathname.startsWith('/client');
+  const isPublicPage = !location.pathname.startsWith('/admin') && !location.pathname.startsWith('/client') && location.pathname !== '/experience';
   
   return (
     <>
+      <DomainRouter />
       <ScrollProgressIndicator />
       <ScrollToTop />
       <BackToTop />
@@ -93,9 +179,10 @@ const AppContent = () => {
       <MetaPixel />
       {isPublicPage && <ExitIntentPopup />}
       <PageTransition>
-        <Suspense fallback={<PageLoader />}>
+        <Suspense fallback={location.pathname === "/experience" ? <ExperienceSkeleton /> : <PageLoader />}>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/r/:org/:form" element={<Redirect />} />
             <Route path="/r" element={<Redirect />} />
             <Route path="/about" element={<About />} />
             <Route path="/services" element={<Services />} />
@@ -106,20 +193,33 @@ const AppContent = () => {
             <Route path="/creative-showcase" element={<CreativeShowcase />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/experience" element={<Experience />} />
+            <Route path="/get-started" element={<GetStarted />} />
+            <Route path="/polls" element={<Polls />} />
+            <Route path="/polls/:slug" element={<PollDetail />} />
             <Route path="/bills/:billNumber" element={<BillDetail />} />
             <Route path="/meta-oauth-callback" element={<MetaOAuthCallback />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/install" element={<Install />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/login" element={<Login />} />
             <Route path="/accept-invite" element={<AcceptInvitation />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/users/:userId" element={<UserDetail />} />
+            <Route path="/admin/organizations/:organizationId" element={<OrganizationDetail />} />
+            <Route path="/admin/contacts" element={<ContactSubmissions />} />
             <Route path="/admin/client-view/:organizationId" element={<AdminClientView />} />
             <Route path="/admin/health" element={<DashboardHealth />} />
+            <Route path="/admin/voter-impact-map" element={<VoterImpactMap />} />
+            <Route path="/admin/ad-copy-studio" element={<AdminAdCopyStudio />} />
+            <Route path="/admin/funnel-insights" element={<FunnelInsights />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/client-login" element={<ClientLogin />} />
             <Route path="/client/dashboard" element={<ClientDashboard />} />
             <Route path="/client/portal" element={<Navigate to="/client/dashboard" replace />} />
+            <Route path="/client-portal" element={<Navigate to="/client/dashboard" replace />} />
             {/* Redirect deprecated custom dashboard route */}
             <Route path="/client/dashboard/custom" element={<Navigate to="/client/dashboard" replace />} />
             <Route path="/client/watchlist" element={<ClientWatchlist />} />
@@ -136,11 +236,13 @@ const AppContent = () => {
             <Route path="/client/media-intelligence" element={<ClientMediaIntelligence />} />
             <Route path="/client/donor-intelligence" element={<ClientDonorIntelligence />} />
             <Route path="/client/creative-intelligence" element={<ClientCreativeIntelligence />} />
+            <Route path="/client/creative-intelligence-v2" element={<ClientCreativeIntelligenceV2 />} />
             <Route path="/client/attribution" element={<Navigate to="/client/journey" replace />} />
             <Route path="/client/ab-tests" element={<ClientABTests />} />
             <Route path="/client/recurring-health" element={<ClientRecurringHealth />} />
             <Route path="/client/news-trends" element={<ClientNewsTrends />} />
             <Route path="/client/ad-performance" element={<ClientAdPerformance />} />
+            <Route path="/client/link-tracking" element={<ClientLinkTracking />} />
             <Route path="/access-denied" element={<AccessDenied />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

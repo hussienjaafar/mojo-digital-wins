@@ -290,7 +290,7 @@ export function CreativeCard({ creative }: Props) {
               </div>
               <div className="text-xs text-[hsl(var(--portal-text-muted))] flex items-center justify-center gap-1">
                 <MousePointer className={iconSizes.xs} />
-                CTR
+                Link CTR
               </div>
             </div>
             <div className="text-center">

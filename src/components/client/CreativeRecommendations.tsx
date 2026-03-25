@@ -1,9 +1,18 @@
-import { useState, useEffect, useMemo } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Sparkles, Lightbulb, TrendingUp, Zap, CheckCircle2, Target, MessageSquare } from "lucide-react";
+import { useMemo } from "react";
+import { motion } from "framer-motion";
+import { Sparkles, Lightbulb, TrendingUp, Zap, CheckCircle2, Target, MessageSquare, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  V3Card,
+  V3CardContent,
+  V3CardHeader,
+  V3CardTitle,
+  V3CardDescription,
+  V3Badge,
+  V3Button,
+  V3EmptyState,
+} from "@/components/v3";
+import { iconSizes, tierColors, getTierClasses } from "@/lib/design-tokens";
 
 type Creative = {
   id: string;
@@ -15,6 +24,7 @@ type Creative = {
   roas: number | null;
   ctr: number | null;
   conversions: number;
+  impressions?: number;
 };
 
 type Props = {
@@ -33,11 +43,43 @@ type Recommendation = {
   suggestion: string;
 };
 
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08 }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } }
+};
+
 export function CreativeRecommendations({ organizationId, creatives }: Props) {
+  // Check data status for user feedback
+  const dataStatus = useMemo(() => {
+    const total = creatives.length;
+    const analyzed = creatives.filter(c => c.topic).length;
+    const withPerformance = creatives.filter(c => (c.impressions ?? 0) > 0 || c.roas !== null).length;
+    
+    return {
+      total,
+      analyzed,
+      withPerformance,
+      hasEnoughData: analyzed >= 5,
+      hasPerformanceData: withPerformance >= 3,
+      needsAnalysis: total > 0 && analyzed < 3,
+      needsPerformance: analyzed >= 3 && withPerformance < 3,
+    };
+  }, [creatives]);
+
   const recommendations = useMemo(() => {
     const recs: Recommendation[] = [];
     
-    if (creatives.length < 5) {
+    // Lowered threshold: only need 3 analyzed creatives instead of 5
+    if (creatives.filter(c => c.topic).length < 3) {
       return recs;
     }
 
@@ -74,29 +116,45 @@ export function CreativeRecommendations({ organizationId, creatives }: Props) {
       }
     });
 
-    // Find top performers in each category
+    // Find top performers - lowered count threshold from 2 to 1
     const sortByAvgRoas = (data: Record<string, { count: number; totalRoas: number }>) => {
       return Object.entries(data)
-        .filter(([_, v]) => v.count >= 2)
+        .filter(([_, v]) => v.count >= 1)
         .map(([k, v]) => ({ key: k, avgRoas: v.totalRoas / v.count, count: v.count }))
         .sort((a, b) => b.avgRoas - a.avgRoas);
     };
 
-    const topTopics = sortByAvgRoas(byTopic);
-    const topTones = sortByAvgRoas(byTone);
-    const topEmotional = sortByAvgRoas(byEmotional);
-    const topCtas = sortByAvgRoas(byCta);
+    // Sort by count when no performance data
+    const sortByCount = (data: Record<string, { count: number; totalRoas: number }>) => {
+      return Object.entries(data)
+        .filter(([_, v]) => v.count >= 1)
+        .map(([k, v]) => ({ key: k, avgRoas: v.totalRoas / v.count, count: v.count }))
+        .sort((a, b) => b.count - a.count);
+    };
+
+    const hasPerformanceData = creatives.some(c => (c.roas ?? 0) > 0);
+    const sortFn = hasPerformanceData ? sortByAvgRoas : sortByCount;
+
+    const topTopics = sortFn(byTopic);
+    const topTones = sortFn(byTone);
+    const topEmotional = sortFn(byEmotional);
+    const topCtas = sortFn(byCta);
 
     // Generate topic recommendation
     if (topTopics.length > 0) {
       const best = topTopics[0];
+      const avgRoas = topTopics.reduce((a, t) => a + t.avgRoas, 0) / topTopics.length;
+      const performanceText = hasPerformanceData && avgRoas > 0
+        ? ` performing ${((best.avgRoas / avgRoas) * 100 - 100).toFixed(0)}% above average`
+        : '';
+      
       recs.push({
         id: 'topic-1',
         type: 'topic',
         title: `Double down on "${best.key}" content`,
-        description: `Your "${best.key}" themed ads are performing ${((best.avgRoas / (topTopics.reduce((a, t) => a + t.avgRoas, 0) / topTopics.length)) * 100 - 100).toFixed(0)}% above average.`,
+        description: `Your "${best.key}" themed ads are your most common pattern${performanceText}.`,
         confidence: Math.min(0.95, 0.6 + (best.count * 0.05)),
-        impact: best.avgRoas > 2 ? 'high' : best.avgRoas > 1 ? 'medium' : 'low',
+        impact: hasPerformanceData && best.avgRoas > 2 ? 'high' : best.avgRoas > 1 ? 'medium' : 'low',
         basedOn: `${best.count} creatives analyzed`,
         suggestion: `Create more ads focused on ${best.key}. Consider testing variations with different tones while keeping the topic consistent.`
       });
@@ -105,13 +163,17 @@ export function CreativeRecommendations({ organizationId, creatives }: Props) {
     // Generate tone recommendation
     if (topTones.length > 0) {
       const best = topTones[0];
+      const performanceText = hasPerformanceData && best.avgRoas > 0
+        ? ` achieving $${best.avgRoas.toFixed(2)} ROAS on average`
+        : '';
+      
       recs.push({
         id: 'tone-1',
         type: 'tone',
         title: `Use "${best.key}" tone more often`,
-        description: `Ads with a "${best.key}" tone achieve $${best.avgRoas.toFixed(2)} ROAS on average.`,
+        description: `Ads with a "${best.key}" tone are your most used pattern${performanceText}.`,
         confidence: Math.min(0.9, 0.5 + (best.count * 0.05)),
-        impact: best.avgRoas > 2 ? 'high' : 'medium',
+        impact: hasPerformanceData && best.avgRoas > 2 ? 'high' : 'medium',
         basedOn: `${best.count} creatives analyzed`,
         suggestion: `Apply the "${best.key}" tone across more of your creative assets, especially when combined with high-performing topics.`
       });
@@ -120,11 +182,12 @@ export function CreativeRecommendations({ organizationId, creatives }: Props) {
     // Generate emotional appeal recommendation
     if (topEmotional.length > 0) {
       const best = topEmotional[0];
+      
       recs.push({
         id: 'emotional-1',
         type: 'emotional',
         title: `Lead with "${best.key}" emotional appeal`,
-        description: `Messages emphasizing "${best.key}" drive ${((best.avgRoas / (topEmotional.reduce((a, e) => a + e.avgRoas, 0) / topEmotional.length)) * 100 - 100).toFixed(0)}% higher returns.`,
+        description: `Messages emphasizing "${best.key}" appear in ${best.count} of your creatives.`,
         confidence: Math.min(0.85, 0.5 + (best.count * 0.04)),
         impact: 'medium',
         basedOn: `${best.count} creatives analyzed`,
@@ -136,7 +199,7 @@ export function CreativeRecommendations({ organizationId, creatives }: Props) {
     if (topCtas.length > 1) {
       const best = topCtas[0];
       const worst = topCtas[topCtas.length - 1];
-      if (best.avgRoas > worst.avgRoas * 1.3) {
+      if (hasPerformanceData && best.avgRoas > worst.avgRoas * 1.3) {
         recs.push({
           id: 'cta-1',
           type: 'cta',
@@ -146,6 +209,17 @@ export function CreativeRecommendations({ organizationId, creatives }: Props) {
           impact: 'medium',
           basedOn: `Comparing ${best.count} vs ${worst.count} creatives`,
           suggestion: `Replace "${worst.key}" CTAs with "${best.key}" across your campaigns. Test transitional phrases that align with your top-performing tone.`
+        });
+      } else if (!hasPerformanceData && best.count > worst.count) {
+        recs.push({
+          id: 'cta-1',
+          type: 'cta',
+          title: `Your most common CTA: "${best.key}"`,
+          description: `"${best.key}" is used in ${best.count} creatives vs "${worst.key}" in ${worst.count}.`,
+          confidence: 0.7,
+          impact: 'low',
+          basedOn: `Comparing ${best.count} vs ${worst.count} creatives`,
+          suggestion: `Connect your Meta account to see which CTA actually drives better performance.`
         });
       }
     }
@@ -167,124 +241,206 @@ export function CreativeRecommendations({ organizationId, creatives }: Props) {
     return recs;
   }, [creatives]);
 
-  const getImpactColor = (impact: string) => {
+  const getImpactBadgeVariant = (impact: string): 'success' | 'info' | 'default' => {
     switch (impact) {
-      case 'high': return 'bg-green-500 text-white';
-      case 'medium': return 'bg-blue-500 text-white';
-      case 'low': return 'bg-muted text-muted-foreground';
-      default: return 'bg-muted';
+      case 'high': return 'success';
+      case 'medium': return 'info';
+      default: return 'default';
     }
   };
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'topic': return <Target className="h-4 w-4" />;
-      case 'tone': return <MessageSquare className="h-4 w-4" />;
-      case 'emotional': return <Zap className="h-4 w-4" />;
-      case 'cta': return <TrendingUp className="h-4 w-4" />;
-      case 'combination': return <Sparkles className="h-4 w-4" />;
-      default: return <Lightbulb className="h-4 w-4" />;
+      case 'topic': return <Target className={iconSizes.sm} />;
+      case 'tone': return <MessageSquare className={iconSizes.sm} />;
+      case 'emotional': return <Zap className={iconSizes.sm} />;
+      case 'cta': return <TrendingUp className={iconSizes.sm} />;
+      case 'combination': return <Sparkles className={iconSizes.sm} />;
+      default: return <Lightbulb className={iconSizes.sm} />;
     }
   };
 
-  if (creatives.length < 5) {
+  const getAccentColor = (impact: string): string => {
+    switch (impact) {
+      case 'high': return 'bg-[hsl(var(--portal-success))]';
+      case 'medium': return 'bg-[hsl(var(--portal-accent-blue))]';
+      default: return 'bg-[hsl(var(--portal-bg-secondary))]';
+    }
+  };
+
+  // Show data status indicators when there's not enough data
+  if (dataStatus.total === 0) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="py-12 text-center">
-          <Sparkles className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Not Enough Data</h3>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            We need at least 5 analyzed creatives to generate meaningful recommendations. 
+      <V3EmptyState
+        icon={Sparkles}
+        title="No Creatives Found"
+        description="Import your campaign data to unlock AI-powered creative recommendations."
+        accent="purple"
+      />
+    );
+  }
+
+  if (dataStatus.needsAnalysis) {
+    return (
+      <V3Card accent="amber">
+        <V3CardContent className="py-8 text-center">
+          <div className="p-3 rounded-xl bg-[hsl(var(--portal-warning)/0.15)] w-fit mx-auto mb-4">
+            <AlertCircle className={cn(iconSizes.xl, "text-[hsl(var(--portal-warning))]")} />
+          </div>
+          <h3 className="text-lg font-semibold text-[hsl(var(--portal-text-primary))] mb-2">
+            Analysis Needed
+          </h3>
+          <p className="text-[hsl(var(--portal-text-muted))] max-w-md mx-auto mb-4">
+            You have {dataStatus.total} creatives, but only {dataStatus.analyzed} have been analyzed. 
+            Run the AI analysis to extract topics, tones, and emotional patterns.
+          </p>
+          <p className="text-sm text-[hsl(var(--portal-text-muted))]">
+            Click the <strong>"Analyze"</strong> button above to start.
+          </p>
+        </V3CardContent>
+      </V3Card>
+    );
+  }
+
+  if (recommendations.length === 0 && creatives.length < 3) {
+    return (
+      <V3Card className="border-dashed border-[hsl(var(--portal-border))]">
+        <V3CardContent className="py-12 text-center">
+          <div className="p-3 rounded-xl bg-[hsl(var(--portal-accent-purple)/0.15)] w-fit mx-auto mb-4">
+            <Sparkles className={cn(iconSizes.xl, "text-[hsl(var(--portal-accent-purple))]")} />
+          </div>
+          <h3 className="text-lg font-semibold text-[hsl(var(--portal-text-primary))] mb-2">
+            Not Enough Data
+          </h3>
+          <p className="text-[hsl(var(--portal-text-muted))] max-w-md mx-auto">
+            We need at least 3 analyzed creatives to generate meaningful recommendations. 
             Import more campaign data to unlock AI-powered creative insights.
           </p>
-        </CardContent>
-      </Card>
+        </V3CardContent>
+      </V3Card>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div 
+      className="space-y-6"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
       {/* Header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Sparkles className="h-5 w-5 text-primary" />
+      <motion.div variants={itemVariants}>
+        <V3Card>
+          <V3CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-[hsl(var(--portal-accent-purple)/0.15)]">
+                <Sparkles className={cn(iconSizes.md, "text-[hsl(var(--portal-accent-purple))]")} />
+              </div>
+              <div>
+                <V3CardTitle>AI-Powered Recommendations</V3CardTitle>
+                <V3CardDescription>
+                  Based on analysis of {creatives.filter(c => c.topic).length} creatives
+                  {!dataStatus.hasPerformanceData && (
+                    <span className="ml-2 text-[hsl(var(--portal-warning))]">
+                      • Connect Meta for performance insights
+                    </span>
+                  )}
+                </V3CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle>AI-Powered Recommendations</CardTitle>
-              <CardDescription>
-                Based on analysis of {creatives.filter(c => c.topic).length} creatives
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
+          </V3CardHeader>
+        </V3Card>
+      </motion.div>
+
+      {/* Performance data warning */}
+      {!dataStatus.hasPerformanceData && dataStatus.analyzed >= 3 && (
+        <motion.div variants={itemVariants}>
+          <V3Card accent="amber">
+            <V3CardContent className="py-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className={cn(iconSizes.md, "text-[hsl(var(--portal-warning))] mt-0.5 shrink-0")} />
+                <div>
+                  <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
+                    Limited Performance Data
+                  </p>
+                  <p className="text-sm text-[hsl(var(--portal-text-muted))]">
+                    Recommendations are based on patterns only. Connect your Meta Ads account to import impressions, clicks, and ROAS for data-driven insights.
+                  </p>
+                </div>
+              </div>
+            </V3CardContent>
+          </V3Card>
+        </motion.div>
+      )}
 
       {/* Recommendations */}
       <div className="grid gap-4">
-        {recommendations.map((rec) => (
-          <Card key={rec.id} className="overflow-hidden">
-            <CardContent className="p-0">
-              <div className="flex">
-                {/* Left accent */}
-                <div className={cn(
-                  "w-1 shrink-0",
-                  rec.impact === 'high' ? 'bg-green-500' : 
-                  rec.impact === 'medium' ? 'bg-blue-500' : 'bg-muted'
-                )} />
-                
-                <div className="p-4 flex-1">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="p-1.5 rounded bg-primary/10 text-primary">
-                          {getTypeIcon(rec.type)}
+        {recommendations.map((rec, index) => (
+          <motion.div key={rec.id} variants={itemVariants}>
+            <V3Card className="overflow-hidden">
+              <V3CardContent className="p-0">
+                <div className="flex">
+                  {/* Left accent */}
+                  <div className={cn("w-1 shrink-0", getAccentColor(rec.impact))} />
+                  
+                  <div className="p-4 flex-1">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="p-1.5 rounded-lg bg-[hsl(var(--portal-accent-blue)/0.15)] text-[hsl(var(--portal-accent-blue))]">
+                            {getTypeIcon(rec.type)}
+                          </div>
+                          <h3 className="font-semibold text-[hsl(var(--portal-text-primary))]">{rec.title}</h3>
+                          <V3Badge variant={getImpactBadgeVariant(rec.impact)}>
+                            {rec.impact} impact
+                          </V3Badge>
                         </div>
-                        <h3 className="font-semibold">{rec.title}</h3>
-                        <Badge className={getImpactColor(rec.impact)}>
-                          {rec.impact} impact
-                        </Badge>
-                      </div>
-                      
-                      <p className="text-sm text-muted-foreground mb-3">
-                        {rec.description}
-                      </p>
+                        
+                        <p className="text-sm text-[hsl(var(--portal-text-muted))] mb-3">
+                          {rec.description}
+                        </p>
 
-                      <div className="p-3 rounded-lg bg-muted/50 mb-3">
-                        <div className="flex items-start gap-2">
-                          <Lightbulb className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                          <p className="text-sm">{rec.suggestion}</p>
+                        <div className="p-3 rounded-lg bg-[hsl(var(--portal-bg-secondary)/0.5)] mb-3">
+                          <div className="flex items-start gap-2">
+                            <Lightbulb className={cn(iconSizes.sm, "text-[hsl(var(--portal-accent-blue))] mt-0.5 shrink-0")} />
+                            <p className="text-sm text-[hsl(var(--portal-text-secondary))]">{rec.suggestion}</p>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3" />
-                          {Math.round(rec.confidence * 100)}% confidence
-                        </span>
-                        <span>{rec.basedOn}</span>
+                        <div className="flex items-center gap-4 text-xs text-[hsl(var(--portal-text-muted))]">
+                          <span className="flex items-center gap-1">
+                            <CheckCircle2 className={iconSizes.xs} />
+                            {Math.round(rec.confidence * 100)}% confidence
+                          </span>
+                          <span>{rec.basedOn}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </V3CardContent>
+            </V3Card>
+          </motion.div>
         ))}
       </div>
 
       {recommendations.length === 0 && (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
-            <Lightbulb className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Analyzing Patterns...</h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Run the AI analysis on your creatives to generate personalized recommendations.
-            </p>
-          </CardContent>
-        </Card>
+        <motion.div variants={itemVariants}>
+          <V3Card className="border-dashed border-[hsl(var(--portal-border))]">
+            <V3CardContent className="py-12 text-center">
+              <div className="p-3 rounded-xl bg-[hsl(var(--portal-bg-secondary))] w-fit mx-auto mb-4">
+                <Lightbulb className={cn(iconSizes.xl, "text-[hsl(var(--portal-text-muted))]")} />
+              </div>
+              <h3 className="text-lg font-semibold text-[hsl(var(--portal-text-primary))] mb-2">
+                Analyzing Patterns...
+              </h3>
+              <p className="text-[hsl(var(--portal-text-muted))] max-w-md mx-auto">
+                Run the AI analysis on your creatives to generate personalized recommendations.
+              </p>
+            </V3CardContent>
+          </V3Card>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }

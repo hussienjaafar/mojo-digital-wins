@@ -291,7 +291,7 @@ export function generateDedupeKey(eventName: string, orgId: string, sourceId: st
  */
 export interface CAPIEventInput {
   eventName: string;
-  eventTime: Date | string;
+  eventTime: Date | string | number; // Can be Date, ISO string, or Unix epoch seconds
   eventId: string;
   eventSourceUrl?: string;
   userData: Record<string, any>;
@@ -301,9 +301,23 @@ export interface CAPIEventInput {
 }
 
 export function buildCAPIEvent(input: CAPIEventInput): Record<string, any> {
+  // Handle event_time correctly based on input type
+  let eventTimeSeconds: number;
+  
+  if (typeof input.eventTime === 'number') {
+    // Already Unix timestamp in seconds - use directly
+    eventTimeSeconds = Math.floor(input.eventTime);
+  } else if (typeof input.eventTime === 'string' && /^\d+$/.test(input.eventTime)) {
+    // Numeric string - treat as Unix seconds
+    eventTimeSeconds = parseInt(input.eventTime, 10);
+  } else {
+    // Date object or ISO string - convert to Unix seconds
+    eventTimeSeconds = Math.floor(new Date(input.eventTime).getTime() / 1000);
+  }
+  
   const event: Record<string, any> = {
     event_name: input.eventName,
-    event_time: Math.floor(new Date(input.eventTime).getTime() / 1000),
+    event_time: eventTimeSeconds,
     event_id: input.eventId,
     action_source: input.actionSource || 'website',
     user_data: input.userData,

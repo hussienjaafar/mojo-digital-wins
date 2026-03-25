@@ -1,14 +1,16 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Session } from "@supabase/supabase-js";
-import { motion } from "framer-motion";
+import { proxyQuery, proxyRpc } from "@/lib/supabaseProxy";
+import { motion, AnimatePresence } from "framer-motion";
 
 import { useTheme } from "@/components/ThemeProvider";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useToast } from "@/hooks/use-toast";
+import { useSessionManager, formatTimeRemaining } from "@/hooks/useSessionManager";
+import { useAutoRefreshOnSync } from "@/hooks/useAutoRefreshOnSync";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/client/AppSidebar";
@@ -17,6 +19,8 @@ import { SkipNavigation } from "@/components/accessibility/SkipNavigation";
 import { OrganizationSelector } from "@/components/client/OrganizationSelector";
 import { ClientHeaderControls } from "@/components/client/ClientHeaderControls";
 import { cn } from "@/lib/utils";
+import { AlertTriangle, RefreshCw, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 // ============================================================================
 // Types
@@ -40,6 +44,74 @@ export interface ClientShellProps {
 }
 
 // ============================================================================
+// Session Expiry Banner Component
+// ============================================================================
+
+interface SessionExpiryBannerProps {
+  timeUntilExpiry: number | null;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  onDismiss: () => void;
+}
+
+const SessionExpiryBanner = ({
+  timeUntilExpiry,
+  isRefreshing,
+  onRefresh,
+  onDismiss,
+}: SessionExpiryBannerProps) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="bg-amber-500/90 dark:bg-amber-600/90 text-white px-4 py-2"
+      role="alert"
+      aria-live="polite"
+    >
+      <div className="max-w-[1800px] mx-auto flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="text-sm font-medium">
+            Session expiring in {formatTimeRemaining(timeUntilExpiry)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="h-7 text-xs bg-white/20 hover:bg-white/30 border-0"
+          >
+            {isRefreshing ? (
+              <>
+                <RefreshCw className="h-3 w-3 mr-1 animate-spin" aria-hidden="true" />
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-3 w-3 mr-1" aria-hidden="true" />
+                Extend Session
+              </>
+            )}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onDismiss}
+            className="h-7 w-7 p-0 hover:bg-white/20"
+            aria-label="Dismiss session warning"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+// ============================================================================
 // Component
 // ============================================================================
 
@@ -53,39 +125,100 @@ export const ClientShell = ({
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { theme, setTheme } = useTheme();
-  const { impersonatedOrgId, isImpersonating } = useImpersonation();
+  const { impersonatedOrgId, isImpersonating, setImpersonation } = useImpersonation();
   const { isAdmin, isLoading: isAdminLoading } = useIsAdmin();
 
-  const [session, setSession] = useState<Session | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingOrgs, setIsLoadingOrgs] = useState(true);
+  const [showExpiryBanner, setShowExpiryBanner] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Track if expiry warning toast was shown to prevent duplicates
+  const expiryToastShown = useRef(false);
 
   // ============================================================================
-  // Auth Effect
+  // Auto-refresh dashboard data when backend syncs complete
+  // ============================================================================
+  useAutoRefreshOnSync(organization?.id);
+
+  // ============================================================================
+  // Session Manager - Single source of truth for auth state
+  // ============================================================================
+
+  const handleSessionExpiring = useCallback(() => {
+    setShowExpiryBanner(true);
+    if (!expiryToastShown.current) {
+      expiryToastShown.current = true;
+      toast({
+        title: "Session expiring soon",
+        description: "Your session will expire in less than 5 minutes. Click refresh to extend.",
+        variant: "default",
+      });
+    }
+  }, [toast]);
+
+  const handleSessionExpired = useCallback(() => {
+    toast({
+      title: "Session expired",
+      description: "Please log in again to continue.",
+      variant: "destructive",
+    });
+    navigate("/client-login");
+  }, [toast, navigate]);
+
+  const handleSessionRefreshed = useCallback(() => {
+    setShowExpiryBanner(false);
+    setIsRefreshing(false);
+    expiryToastShown.current = false;
+  }, []);
+
+  const handleRefreshError = useCallback((error: Error) => {
+    setIsRefreshing(false);
+    toast({
+      title: "Session refresh failed",
+      description: error.message || "Please log in again.",
+      variant: "destructive",
+    });
+  }, [toast]);
+
+  const {
+    session,
+    isLoading: isSessionLoading,
+    isExpiring,
+    timeUntilExpiry,
+    refreshSession,
+    signOut,
+  } = useSessionManager({
+    warningThreshold: 300, // 5 minutes
+    onSessionExpiring: handleSessionExpiring,
+    onSessionExpired: handleSessionExpired,
+    onSessionRefreshed: handleSessionRefreshed,
+    onRefreshError: handleRefreshError,
+  });
+
+  // ============================================================================
+  // Redirect if no session
   // ============================================================================
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      // Allow access if impersonating (admin is logged in)
-      if (!session && !isImpersonating) {
-        navigate("/client-login");
-      }
-    });
+    if (!isSessionLoading && !session && !isImpersonating) {
+      navigate("/client-login");
+    }
+  }, [isSessionLoading, session, isImpersonating, navigate]);
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      // Allow access if impersonating (admin is logged in)
-      if (!session && !isImpersonating) {
-        navigate("/client-login");
-      }
-    });
+  // ============================================================================
+  // Session Refresh Handler
+  // ============================================================================
 
-    return () => subscription.unsubscribe();
-  }, [navigate, isImpersonating]);
+  const handleRefreshSession = async () => {
+    setIsRefreshing(true);
+    await refreshSession();
+  };
+
+  const handleDismissExpiryBanner = () => {
+    setShowExpiryBanner(false);
+  };
 
   // ============================================================================
   // Load Organizations Effect
@@ -99,36 +232,76 @@ export const ClientShell = ({
 
   const loadUserOrganizations = async () => {
     try {
-      // If impersonating, load the impersonated org
+      // If impersonating, check if user is admin to load all orgs
       if (isImpersonating && impersonatedOrgId) {
-        const { data: org, error: orgError } = await (supabase as any)
-          .from("client_organizations")
-          .select("id, name, logo_url")
-          .eq("id", impersonatedOrgId)
-          .maybeSingle();
+        // Get current session to check admin status
+        const { data: sessionData } = await supabase.auth.getSession();
+        const currentUserId = sessionData?.session?.user?.id;
 
-        if (orgError) throw orgError;
-        if (org) {
-          setOrganization(org);
-          setOrganizations([org]);
+        const { data: isAdminUser } = await proxyRpc<boolean>("has_role", {
+          _user_id: currentUserId,
+          _role: "admin",
+        });
+
+        if (isAdminUser) {
+          // Admin impersonating: load ALL organizations for switching
+          const { data: allOrgs, error: orgError } = await proxyQuery<Array<{id: string; name: string; logo_url: string | null}>>({
+            table: "client_organizations",
+            select: "id, name, logo_url",
+            filters: { is_active: true },
+          });
+
+          if (orgError) throw orgError;
+
+          if (allOrgs && allOrgs.length > 0) {
+            // Sort by name client-side since proxy doesn't support order
+            const sortedOrgs = [...allOrgs].sort((a, b) => a.name.localeCompare(b.name));
+            const orgs: Organization[] = sortedOrgs.map((org) => ({
+              id: org.id,
+              name: org.name,
+              logo_url: org.logo_url,
+              role: "admin",
+            }));
+
+            setOrganizations(orgs);
+            // Set the impersonated org as selected
+            const selectedOrg = orgs.find((o) => o.id === impersonatedOrgId) || orgs[0];
+            setOrganization(selectedOrg);
+            setIsLoadingOrgs(false);
+            return;
+          }
+        } else {
+          // Non-admin impersonating (fallback): load only the impersonated org
+          const { data: org, error: orgError } = await proxyQuery<{id: string; name: string; logo_url: string | null}>({
+            table: "client_organizations",
+            select: "id, name, logo_url",
+            filters: { id: impersonatedOrgId },
+            single: true,
+          });
+
+          if (orgError) throw orgError;
+          if (org) {
+            setOrganization(org);
+            setOrganizations([org]);
+          }
+          setIsLoadingOrgs(false);
+          return;
         }
-        setIsLoading(false);
-        return;
       }
 
       // Check if user is admin
-      const { data: isAdminUser } = await supabase.rpc("has_role", {
+      const { data: isAdminUser } = await proxyRpc<boolean>("has_role", {
         _user_id: session?.user?.id,
         _role: "admin",
       });
 
       if (isAdminUser) {
         // Admin: load all organizations
-        const { data: allOrgs, error: orgError } = await supabase
-          .from("client_organizations")
-          .select("id, name, logo_url")
-          .eq("is_active", true)
-          .order("name");
+        const { data: allOrgs, error: orgError } = await proxyQuery<Array<{id: string; name: string; logo_url: string | null}>>({
+          table: "client_organizations",
+          select: "id, name, logo_url",
+          filters: { is_active: true },
+        });
 
         if (orgError) throw orgError;
 
@@ -142,7 +315,9 @@ export const ClientShell = ({
           return;
         }
 
-        const orgs: Organization[] = allOrgs.map((org) => ({
+        // Sort by name client-side since proxy doesn't support order
+        const sortedOrgs = [...allOrgs].sort((a, b) => a.name.localeCompare(b.name));
+        const orgs: Organization[] = sortedOrgs.map((org) => ({
           id: org.id,
           name: org.name,
           logo_url: org.logo_url,
@@ -154,49 +329,58 @@ export const ClientShell = ({
         const savedOrg = orgs.find((org) => org.id === savedOrgId);
         setOrganization(savedOrg || orgs[0]);
       } else {
-        // Regular client user: load their organizations
-        const { data: clientUserData, error: userError } = await (supabase as any)
-          .from("client_users")
-          .select(
-            `
-            organization_id,
-            role,
-            client_organizations (
-              id,
-              name,
-              logo_url
-            )
-          `
-          )
-          .eq("id", session?.user?.id);
+        // Regular client user: load their organization via client_users
+        // Note: proxy doesn't support joins, so we do two queries
+        const { data: clientUserData, error: userError } = await proxyQuery<{organization_id: string; role: string}>({
+          table: "client_users",
+          select: "organization_id, role",
+          filters: { id: session?.user?.id },
+          single: true,
+        });
 
         if (userError) throw userError;
-        if (!clientUserData || clientUserData.length === 0) {
+        if (!clientUserData) {
+          console.error("No client_users record found for user:", session?.user?.id);
           navigate("/access-denied?from=client");
           return;
         }
 
-        const orgs: Organization[] = clientUserData.map((item: any) => ({
-          id: item.client_organizations.id,
-          name: item.client_organizations.name,
-          logo_url: item.client_organizations.logo_url,
-          role: item.role,
-        }));
+        // Now fetch the organization details
+        const { data: orgData, error: orgError } = await proxyQuery<{id: string; name: string; logo_url: string | null}>({
+          table: "client_organizations",
+          select: "id, name, logo_url",
+          filters: { id: clientUserData.organization_id },
+          single: true,
+        });
 
-        setOrganizations(orgs);
-        const savedOrgId = localStorage.getItem("selectedOrganizationId");
-        const savedOrg = orgs.find((org) => org.id === savedOrgId);
-        setOrganization(savedOrg || orgs[0]);
+        if (orgError) throw orgError;
+        if (!orgData) {
+          console.error("Organization not found:", clientUserData.organization_id);
+          navigate("/access-denied?from=client");
+          return;
+        }
+
+        const org: Organization = {
+          id: orgData.id,
+          name: orgData.name,
+          logo_url: orgData.logo_url,
+          role: clientUserData.role,
+        };
+
+        setOrganizations([org]);
+        setOrganization(org);
       }
     } catch (error: any) {
+      console.error("Error loading organizations:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to load organizations",
         variant: "destructive",
       });
-      navigate("/");
+      // Don't redirect on error - stay on loading state and let user retry
+      // This prevents redirect loops when there's a temporary network issue
     } finally {
-      setIsLoading(false);
+      setIsLoadingOrgs(false);
     }
   };
 
@@ -209,6 +393,21 @@ export const ClientShell = ({
     if (newOrg) {
       setOrganization(newOrg);
       localStorage.setItem("selectedOrganizationId", newOrgId);
+
+      // Dispatch custom event for same-tab listeners (e.g., useClientOrganization hook)
+      window.dispatchEvent(new CustomEvent('organizationChanged', { detail: newOrgId }));
+
+      // Sync to impersonation context so child pages using useClientOrganization
+      // automatically pick up the new organization
+      if (isAdmin) {
+        setImpersonation(
+          session?.user?.id || '',
+          'System Admin',
+          newOrg.id,
+          newOrg.name
+        );
+      }
+
       toast({
         title: "Organization switched",
         description: `Now viewing ${newOrg.name}`,
@@ -217,7 +416,7 @@ export const ClientShell = ({
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     navigate("/client-login");
   };
 
@@ -231,6 +430,9 @@ export const ClientShell = ({
 
   // Show "Back to Admin" button when impersonating OR when user is admin
   const showBackToAdmin = isImpersonating || (!isAdminLoading && isAdmin);
+
+  // Combined loading state
+  const isLoading = isSessionLoading || isLoadingOrgs;
 
   // ============================================================================
   // Loading State
@@ -275,12 +477,24 @@ export const ClientShell = ({
         <div className="portal-theme min-h-screen w-full flex portal-bg">
           <AppSidebar organizationId={organization.id} />
           <div className="flex-1 flex flex-col min-w-0">
+            {/* Session Expiry Banner */}
+            <AnimatePresence>
+              {showExpiryBanner && isExpiring && (
+                <SessionExpiryBanner
+                  timeUntilExpiry={timeUntilExpiry}
+                  isRefreshing={isRefreshing}
+                  onRefresh={handleRefreshSession}
+                  onDismiss={handleDismissExpiryBanner}
+                />
+              )}
+            </AnimatePresence>
+
             {/* Impersonation Banner */}
             <ImpersonationBanner />
 
             {/* Header */}
-            <header 
-              className="portal-header-clean" 
+            <header
+              className="portal-header-clean"
               role="banner"
             >
               <div className="max-w-[1800px] mx-auto px-3 sm:px-4 lg:px-6 py-2 sm:py-3">
@@ -309,11 +523,13 @@ export const ClientShell = ({
                         <h1 className="text-base sm:text-lg font-semibold portal-text-primary truncate">
                           {organization.name}
                         </h1>
-                        {organizations.length > 1 && (
+                        {/* Show org selector for admins (always) or users with multiple orgs */}
+                        {(isAdmin || organizations.length > 1) && organizations.length > 0 && (
                           <OrganizationSelector
                             organizations={organizations}
                             selectedId={organization.id}
                             onSelect={handleOrganizationChange}
+                            isAdmin={isAdmin}
                           />
                         )}
                       </div>

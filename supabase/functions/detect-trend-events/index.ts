@@ -137,6 +137,11 @@ const TOPIC_BLOCKLIST: Set<string> = new Set([
   'thread', 'post', 'tweet', 'retweet', 'share', 'like', 'comment',
   // Low-value topics
   'watch', 'video', 'photo', 'image', 'live', 'opinion', 'editorial',
+  // PHASE 3 FIX: Ambiguous single-word abbreviations and common words
+  // NOTE: Removed 'un', 'who', 'ice', 'eu', 'uk' to allow UN/WHO/ICE/EU stories (2026-01-20 fix)
+  'us', 'mlk',  // Too ambiguous without context
+  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
+  'has', 'have', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should',
 ]);
 
 // ============================================================================
@@ -186,28 +191,28 @@ function isEvergreenTopic(topicKey: string, baseline7d: number, baseline30d: num
   return false;
 }
 
-// Calculate evergreen penalty (0.15-1.0): lower for evergreen unless spiking
-// PHASE A: Strengthened penalties + single-word entity penalty
+// Calculate evergreen penalty (0.05-1.0): lower for evergreen unless spiking
+// PHASE 3 FIX: DRASTICALLY strengthened single-word penalty to nearly eliminate them
 function calculateEvergreenPenalty(
-  isEvergreen: boolean, 
-  zScoreVelocity: number, 
+  isEvergreen: boolean,
+  zScoreVelocity: number,
   hasHistoricalBaseline: boolean,
   isSingleWordEntity: boolean = false
 ): number {
-  // PHASE A: Single-word entities get base penalty even if not in evergreen list
-  // This suppresses vague single-word labels like "Gaza", "Greenland"
-  const baseEntityPenalty = isSingleWordEntity ? 0.6 : 1.0;
-  
+  // PHASE 3 FIX: Single-word entities get SEVERE penalty - they should rarely trend
+  // Goal: Force conversion to event phrases like "Trump Announces X" instead of just "Trump"
+  const baseEntityPenalty = isSingleWordEntity ? 0.40 : 1.0;  // Was 0.15, now 0.40 - less aggressive
+
   if (!isEvergreen) return baseEntityPenalty;
-  
-  // PHASE A: Strengthened - require MUCH higher z-score to overcome penalty
-  if (zScoreVelocity > 6) return 0.85 * baseEntityPenalty;  // Extreme spike
-  if (zScoreVelocity > 5) return 0.65 * baseEntityPenalty;  // Very strong spike  
-  if (zScoreVelocity > 4) return 0.45 * baseEntityPenalty;  // Strong spike
-  if (zScoreVelocity > 3) return 0.30 * baseEntityPenalty;  // Moderate spike
-  
-  // Evergreen with no significant spike gets HEAVY penalty
-  return hasHistoricalBaseline ? 0.15 * baseEntityPenalty : 0.20 * baseEntityPenalty;
+
+  // PHASE 3 FIX: Less aggressive z-score thresholds for evergreen topics
+  if (zScoreVelocity > 6) return 0.95 * baseEntityPenalty;  // Strong spike
+  if (zScoreVelocity > 4) return 0.80 * baseEntityPenalty;  // Moderate spike
+  if (zScoreVelocity > 3) return 0.65 * baseEntityPenalty;  // Light spike
+  if (zScoreVelocity > 2) return 0.50 * baseEntityPenalty;  // Minimal spike
+
+  // Evergreen with no significant spike - less aggressive floor penalty
+  return hasHistoricalBaseline ? 0.30 * baseEntityPenalty : 0.35 * baseEntityPenalty;
 }
 
 // ============================================================================
@@ -323,15 +328,16 @@ function calculateRankScore(params: {
   return Math.round(finalScore * 10) / 10;
 }
 
-// Quality thresholds - PHASE 2: Strengthened single-word suppression
+// Quality thresholds - PHASE 3 FIX: Drastically strengthened single-word suppression
 const QUALITY_THRESHOLDS = {
   // Minimum deduped mentions for any topic
   MIN_MENTIONS_DEFAULT: 3,
-  // PHASE 2: Single-word topics need MUCH higher thresholds
-  MIN_MENTIONS_SINGLE_WORD: 8,        // Increased from 5
-  MIN_SOURCES_SINGLE_WORD: 2,
-  MIN_NEWS_SOURCES_SINGLE_WORD: 2,    // Increased from 1 - require corroboration
-  MIN_TIER12_SOURCES_SINGLE_WORD: 1,  // NEW: Require at least one tier1/tier2 source
+  // PHASE 3 FIX: Single-word topics need EXTREME thresholds to pass
+  // Most single-word entities should NOT trend - they need to be converted to event phrases
+  MIN_MENTIONS_SINGLE_WORD: 8,        // Reduced from 20 to allow legitimate single-word trends
+  MIN_SOURCES_SINGLE_WORD: 2,         // Reduced from 3 - moderate corroboration requirement
+  MIN_NEWS_SOURCES_SINGLE_WORD: 3,    // INCREASED from 2 - strong news requirement
+  MIN_TIER12_SOURCES_SINGLE_WORD: 2,  // INCREASED from 1 - need multiple authoritative sources
   // Source diversity requirements
   MIN_SOURCES_FOR_TRENDING: 2,
   MIN_NEWS_FOR_LOW_SOCIAL: 1,
@@ -340,13 +346,16 @@ const QUALITY_THRESHOLDS = {
   MIN_24H_MENTIONS: 5,
 };
 
-// PHASE 2: Single-word entities that are allowed (well-known acronyms, proper nouns)
+// PHASE 3 FIX: DRASTICALLY reduced allowed list - only unambiguous acronyms that have NO other meaning
+// Removed: ice (frozen water), trump/biden/musk (should be event phrases), gaza/ukraine/etc (need context)
+// Single-word person names and geographic locations should NEVER trend alone
 const ALLOWED_SINGLE_WORD_ENTITIES = new Set([
-  'nato', 'fbi', 'cia', 'doj', 'dhs', 'ice', 'doge', 'epa', 'fda', 'cdc',
-  'nsa', 'irs', 'sec', 'ftc', 'fcc', 'fec', 'nlrb', 'osha', 'usps',
-  'scotus', 'potus', 'flotus', 'vpotus', 'hamas', 'hezbollah', 'isis',
-  'gaza', 'ukraine', 'russia', 'china', 'israel', 'taiwan', 'iran',
-  'musk', 'bezos', 'zuckerberg', 'trump', 'biden', 'vance', 'walz',
+  // Only keep US government acronyms that are completely unambiguous
+  'nato', 'fbi', 'cia', 'doj', 'dhs', 'epa', 'fda', 'cdc',
+  'nsa', 'irs', 'sec', 'ftc', 'fcc', 'fec', 'osha',
+  'scotus', 'potus',
+  // Terrorist organizations (no other meaning)
+  'hamas', 'hezbollah', 'isis',
 ]);
 
 /**
@@ -559,6 +568,38 @@ const VERB_DETECTION_LIST = [
   'target', 'targets', 'targeted', 'targeting', 'kill', 'kills', 'killed',
   'end', 'ends', 'ended', 'ending', 'begin', 'begins', 'began', 'beginning',
   'start', 'starts', 'started', 'starting', 'stop', 'stops', 'stopped',
+  // FIX: Missing verbs found in audit
+  'escape', 'escapes', 'escaped', 'escaping', 'flee', 'flees', 'fled', 'fleeing',
+  'mull', 'mulls', 'mulled', 'mulling', 'consider', 'considers', 'considered',
+  'weigh', 'weighs', 'weighed', 'weighing', 'eye', 'eyes', 'eyed', 'eyeing',
+  'dig', 'digs', 'dug', 'digging', 'push', 'pushes', 'pushed', 'pushing',
+  'urge', 'urges', 'urged', 'urging', 'call', 'calls', 'called', 'calling',
+  'contest', 'contests', 'contested', 'contesting', 'challenge', 'challenges', 'challenged',
+  'seek', 'seeks', 'sought', 'seeking', 'pursue', 'pursues', 'pursued',
+  // Passive voice helpers (for "is being deported", "are being detained")
+  'being', 'been',
+  // More common headline verbs
+  'report', 'reports', 'reported', 'reporting', 'say', 'says', 'said',
+  'show', 'shows', 'showed', 'shown', 'showing', 'find', 'finds', 'found',
+  'claim', 'claims', 'claimed', 'allege', 'alleges', 'alleged',
+  'accuse', 'accuses', 'accused', 'blame', 'blames', 'blamed',
+  'praise', 'praises', 'praised', 'criticize', 'criticizes', 'criticized',
+  'slam', 'slams', 'slammed', 'blast', 'blasts', 'blasted',
+  'honor', 'honors', 'honored', 'mourn', 'mourns', 'mourned',
+  'celebrate', 'celebrates', 'celebrated', 'mark', 'marks', 'marked',
+  // FIX: Additional verbs from context_display_only audit
+  'attend', 'attends', 'attended', 'attending', 'hand', 'hands', 'handed',
+  'anger', 'angers', 'angered', 'angering', 'rage', 'rages', 'raged',
+  'threaten', 'threatens', 'threatened', 'threatening', 'revive', 'revives', 'revived',
+  'prove', 'proves', 'proved', 'proven', 'proving', 'lock', 'locks', 'locked',
+  'send', 'sends', 'sent', 'sending', 'internationalise', 'internationalises', 'internationalize',
+  // FIX: Additional verbs from second audit pass
+  'issue', 'issues', 'issued', 'issuing', 'seal', 'seals', 'sealed', 'sealing',
+  'channel', 'channels', 'channeled', 'channeling', 'allow', 'allows', 'allowed', 'allowing',
+  'collaborate', 'collaborates', 'collaborated', 'aim', 'aims', 'aimed', 'aiming',
+  'declare', 'declares', 'declared', 'declaring', 'plunge', 'plunges', 'plunged',
+  'restrict', 'restricts', 'restricted', 'restricting', 'promote', 'promotes', 'promoted',
+  'help', 'helps', 'helped', 'helping', 'contend', 'contends', 'contended',
 ];
 
 // Event nouns that indicate something happened
@@ -571,6 +612,18 @@ const EVENT_NOUN_LIST = [
   'ceasefire', 'invasion', 'collapse', 'evacuation', 'explosion', 'assassination',
   'sanctions', 'tariffs', 'investigation', 'probe', 'audit', 'deportation',
   'pardon', 'ban', 'order', 'mandate', 'regulation', 'reform',
+  // PHASE 5 FIX: Additional common news nouns for better event phrase detection
+  'report', 'reports', 'reporting',
+  'warning', 'warnings', 'alert', 'alerts',
+  'briefing', 'briefings', 'announcement', 'announcements',
+  'statement', 'statements', 'remarks',
+  'death', 'deaths', 'injury', 'injuries',
+  'disaster', 'emergency',
+  'decision', 'decisions',
+  'agreement', 'deal', 'treaty',
+  'threat', 'threats', 'sanction',
+  'deployment', 'withdrawal',
+  'outbreak', 'surge', 'spike',
 ];
 
 // Known entity-only patterns that should NOT be event phrases
@@ -588,13 +641,16 @@ const ENTITY_ONLY_PATTERNS = [
  */
 function containsVerbOrEventNoun(topic: string): boolean {
   const lower = topic.toLowerCase();
-  const words = lower.split(/\s+/);
   
+  // FIX: Use regex word boundary matching for more accurate verb detection
+  // This catches verb forms that may be hyphenated or adjacent to punctuation
   for (const verb of VERB_DETECTION_LIST) {
-    if (words.includes(verb)) return true;
+    const regex = new RegExp(`\\b${verb}\\b`, 'i');
+    if (regex.test(lower)) return true;
   }
   for (const noun of EVENT_NOUN_LIST) {
-    if (words.includes(noun)) return true;
+    const regex = new RegExp(`\\b${noun}\\b`, 'i');
+    if (regex.test(lower)) return true;
   }
   return false;
 }
@@ -648,14 +704,21 @@ function validateEventPhraseLabel(
   topHeadline?: string // NEW: For fallback generation
 ): { is_event_phrase: boolean; label_quality: 'event_phrase' | 'entity_only' | 'fallback_generated'; downgraded: boolean; label_source: string; fallbackLabel?: string } {
   
-  // FIX: If we have metadata hint of fallback_generated and it passes verb check, preserve it
+  // FIX: If we have metadata hint of fallback_generated, check if this topic was the actual fallback phrase
+  // or just an entity from an article where a fallback was generated
   if (labelQualityHint === 'fallback_generated') {
-    const passesVerbCheck = isEventPhrase(topic);
-    if (passesVerbCheck) {
-      return { is_event_phrase: true, label_quality: 'fallback_generated', downgraded: false, label_source: 'fallback_generated' };
+    // Only validate as fallback if the topic was CLAIMED as an event phrase
+    // Entities from fallback-generated articles should not be treated as fallback attempts
+    if (claimedIsEventPhrase) {
+      const passesVerbCheck = isEventPhrase(topic);
+      if (passesVerbCheck) {
+        return { is_event_phrase: true, label_quality: 'fallback_generated', downgraded: false, label_source: 'fallback_generated' };
+      }
+      // Claimed fallback phrase but doesn't pass verb check - downgrade
+      return { is_event_phrase: false, label_quality: 'entity_only', downgraded: true, label_source: 'fallback_downgraded' };
     }
-    // Fallback didn't pass verb check - still mark as fallback_generated but is_event_phrase=false
-    return { is_event_phrase: false, label_quality: 'fallback_generated', downgraded: false, label_source: 'fallback_attempted' };
+    // Entity from a fallback-generated article - treat as entity_only
+    return { is_event_phrase: false, label_quality: 'entity_only', downgraded: false, label_source: 'entity_from_fallback' };
   }
   
   // FIX: If metadata says event_phrase, validate it
@@ -682,6 +745,8 @@ function validateEventPhraseLabel(
           fallbackLabel 
         };
       }
+      // FIX: Fallback was attempted but failed - track this explicitly
+      return { is_event_phrase: false, label_quality: 'entity_only', downgraded: false, label_source: 'fallback_failed' };
     }
     return { is_event_phrase: false, label_quality: 'entity_only', downgraded: false, label_source: 'entity_only' };
   }
@@ -705,6 +770,8 @@ function validateEventPhraseLabel(
           fallbackLabel 
         };
       }
+      // FIX: Fallback was attempted after downgrade but failed
+      return { is_event_phrase: false, label_quality: 'entity_only', downgraded: true, label_source: 'fallback_failed_after_downgrade' };
     }
     return { is_event_phrase: false, label_quality: 'entity_only', downgraded: true, label_source: 'event_phrase_downgraded' };
   }
@@ -712,21 +779,24 @@ function validateEventPhraseLabel(
 
 /**
  * Try to generate a fallback event phrase from headline when entity is detected
- * CRITICAL: This is the fallback generation that was missing in detect-trend-events
+ * PHASE 3 FIX: Strengthened with more verb patterns and headline truncation fallback
  */
 function tryGenerateFallbackFromHeadline(headline: string, entityName: string): string | null {
   if (!headline || headline.length < 10) return null;
-  
-  // Action verbs to look for in headline
+
+  // Escape special regex characters in entity name
+  const escapedEntity = entityName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // PHASE 3 FIX: Comprehensive action verbs
   const verbPatterns = [
     // Active voice: "Trump Fires FBI Director", "House Passes Bill"
-    new RegExp(`(${entityName})\\s+(passes?|blocks?|rejects?|approves?|signs?|fires?|resigns?|announces?|launches?|bans?|arrests?|indicts?|sues?|orders?|vetoes?|strikes?|rules?|overturns?|upholds?|halts?|suspends?|expands?|cuts?|threatens?|warns?|demands?|proposes?|withdraws?|seizes?|raids?|deports?|detains?|pardons?|revokes?|nominates?|appoints?|dismisses?|grants?|denies?|charges?|convicts?|acquits?|sentences?|attacks?|invades?|bombs?|wins?|loses?|faces?|confirms?|targets?)\\s+(.+)`, 'i'),
+    new RegExp(`(${escapedEntity})\\s+(passes?|blocks?|rejects?|approves?|signs?|fires?|resigns?|announces?|launches?|bans?|arrests?|indicts?|sues?|orders?|vetoes?|strikes?|rules?|overturns?|upholds?|halts?|suspends?|expands?|cuts?|threatens?|warns?|demands?|proposes?|withdraws?|seizes?|raids?|deports?|detains?|pardons?|revokes?|nominates?|appoints?|dismisses?|grants?|denies?|charges?|convicts?|acquits?|sentences?|attacks?|invades?|bombs?|wins?|loses?|faces?|confirms?|targets?|reveals?|claims?|alleges?|slams?|blasts?|praises?|defends?|condemns?|honors?|celebrates?|mourns?|marks?|meets?|visits?|hosts?|addresses?|plans?|considers?|seeks?|urges?|vows?)\\s+(.+)`, 'i'),
     // Subject + Verb pattern anywhere
-    new RegExp(`\\b(${entityName})\\b.*?\\b(passes?|blocks?|fires?|signs?|bans?|wins?|loses?|faces?|arrests?|indicts?|sues?|orders?)\\b`, 'i'),
+    new RegExp(`\\b(${escapedEntity})\\b.*?\\b(passes?|blocks?|fires?|signs?|bans?|wins?|loses?|faces?|arrests?|indicts?|sues?|orders?|announces?|reveals?|confirms?|targets?|slams?|honors?|meets?)\\b`, 'i'),
     // Verb + Subject pattern
-    new RegExp(`\\b(passes?|blocks?|fires?|signs?|bans?|wins?|loses?|arrests?|indicts?|sues?)\\b.*?\\b(${entityName})\\b`, 'i'),
+    new RegExp(`\\b(passes?|blocks?|fires?|signs?|bans?|wins?|loses?|arrests?|indicts?|sues?|honors?|targets?)\\b.*?\\b(${escapedEntity})\\b`, 'i'),
   ];
-  
+
   for (const pattern of verbPatterns) {
     const match = headline.match(pattern);
     if (match) {
@@ -734,7 +804,7 @@ function tryGenerateFallbackFromHeadline(headline: string, entityName: string): 
       let phrase = match[0];
       const words = phrase.split(/\s+/).slice(0, 5);
       if (words.length >= 3) {
-        const result = words.map(w => 
+        const result = words.map(w =>
           w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
         ).join(' ');
         // Validate the generated phrase
@@ -744,19 +814,51 @@ function tryGenerateFallbackFromHeadline(headline: string, entityName: string): 
       }
     }
   }
-  
+
   // Look for event nouns in headline that could form a phrase
-  const eventNounPattern = /\b(vote|bill|ruling|crisis|ban|tariff|policy|probe|investigation|hearing|trial|arrest|firing|resignation|indictment|verdict|conviction|acquittal|sanction|ceasefire|attack|bombing|strike|raid|protest|scandal|impeachment|shutdown|veto|deportation|pardon|order|mandate|summit|election|debate)\b/i;
+  const eventNounPattern = /\b(vote|bill|ruling|crisis|ban|tariff|policy|probe|investigation|hearing|trial|arrest|firing|resignation|indictment|verdict|conviction|acquittal|sanction|ceasefire|attack|bombing|strike|raid|protest|scandal|impeachment|shutdown|veto|deportation|pardon|order|mandate|summit|election|debate|ceremony|holiday|memorial|anniversary|legacy)\b/i;
   const actionMatch = headline.match(eventNounPattern);
-  
+
   if (actionMatch) {
     const action = actionMatch[1];
     const phrase = `${entityName} ${action.charAt(0).toUpperCase() + action.slice(1).toLowerCase()}`;
-    if (phrase.split(/\s+/).length >= 3) {
+    if (phrase.split(/\s+/).length >= 2) {
       return phrase;
     }
   }
-  
+
+  // PHASE 5 FIX: Colon pattern for headlines like "Entity: Action description"
+  const headlineLower = headline.toLowerCase();
+  const entityLower = entityName.toLowerCase();
+  const colonMatch = headline.match(/^([^:]+):\s*(.+)/i);
+  if (colonMatch) {
+    const [, prefix, suffix] = colonMatch;
+    if (prefix.toLowerCase().includes(entityLower) || suffix.toLowerCase().includes(entityLower)) {
+      const truncated = headline.slice(0, 60).trim();
+      if (containsVerbOrEventNoun(truncated)) {
+        const words = truncated.split(/\s+/).slice(0, 6);
+        const result = words.map(w => 
+          w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+        ).join(' ');
+        console.log(`[detect-trend-events] Colon pattern match: "${result}" for "${entityName}"`);
+        return result;
+      }
+    }
+  }
+
+  // PHASE 3 FIX: Headline truncation fallback
+  // Use first 4-5 words of headline if it contains the entity
+  if (headlineLower.includes(entityLower.split(' ')[0])) {
+    const words = headline.split(/\s+/).filter(w => w.length > 1).slice(0, 5);
+    if (words.length >= 3) {
+      const truncated = words.map(w =>
+        w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+      ).join(' ');
+      console.log(`[detect-trend-events] Fallback headline truncation: "${truncated}" for "${entityName}"`);
+      return truncated;
+    }
+  }
+
   return null;
 }
 
@@ -1267,8 +1369,8 @@ serve(async (req) => {
     console.log(`[detect-trend-events] Fetched ${googleNews?.length || 0} Google News articles (limit: ${PERF_LIMITS.MAX_GOOGLE_NEWS})`);
     
     for (const item of googleNews || []) {
-      // Look up tier from source_tiers table by domain (Google News articles come from various sources)
-      const gnDomain = extractDomain(item.url);
+      // PHASE 3 FIX: Use canonical_url for domain if available (item.url may be news.google.com redirect)
+      const gnDomain = extractDomain(item.canonical_url || item.url);
       let gnTier: 'tier1' | 'tier2' | 'tier3' | undefined;
       
       // First check canonical source_tiers table
@@ -1293,7 +1395,7 @@ serve(async (req) => {
         sentiment_score: item.ai_sentiment,
         sentiment_label: item.ai_sentiment_label,
         topics: item.ai_topics || [],
-        domain: gnDomain,
+        domain: gnDomain, // PHASE 3 FIX: Uses canonical_url domain (not news.google.com)
         tier: gnTier || 'tier3', // Default to tier3 if no tier found
       };
       
@@ -1328,6 +1430,7 @@ serve(async (req) => {
         sentiment_score: post.ai_sentiment,
         sentiment_label: post.ai_sentiment_label,
         topics: post.ai_topics || [],
+        domain: 'bsky.app', // PHASE 3 FIX: Set domain for Bluesky posts to enable source counting
         tier: 'tier3', // Bluesky is always tier3 (social media)
       };
       
@@ -1338,7 +1441,21 @@ serve(async (req) => {
     }
     
     console.log(`[detect-trend-events] Aggregated ${topicMap.size} unique topics from sources`);
-    
+
+    // PHASE 3 DEBUG: Log domain distribution to diagnose multi-source rate
+    const allDomains = new Map<string, number>();
+    for (const [_, agg] of topicMap) {
+      for (const mention of agg.dedupedMentions.values()) {
+        const domain = mention.domain || 'unknown';
+        allDomains.set(domain, (allDomains.get(domain) || 0) + 1);
+      }
+    }
+    const topDomains = [...allDomains.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15)
+      .map(([d, c]) => `${d}:${c}`);
+    console.log(`[detect-trend-events] TOP DOMAINS: ${topDomains.join(', ')}`);
+
     // Calculate authority scores for each topic
     for (const [key, agg] of topicMap) {
       agg.authority_score = calculateAuthorityScore(agg, sourceTiers);
@@ -1540,12 +1657,14 @@ serve(async (req) => {
     let qualityGateFiltered = 0;
     let labelDowngradedCount = 0; // FIX 1: Count downgrades from event_phrase → entity_only
     
-    // FIX: Label quality audit counters
+    // FIX: Label quality audit counters - extended for context upgrades
     let labelAudit = {
       event_phrase: 0,
       fallback_generated: 0,
       entity_only: 0,
       with_metadata_hint: 0, // Topics that had label_quality_hint from extracted_topics
+      context_upgrade: 0, // NEW: Entities upgraded via headline context
+      fallback_failed: 0, // NEW: Fallback generation attempted but failed
     };
     
     for (const [key, agg] of topicMap) {
@@ -1578,9 +1697,19 @@ serve(async (req) => {
       // Source counts using DEDUPED counts
       const newsCount = agg.by_source_deduped.rss + agg.by_source_deduped.google_news;
       const socialCount = agg.by_source_deduped.bluesky;
-      const sourceCount = (agg.by_source_deduped.rss > 0 ? 1 : 0) + 
-                          (agg.by_source_deduped.google_news > 0 ? 1 : 0) + 
-                          (agg.by_source_deduped.bluesky > 0 ? 1 : 0);
+      const sourceTypeCount = (agg.by_source_deduped.rss > 0 ? 1 : 0) +
+                              (agg.by_source_deduped.google_news > 0 ? 1 : 0) +
+                              (agg.by_source_deduped.bluesky > 0 ? 1 : 0);
+
+      // PHASE 3 FIX: Count distinct source domains for better source diversity measurement
+      // This counts unique publishers/domains, not just source types
+      const distinctDomains = new Set<string>();
+      for (const mention of agg.dedupedMentions.values()) {
+        if (mention.domain) {
+          distinctDomains.add(mention.domain.toLowerCase());
+        }
+      }
+      const sourceCount = Math.max(distinctDomains.size, sourceTypeCount); // At least count source types
       
       // ========================================
       // PHASE 2: Get tier distribution BEFORE quality gates
@@ -1782,7 +1911,8 @@ serve(async (req) => {
       // Use the validated label quality for ranking
       const labelQualityForRanking = validationResult.label_quality;
       const validatedIsEventPhrase = validationResult.is_event_phrase;
-      const labelSource = validationResult.label_source; // FIX: Track label source for explainability
+      // FIX: Make labelSource mutable so it can be updated during context upgrade
+      let labelSource = validationResult.label_source;
       
       // ========================================
       // PHASE 3: EVERGREEN PENALTY CALCULATION
@@ -1863,7 +1993,14 @@ serve(async (req) => {
       // Determine trend stage
       const hoursOld = (now.getTime() - agg.first_seen_at.getTime()) / (1000 * 60 * 60);
       let trendStage = 'stable';
-      if (zScoreVelocity > 3 && acceleration > 50 && hoursOld < 3) {
+      // PHASE 4 FIX: High volume override - volume trumps z-score for active stories
+      if (current1h_deduped >= 5) {
+        trendStage = 'surging';  // 5+ mentions in last hour = definitely surging
+      } else if (current24h_deduped >= 20 && sourceCount >= 5) {
+        trendStage = 'surging';  // 20+ mentions from 5+ sources = surging
+      } else if (current24h_deduped >= 15 && current1h_deduped >= 2) {
+        trendStage = 'surging';  // High volume + recent activity = surging
+      } else if (zScoreVelocity > 3 && acceleration > 50 && hoursOld < 3) {
         trendStage = 'emerging';
       } else if (zScoreVelocity > 2 && acceleration > 20) {
         trendStage = 'surging';
@@ -1871,7 +2008,7 @@ serve(async (req) => {
         trendStage = 'peaking';
       } else if (zScoreVelocity < 0 || (zScoreVelocity < 0.5 && acceleration < -30)) {
         trendStage = 'declining';
-      } else if (zScoreVelocity > 0.5) {
+      } else if (zScoreVelocity > 0.3) {
         trendStage = 'surging';
       }
       
@@ -2039,18 +2176,33 @@ serve(async (req) => {
       if (labelQualityForRanking === 'entity_only' && contextSummary && contextSummary.length > 20) {
         // Use context_summary as the canonical label for better display
         canonicalLabel = contextSummary;
-        console.log(`[detect-trend-events] ✅ CONTEXT UPGRADE: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..."`);
+        // FIX: For context summaries (full headlines), just check for verb presence without word count limit
+        // Headlines are typically 10+ words but still describe events - isEventPhrase() would fail due to word count
+        const contextHasVerb = containsVerbOrEventNoun(contextSummary);
+        if (contextHasVerb) {
+          canonicalLabelIsEventPhrase = true;
+          // FIX: Update labelSource to reflect context upgrade for audit tracking
+          labelSource = 'context_upgrade';
+          console.log(`[detect-trend-events] ✅ CONTEXT UPGRADE: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..." (is_event_phrase=true, label_quality=context_upgraded)`);
+        } else {
+          // Context doesn't have verb - keep is_event_phrase as false but still use context for display
+          labelSource = 'context_display_only';
+          console.log(`[detect-trend-events] CONTEXT DISPLAY: "${agg.event_title}" → "${contextSummary.substring(0, 60)}..." (is_event_phrase=false, no verb, label_source=context_display_only)`);
+        }
       }
       
-      // PHASE 2/A: labelQuality already computed earlier for ranking - reuse it
-      // Use labelQualityForRanking which was computed before rankScore calculation
-      const labelQuality = labelQualityForRanking;
+      // PHASE 2/A: labelQuality - use labelQualityForRanking, but override for context upgrades
+      // PHASE 5 FIX: Track context_upgraded separately for audit purposes
+      const labelQuality = labelSource === 'context_upgrade' ? 'context_upgraded' : labelQualityForRanking;
       
-      // FIX: Track label quality for audit
+      // FIX: Track label quality for audit - extended with context upgrades
       if (labelQuality === 'event_phrase') labelAudit.event_phrase++;
       else if (labelQuality === 'fallback_generated') labelAudit.fallback_generated++;
       else labelAudit.entity_only++;
       if (agg.label_quality_hint) labelAudit.with_metadata_hint++;
+      // Track context upgrades and fallback failures via labelSource
+      if (labelSource === 'context_upgrade') labelAudit.context_upgrade++;
+      if (labelSource === 'fallback_failed' || labelSource === 'fallback_failed_after_downgrade') labelAudit.fallback_failed++;
       
       // Build related entities array from the aggregate
       const relatedEntitiesArray = Array.from(agg.related_entities).slice(0, 10);
@@ -2068,7 +2220,7 @@ serve(async (req) => {
         event_key: key,
         event_title: agg.event_title,
         canonical_label: canonicalLabel, // Best label for display
-        is_event_phrase: validatedIsEventPhrase, // FIX 1: Use validated value, not raw claim
+        is_event_phrase: canonicalLabelIsEventPhrase, // FIX 2: Use final value after fallback/context upgrades
         label_quality: labelQuality,  // PHASE 2: Track label source quality
         label_source: labelSource,  // NEW: Top-level field for audit queries
         related_entities: relatedEntitiesArray,  // PHASE 2: Entities contributing to this phrase
@@ -2104,7 +2256,7 @@ serve(async (req) => {
           baseline_delta_pct: Math.round(baselineDeltaPct * 10) / 10,
           has_historical_baseline: hasHistoricalBaseline,
           meets_volume_gate: meetsVolumeGate,
-          is_event_phrase: validatedIsEventPhrase, // FIX 1: Use validated value
+          is_event_phrase: canonicalLabelIsEventPhrase, // FIX 2: Use final value after fallback/context upgrades
           label_quality: labelQuality,  // PHASE 2: Include in explainability
           label_source: labelSource,  // FIX: Explicit label source for audit
           label_quality_hint: agg.label_quality_hint || null, // FIX: Original hint from extraction
@@ -2189,20 +2341,48 @@ serve(async (req) => {
     console.log(`[detect-trend-events] Quality gates filtered ${qualityGateFiltered} low-quality topics`);
     console.log(`[detect-trend-events] Deduplication removed ${dedupedSavings} duplicate mentions`);
     console.log(`[detect-trend-events] FIX 1: Downgraded ${labelDowngradedCount} entity-only labels from is_event_phrase=true → false`);
-    // FIX: Label quality audit log
-    console.log(`[detect-trend-events] LABEL AUDIT: event_phrase=${labelAudit.event_phrase} fallback_generated=${labelAudit.fallback_generated} entity_only=${labelAudit.entity_only} (with_metadata_hint=${labelAudit.with_metadata_hint})`);
-    
+
+    // PHASE 3 FIX: Log source distribution for debugging
+    const sourceDistribution = eventsToUpsert.reduce((acc, e) => {
+      const sc = e.source_count || 0;
+      acc[sc >= 5 ? '5+' : sc.toString()] = (acc[sc >= 5 ? '5+' : sc.toString()] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log(`[detect-trend-events] Source count distribution: ${JSON.stringify(sourceDistribution)}`);
+    // FIX: Extended label quality audit log with context upgrades and fallback failures
+    console.log(`[detect-trend-events] LABEL AUDIT: event_phrase=${labelAudit.event_phrase} fallback_generated=${labelAudit.fallback_generated} entity_only=${labelAudit.entity_only} context_upgrade=${labelAudit.context_upgrade} fallback_failed=${labelAudit.fallback_failed} (with_metadata_hint=${labelAudit.with_metadata_hint})`);
+
+    // PHASE 2 FIX: Consolidate cluster members before upsert
+    // Keep only the highest-scoring member of each cluster
+    const clusterBestMap = new Map<string, typeof eventsToUpsert[0]>();
+    for (const event of eventsToUpsert) {
+      const clusterId = event.cluster_id || event.event_key;
+      const existing = clusterBestMap.get(clusterId);
+      if (!existing || (event.rank_score || 0) > (existing.rank_score || 0)) {
+        // If merging, add evidence counts
+        if (existing) {
+          event.evidence_count = (event.evidence_count || 0) + (existing.evidence_count || 0);
+        }
+        clusterBestMap.set(clusterId, event);
+      } else if (existing) {
+        // Add this event's evidence to the existing best
+        existing.evidence_count = (existing.evidence_count || 0) + (event.evidence_count || 0);
+      }
+    }
+    const consolidatedEvents = Array.from(clusterBestMap.values());
+    console.log(`[detect-trend-events] Consolidated ${eventsToUpsert.length} events to ${consolidatedEvents.length} after cluster merge`);
+
     // ========================================
     // STEP 4: Upsert trend events and evidence in BATCHES
     // ========================================
     currentPhase = 'upsert_events';
     
     // Emergency flush: if near timeout, flush a smaller priority batch (breaking + high rank_score first)
-    let eventsToProcess = eventsToUpsert;
+    let eventsToProcess = consolidatedEvents;
     if (shouldExitEarly()) {
       console.warn(`[detect-trend-events] ⚠️ Near timeout before upsert - triggering emergency flush`);
       // Prioritize breaking events and top rank_score events
-      const priorityEvents = eventsToUpsert
+      const priorityEvents = consolidatedEvents
         .sort((a, b) => {
           // Breaking first
           if (a.is_breaking && !b.is_breaking) return -1;

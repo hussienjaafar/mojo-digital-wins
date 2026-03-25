@@ -8,9 +8,14 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+// Local VisuallyHidden component (not from Radix - using built-in sr-only pattern)
+const VisuallyHidden = ({ children }: { children: React.ReactNode }) => (
+  <span className="sr-only">{children}</span>
+);
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -163,7 +168,11 @@ const Sidebar = React.forwardRef<
             } as React.CSSProperties
           }
           side={side}
+          aria-describedby={undefined}
         >
+          <VisuallyHidden>
+            <SheetTitle>Navigation Menu</SheetTitle>
+          </VisuallyHidden>
           <div className="flex h-full w-full flex-col">{children}</div>
         </SheetContent>
       </Sheet>

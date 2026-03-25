@@ -35,20 +35,23 @@ function getPerformanceTier(roas: number): AdPerformanceTier {
 }
 
 /**
- * Build totals from ads - Uses Set for unique donors
+ * Build totals from ads - Uses Set for unique attributed donors only
+ * IMPORTANT: Only counts donors that have been attributed to Meta ads, not ALL donors
  */
 function buildTotals(
   ads: AdPerformanceData[],
-  allDonorEmails: string[]
+  attributedDonorEmails: string[]
 ): AdPerformanceTotals {
   const total_spend = ads.reduce((sum, ad) => sum + ad.spend, 0);
   const total_raised = ads.reduce((sum, ad) => sum + ad.raised, 0);
   const total_donations = ads.reduce((sum, ad) => sum + ad.donation_count, 0);
   const total_impressions = ads.reduce((sum, ad) => sum + ad.impressions, 0);
   const total_clicks = ads.reduce((sum, ad) => sum + ad.clicks, 0);
+  // Use link_clicks for accurate Link CTR (outbound clicks to destination URL)
+  const total_link_clicks = ads.reduce((sum, ad) => sum + (ad.link_clicks || 0), 0);
 
-  // Use unique donors from the actual set
-  const unique_donors = new Set(allDonorEmails).size;
+  // FIXED: Only count donors attributed to Meta ads (not ALL donors in period)
+  const unique_donors = new Set(attributedDonorEmails).size;
 
   return {
     total_spend,
@@ -61,7 +64,9 @@ function buildTotals(
     avg_cpa: unique_donors > 0 ? total_spend / unique_donors : 0,
     total_impressions,
     total_clicks,
-    avg_ctr: total_impressions > 0 ? (total_clicks / total_impressions) * 100 : 0,
+    total_link_clicks,
+    // Use Link CTR (link_clicks / impressions) - industry standard for conversion-focused campaigns
+    avg_ctr: total_impressions > 0 ? (total_link_clicks / total_impressions) * 100 : 0,
   };
 }
 
@@ -105,6 +110,8 @@ export function useAdPerformanceQuery({
           spend,
           impressions,
           clicks,
+          link_clicks,
+          link_ctr,
           reach,
           ctr,
           cpm,
@@ -167,10 +174,12 @@ export function useAdPerformanceQuery({
         ad_id: string;
         ad_name: string | null;
         campaign_id: string;
+        adset_id: string | null;
         creative_id: string | null;
         spend: number;
         impressions: number;
         clicks: number;
+        link_clicks: number;
         reach: number;
         meta_roas: number | null;
         quality_ranking: string | null;
@@ -185,10 +194,12 @@ export function useAdPerformanceQuery({
             ad_id: adId,
             ad_name: row.ad_name,
             campaign_id: row.campaign_id,
+            adset_id: row.adset_id || null,
             creative_id: row.creative_id,
             spend: 0,
             impressions: 0,
             clicks: 0,
+            link_clicks: 0,
             reach: 0,
             meta_roas: null,
             quality_ranking: row.quality_ranking,
@@ -199,6 +210,7 @@ export function useAdPerformanceQuery({
             spend: existing.spend + Number(row.spend || 0),
             impressions: existing.impressions + Number(row.impressions || 0),
             clicks: existing.clicks + Number(row.clicks || 0),
+            link_clicks: existing.link_clicks + Number(row.link_clicks || 0),
             reach: existing.reach + Number(row.reach || 0),
             // Use the most recent meta_roas value
             meta_roas: row.meta_roas ?? existing.meta_roas,
@@ -234,6 +246,41 @@ export function useAdPerformanceQuery({
         throw new Error('Failed to load creative data');
       }
 
+      // ========== STEP 2b: Fetch campaign names for hierarchy ==========
+      const { data: campaignsData } = await sb
+        .from('meta_campaigns')
+        .select('campaign_id, campaign_name, status, objective')
+        .eq('organization_id', organizationId);
+
+      // Build campaign name lookup
+      const campaignNamesMap: Record<string, string> = {};
+      for (const campaign of campaignsData || []) {
+        if (campaign.campaign_id && campaign.campaign_name) {
+          campaignNamesMap[campaign.campaign_id] = campaign.campaign_name;
+        }
+      }
+
+      // ========== STEP 2c: Fetch ad set names from meta_adsets table ==========
+      const { data: adsetsData } = await sb
+        .from('meta_adsets')
+        .select('adset_id, adset_name, campaign_id')
+        .eq('organization_id', organizationId);
+
+      // Build adset name lookup from actual Meta data
+      const adsetNamesMap: Record<string, string> = {};
+      for (const adset of adsetsData || []) {
+        if (adset.adset_id && adset.adset_name) {
+          adsetNamesMap[adset.adset_id] = adset.adset_name;
+        }
+      }
+
+      // Fallback: For any adset IDs not in meta_adsets table, use truncated ID
+      for (const row of adLevelData || []) {
+        if (row.adset_id && !adsetNamesMap[row.adset_id]) {
+          adsetNamesMap[row.adset_id] = `Ad Set ${row.adset_id.slice(-8)}`;
+        }
+      }
+
       // Build creative lookup by ad_id, creative_id, and refcode
       const creativeByAdId = new Map<string, any>();
       const creativeByCreativeId = new Map<string, any>();
@@ -265,27 +312,33 @@ export function useAdPerformanceQuery({
         });
       }
 
-      // ========== STEP 3: Get donations with attribution ==========
-      const { data: donationsData, error: donationsError } = await sb
-        .from('donation_attribution')
-        .select(`
-          attributed_creative_id,
-          attributed_ad_id,
-          attributed_campaign_id,
-          refcode,
-          attribution_method,
-          amount,
-          net_amount,
-          donor_email
-        `)
-        .eq('organization_id', organizationId)
-        .gte('transaction_date', startDate)
-        .lte('transaction_date', `${endDate}T23:59:59`)
-        .eq('transaction_type', 'donation');
+      // ========== STEP 3: Get donations with attribution (TIMEZONE-AWARE) ==========
+      // Use the timezone-aware RPC to match ActBlue's Eastern time boundaries
+      const orgTimezone = 'America/New_York'; // Default to ET for political orgs
+      
+      const { data: donationsData, error: donationsError } = await sb.rpc(
+        'get_ad_performance_donations_tz',
+        {
+          p_organization_id: organizationId,
+          p_start_date: startDate,
+          p_end_date: endDate,
+          p_timezone: orgTimezone
+        }
+      );
 
       if (donationsError) {
         logger.error('Failed to load donation attribution', donationsError);
         throw new Error('Failed to load donation data');
+      }
+
+      // DEV-ONLY: Log timezone-aware query results
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[AdPerformance:Hook] Timezone-aware donation query:', {
+          rpc: 'get_ad_performance_donations_tz',
+          params: { p_organization_id: organizationId, p_start_date: startDate, p_end_date: endDate, p_timezone: orgTimezone },
+          resultCount: (donationsData || []).length,
+          totalRaised: (donationsData || []).reduce((sum: number, d: any) => sum + Number(d.net_amount || 0), 0),
+        });
       }
 
       // Aggregate donations by ad_id (primary), creative_id (secondary), or refcode (fallback)
@@ -311,7 +364,9 @@ export function useAdPerformanceQuery({
         attribution_methods: Map<string, number>;
       }>();
 
+      // Track ALL donors (for unattributed banner) vs ATTRIBUTED donors (for KPI summary)
       const allDonorEmails: string[] = [];
+      const attributedDonorEmails: string[] = []; // NEW: Only donors matched to Meta ads
       let directAdIdMatches = 0;
       let creativeIdMatches = 0;
       let refcodeMatches = 0;
@@ -340,6 +395,8 @@ export function useAdPerformanceQuery({
           donationsByAdId.set(adId, existing);
           directAdIdMatches++;
           wasAttributed = true;
+          // Track as attributed donor for accurate KPI count
+          attributedDonorEmails.push(donorEmail);
         }
 
         // Also track by creative_id for fallback
@@ -356,7 +413,11 @@ export function useAdPerformanceQuery({
           existing.donors.add(donorEmail);
           existing.attribution_methods.set(method, (existing.attribution_methods.get(method) || 0) + 1);
           donationsByCreativeId.set(creativeId, existing);
-          if (!wasAttributed) creativeIdMatches++;
+          if (!wasAttributed) {
+            creativeIdMatches++;
+            // Track as attributed donor for accurate KPI count
+            attributedDonorEmails.push(donorEmail);
+          }
           wasAttributed = true;
         }
 
@@ -381,6 +442,8 @@ export function useAdPerformanceQuery({
             donationsByAdId.set(mappedAdId, existing);
             refcodeMatches++;
             wasAttributed = true;
+            // Track as attributed donor for accurate KPI count
+            attributedDonorEmails.push(donorEmail);
           } else {
             // Track by refcode for later analysis
             const existing = donationsByRefcode.get(refcodeLower) || {
@@ -443,15 +506,21 @@ export function useAdPerformanceQuery({
           const roiPct = spend > 0 ? (profit / spend) * 100 : 0;
           const avgDonation = donationCount > 0 ? raised / donationCount : 0;
           const cpa = uniqueDonors > 0 ? spend / uniqueDonors : 0;
-          const ctr = metrics.impressions > 0 ? (metrics.clicks / metrics.impressions) * 100 : 0;
+          // Use link_clicks for Link CTR (accurate measure of outbound clicks)
+          const linkClicks = metrics.link_clicks || 0;
+          const ctr = metrics.impressions > 0 ? (linkClicks / metrics.impressions) * 100 : 0;
           const cpm = metrics.impressions > 0 ? (spend / metrics.impressions) * 1000 : 0;
-          const cpc = metrics.clicks > 0 ? spend / metrics.clicks : 0;
+          const cpc = linkClicks > 0 ? spend / linkClicks : 0;
 
           ads.push({
             id: creative?.id || adId,
             ad_id: adId,
+            ad_name: metrics.ad_name || null, // Actual Meta ad name
             creative_id: metrics.creative_id || creative?.creative_id || '',
             campaign_id: metrics.campaign_id,
+            campaign_name: campaignNamesMap[metrics.campaign_id] || undefined,
+            adset_id: metrics.adset_id || undefined,
+            adset_name: metrics.adset_id ? adsetNamesMap[metrics.adset_id] : undefined,
             status: 'ACTIVE',
             spend,
             raised,
@@ -464,12 +533,13 @@ export function useAdPerformanceQuery({
             cpa,
             impressions: metrics.impressions,
             clicks: metrics.clicks,
+            link_clicks: linkClicks,
             ctr,
             cpm,
             cpc,
             creative_thumbnail_url: creative?.thumbnail_url || null,
             ad_copy_primary_text: creative?.primary_text || null,
-            ad_copy_headline: creative?.headline || metrics.ad_name || null,
+            ad_copy_headline: creative?.headline || null,
             ad_copy_description: creative?.description || null,
             creative_type: creative?.creative_type || 'unknown',
             performance_tier: creative?.performance_tier || getPerformanceTier(roas),
@@ -563,6 +633,7 @@ export function useAdPerformanceQuery({
           const roiPct = spend > 0 ? (profit / spend) * 100 : 0;
           const avgDonation = donationCount > 0 ? raised / donationCount : 0;
           const cpa = uniqueDonors > 0 ? spend / uniqueDonors : 0;
+          // Fallback path: no link_clicks available, use total clicks
           const ctr = impressionsShare > 0 ? (clicksShare / impressionsShare) * 100 : 0;
           const cpm = impressionsShare > 0 ? (spend / impressionsShare) * 1000 : 0;
           const cpc = clicksShare > 0 ? spend / clicksShare : 0;
@@ -572,6 +643,7 @@ export function useAdPerformanceQuery({
             ad_id: creative.ad_id || '',
             creative_id: creativeId,
             campaign_id: creative.campaign_id,
+            adset_id: undefined, // Not available in fallback path
             status: 'ACTIVE',
             spend,
             raised,
@@ -584,6 +656,7 @@ export function useAdPerformanceQuery({
             cpa,
             impressions: impressionsShare,
             clicks: clicksShare,
+            link_clicks: 0, // Not available in fallback path
             ctr,
             cpm,
             cpc,
@@ -658,7 +731,8 @@ export function useAdPerformanceQuery({
       }
 
       // ========== STEP 6: Calculate totals and summary ==========
-      const totals = buildTotals(ads, allDonorEmails);
+      // FIXED: Use attributedDonorEmails (donors matched to Meta ads) not allDonorEmails (all donors in period)
+      const totals = buildTotals(ads, attributedDonorEmails);
 
       const topThree = [...ads]
         .sort((a, b) => b.roas - a.roas)
@@ -735,6 +809,8 @@ export function useAdPerformanceQuery({
           modeled_attributed: modeledAttributed,
           total_attributed: totalAttributed,
         },
+        campaignNames: campaignNamesMap,
+        adsetNames: adsetNamesMap,
         attributionFallbackMode,
         isEstimatedDistribution,
         hasUnattributedDonations,

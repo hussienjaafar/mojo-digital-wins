@@ -43,11 +43,13 @@ export function InviteUserDialog({
   const [sending, setSending] = useState(false);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [existingInvitation, setExistingInvitation] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, action: "send" | "resend" = "send") => {
     e.preventDefault();
     setSending(true);
     setInviteUrl(null);
+    setExistingInvitation(false);
 
     try {
       const response = await supabase.functions.invoke("send-user-invitation", {
@@ -56,19 +58,33 @@ export function InviteUserDialog({
           type,
           organization_id: type === "organization_member" ? organizationId : undefined,
           role: type === "organization_member" ? role : undefined,
+          action,
         },
       });
 
-      if (response.error) {
-        throw new Error(response.error.message || "Failed to send invitation");
-      }
-
+      // Check for error in response data first (edge function error responses)
       if (response.data?.error) {
+        // Check if it's an "already exists" error
+        if (response.data.error.includes("already a pending invitation")) {
+          setExistingInvitation(true);
+          toast.info("An invitation already exists. Click 'Resend' to send again.");
+          return;
+        }
         throw new Error(response.data.error);
       }
 
+      // Check for network/invocation errors
+      if (response.error) {
+        // Try to extract error from context if available
+        const errorMessage = response.error.message || "Failed to send invitation";
+        throw new Error(errorMessage);
+      }
+
       setInviteUrl(response.data.invite_url);
-      toast.success(response.data.message || "Invitation sent successfully");
+      const successMessage = action === "resend"
+        ? "Invitation resent successfully"
+        : (response.data.message || "Invitation sent successfully");
+      toast.success(successMessage);
       onSuccess?.();
     } catch (err: any) {
       console.error("Error sending invitation:", err);
@@ -76,6 +92,10 @@ export function InviteUserDialog({
     } finally {
       setSending(false);
     }
+  };
+
+  const handleResend = async (e: React.FormEvent) => {
+    await handleSubmit(e, "resend");
   };
 
   const handleCopyLink = async () => {
@@ -95,6 +115,7 @@ export function InviteUserDialog({
     setRole("viewer");
     setInviteUrl(null);
     setCopied(false);
+    setExistingInvitation(false);
     onOpenChange(false);
   };
 
@@ -193,16 +214,29 @@ export function InviteUserDialog({
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={sending}>
-                {sending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  "Send Invitation"
-                )}
-              </Button>
+              {existingInvitation ? (
+                <Button type="button" onClick={handleResend} disabled={sending}>
+                  {sending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Resending...
+                    </>
+                  ) : (
+                    "Resend Invitation"
+                  )}
+                </Button>
+              ) : (
+                <Button type="submit" disabled={sending}>
+                  {sending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Send Invitation"
+                  )}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         )}

@@ -1,11 +1,10 @@
-import { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { V3Card, V3CardContent, V3CardHeader, V3CardTitle } from "@/components/v3/V3Card";
 import { V3KPICard } from "@/components/v3/V3KPICard";
 import { V3ChartWrapper } from "@/components/v3/V3ChartWrapper";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { EChartsLineChart } from "@/components/charts/echarts/EChartsLineChart";
 import { V3BarChart } from "@/components/charts/V3BarChart";
@@ -523,109 +522,112 @@ export default function EnhancedSMSMetrics({ organizationId, startDate, endDate 
             </TableHeader>
             <TableBody>
               {aggregatedMetrics.map((metric) => (
-                <Collapsible
-                  key={metric.campaign_id}
-                  open={expandedCampaign === metric.campaign_id}
-                  onOpenChange={() => setExpandedCampaign(
-                    expandedCampaign === metric.campaign_id ? null : metric.campaign_id
-                  )}
-                  asChild
-                >
-                  <>
-                    <TableRow className="cursor-pointer hover:bg-[hsl(var(--portal-bg-hover))]">
-                      <TableCell className="font-medium">
-                        <div>
-                          {metric.campaign_name}
-                          {metric.a_b_test_variant && (
-                            <Badge variant="outline" className="ml-2 text-xs">
-                              {metric.a_b_test_variant}
-                            </Badge>
-                          )}
-                        </div>
-                        {metric.audience_segment !== "General" && (
-                          <div className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">
-                            {metric.audience_segment}
-                          </div>
+                <React.Fragment key={metric.campaign_id}>
+                  <TableRow 
+                    className="cursor-pointer hover:bg-[hsl(var(--portal-bg-hover))]"
+                    onClick={() => setExpandedCampaign(
+                      expandedCampaign === metric.campaign_id ? null : metric.campaign_id
+                    )}
+                  >
+                    <TableCell className="font-medium">
+                      <div>
+                        {metric.campaign_name}
+                        {metric.a_b_test_variant && (
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            {metric.a_b_test_variant}
+                          </Badge>
                         )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {metric.messages_sent.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className={metric.delivery_rate < 90 ? 'text-[hsl(var(--portal-error))] font-medium' : ''}>
-                          {metric.delivery_rate.toFixed(1)}%
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {metric.conversions.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {metric.conversion_rate.toFixed(1)}%
-                      </TableCell>
-                      <TableCell className="text-right">
-                        ${metric.cost_per_conversion.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className={metric.opt_out_rate > 5 ? 'text-[hsl(var(--portal-error))] font-medium' : ''}>
-                          {metric.opt_out_rate.toFixed(2)}%
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <CollapsibleTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            {expandedCampaign === metric.campaign_id ? (
-                              <ChevronUp className="h-4 w-4" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </CollapsibleTrigger>
-                      </TableCell>
-                    </TableRow>
-                    <CollapsibleContent asChild>
-                      <TableRow>
-                        <TableCell colSpan={8} className="bg-[hsl(var(--portal-bg-hover))]">
-                          <div className="p-4 space-y-3">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                              <div>
-                                <div className="text-[hsl(var(--portal-text-muted))]">Delivered</div>
-                                <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.messages_delivered.toLocaleString()}</div>
-                              </div>
-                              <div>
-                                <div className="text-[hsl(var(--portal-text-muted))]">Failed</div>
-                                <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.messages_failed.toLocaleString()}</div>
-                              </div>
-                              <div>
-                                <div className="text-[hsl(var(--portal-text-muted))]">Clicks</div>
-                                <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.clicks.toLocaleString()}</div>
-                              </div>
-                              <div>
-                                <div className="text-[hsl(var(--portal-text-muted))]">Click Rate</div>
-                                <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.click_through_rate.toFixed(2)}%</div>
-                              </div>
-                              <div>
-                                <div className="text-[hsl(var(--portal-text-muted))]">Amount Raised</div>
-                                <div className="font-medium text-[hsl(var(--portal-success))]">${metric.amount_raised.toLocaleString()}</div>
-                              </div>
-                              <div>
-                                <div className="text-[hsl(var(--portal-text-muted))]">Total Cost</div>
-                                <div className="font-medium text-[hsl(var(--portal-text-primary))]">${metric.cost.toLocaleString()}</div>
-                              </div>
-                              <div>
-                                <div className="text-[hsl(var(--portal-text-muted))]">Bounce Rate</div>
-                                <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.bounce_rate.toFixed(2)}%</div>
-                              </div>
-                              <div>
-                                <div className="text-[hsl(var(--portal-text-muted))]">Opt-outs</div>
-                                <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.opt_outs.toLocaleString()}</div>
-                              </div>
+                      </div>
+                      {metric.audience_segment !== "General" && (
+                        <div className="text-xs text-[hsl(var(--portal-text-muted))] mt-1">
+                          {metric.audience_segment}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {metric.messages_sent.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span className={metric.delivery_rate < 90 ? 'text-[hsl(var(--portal-error))] font-medium' : ''}>
+                        {metric.delivery_rate.toFixed(1)}%
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {metric.conversions.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {metric.conversion_rate.toFixed(1)}%
+                    </TableCell>
+                    <TableCell className="text-right">
+                      ${metric.cost_per_conversion.toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span className={metric.opt_out_rate > 5 ? 'text-[hsl(var(--portal-error))] font-medium' : ''}>
+                        {metric.opt_out_rate.toFixed(2)}%
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedCampaign(
+                            expandedCampaign === metric.campaign_id ? null : metric.campaign_id
+                          );
+                        }}
+                      >
+                        {expandedCampaign === metric.campaign_id ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  {expandedCampaign === metric.campaign_id && (
+                    <TableRow>
+                      <TableCell colSpan={8} className="bg-[hsl(var(--portal-bg-hover))]">
+                        <div className="p-4 space-y-3">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <div className="text-[hsl(var(--portal-text-muted))]">Delivered</div>
+                              <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.messages_delivered.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-[hsl(var(--portal-text-muted))]">Failed</div>
+                              <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.messages_failed.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-[hsl(var(--portal-text-muted))]">Clicks</div>
+                              <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.clicks.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-[hsl(var(--portal-text-muted))]">Click Rate</div>
+                              <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.click_through_rate.toFixed(2)}%</div>
+                            </div>
+                            <div>
+                              <div className="text-[hsl(var(--portal-text-muted))]">Amount Raised</div>
+                              <div className="font-medium text-[hsl(var(--portal-success))]">${metric.amount_raised.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-[hsl(var(--portal-text-muted))]">Total Cost</div>
+                              <div className="font-medium text-[hsl(var(--portal-text-primary))]">${metric.cost.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-[hsl(var(--portal-text-muted))]">Bounce Rate</div>
+                              <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.bounce_rate.toFixed(2)}%</div>
+                            </div>
+                            <div>
+                              <div className="text-[hsl(var(--portal-text-muted))]">Opt-outs</div>
+                              <div className="font-medium text-[hsl(var(--portal-text-primary))]">{metric.opt_outs.toLocaleString()}</div>
                             </div>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    </CollapsibleContent>
-                  </>
-                </Collapsible>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>

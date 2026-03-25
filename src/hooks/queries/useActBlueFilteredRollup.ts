@@ -49,6 +49,8 @@ const DEFAULT_TIMEZONE = "America/New_York";
  * Hook to fetch ActBlue metrics using the server-side filtered rollup RPC.
  * Uses timezone-aware day bucketing and supports optional campaign/creative filtering.
  *
+ * Always uses Eastern Time boundaries to match ActBlue's Fundraising Performance dashboard.
+ *
  * This replaces client-side day bucketing with server-side aggregation for:
  * - Better performance (aggregation happens in DB)
  * - Consistent timezone handling (configured per-org)
@@ -62,7 +64,6 @@ export function useActBlueFilteredRollup({
   creativeId,
   timezone = DEFAULT_TIMEZONE,
 }: ActBlueFilteredRollupParams): UseActBlueFilteredRollupResult {
-  const hasFilters = !!(campaignId || creativeId);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
@@ -75,7 +76,7 @@ export function useActBlueFilteredRollup({
       timezone,
     ],
     queryFn: async () => {
-      // Call the RPC with optional parameters
+      // Call the RPC with optional parameters - always use ET (p_use_utc: false)
       const { data: rpcData, error: rpcError } = await (supabase as any).rpc(
         "get_actblue_filtered_rollup",
         {
@@ -85,6 +86,7 @@ export function useActBlueFilteredRollup({
           p_campaign_id: campaignId || null,
           p_creative_id: creativeId || null,
           p_timezone: timezone,
+          p_use_utc: false,
         }
       );
 

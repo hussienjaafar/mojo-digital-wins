@@ -135,6 +135,23 @@ const ACTION_VERBS = [
   // General action verbs
   'face', 'faces', 'faced', 'facing', 'win', 'wins', 'won', 'winning',
   'lose', 'loses', 'lost', 'losing', 'defeat', 'defeats', 'defeated',
+  // PHASE 3 FIX: Added common headline verbs that were missing
+  'reveal', 'reveals', 'revealed', 'revealing', 'confirm', 'confirms', 'confirmed',
+  'plan', 'plans', 'planned', 'planning', 'consider', 'considers', 'considered',
+  'mull', 'mulls', 'mulled', 'weigh', 'weighs', 'weighed',
+  'call', 'calls', 'called', 'calling', 'push', 'pushes', 'pushed', 'pushing',
+  'seek', 'seeks', 'sought', 'seeking', 'target', 'targets', 'targeted',
+  'slam', 'slams', 'slammed', 'blast', 'blasts', 'blasted',
+  'praise', 'praises', 'praised', 'defend', 'defends', 'defended',
+  'criticize', 'criticizes', 'criticized', 'condemn', 'condemns', 'condemned',
+  'urge', 'urges', 'urged', 'vow', 'vows', 'vowed',
+  'claim', 'claims', 'claimed', 'allege', 'alleges', 'alleged',
+  'honor', 'honors', 'honored', 'celebrate', 'celebrates', 'celebrated',
+  'mourn', 'mourns', 'mourned', 'mark', 'marks', 'marked',
+  'hold', 'holds', 'held', 'host', 'hosts', 'hosted',
+  'meet', 'meets', 'met', 'visit', 'visits', 'visited',
+  'speak', 'speaks', 'spoke', 'address', 'addresses', 'addressed',
+  'testify', 'testifies', 'testified', 'appear', 'appears', 'appeared',
   'confirm', 'confirms', 'confirmed', 'confirming', 'release', 'releases', 'released',
   'reveal', 'reveals', 'revealed', 'expose', 'exposes', 'exposed',
   'target', 'targets', 'targeted', 'targeting', 'kill', 'kills', 'killed',
@@ -226,14 +243,14 @@ function isValidEventPhrase(phrase: string): boolean {
 
 /**
  * Generate fallback event phrase from headline when AI only returns entities
- * PHASE 2: Strengthened with more patterns and better Subject+Verb+Object extraction
+ * PHASE 3 FIX: Strengthened with more patterns, better extraction, and headline truncation fallback
  */
 function generateFallbackEventPhrase(title: string, entities: Array<{ name: string; type: string; canonical: string }>): string | null {
   if (!title || entities.length === 0) return null;
-  
+
   const titleClean = title.trim();
-  
-  // PHASE 2: Expanded verb patterns for Subject + Verb + Object extraction
+
+  // PHASE 3 FIX: Comprehensive verb patterns for Subject + Verb + Object extraction
   const verbPatterns = [
     // Active voice: "Trump Fires FBI Director", "House Passes Bill"
     /^(\w+(?:\s+\w+)?)\s+(passes?|blocks?|rejects?|approves?|signs?|fires?|resigns?|announces?|launches?|bans?|arrests?|indicts?|sues?|orders?|vetoes?|strikes?|rules?|overturns?|upholds?|halts?|suspends?|expands?|cuts?|threatens?|warns?|demands?|proposes?|withdraws?|seizes?|raids?|deports?|detains?|pardons?|revokes?|nominates?|appoints?|dismisses?|grants?|denies?|charges?|convicts?|acquits?|sentences?|attacks?|invades?|bombs?|collapses?|escalates?|ceases?|freezes?|raises?|lowers?)\s+(.+)/i,
@@ -247,6 +264,21 @@ function generateFallbackEventPhrase(title: string, entities: Array<{ name: stri
     /^(\w+(?:\s+\w+)?)\s+(faces?|face)\s+(.+)/i,
     // "X wins/loses Y" pattern: "Democrats Win Senate"
     /^(\w+(?:\s+\w+)?)\s+(wins?|loses?|won|lost)\s+(.+)/i,
+    // PHASE 3 FIX: Additional patterns for common headline structures
+    // "X reveals/confirms Y" pattern
+    /^(\w+(?:\s+\w+)?)\s+(reveals?|confirms?|denies?|claims?|alleges?)\s+(.+)/i,
+    // "X plans/considers Y" pattern
+    /^(\w+(?:\s+\w+)?)\s+(plans?|considers?|mulls?|weighs?|eyes?)\s+(.+)/i,
+    // "X calls for/pushes for Y" pattern
+    /^(\w+(?:\s+\w+)?)\s+(calls?\s+for|pushes?\s+for|demands?|urges?)\s+(.+)/i,
+    // "X slams/blasts Y" pattern
+    /^(\w+(?:\s+\w+)?)\s+(slams?|blasts?|criticizes?|condemns?|praises?|defends?)\s+(.+)/i,
+    // "X honors/celebrates Y" pattern
+    /^(\w+(?:\s+\w+)?)\s+(honors?|celebrates?|mourns?|marks?|commemorates?)\s+(.+)/i,
+    // "X meets/visits Y" pattern
+    /^(\w+(?:\s+\w+)?)\s+(meets?|visits?|hosts?|addresses?|speaks?\s+to)\s+(.+)/i,
+    // "X targets/seeks Y" pattern
+    /^(\w+(?:\s+\w+)?)\s+(targets?|seeks?|pursues?|investigates?)\s+(.+)/i,
   ];
   
   for (const pattern of verbPatterns) {
@@ -289,19 +321,52 @@ function generateFallbackEventPhrase(title: string, entities: Array<{ name: stri
     }
   }
   
-  // PHASE 2: Last resort - combine top 2 entities if multi-word
-  if (entities.length >= 2) {
-    const e1 = entities[0].canonical || entities[0].name;
-    const e2 = entities[1].canonical || entities[1].name;
-    // Only if they're different and result is meaningful
-    if (e1 !== e2 && e1.length > 2 && e2.length > 2) {
-      const combined = `${e1} ${e2}`;
-      if (combined.split(/\s+/).length >= 2 && combined.split(/\s+/).length <= 5) {
-        return combined;
+  // PHASE 3 FIX: Headline truncation fallback - use first 4-5 meaningful words
+  // This ensures we ALWAYS generate something rather than returning null
+  const words = titleClean.split(/\s+/).filter(w => w.length > 1);
+  if (words.length >= 3) {
+    // Take first 4-5 words, title case them
+    const truncated = words.slice(0, 5).map(w =>
+      w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+    ).join(' ');
+
+    // Check if it contains at least one entity (to ensure relevance)
+    const topEntity = entities[0]?.canonical || entities[0]?.name || '';
+    const entityInTruncated = topEntity && truncated.toLowerCase().includes(topEntity.toLowerCase().split(' ')[0]);
+
+    if (entityInTruncated || words.length >= 4) {
+      console.log(`[FALLBACK] Headline truncation: "${truncated}" from "${title.substring(0, 50)}..."`);
+      return truncated;
+    }
+  }
+
+  // PHASE 2: Last resort - combine top entity with context word from headline
+  if (entities.length >= 1) {
+    const topEntity = entities[0].canonical || entities[0].name;
+    // Find a context word from headline that isn't the entity
+    const contextWords = words.filter(w =>
+      !topEntity.toLowerCase().includes(w.toLowerCase()) &&
+      w.length > 3 &&
+      !['the', 'and', 'for', 'with', 'from', 'that', 'this', 'have', 'has', 'been', 'were', 'will'].includes(w.toLowerCase())
+    );
+
+    if (contextWords.length > 0) {
+      const phrase = `${topEntity} ${contextWords[0].charAt(0).toUpperCase() + contextWords[0].slice(1).toLowerCase()}`;
+      if (phrase.split(/\s+/).length >= 2) {
+        console.log(`[FALLBACK] Entity+context: "${phrase}" from "${title.substring(0, 50)}..."`);
+        return phrase;
       }
     }
   }
-  
+
+  // Absolute last resort: just use the top entity name if it's multi-word
+  if (entities.length >= 1) {
+    const topEntity = entities[0].canonical || entities[0].name;
+    if (topEntity.split(/\s+/).length >= 2) {
+      return topEntity;
+    }
+  }
+
   return null;
 }
 
@@ -326,39 +391,52 @@ async function extractNERWithAI(items: ContentItem[]): Promise<Map<string, NERRe
     `[${i}] ${item.title}${item.description ? ` - ${item.description.substring(0, 200)}` : ''}`
   ).join('\n');
   
-  // PHASE 2: Enhanced prompt prioritizing event phrases over entities
-  const prompt = `Extract EVENT PHRASES (primary) and named entities (secondary) from these headlines for Twitter-style trending.
+  // PHASE 3 FIX: Enhanced prompt with MANDATORY event phrase requirement
+  const prompt = `Extract EVENT PHRASES (MANDATORY) and named entities from these headlines for Twitter-style trending.
 
 ${itemsText}
 
-For EACH item, extract in ORDER OF PRIORITY:
+**MANDATORY REQUIREMENT**: Every headline MUST have at least ONE event_phrase. If you cannot find an obvious event, create one from the headline using this formula:
+- Take the SUBJECT (who/what) + VERB (action word) + OBJECT (affected thing)
+- Example: "ICE arrests migrants in Chicago" → "ICE Arrests Migrants"
 
-1. **event_phrases** (PRIMARY - these become the trend labels):
-   Multi-word verb-centered phrases (2-5 words) that describe WHAT is happening:
-   - GOOD: "House Passes Border Bill", "Trump Fires FBI Director", "Gaza Ceasefire Collapses"
-   - GOOD: "Supreme Court Blocks Abortion Ban", "DOJ Indicts Senator", "Texas Sues Biden"
-   - BAD: Just names like "Donald Trump", "FBI", "Gaza" (these are entities, not events)
-   
-   REQUIRE: Subject + Verb + Object pattern when possible
-   - "[Who] [Does What] [To Whom/What]"
+For EACH item, extract:
 
-2. **entities** (SECONDARY - metadata, not primary labels):
-   - PERSON: Full canonical names (e.g., "Donald Trump", NOT "Trump")
-   - ORG: Organizations (e.g., "Supreme Court", "FBI")
-   - GPE: Locations (e.g., "Gaza", "Texas")
-   - These should NOT be the trending label if an event phrase exists
+1. **event_phrases** (REQUIRED - at least ONE per headline):
+   3-5 word phrases describing WHAT IS HAPPENING:
+
+   Pattern: [Subject] [Verb] [Object/Target]
+
+   GOOD examples:
+   - "House Passes Border Bill"
+   - "Trump Fires FBI Director"
+   - "ICE Raids Chicago Sanctuary"
+   - "Supreme Court Blocks Ban"
+   - "Democrats Honor MLK Legacy"
+   - "Florida Faces Storm Threat"
+
+   BAD (these are entities, NOT events):
+   - "Donald Trump" ❌
+   - "ICE" ❌
+   - "Gaza" ❌
+   - "Democratic Party" ❌
+
+   **IF NO OBVIOUS EVENT**: Use the headline's first 4-5 words if they form a coherent phrase.
+
+2. **entities** (secondary metadata):
+   - PERSON: Full names ("Donald Trump", "Joe Biden")
+   - ORG: Organizations ("FBI", "Supreme Court")
+   - GPE: Places ("Gaza", "Florida")
 
 3. **sentiment**: -1.0 to 1.0
 
-CRITICAL RULES:
-- PRIORITIZE event phrases over single entities as the trending topic
-- Event phrases MUST describe an action/event, not just a person or place
-- Use FULL CANONICAL NAMES for people: "Donald Trump" not "Trump"
-- DO NOT include news publishers (CNN, Reuters, AP) as entities
-- Each headline should ideally produce at least ONE event phrase
+CRITICAL:
+- event_phrases array MUST NOT be empty
+- DO NOT return only entities - that is a FAILURE
+- If unsure, use headline's first meaningful phrase as event_phrase
 
 Return JSON array:
-[{"index": 0, "event_phrases": ["Trump Fires FBI Director", "DOJ Investigation Expands"], "entities": [{"name": "Donald Trump", "type": "PERSON"}, {"name": "FBI", "type": "ORG"}], "sentiment": -0.3, "sentiment_label": "negative"}]`;
+[{"index": 0, "event_phrases": ["Trump Fires FBI Director"], "entities": [{"name": "Donald Trump", "type": "PERSON"}, {"name": "FBI", "type": "ORG"}], "sentiment": -0.3, "sentiment_label": "negative"}]`;
 
   try {
     const response = await fetch(AI_GATEWAY_URL, {
@@ -370,9 +448,9 @@ Return JSON array:
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          { 
-            role: 'system', 
-            content: 'You are an NER system that extracts verb-centered event phrases (primary) and canonical entities (secondary) from news headlines. Event phrases describe WHAT HAPPENED, not just WHO. Output ONLY valid JSON arrays.' 
+          {
+            role: 'system',
+            content: 'You are an NER system that MUST extract event phrases from every headline. Event phrases describe WHAT IS HAPPENING (e.g., "Trump Fires Director", "ICE Raids City"). NEVER return empty event_phrases - always generate at least one phrase using Subject+Verb+Object pattern. Output ONLY valid JSON arrays.'
           },
           { role: 'user', content: prompt }
         ]

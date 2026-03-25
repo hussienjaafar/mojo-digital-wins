@@ -32,6 +32,8 @@ import {
   TrendingUp,
   HeartPulse,
   Layers,
+  Map,
+  Sparkles,
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import {
@@ -92,8 +94,11 @@ export const navigationGroups: NavigationGroup[] = [
       { title: "Daily Briefing", icon: Calendar, value: "daily-briefing" },
       { title: "News & Trends", icon: Newspaper, value: "news" },
       { title: "Analytics", icon: BarChart3, value: "content-analytics" },
+      { title: "Ad Copy Studio", icon: Sparkles, value: "ad-copy-studio" },
       { title: "Critical Alerts", icon: AlertTriangle, value: "critical-alerts" },
       { title: "Bills", icon: ScrollText, value: "bills" },
+      { title: "Voter Impact Map", icon: Map, value: "voter-impact-map" },
+      { title: "Voter Data Import", icon: Download, value: "voter-data-import", requiredRole: 'admin' },
     ],
   },
   {
@@ -101,6 +106,7 @@ export const navigationGroups: NavigationGroup[] = [
     icon: Building2,
     items: [
       { title: "Organizations", icon: Building2, value: "clients" },
+      { title: "Donor Universe", icon: Users, value: "donor-universe", requiredRole: 'admin' },
       { title: "Onboarding Wizard", icon: UserCog, value: "onboarding-wizard", requiredRole: 'admin' },
       { title: "Organization Members", icon: Users, value: "client-users" },
       { title: "Bulk Operations", icon: Download, value: "bulk-ops", requiredRole: 'admin' },
@@ -122,6 +128,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { title: "Platform Admins", icon: UserCog, value: "users", requiredRole: 'admin' },
       { title: "Platform Invites", icon: Mail, value: "invite-codes", requiredRole: 'admin' },
+      { title: "Contact Submissions", icon: MessageSquare, value: "contacts", requiredRole: 'admin' },
       { title: "Operations", icon: Activity, value: "scheduler", requiredRole: 'admin' },
       { title: "Coverage Governance", icon: Layers, value: "coverage-governance", requiredRole: 'admin' },
       { title: "Sessions", icon: Shield, value: "sessions", requiredRole: 'admin' },

@@ -1,13 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { donationKeys } from "./queryKeys";
+import { actblueKeys } from "./queryKeys";
 import { useDateRange } from "@/stores/dashboardStore";
-import { format, parseISO, eachDayOfInterval, addDays } from "date-fns";
+import { format, parseISO, eachDayOfInterval } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { logger } from "@/lib/logger";
 import { DEFAULT_ORG_TIMEZONE } from "@/lib/metricDefinitions";
+import { fetchDailyRollup, fetchPeriodSummary } from "@/lib/actblueRpcClient";
 import type { DailyRollupRow, PeriodSummary } from "./useActBlueDailyRollupQuery";
 
+// NOTE: Timezone conversion is now handled server-side by RPCs using p_use_utc=false
+// All date strings are interpreted as Eastern Time boundaries by the database
 /**
  * Format a timestamp in org timezone for display purposes.
  * @param dateStr ISO timestamp string
@@ -84,128 +87,32 @@ interface DonationMetricsResult {
   recentDonations: DonationRow[];
 }
 
-/**
- * Fetch canonical ActBlue daily rollup for timezone-aware metrics
- */
-async function fetchCanonicalDailyRollup(
-  organizationId: string,
-  startDate: string,
-  endDate: string
-): Promise<DailyRollupRow[]> {
-  const { data, error } = await (supabase as any).rpc('get_actblue_daily_rollup', {
-    p_organization_id: organizationId,
-    p_start_date: startDate,
-    p_end_date: endDate,
-  });
-
-  if (error) {
-    logger.error('Failed to fetch canonical ActBlue daily rollup', { error, organizationId });
-    throw new Error(`Failed to fetch daily rollup: ${error.message}`);
-  }
-
-  return (data || []).map((row: any) => {
-    const grossDonations = Number(row.gross_donations) || 0;
-    const netDonations = Number(row.net_donations) || 0;
-    const donationCount = Number(row.donation_count) || 0;
-    const recurringCount = Number(row.recurring_count) || 0;
-    const recurringRevenue = Number(row.recurring_revenue) || 0;
-    const totalFees = Number(row.total_fees) || 0;
-    const refundCount = Number(row.refund_count) || 0;
-
-    return {
-      day: row.day,
-      gross_raised: grossDonations,
-      net_raised: netDonations,
-      refunds: Number(row.refunds) || 0,
-      net_revenue: Number(row.net_revenue) || 0,
-      total_fees: totalFees,
-      donation_count: donationCount,
-      unique_donors: Number(row.unique_donors) || 0,
-      refund_count: refundCount,
-      recurring_count: recurringCount,
-      one_time_count: donationCount - recurringCount,
-      recurring_revenue: recurringRevenue,
-      one_time_revenue: netDonations - recurringRevenue,
-      fee_percentage: grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0,
-      refund_rate: donationCount > 0 ? (refundCount / donationCount) * 100 : 0,
-    };
-  });
-}
-
-/**
- * Fetch canonical ActBlue period summary for timezone-aware metrics
- */
-async function fetchCanonicalPeriodSummary(
-  organizationId: string,
-  startDate: string,
-  endDate: string
-): Promise<PeriodSummary> {
-  const { data, error } = await (supabase as any).rpc('get_actblue_period_summary', {
-    p_organization_id: organizationId,
-    p_start_date: startDate,
-    p_end_date: endDate,
-  });
-
-  if (error) {
-    logger.error('Failed to fetch canonical ActBlue period summary', { error, organizationId });
-    throw new Error(`Failed to fetch period summary: ${error.message}`);
-  }
-
-  const row = data?.[0] || {};
-  const grossDonations = Number(row.total_gross_donations) || 0;
-  const netDonations = Number(row.total_net_donations) || 0;
-  const donationCount = Number(row.total_donation_count) || 0;
-  const recurringCount = Number(row.total_recurring_count) || 0;
-  const recurringRevenue = Number(row.total_recurring_revenue) || 0;
-  const totalFees = Number(row.total_fees) || 0;
-  const refundCount = Number(row.total_refund_count) || 0;
-
-  return {
-    gross_raised: grossDonations,
-    net_raised: netDonations,
-    refunds: Number(row.total_refunds) || 0,
-    net_revenue: Number(row.total_net_revenue) || 0,
-    total_fees: totalFees,
-    donation_count: donationCount,
-    unique_donors_approx: Number(row.total_unique_donors) || 0,
-    refund_count: refundCount,
-    recurring_count: recurringCount,
-    one_time_count: donationCount - recurringCount,
-    recurring_revenue: recurringRevenue,
-    one_time_revenue: netDonations - recurringRevenue,
-    avg_fee_percentage: grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0,
-    refund_rate: donationCount > 0 ? (refundCount / donationCount) * 100 : 0,
-    avg_donation: Number(row.overall_avg_donation) || 0,
-    days_with_donations: 0, // Not provided by RPC
-  };
-}
-
 async function fetchDonationMetrics(
   organizationId: string,
   startDate: string,
   endDate: string
 ): Promise<DonationMetricsResult> {
-  // Use inclusive date range: [startDate, endDate+1day) to include full end date
-  const endDateInclusive = format(addDays(parseISO(endDate), 1), 'yyyy-MM-dd');
+  // Timezone conversion is now handled server-side by RPCs (p_use_utc=false)
+  // Date strings are interpreted as Eastern Time boundaries by the database
+  logger.debug('Fetching donation metrics', { startDate, endDate, timezone: DEFAULT_ORG_TIMEZONE });
 
-  // Fetch CANONICAL ROLLUP for summary metrics and time series (timezone-aware)
+  // Fetch CANONICAL ROLLUP for summary metrics and time series (timezone-aware via RPC)
   // AND raw transactions for donor details (top donors, recent donations, by source)
   const [
     canonicalDailyRollup,
     canonicalPeriodSummary,
     { data: allTransactions, error },
   ] = await Promise.all([
-    fetchCanonicalDailyRollup(organizationId, startDate, endDate),
-    fetchCanonicalPeriodSummary(organizationId, startDate, endDate),
-    // Still need raw transactions for donor details, top donors, by source
-    // LIMIT to 2000 most recent to prevent slow queries blocking the UI
-    // NOTE: donor_id_hash does NOT exist in actblue_transactions_secure - use donor_email as key
+    fetchDailyRollup(organizationId, startDate, endDate),
+    fetchPeriodSummary(organizationId, startDate, endDate),
+    // Raw transactions for donor details - date filtering uses yyyy-MM-dd bounds
+    // Database will interpret these as ET boundaries when comparing timestamptz
     (supabase as any)
       .from("actblue_transactions_secure")
       .select("amount, net_amount, donor_email, donor_name, first_name, last_name, state, city, is_recurring, transaction_type, transaction_date, refcode, source_campaign, transaction_id, id")
       .eq("organization_id", organizationId)
-      .gte("transaction_date", startDate)
-      .lt("transaction_date", endDateInclusive)
+      .gte("transaction_date", `${startDate}T00:00:00-05:00`) // ET midnight start
+      .lt("transaction_date", `${endDate}T23:59:59.999-05:00`) // ET midnight end
       .order("transaction_date", { ascending: false })
       .limit(2000),
   ]);
@@ -390,13 +297,13 @@ export function useDonationMetricsQuery(
   };
 
   return useQuery({
-    queryKey: donationKeys.metrics(organizationId || "", effectiveRange),
-    queryFn: () =>
-      fetchDonationMetrics(organizationId!, effectiveRange.startDate, effectiveRange.endDate),
+    // Use unified actblueKeys for better cache sharing across hooks
+    queryKey: actblueKeys.periodSummary(organizationId || "", effectiveRange.startDate, effectiveRange.endDate),
+    queryFn: () => fetchDonationMetrics(organizationId!, effectiveRange.startDate, effectiveRange.endDate),
     enabled: !!organizationId,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    retry: false, // Fail fast instead of infinite skeleton on errors
+    retry: false,
   });
 }
 
@@ -415,7 +322,8 @@ export function useDonationTimeSeriesQuery(
   };
 
   return useQuery({
-    queryKey: donationKeys.timeSeries(organizationId || "", effectiveRange),
+    // Use unified actblueKeys for cache sharing
+    queryKey: actblueKeys.dailyRollup(organizationId || "", effectiveRange.startDate, effectiveRange.endDate),
     queryFn: async () => {
       const result = await fetchDonationMetrics(
         organizationId!,

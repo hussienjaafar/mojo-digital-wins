@@ -53,6 +53,12 @@ export interface EChartsBarChartProps {
   disableHoverEmphasis?: boolean;
   /** Override grid left padding (defaults to 135 for horizontal, 12 otherwise) */
   gridLeft?: number;
+  /** Show value labels directly on each bar */
+  showBarLabels?: boolean;
+  /** Hide the value axis (useful when bar labels are shown) */
+  hideValueAxis?: boolean;
+  /** Reverse category axis so first item renders at top (for horizontal bars) */
+  inverseCategoryAxis?: boolean;
   onBarClick?: (params: { dataIndex: number; seriesName: string; value: unknown; name: string }) => void;
 }
 
@@ -76,6 +82,9 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
   enableCrossHighlight = false,
   disableHoverEmphasis = false,
   gridLeft,
+  showBarLabels = false,
+  hideValueAxis = false,
+  inverseCategoryAxis = false,
   onBarClick,
 }) => {
   const { setHoveredDataPoint, hoveredDataPoint } = useChartInteractionStore();
@@ -125,16 +134,19 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
   const option = React.useMemo(() => {
     const xAxisData = data.map((d) => d[xAxisKey]) as string[];
 
-    const seriesConfig = series.map((s, index) => ({
+    const seriesConfig = series.map((s, index) => {
+      const seriesColor = s.color || colorPalette[index % colorPalette.length];
+      return {
       name: s.name,
       type: "bar" as const,
+      color: seriesColor,
       data: data.map((d) => {
         const value = d[s.dataKey] as number;
         const isHighlighted = enableCrossHighlight && hoveredDataPoint?.date === d[xAxisKey];
         return {
           value,
           itemStyle: {
-            color: s.color || colorPalette[index % colorPalette.length],
+            color: seriesColor,
             opacity: enableCrossHighlight && hoveredDataPoint && !isHighlighted ? 0.4 : 1,
           },
         };
@@ -148,17 +160,38 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
       emphasis: disableHoverEmphasis
         ? { disabled: true }
         : {
-            focus: "series" as const,
+            focus: "none" as const,
             itemStyle: {
-              shadowBlur: 10,
-              shadowColor: "rgba(0, 0, 0, 0.3)",
+              color: "inherit",
+              borderColor: "rgba(255, 255, 255, 0.3)",
+              borderWidth: 1,
+              shadowBlur: 8,
+              shadowColor: "rgba(0, 0, 0, 0.2)",
             },
           },
       // Prevent bars from dimming when other bars are hovered
       ...(disableHoverEmphasis && {
         blur: { itemStyle: { opacity: 1 } },
       }),
-    }));
+      // Inline value labels on bars
+      ...(showBarLabels && {
+        label: {
+          show: true,
+          position: (s.stack
+            ? 'inside'
+            : (horizontal ? 'right' : 'top')) as 'inside' | 'right' | 'top',
+          formatter: (params: any) => {
+            const val = typeof params.value === 'object' ? params.value.value : params.value;
+            if (s.stack && val < 5) return '';
+            return formatTooltipValue(val, s.name);
+          },
+          color: s.stack ? '#fff' : 'hsl(var(--portal-text-primary))',
+          fontSize: 11,
+          fontWeight: s.stack ? 600 : undefined,
+        },
+      }),
+    };
+    });
 
     const axisConfig = {
       axisLine: {
@@ -176,6 +209,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
 
     const valueAxisConfig = {
       type: "value" as const,
+      show: !hideValueAxis,
       axisLabel: {
         formatter: (value: number) => formatAxisValue(value),
         color: "hsl(var(--portal-text-muted))",
@@ -191,6 +225,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
     const categoryAxisConfig = {
       type: "category" as const,
       data: xAxisData,
+      ...(inverseCategoryAxis && { inverse: true }),
       axisLine: axisConfig.axisLine,
       axisTick: axisConfig.axisTick,
       axisLabel: {
@@ -235,7 +270,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
             `,
             axisPointer: disableHoverEmphasis
               ? { type: "none" as const }
-              : { type: "shadow" as const },
+              : { type: horizontal ? "none" as const : "shadow" as const },
             formatter: (params: unknown) => {
               const items = Array.isArray(params) ? params : [params];
               const typedItems = items as EChartsBarParams[];
@@ -270,7 +305,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
         : undefined,
       grid: {
         left: gridLeft ?? 12,
-        right: 12,
+        right: showBarLabels ? 55 : 12,
         top: 20,
         // Increase bottom padding for rotated labels
         bottom: showLegend ? 60 : (xAxisLabelRotate > 0 ? 60 : 20),
@@ -280,7 +315,7 @@ export const EChartsBarChart: React.FC<EChartsBarChartProps> = ({
       yAxis: horizontal ? categoryAxisConfig : valueAxisConfig,
       series: seriesConfig,
     };
-  }, [data, xAxisKey, series, showLegend, showTooltip, horizontal, formatAxisValue, formatTooltipValue, xAxisLabelFormatter, xAxisLabelRotate, enableCrossHighlight, disableHoverEmphasis, gridLeft, hoveredDataPoint]);
+  }, [data, xAxisKey, series, showLegend, showTooltip, horizontal, formatAxisValue, formatTooltipValue, xAxisLabelFormatter, xAxisLabelRotate, enableCrossHighlight, disableHoverEmphasis, gridLeft, hoveredDataPoint, showBarLabels, hideValueAxis, inverseCategoryAxis]);
 
   const handleEvents = React.useMemo(() => {
     const events: Record<string, (params: EChartsBarParams) => void> = {};

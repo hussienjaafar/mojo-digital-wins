@@ -17,7 +17,7 @@ import {
   useIsDrilldownOpen,
   type KpiKey,
 } from "@/stores/dashboardStore";
-import { V3KPIDrilldownDrawer, type KPIDrilldownData } from "@/components/v3/V3KPIDrilldownDrawer";
+import { V3KPIDrilldownDrawer, type KPIDrilldownData, type SingleDayComparisonData } from "@/components/v3/V3KPIDrilldownDrawer";
 import { InlineKpiExpansion, type ValueType } from "./InlineKpiExpansion";
 import type { LineSeriesConfig } from "@/components/charts/echarts";
 import { EChartsSparkline, type SparklineValueType } from "@/components/charts/echarts";
@@ -95,6 +95,8 @@ export interface HeroKpiCardProps {
   expansionMode?: "drawer" | "inline";
   /** Callback when inline expansion state changes */
   onInlineExpandChange?: (expanded: boolean) => void;
+  /** Single-day comparison data for optimized single-day view */
+  singleDayData?: SingleDayComparisonData;
 }
 
 // ============================================================================
@@ -259,6 +261,7 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
   expandable,
   expansionMode = "drawer",
   onInlineExpandChange,
+  singleDayData,
 }) => {
   const cardRef = React.useRef<HTMLElement>(null);
   // Local state for inline expansion mode
@@ -308,10 +311,16 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
         }] as LineSeriesConfig[],
       } : undefined,
       breakdown,
+      singleDayData,
     };
-  }, [label, value, Icon, trend, description, trendData, trendXAxisKey, breakdown, accent, hasDrilldownData]);
+  }, [label, value, Icon, trend, description, trendData, trendXAxisKey, breakdown, accent, hasDrilldownData, singleDayData]);
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    // Aggressive event prevention to avoid parent handlers catching this
+    e.stopPropagation();
+    e.preventDefault();
+    e.nativeEvent.stopImmediatePropagation();
+    
     if (isExpandable && hasDrilldownData) {
       if (expansionMode === "inline") {
         // Inline mode: toggle local expansion state
@@ -348,19 +357,13 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
     cardRef.current?.focus();
   };
 
-  const handleDrawerOpenChange = (open: boolean) => {
-    setDrilldownOpen(open);
-    if (!open) {
-      setSelectedKpi(null);
-      // Restore focus to the card after drawer closes
-      cardRef.current?.focus();
-    }
-  };
+  // Note: handleDrawerOpenChange is now handled at parent level
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      handleClick();
+      // Create a synthetic mouse event for keyboard activation
+      handleClick(e as unknown as React.MouseEvent);
     } else if (e.key === "Escape" && expansionMode === "inline" && isInlineExpanded) {
       e.preventDefault();
       handleInlineClose();
@@ -387,6 +390,8 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
         "group relative p-4 rounded-xl border cursor-pointer",
         "bg-[hsl(var(--portal-bg-secondary))]",
         "border-[hsl(var(--portal-border))]",
+        // Fixed height for uniform sizing
+        "min-h-[180px] flex flex-col",
         // Transitions
         "transition-all duration-200",
         // Hover state
@@ -480,9 +485,9 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
         {subtitle || (previousValue ? `Previous: ${previousValue}` : "—")}
       </p>
 
-      {/* Sparkline */}
-      {sparklineData && sparklineData.length > 0 && (
-        <div className="mt-auto pt-2 border-t border-[hsl(var(--portal-border)/0.5)]">
+      {/* Sparkline - pushed to bottom with mt-auto for uniform sizing */}
+      {sparklineData && sparklineData.length >= 2 ? (
+        <div className="mt-auto pt-2 border-t border-[hsl(var(--portal-border)/0.5)] min-h-[52px]">
           <Sparkline
             data={sparklineData}
             color={
@@ -496,18 +501,23 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
             valueType={KPI_VALUE_TYPE_MAP[kpiKey]}
           />
         </div>
+      ) : (
+        /* Empty spacer when no sparkline to maintain consistent card height */
+        <div className="mt-auto h-[52px]" aria-hidden="true" />
       )}
 
-      {/* Selection indicator */}
-      {isSelected && (
-        <motion.div
-          className="absolute inset-x-0 bottom-0 h-0.5 bg-[hsl(var(--portal-accent-blue))] rounded-b-xl"
-          layoutId="kpi-selection-indicator"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        />
-      )}
+      {/* Selection indicator - independent animation per card (no shared layoutId) */}
+      <AnimatePresence>
+        {isSelected && (
+          <motion.div
+            className="absolute inset-x-0 bottom-0 h-0.5 bg-[hsl(var(--portal-accent-blue))] rounded-b-xl"
+            initial={{ opacity: 0, scaleX: 0 }}
+            animate={{ opacity: 1, scaleX: 1 }}
+            exit={{ opacity: 0, scaleX: 0 }}
+            transition={{ duration: 0.2 }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Expand affordance (chevron) - shows on hover for expandable cards */}
       {isExpandable && (
@@ -547,6 +557,7 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
             accent={accent}
             valueType={KPI_VALUE_TYPE_MAP[kpiKey] || "currency"}
             onClose={handleInlineClose}
+            singleDayData={singleDayData}
           />
         )}
       </AnimatePresence>
@@ -574,20 +585,8 @@ export const HeroKpiCard: React.FC<HeroKpiCardProps> = ({
     return cardContent;
   };
 
-  return (
-    <>
-      {renderContent()}
-
-      {/* Drilldown Drawer - only render in drawer mode */}
-      {expansionMode === "drawer" && isExpandable && drilldownData && (
-        <V3KPIDrilldownDrawer
-          open={isSelected && isDrilldownOpen}
-          onOpenChange={handleDrawerOpenChange}
-          data={drilldownData}
-        />
-      )}
-    </>
-  );
+  // Drawer is now rendered at parent level (DonationMetrics) to prevent multiple instances
+  return renderContent();
 };
 
 export default HeroKpiCard;

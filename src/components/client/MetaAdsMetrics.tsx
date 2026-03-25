@@ -17,14 +17,18 @@ import {
 import { PortalBadge } from "@/components/portal/PortalBadge";
 import { Target, MousePointer, Eye, DollarSign, TrendingUp, BarChart3, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { EChartsLineChart } from "@/components/charts/echarts";
 import { EChartsBarChart } from "@/components/charts/echarts";
 import { MetaDataFreshnessIndicator } from "./MetaDataFreshnessIndicator";
 import { useMetaAdsMetricsQuery } from "@/queries";
 import { useAnomalyDetection } from "@/hooks/useAnomalyDetection";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsSingleDayView } from "@/hooks/useHourlyMetrics";
 import { formatRatio, formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
+import { SingleDayMetricGrid, type SingleDayMetric } from "./SingleDayMetricGrid";
+import { TopCreativesSection } from "./TopCreativesSection";
+import { getOrgToday } from "@/lib/timezone";
 
 type Props = {
   organizationId: string;
@@ -97,46 +101,44 @@ const MetaAdsMetrics = ({
   };
 
   const isMobile = useIsMobile();
+  const isSingleDay = useIsSingleDayView();
 
   // Use TanStack Query hook with dashboard date range
   const { data, isLoading, error, refetch } = useMetaAdsMetricsQuery(organizationId, startDate, endDate);
 
   // Memoized derived data
-  const { campaigns, metrics, dailyMetrics, previousPeriodMetrics } = useMemo(() => ({
+  const { campaigns, metrics, dailyMetrics, previousPeriodMetrics, isEstimated, latestDataDate, attributedRevenue, attributedROI, previousAttributedRevenue, previousAttributedROI } = useMemo(() => ({
     campaigns: data?.campaigns || [],
     metrics: data?.metrics || {},
     dailyMetrics: data?.dailyMetrics || [],
     previousPeriodMetrics: data?.previousPeriodMetrics || {},
+    isEstimated: data?.isEstimated ?? false,
+    latestDataDate: data?.latestDataDate ?? null,
+    // Unified attribution data - same source as Hero KPIs
+    attributedRevenue: data?.attributedRevenue ?? 0,
+    attributedROI: data?.attributedROI ?? 0,
+    previousAttributedRevenue: data?.previousAttributedRevenue ?? 0,
+    previousAttributedROI: data?.previousAttributedROI ?? 0,
   }), [data]);
 
-  // Calculate totals
-  const totals = useMemo(() => {
-    return Object.values(metrics).reduce(
-      (acc, m) => ({
-        impressions: acc.impressions + m.impressions,
-        clicks: acc.clicks + m.clicks,
-        spend: acc.spend + m.spend,
-        conversions: acc.conversions + m.conversions,
-        conversion_value: acc.conversion_value + m.conversion_value,
-        reach: acc.reach + m.reach,
-      }),
-      { impressions: 0, clicks: 0, spend: 0, conversions: 0, conversion_value: 0, reach: 0 }
-    );
-  }, [metrics]);
+  // Check if showing stale data (selected date has no data yet)
+  // Uses org timezone for accurate "today" detection
+  const isShowingStaleData = useMemo(() => {
+    if (!latestDataDate) return false;
+    const today = getOrgToday();
+    return startDate === today && latestDataDate !== today;
+  }, [latestDataDate, startDate]);
 
-  const previousTotals = useMemo(() => {
-    return Object.values(previousPeriodMetrics).reduce(
-      (acc, m) => ({
-        impressions: acc.impressions + m.impressions,
-        clicks: acc.clicks + m.clicks,
-        spend: acc.spend + m.spend,
-        conversions: acc.conversions + m.conversions,
-        conversion_value: acc.conversion_value + m.conversion_value,
-        reach: acc.reach + m.reach,
-      }),
-      { impressions: 0, clicks: 0, spend: 0, conversions: 0, conversion_value: 0, reach: 0 }
-    );
-  }, [previousPeriodMetrics]);
+  // Use pre-calculated totals from the query (includes link metrics)
+  const totals = data?.totals ?? { 
+    impressions: 0, clicks: 0, spend: 0, conversions: 0, 
+    conversion_value: 0, reach: 0, link_clicks: 0, link_ctr: 0, link_cpc: 0 
+  };
+  
+  const previousTotals = data?.previousTotals ?? { 
+    impressions: 0, clicks: 0, spend: 0, conversions: 0, 
+    conversion_value: 0, reach: 0, link_clicks: 0, link_ctr: 0, link_cpc: 0 
+  };
 
   const calcChange = (current: number, previous: number) => {
     if (previous === 0) return current > 0 ? 100 : 0;
@@ -145,10 +147,12 @@ const MetaAdsMetrics = ({
 
   const avgCTR = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
   const avgCPC = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
-  const roas = totals.spend > 0 ? totals.conversion_value / totals.spend : 0;
+  // Use unified attributed ROI instead of Meta's conversion_value for consistency with Hero KPIs
+  const roas = attributedROI;
   const cpm = totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0;
 
-  const prevRoas = previousTotals.spend > 0 ? previousTotals.conversion_value / previousTotals.spend : 0;
+  // Previous period comparison
+  const prevRoas = previousAttributedROI;
   const prevCTR = previousTotals.impressions > 0 ? (previousTotals.clicks / previousTotals.impressions) * 100 : 0;
   const prevCPM = previousTotals.impressions > 0 ? (previousTotals.spend / previousTotals.impressions) * 1000 : 0;
 
@@ -338,9 +342,21 @@ const MetaAdsMetrics = ({
     <div className="space-y-[var(--portal-space-lg)]">
       {/* Panel Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-[hsl(var(--portal-border)/0.5)]">
-        <h4 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))]">
-          Meta Ads Overview
-        </h4>
+        <div className="flex items-center gap-2">
+          <h4 className="text-sm font-medium text-[hsl(var(--portal-text-secondary))]">
+            Meta Ads Overview
+          </h4>
+          {isShowingStaleData && latestDataDate && (
+            <V3InsightBadge type="anomaly-high">
+              Showing data from {format(parseISO(latestDataDate), 'MMM d')} — today's data not yet synced
+            </V3InsightBadge>
+          )}
+          {isEstimated && (
+            <V3InsightBadge type="info">
+              Using estimated campaign-level data
+            </V3InsightBadge>
+          )}
+        </div>
         <MetaDataFreshnessIndicator organizationId={organizationId} compact />
       </div>
 
@@ -411,8 +427,39 @@ const MetaAdsMetrics = ({
         </div>
       )}
 
-      {/* Performance Trend Chart */}
-      {trendChartData.length > 0 && (
+      {/* Single-Day View: Top Creatives + Secondary Metrics Grid */}
+      {isSingleDay && (
+        <>
+          {/* Top Performing Creatives for the selected day */}
+          <TopCreativesSection
+            organizationId={organizationId}
+            startDate={startDate}
+            endDate={endDate}
+            maxItems={5}
+          />
+
+          {/* Additional metrics in grid format for single day */}
+          <V3Card accent="blue">
+            <V3CardHeader className="pb-2">
+              <V3CardTitle className="text-sm">Detailed Metrics</V3CardTitle>
+            </V3CardHeader>
+            <V3CardContent>
+              <SingleDayMetricGrid
+                metrics={[
+                  { label: "Impressions", value: totals.impressions, previousValue: previousTotals.impressions, format: "number", accent: "purple" },
+                  { label: "Link Clicks", value: totals.link_clicks, previousValue: previousTotals.link_clicks, format: "number", accent: "blue" },
+                  { label: "Cost/Link Click", value: totals.link_cpc, previousValue: previousTotals.link_cpc, format: "currency", accent: "default" },
+                  { label: "Reach", value: totals.reach, previousValue: previousTotals.reach, format: "number", accent: "green" },
+                ] as SingleDayMetric[]}
+                columns={4}
+              />
+            </V3CardContent>
+          </V3Card>
+        </>
+      )}
+
+      {/* Multi-Day View: Performance Trend Chart */}
+      {!isSingleDay && trendChartData.length > 0 && (
         <div className="space-y-2">
           <V3ChartWrapper
             title="Performance Trend"
@@ -475,8 +522,8 @@ const MetaAdsMetrics = ({
         </div>
       )}
 
-      {/* Campaign Breakdown Chart */}
-      {campaignBreakdownData.length > 0 && (
+      {/* Multi-Day View: Campaign Breakdown Chart */}
+      {!isSingleDay && campaignBreakdownData.length > 0 && (
         <div className="space-y-2">
           <V3ChartWrapper
             title={breakdownChartConfig.title}

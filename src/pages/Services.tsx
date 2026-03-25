@@ -2,7 +2,7 @@ import { Helmet } from "react-helmet";
 import { Card, CardContent } from "@/components/ui/card";
 import { ParticleButton } from "@/components/ParticleButton";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { 
   Megaphone, 
   MessageSquare, 
@@ -25,7 +25,12 @@ import AnimatedPatternHero from "@/components/AnimatedPatternHero";
 import AnimatedServiceGraphic from "@/components/AnimatedServiceGraphic";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import ScrollProgressIndicator from "@/components/ScrollProgressIndicator";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+
+// Local VisuallyHidden component
+const VisuallyHidden = ({ children }: { children: ReactNode }) => (
+  <span className="sr-only">{children}</span>
+);
 
 const Services = () => {
   const [selectedBillboard, setSelectedBillboard] = useState<{ src: string; alt: string; caption: string } | null>(null);
@@ -657,6 +662,9 @@ const Services = () => {
       {/* Billboard Lightbox Dialog */}
       <Dialog open={!!selectedBillboard} onOpenChange={() => setSelectedBillboard(null)}>
         <DialogContent className="max-w-7xl w-[95vw] h-[90vh] p-0 bg-background/95 backdrop-blur-md">
+          <VisuallyHidden>
+            <DialogTitle>Billboard Preview</DialogTitle>
+          </VisuallyHidden>
           {selectedBillboard && (
             <div className="w-full h-full flex items-center justify-center p-4">
               <img 

@@ -374,8 +374,12 @@ export function ConsolidatedChannelMetrics({ organizationId, startDate, endDate 
         const roasDisplay = meta.hasConversionValueData
           ? formatRatio(meta.roas, 2)
           : "N/A";
+        const spendLabel = meta.awarenessSpend > 0
+          ? `${formatCurrency(meta.spend)} fundraising`
+          : formatCurrency(meta.spend);
         return [
-          { label: "Spend", value: formatCurrency(meta.spend) },
+          { label: "Spend", value: spendLabel },
+          ...(meta.awarenessSpend > 0 ? [{ label: "Awareness", value: formatCurrency(meta.awarenessSpend) }] : []),
           { label: "Conv", value: formatInteger(meta.conversions) },
           {
             label: "ROAS",

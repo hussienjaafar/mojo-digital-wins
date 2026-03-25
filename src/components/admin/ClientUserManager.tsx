@@ -1,38 +1,62 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Users, Mail, Eye, Edit, Trash2, Key, MoreVertical, Send, Clock } from "lucide-react";
+import { UserPlus, Users, Mail, Eye, Edit, Trash2, Key, MoreVertical, Send, Search, X, Settings, Shield, ShieldOff, Monitor, AlertTriangle, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { AdminPageHeader, AdminLoadingState } from "./v3";
 import { V3Button } from "@/components/v3/V3Button";
+import { V3Card, V3CardHeader, V3CardTitle, V3CardDescription, V3CardContent } from "@/components/v3/V3Card";
+import { V3Badge, type V3BadgeVariant } from "@/components/v3/V3Badge";
+import { V3FilterPill } from "@/components/v3/V3FilterPill";
 import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
 import { PendingInvitations } from "@/components/admin/PendingInvitations";
+import { UserPagination } from "@/components/admin/UserPagination";
+import { BulkUserActions } from "@/components/admin/BulkUserActions";
+import { SeatManagement } from "@/components/admin/SeatManagement";
+import { MemberRequestQueue } from "@/components/admin/MemberRequestQueue";
+import { UserDetailSidebar, type EnhancedUser } from "@/components/admin/user-management";
+import { formatDistanceToNow } from "date-fns";
+import { motion } from "framer-motion";
+
+// Role badge variant helper
+const getRoleBadgeVariant = (role: string): V3BadgeVariant => {
+  switch (role) {
+    case 'admin': return 'info';
+    case 'manager': return 'purple';
+    case 'editor': return 'success';
+    case 'viewer': return 'muted';
+    default: return 'muted';
+  }
+};
+
+// Status badge variant helper
+const getStatusBadgeVariant = (status: string): V3BadgeVariant => {
+  switch (status) {
+    case 'active': return 'success';
+    case 'pending': return 'warning';
+    case 'suspended': return 'error';
+    case 'inactive': return 'muted';
+    default: return 'muted';
+  }
+};
 
 type Organization = {
   id: string;
   name: string;
-};
-
-type ClientUser = {
-  id: string;
-  full_name: string;
-  organization_id: string;
-  role: string;
-  status: 'pending' | 'active' | 'inactive' | 'suspended';
-  created_at: string;
-  last_login_at: string | null;
 };
 
 // Valid org roles
@@ -45,7 +69,7 @@ const ClientUserManager = () => {
   const { setImpersonation } = useImpersonation();
   const isMobile = useIsMobile();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [users, setUsers] = useState<ClientUser[]>([]);
+  const [users, setUsers] = useState<EnhancedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
@@ -53,9 +77,25 @@ const ClientUserManager = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<ClientUser | null>(null);
+  const [selectedUser, setSelectedUser] = useState<EnhancedUser | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingInviteCount, setPendingInviteCount] = useState(0);
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
+  const [showUserDetail, setShowUserDetail] = useState(false);
+  const [selectedUserForDetail, setSelectedUserForDetail] = useState<EnhancedUser | null>(null);
+
+  // Filter & pagination state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedOrgFilter, setSelectedOrgFilter] = useState("all");
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [orgSearchOpen, setOrgSearchOpen] = useState(false);
+  const [orgSearch, setOrgSearch] = useState("");
+
   const [formData, setFormData] = useState({
     email: "",
     full_name: "",
@@ -70,12 +110,15 @@ const ClientUserManager = () => {
 
   useEffect(() => {
     loadData();
+  }, [currentPage, pageSize, searchQuery, selectedOrgFilter, selectedRoles, selectedStatus]);
+
+  // Load organizations (only once)
+  useEffect(() => {
+    loadOrganizations();
   }, []);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadOrganizations = async () => {
     try {
-      // Load organizations
       const { data: orgsData, error: orgsError } = await (supabase as any)
         .from('client_organizations')
         .select('id, name')
@@ -84,24 +127,63 @@ const ClientUserManager = () => {
 
       if (orgsError) throw orgsError;
       setOrganizations(orgsData || []);
+    } catch (error: any) {
+      console.error('Error loading organizations:', error);
+    }
+  };
 
-      // Load client users
-      const { data: usersData, error: usersError } = await (supabase as any)
-        .from('client_users')
-        .select('*')
-        .order('created_at', { ascending: false });
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Load users with enhanced data using RPC
+      const offset = (currentPage - 1) * pageSize;
+      const { data: usersData, error: usersError } = await (supabase.rpc as any)('get_user_management_data', {
+        p_search: searchQuery || null,
+        p_org_id: selectedOrgFilter !== 'all' ? selectedOrgFilter : null,
+        p_roles: selectedRoles.length > 0 ? selectedRoles : null,
+        p_status: selectedStatus !== 'all' ? selectedStatus : null,
+        p_limit: pageSize,
+        p_offset: offset
+      });
 
       if (usersError) throw usersError;
-      setUsers(usersData || []);
+      
+      const enhancedUsers: EnhancedUser[] = (usersData || []).map((row: any) => ({
+        id: row.id,
+        full_name: row.full_name,
+        email: row.email,
+        organization_id: row.organization_id,
+        organization_name: row.organization_name || 'Unknown',
+        role: row.role,
+        status: row.status,
+        mfa_enabled: row.mfa_enabled || false,
+        created_at: row.created_at,
+        last_login_at: row.last_login_at,
+        latest_session: row.latest_session,
+        active_sessions_30d: row.active_sessions_30d || 0,
+        failed_logins_24h: row.failed_logins_24h || 0,
+        is_locked: row.is_locked || false
+      }));
+      
+      setUsers(enhancedUsers);
+      setTotalCount(usersData?.[0]?.total_count || 0);
 
       // Load pending invitation count
-      const { data: pendingData } = await supabase
+      const { data: pendingInviteData } = await supabase
         .from('user_invitations')
         .select('id')
         .eq('invitation_type', 'organization_member')
         .eq('status', 'pending');
       
-      setPendingCount(pendingData?.length || 0);
+      setPendingInviteCount(pendingInviteData?.length || 0);
+
+      // Load pending member request count
+      const { data: pendingRequestData } = await (supabase as any)
+        .from('pending_member_requests')
+        .select('id')
+        .eq('status', 'pending');
+      
+      setPendingRequestCount(pendingRequestData?.length || 0);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -111,7 +193,7 @@ const ClientUserManager = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, pageSize, searchQuery, selectedOrgFilter, selectedRoles, selectedStatus, toast]);
 
   const handleInvite = (org: Organization) => {
     setSelectedOrgForInvite(org);
@@ -178,13 +260,13 @@ const ClientUserManager = () => {
     return organizations.find(o => o.id === orgId)?.name || 'Unknown';
   };
 
-  const handleViewPortal = (user: ClientUser) => {
+  const handleViewPortal = (user: EnhancedUser) => {
     const orgName = getOrganizationName(user.organization_id);
     setImpersonation(user.id, user.full_name, user.organization_id, orgName);
     navigate('/client/dashboard');
   };
 
-  const handleEditClick = (user: ClientUser) => {
+  const handleEditClick = (user: EnhancedUser) => {
     setSelectedUser(user);
     setEditFormData({
       full_name: user.full_name,
@@ -230,7 +312,7 @@ const ClientUserManager = () => {
     }
   };
 
-  const handleDeleteClick = (user: ClientUser) => {
+  const handleDeleteClick = (user: EnhancedUser) => {
     setSelectedUser(user);
     setShowDeleteDialog(true);
   };
@@ -267,7 +349,7 @@ const ClientUserManager = () => {
     }
   };
 
-  const handleResetPassword = async (user: ClientUser) => {
+  const handleResetPassword = async (user: EnhancedUser) => {
     setIsProcessing(true);
     try {
       const { data, error } = await supabase.functions.invoke('reset-client-password', {
@@ -309,23 +391,23 @@ const ClientUserManager = () => {
   }
 
   // Mobile card renderer for users
-  const renderMobileUserCard = (user: ClientUser) => (
-    <Card key={user.id} className="overflow-hidden">
-      <CardContent className="p-4 space-y-3">
+  const renderMobileUserCard = (user: EnhancedUser) => (
+    <V3Card key={user.id} className="overflow-hidden">
+      <V3CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-medium">{user.full_name}</p>
-            <p className="text-xs text-muted-foreground">{getOrganizationName(user.organization_id)}</p>
+            <p className="font-medium text-[hsl(var(--portal-text-primary))]">{user.full_name}</p>
+            <p className="text-xs text-[hsl(var(--portal-text-secondary))]">{getOrganizationName(user.organization_id)}</p>
           </div>
-          <Badge variant="outline">{user.role}</Badge>
+          <V3Badge variant={getRoleBadgeVariant(user.role)} className="capitalize">{user.role}</V3Badge>
         </div>
         
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex items-center justify-between text-xs text-[hsl(var(--portal-text-secondary))]">
           <span>Last login: {user.last_login_at ? new Date(user.last_login_at).toLocaleDateString() : 'Never'}</span>
           <span>Created: {new Date(user.created_at).toLocaleDateString()}</span>
         </div>
         
-        <div className="flex items-center justify-between pt-2 border-t">
+        <div className="flex items-center justify-between pt-2 border-t border-[hsl(var(--portal-border))]">
           <V3Button
             variant="ghost"
             size="sm"
@@ -340,7 +422,7 @@ const ClientUserManager = () => {
                 <MoreVertical className="h-4 w-4" />
               </V3Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
               <DropdownMenuItem onClick={() => handleEditClick(user)}>
                 <Edit className="h-4 w-4 mr-2" />
                 Edit User
@@ -352,7 +434,7 @@ const ClientUserManager = () => {
               <DropdownMenuSeparator />
               <DropdownMenuItem 
                 onClick={() => handleDeleteClick(user)}
-                className="text-destructive focus:text-destructive"
+                className="text-[hsl(var(--portal-error))] focus:text-[hsl(var(--portal-error))]"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete User
@@ -360,70 +442,245 @@ const ClientUserManager = () => {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </CardContent>
-    </Card>
+      </V3CardContent>
+    </V3Card>
   );
 
+  // Selection handlers
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUserIds(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedUserIds.length === users.length) {
+      setSelectedUserIds([]);
+    } else {
+      setSelectedUserIds(users.map(u => u.id));
+    }
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSelectedOrgFilter("all");
+    setSelectedRoles([]);
+    setSelectedStatus("all");
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = searchQuery || selectedOrgFilter !== "all" || selectedRoles.length > 0 || selectedStatus !== "all";
+  const totalPages = Math.ceil(totalCount / pageSize);
+
+  const filteredOrganizations = organizations.filter(org =>
+    org.name.toLowerCase().includes(orgSearch.toLowerCase())
+  );
+
+  const selectedOrgName = selectedOrgFilter === "all" 
+    ? "All organizations" 
+    : organizations.find(o => o.id === selectedOrgFilter)?.name || "Select organization";
+
   return (
-    <Card>
-      <CardHeader>
+    <V3Card accent="blue">
+      <V3CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Organization Members
-            </CardTitle>
-            <CardDescription>
-              Manage user access within client organizations. Roles: Admin (full access), Manager (edit), Viewer (read-only)
-            </CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-[hsl(var(--portal-accent-blue)/0.1)]">
+              <Users className="h-5 w-5 text-[hsl(var(--portal-accent-blue))]" />
+            </div>
+            <div>
+              <V3CardTitle>Organization Members</V3CardTitle>
+              <V3CardDescription>Manage user access within client organizations</V3CardDescription>
+            </div>
           </div>
           <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            {/* Searchable org dropdown for inviting */}
+            <Popover>
+              <PopoverTrigger asChild>
                 <V3Button variant="primary" className="w-full sm:w-auto" leftIcon={<UserPlus className="w-4 h-4" />}>
                   Invite User
                 </V3Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {organizations.length === 0 ? (
-                  <DropdownMenuItem disabled>
-                    No organizations available
-                  </DropdownMenuItem>
-                ) : (
-                  organizations.slice(0, 8).map((org) => (
-                    <DropdownMenuItem key={org.id} onClick={() => handleInvite(org)}>
-                      <Send className="w-4 h-4 mr-2" />
-                      Invite to {org.name}
-                    </DropdownMenuItem>
-                  ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </PopoverTrigger>
+              <PopoverContent className="w-[250px] p-0 bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]" align="end">
+                <Command>
+                  <CommandInput placeholder="Search organizations..." />
+                  <CommandList>
+                    <CommandEmpty>No organizations found.</CommandEmpty>
+                    <CommandGroup>
+                      {organizations.map((org) => (
+                        <CommandItem
+                          key={org.id}
+                          onSelect={() => handleInvite(org)}
+                          className="cursor-pointer"
+                        >
+                          <Send className="w-4 h-4 mr-2" />
+                          {org.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
+      </V3CardHeader>
+      <V3CardContent>
         <Tabs defaultValue="users" className="w-full">
-          <TabsList>
-            <TabsTrigger value="users">
+          <TabsList className="flex-wrap h-auto gap-1 bg-[hsl(var(--portal-bg-tertiary))] p-1 rounded-lg border border-[hsl(var(--portal-border))]">
+            <TabsTrigger value="users" className="data-[state=active]:bg-[hsl(var(--portal-bg-secondary))] data-[state=active]:shadow-sm rounded-md">
               Active Members
-              <Badge variant="secondary" className="ml-2">{users.length}</Badge>
+              <V3Badge variant="muted" className="ml-2">{totalCount}</V3Badge>
             </TabsTrigger>
-            <TabsTrigger value="pending">
+            <TabsTrigger value="pending" className="data-[state=active]:bg-[hsl(var(--portal-bg-secondary))] data-[state=active]:shadow-sm rounded-md">
               Pending Invites
-              {pendingCount > 0 && (
-                <Badge variant="default" className="ml-2">{pendingCount}</Badge>
+              {pendingInviteCount > 0 && (
+                <V3Badge variant="info" className="ml-2">{pendingInviteCount}</V3Badge>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="requests" className="data-[state=active]:bg-[hsl(var(--portal-bg-secondary))] data-[state=active]:shadow-sm rounded-md">
+              Member Requests
+              {pendingRequestCount > 0 && (
+                <V3Badge variant="error" className="ml-2">{pendingRequestCount}</V3Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="seats" className="data-[state=active]:bg-[hsl(var(--portal-bg-secondary))] data-[state=active]:shadow-sm rounded-md">
+              <Settings className="w-4 h-4 mr-1" />
+              Seats
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="users" className="mt-4">
+          <TabsContent value="users" className="mt-4 space-y-4">
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="pl-9"
+                />
+              </div>
+              
+              {/* Organization filter with search */}
+              <Popover open={orgSearchOpen} onOpenChange={setOrgSearchOpen}>
+                <PopoverTrigger asChild>
+                  <V3Button variant="outline" className="justify-between min-w-[180px]">
+                    <span className="truncate">{selectedOrgName}</span>
+                  </V3Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[250px] p-0" align="start">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Search organizations..." 
+                      value={orgSearch}
+                      onValueChange={setOrgSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>No organizations found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          onSelect={() => {
+                            setSelectedOrgFilter("all");
+                            setOrgSearchOpen(false);
+                            setCurrentPage(1);
+                          }}
+                          className="cursor-pointer"
+                        >
+                          All organizations
+                        </CommandItem>
+                        {filteredOrganizations.map((org) => (
+                          <CommandItem
+                            key={org.id}
+                            onSelect={() => {
+                              setSelectedOrgFilter(org.id);
+                              setOrgSearchOpen(false);
+                              setCurrentPage(1);
+                            }}
+                            className="cursor-pointer"
+                          >
+                            {org.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+              {/* Status filter */}
+              <Select 
+                value={selectedStatus} 
+                onValueChange={(v) => {
+                  setSelectedStatus(v);
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {hasActiveFilters && (
+                <V3Button variant="ghost" size="sm" onClick={clearFilters}>
+                  <X className="h-4 w-4 mr-1" />
+                  Clear
+                </V3Button>
+              )}
+            </div>
+
+            {/* Role pills */}
+            <div className="flex flex-wrap gap-2">
+              {ORG_ROLES.map(role => (
+                <V3FilterPill
+                  key={role}
+                  label={role}
+                  isActive={selectedRoles.includes(role)}
+                  className="capitalize"
+                  onClick={() => {
+                    setSelectedRoles(prev => 
+                      prev.includes(role) 
+                        ? prev.filter(r => r !== role)
+                        : [...prev, role]
+                    );
+                    setCurrentPage(1);
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Bulk Actions */}
+            {selectedUserIds.length > 0 && selectedOrgFilter !== "all" && (
+              <BulkUserActions
+                selectedUserIds={selectedUserIds}
+                organizationId={selectedOrgFilter}
+                onActionComplete={() => {
+                  loadData();
+                  setSelectedUserIds([]);
+                }}
+                onClearSelection={() => setSelectedUserIds([])}
+              />
+            )}
+
             {/* Mobile Card View */}
             {isMobile ? (
               <div className="space-y-3">
                 {users.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">
-                    No users yet. Create your first one!
+                    {hasActiveFilters ? "No users match your filters" : "No users yet. Invite your first member!"}
                   </p>
                 ) : (
                   users.map(renderMobileUserCard)
@@ -431,64 +688,127 @@ const ClientUserManager = () => {
               </div>
             ) : (
               /* Desktop Table View */
-              <Table>
+              <Table className="[&_th]:bg-[hsl(var(--portal-bg-tertiary))] [&_th]:text-[hsl(var(--portal-text-secondary))] [&_th]:font-medium [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider">
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="border-[hsl(var(--portal-border))]">
+                    <TableHead className="w-[40px]">
+                      <Checkbox
+                        checked={users.length > 0 && selectedUserIds.length === users.length}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </TableHead>
                     <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
                     <TableHead>Organization</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Last Login</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead>Security</TableHead>
+                    <TableHead>Last Session</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground">
-                        No users yet. Invite your first member!
+                      <TableCell colSpan={9} className="text-center text-[hsl(var(--portal-text-secondary))]">
+                        {hasActiveFilters ? "No users match your filters" : "No users yet. Invite your first member!"}
                       </TableCell>
                     </TableRow>
                   ) : (
                     users.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.full_name}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {getOrganizationName(user.organization_id)}
+                      <TableRow 
+                        key={user.id} 
+                        className="hover:bg-[hsl(var(--portal-bg-hover))] transition-colors duration-150 border-[hsl(var(--portal-border))] cursor-pointer" 
+                        data-state={selectedUserIds.includes(user.id) ? "selected" : undefined}
+                        onClick={() => {
+                          setSelectedUserForDetail(user);
+                          setShowUserDetail(true);
+                        }}
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedUserIds.includes(user.id)}
+                            onCheckedChange={() => toggleUserSelection(user.id)}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium text-[hsl(var(--portal-text-primary))]">{user.full_name}</TableCell>
+                        <TableCell className="text-[hsl(var(--portal-text-secondary))]">{user.email || '-'}</TableCell>
+                        <TableCell className="text-[hsl(var(--portal-text-secondary))]">
+                          {user.organization_name || getOrganizationName(user.organization_id)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="capitalize">{user.role}</Badge>
+                          <V3Badge variant={getRoleBadgeVariant(user.role)} className="capitalize">{user.role}</V3Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge 
-                            variant={user.status === 'active' ? 'default' : 'secondary'}
-                            className={
-                              user.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                              user.status === 'suspended' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                              user.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                              'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-                            }
-                          >
-                            {user.status || 'active'}
-                          </Badge>
+                          <div className="flex items-center gap-1">
+                            <V3Badge variant={getStatusBadgeVariant(user.status)}>
+                              {user.status || 'active'}
+                            </V3Badge>
+                            {user.is_locked && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <Lock className="h-3 w-3 text-[hsl(var(--portal-error))]" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>Account Locked</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {user.last_login_at
-                            ? new Date(user.last_login_at).toLocaleDateString()
-                            : 'Never'}
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  {user.mfa_enabled ? (
+                                    <Shield className="h-4 w-4 text-[hsl(var(--portal-success))]" />
+                                  ) : (
+                                    <ShieldOff className="h-4 w-4 text-[hsl(var(--portal-warning))]" />
+                                  )}
+                                </TooltipTrigger>
+                                <TooltipContent>{user.mfa_enabled ? 'MFA Enabled' : 'MFA Disabled'}</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            {user.failed_logins_24h > 0 && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <AlertTriangle className="h-4 w-4 text-[hsl(var(--portal-error))]" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>{user.failed_logins_24h} failed logins (24h)</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(user.created_at).toLocaleDateString()}
+                        <TableCell className="text-[hsl(var(--portal-text-secondary))]">
+                          {user.latest_session ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger className="flex items-center gap-1">
+                                  <Monitor className="h-3 w-3" />
+                                  <span className="text-xs">
+                                    {formatDistanceToNow(new Date(user.latest_session.last_active_at), { addSuffix: true })}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {user.latest_session.city && `${user.latest_session.city}, ${user.latest_session.country}`}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <span className="text-xs text-[hsl(var(--portal-text-muted))]">No sessions</span>
+                          )}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <V3Button variant="ghost" size="icon-sm">
                                 <MoreVertical className="h-4 w-4" />
                               </V3Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
+                            <DropdownMenuContent align="end" className="bg-[hsl(var(--portal-bg-secondary))] border-[hsl(var(--portal-border))]">
                               <DropdownMenuItem onClick={() => handleViewPortal(user)}>
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Portal
@@ -504,7 +824,7 @@ const ClientUserManager = () => {
                               <DropdownMenuSeparator />
                               <DropdownMenuItem 
                                 onClick={() => handleDeleteClick(user)}
-                                className="text-destructive focus:text-destructive"
+                                className="text-[hsl(var(--portal-error))] focus:text-[hsl(var(--portal-error))]"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete User
@@ -518,6 +838,21 @@ const ClientUserManager = () => {
                 </TableBody>
               </Table>
             )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <UserPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalCount={totalCount}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setCurrentPage(1);
+                }}
+              />
+            )}
           </TabsContent>
           
           <TabsContent value="pending" className="mt-4">
@@ -526,8 +861,16 @@ const ClientUserManager = () => {
               onInvitationChange={loadData}
             />
           </TabsContent>
+
+          <TabsContent value="requests" className="mt-4">
+            <MemberRequestQueue onRequestProcessed={loadData} />
+          </TabsContent>
+
+          <TabsContent value="seats" className="mt-4">
+            <SeatManagement />
+          </TabsContent>
         </Tabs>
-      </CardContent>
+      </V3CardContent>
 
       {/* Create User Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -560,12 +903,12 @@ const ClientUserManager = () => {
                 required
               />
             </div>
-            <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="space-y-2 p-3 bg-primary/10 rounded-lg border border-primary/20">
               <div className="flex items-start gap-2">
-                <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5" />
-                <div className="text-xs text-blue-900 dark:text-blue-100">
+                <Mail className="w-4 h-4 text-primary mt-0.5" />
+                <div className="text-xs text-foreground">
                   <p className="font-medium mb-1">Automated Setup</p>
-                  <p>A temporary password will be auto-generated and sent to the user via email with login instructions.</p>
+                  <p className="text-muted-foreground">A temporary password will be auto-generated and sent to the user via email with login instructions.</p>
                 </div>
               </div>
             </div>
@@ -730,7 +1073,18 @@ const ClientUserManager = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+
+      {/* User Detail Sidebar */}
+      <UserDetailSidebar
+        user={selectedUserForDetail}
+        open={showUserDetail}
+        onClose={() => {
+          setShowUserDetail(false);
+          setSelectedUserForDetail(null);
+        }}
+        onUserUpdated={loadData}
+      />
+    </V3Card>
   );
 };
 

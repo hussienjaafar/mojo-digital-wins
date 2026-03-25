@@ -454,7 +454,7 @@ export function ActBlueMetricsDebug({
               {/* Data Source Info */}
               <div className="text-gray-500 text-[10px] mt-2">
                 Source: actblue_transactions_secure (raw query) |
-                Dashboard uses: useClientDashboardMetricsQuery
+                Dashboard uses: useDashboardMetricsV2
               </div>
             </>
           )}

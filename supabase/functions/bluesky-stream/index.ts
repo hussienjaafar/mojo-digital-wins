@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, validateCronOrAdmin, logJobFailure, checkRateLimit } from "../_shared/security.ts";
+import { getAllKeywords, POLICY_DOMAIN_KEYWORDS } from "../_shared/policyDomainKeywords.ts";
 
 const corsHeaders = getCorsHeaders();
 
@@ -8,19 +9,11 @@ const corsHeaders = getCorsHeaders();
 const MAX_POSTS_IN_DB = 50000;
 const MAX_POSTS_PER_SESSION = 500;
 const MAX_DURATION_MS = 10000;
-const MIN_RELEVANCE_SCORE = 0.20;
+const MIN_RELEVANCE_SCORE = 0.15; // Lowered threshold for broader collection
 
-const POLITICAL_KEYWORDS = [
-  'congress', 'senate', 'biden', 'trump', 'pelosi', 'mcconnell', 'schumer',
-  'executive order', 'white house', 'supreme court', 'scotus',
-  'immigration ban', 'border wall', 'climate bill', 'student loan forgiveness',
-  'abortion ban', 'roe v wade', 'gun control', 'gun reform', 'healthcare bill',
-  'voting rights', 'voter suppression', 'gerrymandering', 'hate crime',
-  'discrimination lawsuit', 'civil rights violation',
-  'muslim ban', 'islamophobia', 'antisemitism', 'anti-asian', 'black lives matter',
-  'lgbtq rights', 'trans rights', 'transgender ban',
-  'gaza', 'ceasefire', 'ukraine war', 'russia sanctions', 'china tariffs', 'israel palestine'
-];
+// Use comprehensive policy domain keywords instead of hardcoded list
+// This covers all 12 policy domains with 500+ keywords
+const POLITICAL_KEYWORDS = getAllKeywords();
 
 const SPAM_PATTERNS = [
   /follow\s*me/i, /check\s*my\s*profile/i, /link\s*in\s*bio/i, /dm\s*me/i,

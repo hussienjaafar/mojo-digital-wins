@@ -7,6 +7,7 @@ import {
   calculateMatchScore,
   getMatchQualityLabel,
 } from "../_shared/capi-utils.ts";
+import { normalizeActBlueTimestamp } from "../_shared/actblue-timezone.ts";
 
 // SECURITY: Restrict CORS to known origins
 const ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
@@ -333,8 +334,29 @@ serve(async (req) => {
       ? `${donor.firstname} ${donor.lastname}`.trim() 
       : null;
     const customFields = contribution.customFields || [];
-    const clickId = getCustomFieldValue(customFields, 'click_id') || getCustomFieldValue(customFields, 'fbclid');
-    const fbclid = getCustomFieldValue(customFields, 'fbclid');
+    
+    // Extract fbclid from multiple sources:
+    // 1. customFields (direct fbclid field from ActBlue)
+    // 2. refcode2 with fb_ prefix (common pattern: fb_IwZXh0bgNhZW0...)
+    const customFieldFbclid = getCustomFieldValue(customFields, 'fbclid');
+    const customFieldClickId = getCustomFieldValue(customFields, 'click_id');
+    const refcode2Value = safeString(refcodes.refcode2);
+    
+    // Check if refcode2 contains a Facebook click ID (starts with fb_)
+    const refcode2Fbclid = refcode2Value?.startsWith('fb_') ? refcode2Value.substring(3) : null;
+    
+    // Priority: customField fbclid > refcode2 fbclid > customField click_id
+    const fbclid = customFieldFbclid || refcode2Fbclid;
+    const clickId = customFieldClickId || fbclid;
+    
+    console.log('[ACTBLUE] [DEBUG] Click ID extraction:', {
+      customFieldFbclid,
+      customFieldClickId,
+      refcode2Value,
+      refcode2Fbclid,
+      finalFbclid: fbclid,
+      finalClickId: clickId,
+    });
 
     // Recurring state derivation (best-effort with available payload fields)
     let recurringState: string | null = null;
@@ -345,7 +367,8 @@ serve(async (req) => {
     // Extract data using safe helpers
     const amount = safeNumber(lineitem.amount);
     const lineitemId = safeInt(lineitem.lineitemId);
-    const paidAt = safeString(lineitem.paidAt) || safeString(contribution.createdAt) || new Date().toISOString();
+    // Normalize timestamp to UTC - ActBlue sends Eastern Time without TZ suffix
+    const paidAt = normalizeActBlueTimestamp(lineitem.paidAt) || normalizeActBlueTimestamp(contribution.createdAt) || new Date().toISOString();
 
     if (amount === null || lineitemId === null) {
       console.error('[ACTBLUE] Missing required fields: amount or lineitemId', { amount, lineitemId });
@@ -418,8 +441,9 @@ serve(async (req) => {
         employer: safeString(donor.employerData?.employer),
         occupation: safeString(donor.employerData?.occupation),
         amount: amount,
-        // NEW: Capture fee for net revenue calculation
-        fee: safeNumber(lineitem.feeAmount),
+        // Capture fee for net revenue calculation
+        // ActBlue webhooks often don't include feeAmount, so estimate at 3.95% if missing
+        fee: safeNumber(lineitem.feeAmount) ?? (amount ? Math.round(amount * 0.0395 * 100) / 100 : null),
         // NEW: Payment method details for payment quality analysis
         payment_method: safeString(contribution.paymentMethod),
         card_type: safeString(contribution.cardType),
@@ -497,54 +521,70 @@ serve(async (req) => {
         if (error) console.error('[ACTBLUE] Error tracking touchpoint:', error);
       });
 
-      // Update donor demographics
-      await supabase.from('donor_demographics')
-        .upsert({
-          organization_id,
-          donor_email: safeString(donor.email),
-          first_name: safeString(donor.firstname),
-          last_name: safeString(donor.lastname),
-          address: safeString(donor.addr1),
-          city: safeString(donor.city),
-          state: safeString(donor.state),
-          zip: safeString(donor.zip),
-          country: safeString(donor.country),
-          phone: safeString(donor.phone),
-          employer: safeString(donor.employerData?.employer),
-          occupation: safeString(donor.employerData?.occupation),
-          last_donation_date: paidAt,
-        }, {
-          onConflict: 'organization_id,donor_email',
-          ignoreDuplicates: false,
-        })
-        .select()
-        .single()
-        .then(async ({ data, error }) => {
-          if (!error && data) {
-            const { data: txData } = await supabase
-              .from('actblue_transactions')
-              .select('amount')
-              .eq('organization_id', organization_id)
-              .eq('donor_email', donor.email);
-            
-            if (txData) {
-              const total = txData.reduce((sum, tx) => sum + tx.amount, 0);
-              await supabase.from('donor_demographics')
-                .update({
-                  total_donated: total,
-                  donation_count: txData.length,
-                  first_donation_date: data.first_donation_date || paidAt,
-                })
-                .eq('id', data.id);
+      // Update donor demographics with proper aggregate calculation (non-fatal)
+      try {
+        await supabase.from('donor_demographics')
+          .upsert({
+            organization_id,
+            donor_email: safeString(donor.email),
+            first_name: safeString(donor.firstname),
+            last_name: safeString(donor.lastname),
+            address: safeString(donor.addr1),
+            city: safeString(donor.city),
+            state: safeString(donor.state),
+            zip: safeString(donor.zip),
+            country: safeString(donor.country),
+            phone: safeString(donor.phone),
+            employer: safeString(donor.employerData?.employer),
+            occupation: safeString(donor.employerData?.occupation),
+            last_donation_date: paidAt,
+          }, {
+            onConflict: 'organization_id,donor_email',
+            ignoreDuplicates: false,
+          })
+          .select()
+          .single()
+          .then(async ({ data, error }) => {
+            if (!error && data) {
+              const { data: txData } = await supabase
+                .from('actblue_transactions')
+                .select('amount, recurring_period, transaction_type, transaction_date')
+                .eq('organization_id', organization_id)
+                .ilike('donor_email', donor.email);
+              
+              if (txData && txData.length > 0) {
+                const donations = txData.filter(t => t.transaction_type === 'donation');
+                const totalDonated = donations.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+                const donationCount = donations.length;
+                const dates = donations.map(t => t.transaction_date).filter(Boolean).sort();
+                const isRecurring = txData.some(tx => 
+                  tx.recurring_period && tx.recurring_period !== 'once' && tx.recurring_period !== ''
+                );
+                
+                await supabase.from('donor_demographics')
+                  .update({
+                    total_donated: totalDonated,
+                    donation_count: donationCount,
+                    first_donation_date: dates[0] || data.first_donation_date || paidAt,
+                    last_donation_date: dates[dates.length - 1] || paidAt,
+                    is_recurring: isRecurring,
+                  })
+                  .eq('id', data.id);
+              }
+            } else if (error) {
+              console.error('[ACTBLUE] Non-fatal: donor demographics upsert failed:', error.message);
             }
-          }
-        });
+          });
+      } catch (demoError) {
+        console.error('[ACTBLUE] Non-fatal: donor demographics update failed:', demoError);
+      }
     }
 
     console.log('[ACTBLUE] Transaction stored successfully:', lineitemId, '| Amount:', amount);
 
     // === META CAPI OUTBOX ENQUEUE ===
     // Enqueue conversion event for server-side tracking (non-blocking, non-fatal)
+    console.log('[ACTBLUE] [DEBUG] About to enqueue CAPI event for transaction:', lineitemId, '| org:', organization_id);
     try {
       await enqueueCAPIEvent(supabase, {
         organization_id,
@@ -563,13 +603,15 @@ serve(async (req) => {
         amount,
         paidAt,
         refcode,
+        refcode2: refcode2Value,
         fbclid,
         clickId,
         contributionForm: safeString(contribution.contributionForm) || undefined,
       });
+      console.log('[ACTBLUE] [DEBUG] CAPI enqueue completed successfully for:', lineitemId);
     } catch (capiError: any) {
       // Non-fatal: log but don't fail the webhook
-      console.error('[ACTBLUE] CAPI enqueue failed (non-fatal):', capiError?.message || capiError);
+      console.error('[ACTBLUE] [DEBUG] CAPI enqueue FAILED:', capiError?.message || capiError);
     }
 
     // Update webhook log with success
@@ -649,6 +691,7 @@ interface EnqueueCAPIParams {
   amount: number;
   paidAt: string;
   refcode?: string | null;
+  refcode2?: string | null;
   fbclid?: string | null;
   clickId?: string | null;
   contributionForm?: string | null;
@@ -666,14 +709,16 @@ async function enqueueCAPIEvent(
     amount,
     paidAt,
     refcode,
+    refcode2,
     fbclid,
     clickId,
     contributionForm,
   } = params;
 
   // Only enqueue for donation events (not refunds/cancellations)
+  console.log('[CAPI] [DEBUG] enqueueCAPIEvent called | transactionId:', transactionId, '| type:', transactionType);
   if (transactionType !== 'donation') {
-    console.log('[CAPI] Skipping non-donation transaction type:', transactionType);
+    console.log('[CAPI] [DEBUG] SKIPPED - non-donation type:', transactionType);
     return;
   }
 
@@ -685,41 +730,48 @@ async function enqueueCAPIEvent(
     .maybeSingle();
 
   if (configError) {
-    console.error('[CAPI] Error fetching config:', configError.message);
+    console.error('[CAPI] [DEBUG] Error fetching config:', configError.message);
     return;
   }
+
+  console.log('[CAPI] [DEBUG] Config lookup result:', { 
+    hasConfig: !!capiConfig, 
+    isEnabled: capiConfig?.is_enabled,
+    pixelId: capiConfig?.pixel_id?.substring(0, 8) + '...',
+    actblueOwns: capiConfig?.actblue_owns_donation_complete
+  });
 
   if (!capiConfig || !capiConfig.is_enabled) {
-    // CAPI not configured or not enabled for this org - silent skip
+    console.log('[CAPI] [DEBUG] SKIPPED - CAPI not configured or not enabled');
     return;
   }
 
-  // Determine if this is an enrichment-only event (ActBlue owns primary conversion tracking)
-  // When actblue_owns_donation_complete = true, we still send the event to Meta with 
-  // additional matching data (phone, name, address), using a deterministic event_id 
-  // derived from the transaction so Meta can deduplicate via external_id/fbp/fbc.
-  const isEnrichmentOnly = capiConfig.actblue_owns_donation_complete === true;
+  // ============= ENRICHMENT-ONLY MODE =============
+  // When actblue_owns_donation_complete = true, ActBlue's browser pixel handles conversion tracking.
+  // We must NOT send Purchase events via CAPI to avoid duplicate conversions in Meta Ads Manager.
+  // Meta's deduplication is unreliable when data or timing mismatches occur.
+  if (capiConfig.actblue_owns_donation_complete === true) {
+    console.log('[CAPI] ENRICHMENT-ONLY mode active - SKIPPING Purchase event (ActBlue owns conversion tracking)');
+    console.log('[CAPI] Transaction', transactionId, 'will be tracked by ActBlue browser pixel only');
+    return; // Exit completely - do not enqueue any event
+  }
 
   const eventName = capiConfig.donation_event_name || 'Purchase';
   const dedupeKey = generateDedupeKey(eventName, organization_id, transactionId);
 
-  // Generate event_id:
-  // - For enrichment events: Use deterministic ID from org+transaction so if ActBlue 
-  //   sends the same transaction, Meta can potentially match via external_id/fbp/fbc
-  // - For primary events: Use random UUID (we own the conversion tracking)
-  let eventId: string;
-  if (isEnrichmentOnly) {
-    // Deterministic event_id for potential deduplication
-    eventId = await hashSHA256(`enrichment:${organization_id}:${transactionId}`);
-    console.log('[CAPI] Enrichment mode - sending additional matching data for:', transactionId);
-  } else {
-    eventId = crypto.randomUUID();
-  }
+  // Generate event_id: For primary mode (non-enrichment), use random UUID since we own conversion tracking
+  // Note: Enrichment mode is handled above (early return) - this code only runs for primary mode
+  const eventId = crypto.randomUUID();
 
   // Lookup fbp/fbc from attribution touchpoints
-  // Priority: 1) Email match, 2) Refcode match (for pre-donation captures)
+  // Priority: 1) Email match, 2) Refcode match, 3) Time-proximity with truncated prefix match
   let fbp: string | null = null;
   let fbc: string | null = fbclid || clickId || null;
+  let touchpointMatchMethod = 'none';
+
+  // Time window for proximity matching (30 minutes before donation)
+  const donationTime = new Date(paidAt);
+  const windowStart = new Date(donationTime.getTime() - 30 * 60 * 1000).toISOString();
 
   // Try email-based lookup first (most reliable)
   if (donor.email) {
@@ -734,9 +786,19 @@ async function enqueueCAPIEvent(
       .maybeSingle();
 
     if (emailTouchpoint?.metadata) {
-      fbp = emailTouchpoint.metadata.fbp || fbp;
-      fbc = emailTouchpoint.metadata.fbc || emailTouchpoint.metadata.fbclid || fbc;
-      console.log('[CAPI] Found Meta identifiers via email lookup:', { hasFbp: !!fbp, hasFbc: !!fbc });
+      const meta = emailTouchpoint.metadata as any;
+      fbp = meta.fbp || fbp;
+      // Prefer full fbclid from touchpoint over truncated refcode2
+      const touchpointFbc = meta.fbc || meta.fbclid;
+      if (touchpointFbc && touchpointFbc.length > 50) {
+        fbc = touchpointFbc;
+        touchpointMatchMethod = 'email_full_fbclid';
+        console.log('[CAPI] Found FULL fbclid via email lookup:', { fbcLength: fbc?.length });
+      } else {
+        fbc = touchpointFbc || fbc;
+        touchpointMatchMethod = 'email';
+      }
+      console.log('[CAPI] Found Meta identifiers via email lookup:', { hasFbp: !!fbp, hasFbc: !!fbc, method: touchpointMatchMethod });
     }
   }
 
@@ -754,9 +816,17 @@ async function enqueueCAPIEvent(
       .maybeSingle();
 
     if (refcodeTouchpoint?.metadata) {
-      fbp = refcodeTouchpoint.metadata.fbp || fbp;
-      fbc = refcodeTouchpoint.metadata.fbc || refcodeTouchpoint.metadata.fbclid || fbc;
-      console.log('[CAPI] Found Meta identifiers via refcode lookup:', { hasFbp: !!fbp, hasFbc: !!fbc, refcode });
+      const meta = refcodeTouchpoint.metadata as any;
+      fbp = meta.fbp || fbp;
+      const touchpointFbc = meta.fbc || meta.fbclid;
+      if (touchpointFbc && touchpointFbc.length > 50) {
+        fbc = touchpointFbc;
+        touchpointMatchMethod = 'refcode_full_fbclid';
+      } else {
+        fbc = touchpointFbc || fbc;
+        touchpointMatchMethod = 'refcode';
+      }
+      console.log('[CAPI] Found Meta identifiers via refcode lookup:', { hasFbp: !!fbp, hasFbc: !!fbc, refcode, method: touchpointMatchMethod });
       
       // Update the touchpoint with this donor's email for future lookups
       if (donor.email && !refcodeTouchpoint.donor_email) {
@@ -772,6 +842,156 @@ async function enqueueCAPIEvent(
       }
     }
   }
+
+  // If still no full fbclid, try suffix-based matching with refcode2
+  // NEW: Requires email validation OR unique suffix to prevent cross-donor attribution
+  if ((!fbc || fbc.length <= 50) && refcode2?.startsWith('fb_')) {
+    const truncatedPart = refcode2.substring(3); // Remove 'fb_' prefix
+    const donorEmailLower = donor?.email?.toLowerCase();
+    
+    // Fetch touchpoints with email info for validation
+    const { data: suffixMatch } = await supabase
+      .from('attribution_touchpoints')
+      .select('id, metadata, donor_email')
+      .eq('organization_id', organization_id)
+      .not('metadata', 'is', null)
+      .order('occurred_at', { ascending: false })
+      .limit(50);
+    
+    let foundValidMatch = false;
+    
+    // PRIORITY 1: Email-verified match (most reliable)
+    if (donorEmailLower) {
+      for (const tp of suffixMatch || []) {
+        const meta = tp.metadata as any;
+        const fullFbclid = meta?.fbclid as string;
+        const tpEmailLower = tp.donor_email?.toLowerCase();
+        
+        if (!fullFbclid || fullFbclid.length <= 50) continue;
+        
+        // Only match if SAME DONOR (email verification)
+        if (tpEmailLower && tpEmailLower === donorEmailLower) {
+          const isMatch = fullFbclid.endsWith(truncatedPart) || fullFbclid.startsWith(truncatedPart);
+          if (isMatch) {
+            fbp = meta.fbp || fbp;
+            fbc = fullFbclid;
+            touchpointMatchMethod = 'email_verified_fbclid';
+            foundValidMatch = true;
+            console.log('[CAPI] Recovered FULL fbclid (EMAIL VERIFIED):', {
+              donorEmail: donorEmailLower.substring(0, 5) + '...',
+              fullFbclidLength: fbc.length,
+              touchpointId: tp.id,
+            });
+            break;
+          }
+        }
+      }
+    }
+    
+    // PRIORITY 2: Unique suffix match (only if ONE match exists)
+    if (!foundValidMatch) {
+      const suffixMatches = (suffixMatch || []).filter((tp: any) => {
+        const meta = tp.metadata as any;
+        const fullFbclid = meta?.fbclid as string;
+        return fullFbclid && fullFbclid.length > 50 && fullFbclid.endsWith(truncatedPart);
+      });
+      
+      if (suffixMatches.length === 1) {
+        // Single unique match - deterministic even without email
+        const meta = suffixMatches[0].metadata as any;
+        const recoveredFbc = meta.fbclid as string;
+        fbp = meta.fbp || fbp;
+        fbc = recoveredFbc;
+        touchpointMatchMethod = 'suffix_unique';
+        foundValidMatch = true;
+        console.log('[CAPI] Recovered FULL fbclid (UNIQUE SUFFIX):', {
+          suffix: truncatedPart.substring(0, 10) + '...',
+          fullFbclidLength: recoveredFbc.length,
+          touchpointId: suffixMatches[0].id,
+        });
+      } else if (suffixMatches.length > 1) {
+        // AMBIGUOUS: Multiple matches - skip to avoid cross-donor attribution
+        console.warn('[CAPI] BLOCKED: Ambiguous suffix match - would cause cross-donor attribution', {
+          truncatedPart: truncatedPart.substring(0, 15) + '...',
+          possibleMatches: suffixMatches.length,
+          donorEmail: donorEmailLower?.substring(0, 5) + '...',
+        });
+      }
+    }
+
+    // PRIORITY 3: Time-proximity + email verified (legacy prefix flow)
+    if (!foundValidMatch && donorEmailLower) {
+      const { data: proximityTouchpoints } = await supabase
+        .from('attribution_touchpoints')
+        .select('id, metadata, occurred_at, donor_email')
+        .eq('organization_id', organization_id)
+        .not('metadata', 'is', null)
+        .gte('occurred_at', windowStart)
+        .lte('occurred_at', paidAt)
+        .order('occurred_at', { ascending: false })
+        .limit(20);
+
+      for (const tp of proximityTouchpoints || []) {
+        const meta = tp.metadata as any;
+        const fullFbclid = meta?.fbclid as string;
+        const tpEmailLower = tp.donor_email?.toLowerCase();
+        
+        if (!fullFbclid || fullFbclid.length <= 50) continue;
+
+        // Only accept if emails match (prevent cross-donor)
+        if (tpEmailLower && tpEmailLower === donorEmailLower) {
+          if (fullFbclid.startsWith(truncatedPart)) {
+            fbp = meta.fbp || fbp;
+            fbc = fullFbclid;
+            touchpointMatchMethod = 'time_proximity_email_verified';
+            foundValidMatch = true;
+            console.log('[CAPI] Recovered FULL fbclid via time-proximity + email verification:', {
+              truncatedPart: truncatedPart.substring(0, 15) + '...',
+              fullFbclidLength: fbc.length,
+              touchpointId: tp.id,
+            });
+            break;
+          }
+        }
+      }
+    }
+    
+    // BLOCKED: Do NOT use prefix-only matching without email verification
+    // This was causing cross-donor attribution errors
+    if (!foundValidMatch) {
+      console.log('[CAPI] No verified fbclid match found - using truncated to prevent misattribution', {
+        truncatedPart: truncatedPart.substring(0, 15) + '...',
+        hasDonorEmail: !!donorEmailLower,
+      });
+    }
+  }
+
+  // Last resort: Check if actblue_transactions already has full fbclid (from backfill)
+  if ((!fbc || fbc.length <= 50) && transactionId) {
+    const { data: txRecord } = await supabase
+      .from('actblue_transactions')
+      .select('fbclid')
+      .eq('transaction_id', transactionId)
+      .eq('organization_id', organization_id)
+      .maybeSingle();
+    
+    if (txRecord?.fbclid && txRecord.fbclid.length > 50) {
+      const backfilledFbc = txRecord.fbclid;
+      fbc = backfilledFbc;
+      touchpointMatchMethod = 'transaction_backfill';
+      console.log('[CAPI] Found FULL fbclid from transaction backfill:', {
+        fbcLength: backfilledFbc.length,
+        transactionId,
+      });
+    }
+  }
+
+  console.log('[CAPI] Final touchpoint lookup result:', {
+    hasFbp: !!fbp,
+    hasFbc: !!fbc,
+    fbcLength: fbc?.length,
+    matchMethod: touchpointMatchMethod,
+  });
 
   // SECURITY: Pre-hash all PII before storing in database
   // This ensures NO plaintext PII is stored in meta_conversion_events
@@ -815,6 +1035,9 @@ async function enqueueCAPIEvent(
     ? `https://secure.actblue.com/donate/${contributionForm}`
     : null;
 
+  // Convert paidAt to Unix timestamp (seconds) for Meta CAPI
+  const eventTimeUnix = Math.floor(new Date(paidAt).getTime() / 1000);
+
   // Insert into meta_conversion_events (the outbox)
   const { error: insertError } = await supabase
     .from('meta_conversion_events')
@@ -822,7 +1045,7 @@ async function enqueueCAPIEvent(
       organization_id,
       event_id: eventId,
       event_name: eventName,
-      event_time: paidAt,
+      event_time: eventTimeUnix,
       event_source_url: eventSourceUrl,
       dedupe_key: dedupeKey,
       source_type: 'actblue_webhook',
@@ -836,7 +1059,7 @@ async function enqueueCAPIEvent(
       pixel_id: capiConfig.pixel_id,
       match_score: matchScore,
       match_quality: matchQuality,
-      is_enrichment_only: isEnrichmentOnly,
+      is_enrichment_only: false, // We already returned early for enrichment mode
       status: 'pending',
       retry_count: 0,
       max_attempts: 5,
@@ -846,11 +1069,22 @@ async function enqueueCAPIEvent(
       ignoreDuplicates: true,  // Skip if already queued (idempotent)
     });
 
+  console.log('[CAPI] [DEBUG] Attempting insert with:', {
+    organization_id,
+    event_name: eventName,
+    dedupe_key: dedupeKey,
+    match_score: matchScore,
+    match_quality: matchQuality,
+    has_fbp: !!fbp,
+    has_fbc: !!fbc,
+    has_external_id: !!externalId,
+    is_enrichment_only: false,
+  });
+
   if (insertError) {
     // Log but don't fail the webhook - CAPI is non-critical
-    console.error('[CAPI] Failed to enqueue event:', insertError.message);
+    console.error('[CAPI] [DEBUG] INSERT FAILED:', insertError.message, insertError.details, insertError.hint);
   } else {
-    const eventType = isEnrichmentOnly ? 'enrichment' : 'primary';
-    console.log(`[CAPI] Enqueued ${eventType} donation event:`, dedupeKey);
+    console.log(`[CAPI] [DEBUG] INSERT SUCCESS - Enqueued primary donation event:`, dedupeKey);
   }
 }

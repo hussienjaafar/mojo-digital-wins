@@ -141,7 +141,18 @@ function buildRedirectUrl(
   if (fbclid) {
     // Store in refcode2 if not already set, so it's captured in webhook
     if (!url.searchParams.get('refcode2')) {
-      url.searchParams.set('refcode2', `fb_${fbclid.substring(0, 20)}`);
+      // Facebook Click IDs have unique suffix after _aem_ (e.g., _aem_tvMPYAxP2Ya-c2efJ4jCUg)
+      // The prefix is shared across many clicks, so we extract the unique suffix
+      let clickIdKey: string;
+      const aemIndex = fbclid.lastIndexOf('_aem_');
+      if (aemIndex !== -1 && aemIndex + 5 < fbclid.length) {
+        // Extract everything after _aem_ (typically 20-30 unique chars)
+        clickIdKey = fbclid.substring(aemIndex + 5);
+      } else {
+        // Fallback: use last 24 characters (where uniqueness typically lives)
+        clickIdKey = fbclid.slice(-24);
+      }
+      url.searchParams.set('refcode2', `fb_${clickIdKey}`);
     }
   }
   

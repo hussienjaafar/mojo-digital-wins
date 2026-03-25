@@ -53,6 +53,94 @@ export type Database = {
         }
         Relationships: []
       }
+      actblue_backfill_chunks: {
+        Row: {
+          attempt_count: number | null
+          chunk_index: number
+          completed_at: string | null
+          created_at: string | null
+          end_date: string
+          error_message: string | null
+          id: string
+          inserted_rows: number | null
+          job_id: string
+          max_attempts: number | null
+          next_retry_at: string | null
+          organization_id: string
+          processed_rows: number | null
+          skipped_rows: number | null
+          start_date: string
+          started_at: string | null
+          status: string | null
+          updated_at: string | null
+          updated_rows: number | null
+        }
+        Insert: {
+          attempt_count?: number | null
+          chunk_index: number
+          completed_at?: string | null
+          created_at?: string | null
+          end_date: string
+          error_message?: string | null
+          id?: string
+          inserted_rows?: number | null
+          job_id: string
+          max_attempts?: number | null
+          next_retry_at?: string | null
+          organization_id: string
+          processed_rows?: number | null
+          skipped_rows?: number | null
+          start_date: string
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          updated_rows?: number | null
+        }
+        Update: {
+          attempt_count?: number | null
+          chunk_index?: number
+          completed_at?: string | null
+          created_at?: string | null
+          end_date?: string
+          error_message?: string | null
+          id?: string
+          inserted_rows?: number | null
+          job_id?: string
+          max_attempts?: number | null
+          next_retry_at?: string | null
+          organization_id?: string
+          processed_rows?: number | null
+          skipped_rows?: number | null
+          start_date?: string
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          updated_rows?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "actblue_backfill_chunks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actblue_backfill_chunks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "actblue_backfill_chunks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       actblue_transactions: {
         Row: {
           ab_test_name: string | null
@@ -89,6 +177,7 @@ export type Database = {
           organization_id: string
           payment_method: string | null
           phone: string | null
+          phone_hash: string | null
           receipt_id: string | null
           recurring_duration: number | null
           recurring_period: string | null
@@ -142,6 +231,7 @@ export type Database = {
           organization_id: string
           payment_method?: string | null
           phone?: string | null
+          phone_hash?: string | null
           receipt_id?: string | null
           recurring_duration?: number | null
           recurring_period?: string | null
@@ -195,6 +285,7 @@ export type Database = {
           organization_id?: string
           payment_method?: string | null
           phone?: string | null
+          phone_hash?: string | null
           receipt_id?: string | null
           recurring_duration?: number | null
           recurring_period?: string | null
@@ -303,6 +394,269 @@ export type Database = {
           },
           {
             foreignKeyName: "action_generator_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      ad_copy_generations: {
+        Row: {
+          actblue_form_name: string
+          amount_preset: number | null
+          audience_segments: Json
+          batch_id: string | null
+          batch_sequence: number | null
+          copy_validation_status: string | null
+          created_at: string | null
+          generated_at: string | null
+          generated_copy: Json | null
+          generation_model: string | null
+          generation_prompt_version: string | null
+          id: string
+          meta_ready_copy: Json | null
+          organization_id: string
+          recurring_default: boolean | null
+          refcode: string
+          refcode_auto_generated: boolean | null
+          tracking_url: string | null
+          transcript_ref: string | null
+          updated_at: string | null
+          video_ref: string | null
+        }
+        Insert: {
+          actblue_form_name: string
+          amount_preset?: number | null
+          audience_segments?: Json
+          batch_id?: string | null
+          batch_sequence?: number | null
+          copy_validation_status?: string | null
+          created_at?: string | null
+          generated_at?: string | null
+          generated_copy?: Json | null
+          generation_model?: string | null
+          generation_prompt_version?: string | null
+          id?: string
+          meta_ready_copy?: Json | null
+          organization_id: string
+          recurring_default?: boolean | null
+          refcode: string
+          refcode_auto_generated?: boolean | null
+          tracking_url?: string | null
+          transcript_ref?: string | null
+          updated_at?: string | null
+          video_ref?: string | null
+        }
+        Update: {
+          actblue_form_name?: string
+          amount_preset?: number | null
+          audience_segments?: Json
+          batch_id?: string | null
+          batch_sequence?: number | null
+          copy_validation_status?: string | null
+          created_at?: string | null
+          generated_at?: string | null
+          generated_copy?: Json | null
+          generation_model?: string | null
+          generation_prompt_version?: string | null
+          id?: string
+          meta_ready_copy?: Json | null
+          organization_id?: string
+          recurring_default?: boolean | null
+          refcode?: string
+          refcode_auto_generated?: boolean | null
+          tracking_url?: string | null
+          transcript_ref?: string | null
+          updated_at?: string | null
+          video_ref?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_copy_generations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_copy_generations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "ad_copy_generations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "ad_copy_generations_transcript_ref_fkey"
+            columns: ["transcript_ref"]
+            isOneToOne: false
+            referencedRelation: "meta_ad_transcripts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_copy_generations_video_ref_fkey"
+            columns: ["video_ref"]
+            isOneToOne: false
+            referencedRelation: "meta_ad_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ad_copy_studio_sessions: {
+        Row: {
+          batch_id: string
+          completed_steps: number[] | null
+          created_at: string | null
+          current_step: number
+          id: string
+          organization_id: string
+          status: string | null
+          step_data: Json | null
+          transcript_ids: string[] | null
+          updated_at: string | null
+          user_id: string
+          video_ids: string[] | null
+        }
+        Insert: {
+          batch_id?: string
+          completed_steps?: number[] | null
+          created_at?: string | null
+          current_step?: number
+          id?: string
+          organization_id: string
+          status?: string | null
+          step_data?: Json | null
+          transcript_ids?: string[] | null
+          updated_at?: string | null
+          user_id: string
+          video_ids?: string[] | null
+        }
+        Update: {
+          batch_id?: string
+          completed_steps?: number[] | null
+          created_at?: string | null
+          current_step?: number
+          id?: string
+          organization_id?: string
+          status?: string | null
+          step_data?: Json | null
+          transcript_ids?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+          video_ids?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_copy_studio_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_copy_studio_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "ad_copy_studio_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      ad_fatigue_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          ad_id: string
+          alert_severity: string | null
+          baseline_ctr: number | null
+          created_at: string | null
+          creative_id: string | null
+          current_ctr: number | null
+          days_declining: number | null
+          decline_percent: number | null
+          decline_start_date: string | null
+          id: string
+          is_acknowledged: boolean | null
+          organization_id: string | null
+          predicted_exhaustion_date: string | null
+          resolution_action: string | null
+          resolved_at: string | null
+          total_spend_at_detection: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          ad_id: string
+          alert_severity?: string | null
+          baseline_ctr?: number | null
+          created_at?: string | null
+          creative_id?: string | null
+          current_ctr?: number | null
+          days_declining?: number | null
+          decline_percent?: number | null
+          decline_start_date?: string | null
+          id?: string
+          is_acknowledged?: boolean | null
+          organization_id?: string | null
+          predicted_exhaustion_date?: string | null
+          resolution_action?: string | null
+          resolved_at?: string | null
+          total_spend_at_detection?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          ad_id?: string
+          alert_severity?: string | null
+          baseline_ctr?: number | null
+          created_at?: string | null
+          creative_id?: string | null
+          current_ctr?: number | null
+          days_declining?: number | null
+          decline_percent?: number | null
+          decline_start_date?: string | null
+          id?: string
+          is_acknowledged?: boolean | null
+          organization_id?: string | null
+          predicted_exhaustion_date?: string | null
+          resolution_action?: string | null
+          resolved_at?: string | null
+          total_spend_at_detection?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_fatigue_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_fatigue_alerts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "ad_fatigue_alerts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "v_integration_summary"
@@ -1326,6 +1680,7 @@ export type Database = {
       }
       attribution_touchpoints: {
         Row: {
+          ad_id: string | null
           campaign_id: string | null
           created_at: string | null
           donor_email: string | null
@@ -1340,6 +1695,7 @@ export type Database = {
           utm_source: string | null
         }
         Insert: {
+          ad_id?: string | null
           campaign_id?: string | null
           created_at?: string | null
           donor_email?: string | null
@@ -1354,6 +1710,7 @@ export type Database = {
           utm_source?: string | null
         }
         Update: {
+          ad_id?: string | null
           campaign_id?: string | null
           created_at?: string | null
           donor_email?: string | null
@@ -2054,6 +2411,79 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_analytics: {
+        Row: {
+          campaign_id: string
+          campaign_type: string | null
+          click_rate: number | null
+          clicks: number | null
+          conversion_rate: number | null
+          conversions: number | null
+          created_at: string | null
+          id: string
+          open_rate: number | null
+          opens: number | null
+          organization_id: string
+          revenue: number | null
+          sends: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          campaign_id: string
+          campaign_type?: string | null
+          click_rate?: number | null
+          clicks?: number | null
+          conversion_rate?: number | null
+          conversions?: number | null
+          created_at?: string | null
+          id?: string
+          open_rate?: number | null
+          opens?: number | null
+          organization_id: string
+          revenue?: number | null
+          sends?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          campaign_type?: string | null
+          click_rate?: number | null
+          clicks?: number | null
+          conversion_rate?: number | null
+          conversions?: number | null
+          created_at?: string | null
+          id?: string
+          open_rate?: number | null
+          opens?: number | null
+          organization_id?: string
+          revenue?: number | null
+          sends?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_campaign_analytics_org"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_campaign_analytics_org"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "fk_campaign_analytics_org"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       campaign_attribution: {
         Row: {
           attributed_revenue: number | null
@@ -2129,6 +2559,58 @@ export type Database = {
           },
           {
             foreignKeyName: "campaign_attribution_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      campaign_topic_extractions: {
+        Row: {
+          campaign_id: string
+          campaign_type: string
+          extracted_at: string | null
+          extracted_topics: string[] | null
+          id: string
+          organization_id: string | null
+          policy_domains: string[] | null
+        }
+        Insert: {
+          campaign_id: string
+          campaign_type: string
+          extracted_at?: string | null
+          extracted_topics?: string[] | null
+          id?: string
+          organization_id?: string | null
+          policy_domains?: string[] | null
+        }
+        Update: {
+          campaign_id?: string
+          campaign_type?: string
+          extracted_at?: string | null
+          extracted_topics?: string[] | null
+          id?: string
+          organization_id?: string | null
+          policy_domains?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_topic_extractions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_topic_extractions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "campaign_topic_extractions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "v_integration_summary"
@@ -2404,43 +2886,61 @@ export type Database = {
       }
       client_organizations: {
         Row: {
+          bonus_reason: string | null
+          bonus_seats: number
           created_at: string | null
+          election_date: string | null
+          election_name: string | null
           id: string
           is_active: boolean | null
           logo_url: string | null
+          max_concurrent_sessions: number
           mfa_grace_period_days: number | null
           mfa_required: boolean | null
           name: string
           org_timezone: string | null
           primary_contact_email: string | null
+          seat_limit: number
           slug: string
           timezone: string | null
           updated_at: string | null
         }
         Insert: {
+          bonus_reason?: string | null
+          bonus_seats?: number
           created_at?: string | null
+          election_date?: string | null
+          election_name?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
+          max_concurrent_sessions?: number
           mfa_grace_period_days?: number | null
           mfa_required?: boolean | null
           name: string
           org_timezone?: string | null
           primary_contact_email?: string | null
+          seat_limit?: number
           slug: string
           timezone?: string | null
           updated_at?: string | null
         }
         Update: {
+          bonus_reason?: string | null
+          bonus_seats?: number
           created_at?: string | null
+          election_date?: string | null
+          election_name?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
+          max_concurrent_sessions?: number
           mfa_grace_period_days?: number | null
           mfa_required?: boolean | null
           name?: string
           org_timezone?: string | null
           primary_contact_email?: string | null
+          seat_limit?: number
           slug?: string
           timezone?: string | null
           updated_at?: string | null
@@ -2449,6 +2949,7 @@ export type Database = {
       }
       client_users: {
         Row: {
+          active_organization_id: string | null
           created_at: string | null
           full_name: string
           id: string
@@ -2459,6 +2960,7 @@ export type Database = {
           status: Database["public"]["Enums"]["user_status"]
         }
         Insert: {
+          active_organization_id?: string | null
           created_at?: string | null
           full_name: string
           id: string
@@ -2469,6 +2971,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["user_status"]
         }
         Update: {
+          active_organization_id?: string | null
           created_at?: string | null
           full_name?: string
           id?: string
@@ -2479,6 +2982,27 @@ export type Database = {
           status?: Database["public"]["Enums"]["user_status"]
         }
         Relationships: [
+          {
+            foreignKeyName: "client_users_active_organization_id_fkey"
+            columns: ["active_organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_users_active_organization_id_fkey"
+            columns: ["active_organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "client_users_active_organization_id_fkey"
+            columns: ["active_organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
           {
             foreignKeyName: "client_users_organization_id_fkey"
             columns: ["organization_id"]
@@ -2501,6 +3025,72 @@ export type Database = {
             referencedColumns: ["organization_id"]
           },
         ]
+      }
+      consent_records: {
+        Row: {
+          consent_type: string
+          consent_version: string
+          created_at: string
+          granted: boolean
+          granted_at: string | null
+          id: string
+          ip_address: unknown
+          revoked_at: string | null
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          consent_type: string
+          consent_version?: string
+          created_at?: string
+          granted?: boolean
+          granted_at?: string | null
+          id?: string
+          ip_address?: unknown
+          revoked_at?: string | null
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          consent_type?: string
+          consent_version?: string
+          created_at?: string
+          granted?: boolean
+          granted_at?: string | null
+          id?: string
+          ip_address?: unknown
+          revoked_at?: string | null
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      contact_notification_recipients: {
+        Row: {
+          added_by: string | null
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean
+        }
+        Insert: {
+          added_by?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          is_active?: boolean
+        }
+        Update: {
+          added_by?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+        }
+        Relationships: []
       }
       contact_submissions: {
         Row: {
@@ -2559,6 +3149,139 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles_secure"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_optimization: {
+        Row: {
+          body_content: Json | null
+          conversions: number
+          created_at: string
+          cta_text: string
+          headline_text: string
+          id: string
+          impressions: number
+          is_active: boolean
+          step_key: string
+          subheadline_text: string | null
+          traffic_weight: number
+          variant_label: string
+        }
+        Insert: {
+          body_content?: Json | null
+          conversions?: number
+          created_at?: string
+          cta_text: string
+          headline_text: string
+          id?: string
+          impressions?: number
+          is_active?: boolean
+          step_key: string
+          subheadline_text?: string | null
+          traffic_weight?: number
+          variant_label: string
+        }
+        Update: {
+          body_content?: Json | null
+          conversions?: number
+          created_at?: string
+          cta_text?: string
+          headline_text?: string
+          id?: string
+          impressions?: number
+          is_active?: boolean
+          step_key?: string
+          subheadline_text?: string | null
+          traffic_weight?: number
+          variant_label?: string
+        }
+        Relationships: []
+      }
+      creative_performance_correlations: {
+        Row: {
+          attribute_name: string
+          attribute_value: string
+          confidence_level: number | null
+          correlated_metric: string
+          correlation_coefficient: number | null
+          correlation_type: string
+          created_at: string | null
+          detected_at: string | null
+          id: string
+          insight_text: string | null
+          is_actionable: boolean | null
+          lift_percentage: number | null
+          metric_avg_with_attribute: number | null
+          metric_avg_without_attribute: number | null
+          organization_id: string | null
+          p_value: number | null
+          recommended_action: string | null
+          sample_size: number
+          updated_at: string | null
+        }
+        Insert: {
+          attribute_name: string
+          attribute_value: string
+          confidence_level?: number | null
+          correlated_metric: string
+          correlation_coefficient?: number | null
+          correlation_type: string
+          created_at?: string | null
+          detected_at?: string | null
+          id?: string
+          insight_text?: string | null
+          is_actionable?: boolean | null
+          lift_percentage?: number | null
+          metric_avg_with_attribute?: number | null
+          metric_avg_without_attribute?: number | null
+          organization_id?: string | null
+          p_value?: number | null
+          recommended_action?: string | null
+          sample_size?: number
+          updated_at?: string | null
+        }
+        Update: {
+          attribute_name?: string
+          attribute_value?: string
+          confidence_level?: number | null
+          correlated_metric?: string
+          correlation_coefficient?: number | null
+          correlation_type?: string
+          created_at?: string | null
+          detected_at?: string | null
+          id?: string
+          insight_text?: string | null
+          is_actionable?: boolean | null
+          lift_percentage?: number | null
+          metric_avg_with_attribute?: number | null
+          metric_avg_without_attribute?: number | null
+          organization_id?: string | null
+          p_value?: number | null
+          recommended_action?: string | null
+          sample_size?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_performance_correlations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_performance_correlations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "creative_performance_correlations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -2888,6 +3611,95 @@ export type Database = {
         }
         Relationships: []
       }
+      data_cart_items: {
+        Row: {
+          created_at: string
+          geo_code: string
+          geo_name: string
+          geo_type: string
+          id: string
+          product_id: string
+          record_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          geo_code: string
+          geo_name: string
+          geo_type: string
+          id?: string
+          product_id: string
+          record_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          geo_code?: string
+          geo_name?: string
+          geo_type?: string
+          id?: string
+          product_id?: string
+          record_count?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_cart_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "data_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_deletion_requests: {
+        Row: {
+          cancelled_at: string | null
+          cancelled_by: string | null
+          completed_at: string | null
+          created_at: string
+          deleted_tables: Json | null
+          error_message: string | null
+          id: string
+          processed_at: string | null
+          reason: string | null
+          requested_at: string
+          scheduled_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          deleted_tables?: Json | null
+          error_message?: string | null
+          id?: string
+          processed_at?: string | null
+          reason?: string | null
+          requested_at?: string
+          scheduled_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          deleted_tables?: Json | null
+          error_message?: string | null
+          id?: string
+          processed_at?: string | null
+          reason?: string | null
+          requested_at?: string
+          scheduled_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       data_export_logs: {
         Row: {
           created_at: string | null
@@ -2945,6 +3757,48 @@ export type Database = {
             referencedColumns: ["organization_id"]
           },
         ]
+      }
+      data_export_requests: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          download_expires_at: string | null
+          download_url: string | null
+          error_message: string | null
+          format: string
+          id: string
+          processed_at: string | null
+          requested_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          download_expires_at?: string | null
+          download_url?: string | null
+          error_message?: string | null
+          format?: string
+          id?: string
+          processed_at?: string | null
+          requested_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          download_expires_at?: string | null
+          download_url?: string | null
+          error_message?: string | null
+          format?: string
+          id?: string
+          processed_at?: string | null
+          requested_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       data_freshness: {
         Row: {
@@ -3086,6 +3940,168 @@ export type Database = {
           },
         ]
       }
+      data_order_items: {
+        Row: {
+          created_at: string
+          geo_code: string
+          geo_name: string
+          geo_type: string
+          id: string
+          line_total: number
+          order_id: string
+          product_id: string
+          record_count: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          geo_code: string
+          geo_name: string
+          geo_type: string
+          id?: string
+          line_total: number
+          order_id: string
+          product_id: string
+          record_count: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string
+          geo_code?: string
+          geo_name?: string
+          geo_type?: string
+          id?: string
+          line_total?: number
+          order_id?: string
+          product_id?: string
+          record_count?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "data_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "data_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_orders: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          status: string
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          total_amount?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      data_products: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          min_order_amount: number
+          name: string
+          price_per_record: number
+          slug: string
+          source_field: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          min_order_amount?: number
+          name: string
+          price_per_record?: number
+          slug: string
+          source_field: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          min_order_amount?: number
+          name?: string
+          price_per_record?: number
+          slug?: string
+          source_field?: string
+        }
+        Relationships: []
+      }
+      data_retention_policies: {
+        Row: {
+          archive_before_delete: boolean
+          created_at: string
+          id: string
+          is_active: boolean
+          last_cleanup_at: string | null
+          next_cleanup_at: string | null
+          retention_days: number
+          table_name: string
+          updated_at: string
+        }
+        Insert: {
+          archive_before_delete?: boolean
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_cleanup_at?: string | null
+          next_cleanup_at?: string | null
+          retention_days?: number
+          table_name: string
+          updated_at?: string
+        }
+        Update: {
+          archive_before_delete?: boolean
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_cleanup_at?: string | null
+          next_cleanup_at?: string | null
+          retention_days?: number
+          table_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       detected_anomalies: {
         Row: {
           alert_sent: boolean | null
@@ -3148,6 +4164,7 @@ export type Database = {
           created_at: string | null
           donation_count: number | null
           donor_email: string
+          donor_key: string | null
           employer: string | null
           first_donation_date: string | null
           first_name: string | null
@@ -3178,6 +4195,7 @@ export type Database = {
           created_at?: string | null
           donation_count?: number | null
           donor_email: string
+          donor_key?: string | null
           employer?: string | null
           first_donation_date?: string | null
           first_name?: string | null
@@ -3208,6 +4226,7 @@ export type Database = {
           created_at?: string | null
           donation_count?: number | null
           donor_email?: string
+          donor_key?: string | null
           employer?: string | null
           first_donation_date?: string | null
           first_name?: string | null
@@ -3247,6 +4266,64 @@ export type Database = {
             foreignKeyName: "donor_demographics_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      donor_demographics_cache: {
+        Row: {
+          calculated_at: string
+          created_at: string | null
+          id: string
+          is_stale: boolean
+          organization_id: string
+          summary_data: Json
+          transaction_count: number
+          updated_at: string | null
+          version: number
+        }
+        Insert: {
+          calculated_at?: string
+          created_at?: string | null
+          id?: string
+          is_stale?: boolean
+          organization_id: string
+          summary_data?: Json
+          transaction_count?: number
+          updated_at?: string | null
+          version?: number
+        }
+        Update: {
+          calculated_at?: string
+          created_at?: string | null
+          id?: string
+          is_stale?: boolean
+          organization_id?: string
+          summary_data?: Json
+          transaction_count?: number
+          updated_at?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donor_demographics_cache_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "donor_demographics_cache_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "donor_demographics_cache_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
             referencedRelation: "v_integration_summary"
             referencedColumns: ["organization_id"]
           },
@@ -4023,6 +5100,182 @@ export type Database = {
         }
         Relationships: []
       }
+      everyaction_sync_state: {
+        Row: {
+          created_at: string
+          id: string
+          last_export_job_id: number | null
+          last_sync_at: string | null
+          last_sync_cursor: string | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_export_job_id?: number | null
+          last_sync_at?: string | null
+          last_sync_cursor?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_export_job_id?: number | null
+          last_sync_at?: string | null
+          last_sync_cursor?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "everyaction_sync_state_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "everyaction_sync_state_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "everyaction_sync_state_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      everyaction_transactions: {
+        Row: {
+          addr1: string | null
+          amount: number
+          city: string | null
+          contribution_form: string | null
+          country: string | null
+          created_at: string
+          custom_fields: Json | null
+          designation: string | null
+          donor_email: string | null
+          donor_name: string | null
+          employer: string | null
+          first_name: string | null
+          id: string
+          is_recurring: boolean | null
+          last_name: string | null
+          occupation: string | null
+          organization_id: string
+          payment_method: string | null
+          phone: string | null
+          phone_hash: string | null
+          recurring_period: string | null
+          refcode: string | null
+          source_code: string | null
+          state: string | null
+          transaction_date: string
+          transaction_id: string
+          transaction_type: string | null
+          van_id: string | null
+          zip: string | null
+        }
+        Insert: {
+          addr1?: string | null
+          amount: number
+          city?: string | null
+          contribution_form?: string | null
+          country?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          designation?: string | null
+          donor_email?: string | null
+          donor_name?: string | null
+          employer?: string | null
+          first_name?: string | null
+          id?: string
+          is_recurring?: boolean | null
+          last_name?: string | null
+          occupation?: string | null
+          organization_id: string
+          payment_method?: string | null
+          phone?: string | null
+          phone_hash?: string | null
+          recurring_period?: string | null
+          refcode?: string | null
+          source_code?: string | null
+          state?: string | null
+          transaction_date: string
+          transaction_id: string
+          transaction_type?: string | null
+          van_id?: string | null
+          zip?: string | null
+        }
+        Update: {
+          addr1?: string | null
+          amount?: number
+          city?: string | null
+          contribution_form?: string | null
+          country?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          designation?: string | null
+          donor_email?: string | null
+          donor_name?: string | null
+          employer?: string | null
+          first_name?: string | null
+          id?: string
+          is_recurring?: boolean | null
+          last_name?: string | null
+          occupation?: string | null
+          organization_id?: string
+          payment_method?: string | null
+          phone?: string | null
+          phone_hash?: string | null
+          recurring_period?: string | null
+          refcode?: string | null
+          source_code?: string | null
+          state?: string | null
+          transaction_date?: string
+          transaction_id?: string
+          transaction_type?: string | null
+          van_id?: string | null
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "everyaction_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "everyaction_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "everyaction_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       executive_orders: {
         Row: {
           created_at: string
@@ -4248,6 +5501,327 @@ export type Database = {
             referencedColumns: ["organization_id"]
           },
         ]
+      }
+      funnel_analytics: {
+        Row: {
+          action: string
+          created_at: string
+          duration_ms: number | null
+          exit_type: string | null
+          id: string
+          metadata: Json | null
+          segment: string | null
+          session_id: string
+          step_key: string
+          step_number: number
+          variant_label: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          duration_ms?: number | null
+          exit_type?: string | null
+          id?: string
+          metadata?: Json | null
+          segment?: string | null
+          session_id: string
+          step_key: string
+          step_number: number
+          variant_label: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          duration_ms?: number | null
+          exit_type?: string | null
+          id?: string
+          metadata?: Json | null
+          segment?: string | null
+          session_id?: string
+          step_key?: string
+          step_number?: number
+          variant_label?: string
+        }
+        Relationships: []
+      }
+      funnel_copy_generations: {
+        Row: {
+          created_at: string
+          cta_text: string
+          generation_prompt: string | null
+          headline_text: string
+          id: string
+          parent_variant: string | null
+          status: string
+          step_key: string
+          subheadline_text: string | null
+          variant_label: string
+        }
+        Insert: {
+          created_at?: string
+          cta_text: string
+          generation_prompt?: string | null
+          headline_text: string
+          id?: string
+          parent_variant?: string | null
+          status?: string
+          step_key: string
+          subheadline_text?: string | null
+          variant_label: string
+        }
+        Update: {
+          created_at?: string
+          cta_text?: string
+          generation_prompt?: string | null
+          headline_text?: string
+          id?: string
+          parent_variant?: string | null
+          status?: string
+          step_key?: string
+          subheadline_text?: string | null
+          variant_label?: string
+        }
+        Relationships: []
+      }
+      funnel_field_interactions: {
+        Row: {
+          created_at: string
+          field_name: string
+          had_error: boolean | null
+          id: string
+          interaction_type: string
+          session_id: string
+          time_spent_ms: number | null
+        }
+        Insert: {
+          created_at?: string
+          field_name: string
+          had_error?: boolean | null
+          id?: string
+          interaction_type: string
+          session_id: string
+          time_spent_ms?: number | null
+        }
+        Update: {
+          created_at?: string
+          field_name?: string
+          had_error?: boolean | null
+          id?: string
+          interaction_type?: string
+          session_id?: string
+          time_spent_ms?: number | null
+        }
+        Relationships: []
+      }
+      funnel_leads: {
+        Row: {
+          budget_range: string | null
+          buying_authority_info: string | null
+          created_at: string
+          email: string | null
+          email_hash: string | null
+          id: string
+          is_decision_maker: boolean
+          lead_score: number
+          name: string | null
+          organization: string | null
+          performance_kpis: string[] | null
+          role: string | null
+          segment: string | null
+          selected_channels: string[] | null
+          session_id: string
+          status: string
+          utm_campaign: string | null
+          utm_source: string | null
+          variant_label: string | null
+        }
+        Insert: {
+          budget_range?: string | null
+          buying_authority_info?: string | null
+          created_at?: string
+          email?: string | null
+          email_hash?: string | null
+          id?: string
+          is_decision_maker?: boolean
+          lead_score?: number
+          name?: string | null
+          organization?: string | null
+          performance_kpis?: string[] | null
+          role?: string | null
+          segment?: string | null
+          selected_channels?: string[] | null
+          session_id: string
+          status?: string
+          utm_campaign?: string | null
+          utm_source?: string | null
+          variant_label?: string | null
+        }
+        Update: {
+          budget_range?: string | null
+          buying_authority_info?: string | null
+          created_at?: string
+          email?: string | null
+          email_hash?: string | null
+          id?: string
+          is_decision_maker?: boolean
+          lead_score?: number
+          name?: string | null
+          organization?: string | null
+          performance_kpis?: string[] | null
+          role?: string | null
+          segment?: string | null
+          selected_channels?: string[] | null
+          session_id?: string
+          status?: string
+          utm_campaign?: string | null
+          utm_source?: string | null
+          variant_label?: string | null
+        }
+        Relationships: []
+      }
+      funnel_sessions: {
+        Row: {
+          completed_at: string | null
+          device_type: string
+          fb_pixel_id: string | null
+          id: string
+          ip_address: string | null
+          lead_id: string | null
+          segment: string | null
+          selected_channels: string[] | null
+          session_id: string
+          started_at: string
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          variant_label: string
+        }
+        Insert: {
+          completed_at?: string | null
+          device_type?: string
+          fb_pixel_id?: string | null
+          id?: string
+          ip_address?: string | null
+          lead_id?: string | null
+          segment?: string | null
+          selected_channels?: string[] | null
+          session_id: string
+          started_at?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          variant_label: string
+        }
+        Update: {
+          completed_at?: string | null
+          device_type?: string
+          fb_pixel_id?: string | null
+          id?: string
+          ip_address?: string | null
+          lead_id?: string | null
+          segment?: string | null
+          selected_channels?: string[] | null
+          session_id?: string
+          started_at?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          variant_label?: string
+        }
+        Relationships: []
+      }
+      funnel_step_metrics: {
+        Row: {
+          avg_duration_ms: number | null
+          completions: number
+          conversion_rate: number
+          created_at: string
+          date: string
+          drop_off_count: number
+          id: string
+          segment: string | null
+          step_key: string
+          step_number: number
+          variant_label: string
+          views: number
+        }
+        Insert: {
+          avg_duration_ms?: number | null
+          completions?: number
+          conversion_rate?: number
+          created_at?: string
+          date: string
+          drop_off_count?: number
+          id?: string
+          segment?: string | null
+          step_key: string
+          step_number: number
+          variant_label: string
+          views?: number
+        }
+        Update: {
+          avg_duration_ms?: number | null
+          completions?: number
+          conversion_rate?: number
+          created_at?: string
+          date?: string
+          drop_off_count?: number
+          id?: string
+          segment?: string | null
+          step_key?: string
+          step_number?: number
+          variant_label?: string
+          views?: number
+        }
+        Relationships: []
+      }
+      funnel_variant_performance: {
+        Row: {
+          alpha: number
+          beta: number
+          conversions: number
+          created_at: string
+          id: string
+          impressions: number
+          is_active: boolean
+          is_champion: boolean
+          step_key: string
+          traffic_weight: number
+          updated_at: string
+          variant_label: string
+        }
+        Insert: {
+          alpha?: number
+          beta?: number
+          conversions?: number
+          created_at?: string
+          id?: string
+          impressions?: number
+          is_active?: boolean
+          is_champion?: boolean
+          step_key: string
+          traffic_weight?: number
+          updated_at?: string
+          variant_label: string
+        }
+        Update: {
+          alpha?: number
+          beta?: number
+          conversions?: number
+          created_at?: string
+          id?: string
+          impressions?: number
+          is_active?: boolean
+          is_champion?: boolean
+          step_key?: string
+          traffic_weight?: number
+          updated_at?: string
+          variant_label?: string
+        }
+        Relationships: []
       }
       generated_campaign_messages: {
         Row: {
@@ -4649,6 +6223,59 @@ export type Database = {
           },
         ]
       }
+      invitation_audit_logs: {
+        Row: {
+          created_at: string
+          email: string | null
+          error_message: string | null
+          event_type: string
+          id: string
+          invitation_id: string | null
+          invitation_type: string | null
+          metadata: Json | null
+          organization_id: string | null
+          source: string
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          error_message?: string | null
+          event_type: string
+          id?: string
+          invitation_id?: string | null
+          invitation_type?: string | null
+          metadata?: Json | null
+          organization_id?: string | null
+          source?: string
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          invitation_id?: string | null
+          invitation_type?: string | null
+          metadata?: Json | null
+          organization_id?: string | null
+          source?: string
+          status?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitation_audit_logs_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: false
+            referencedRelation: "user_invitations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_executions: {
         Row: {
           completed_at: string | null
@@ -4783,6 +6410,39 @@ export type Database = {
           sample_count?: number | null
           signal_type?: string
           weight_adjustment?: number | null
+        }
+        Relationships: []
+      }
+      login_attempts: {
+        Row: {
+          attempted_at: string
+          created_at: string
+          email: string
+          failure_reason: string | null
+          id: string
+          ip_address: unknown
+          success: boolean
+          user_agent: string | null
+        }
+        Insert: {
+          attempted_at?: string
+          created_at?: string
+          email: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown
+          success?: boolean
+          user_agent?: string | null
+        }
+        Update: {
+          attempted_at?: string
+          created_at?: string
+          email?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown
+          success?: boolean
+          user_agent?: string | null
         }
         Relationships: []
       }
@@ -5032,6 +6692,8 @@ export type Database = {
           frequency: number | null
           id: string
           impressions: number | null
+          link_clicks: number | null
+          link_ctr: number | null
           meta_roas: number | null
           organization_id: string
           quality_ranking: string | null
@@ -5060,6 +6722,8 @@ export type Database = {
           frequency?: number | null
           id?: string
           impressions?: number | null
+          link_clicks?: number | null
+          link_ctr?: number | null
           meta_roas?: number | null
           organization_id: string
           quality_ranking?: string | null
@@ -5088,6 +6752,8 @@ export type Database = {
           frequency?: number | null
           id?: string
           impressions?: number | null
+          link_clicks?: number | null
+          link_ctr?: number | null
           meta_roas?: number | null
           organization_id?: string
           quality_ranking?: string | null
@@ -5112,6 +6778,403 @@ export type Database = {
           },
           {
             foreignKeyName: "meta_ad_metrics_daily_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      meta_ad_transcripts: {
+        Row: {
+          ad_id: string
+          analysis_count: number | null
+          analysis_model: string | null
+          analysis_version: string | null
+          analyzed_at: string | null
+          auto_retry_count: number
+          cta_text: string | null
+          cta_type: string | null
+          donor_pain_points: string[] | null
+          duration_seconds: number | null
+          emotional_appeals: string[] | null
+          emotional_triggers: string[] | null
+          hallucination_risk: number | null
+          hook_duration_seconds: number | null
+          hook_text: string | null
+          hook_word_count: number | null
+          id: string
+          issue_primary: string | null
+          issue_specifics: string[] | null
+          issue_tags: string[] | null
+          key_phrases: string[] | null
+          language: string | null
+          language_confidence: number | null
+          last_analyzed_at: string | null
+          organization_id: string
+          policy_positions: string[] | null
+          political_stances: string[] | null
+          sentiment_label: string | null
+          sentiment_score: number | null
+          silence_percentage: number | null
+          speaker_count: number | null
+          targets_attacked: string[] | null
+          targets_supported: string[] | null
+          tone_primary: string | null
+          tone_tags: string[] | null
+          topic_primary: string | null
+          topic_tags: string[] | null
+          transcribed_at: string | null
+          transcript_segments: Json | null
+          transcript_text: string
+          transcription_confidence: number | null
+          transcription_model: string | null
+          updated_at: string | null
+          urgency_drivers: string[] | null
+          urgency_level: string | null
+          user_context_post: string | null
+          user_context_pre: string | null
+          values_appealed: string[] | null
+          video_id: string
+          video_ref: string | null
+          words_per_minute: number | null
+          words_total: number | null
+        }
+        Insert: {
+          ad_id: string
+          analysis_count?: number | null
+          analysis_model?: string | null
+          analysis_version?: string | null
+          analyzed_at?: string | null
+          auto_retry_count?: number
+          cta_text?: string | null
+          cta_type?: string | null
+          donor_pain_points?: string[] | null
+          duration_seconds?: number | null
+          emotional_appeals?: string[] | null
+          emotional_triggers?: string[] | null
+          hallucination_risk?: number | null
+          hook_duration_seconds?: number | null
+          hook_text?: string | null
+          hook_word_count?: number | null
+          id?: string
+          issue_primary?: string | null
+          issue_specifics?: string[] | null
+          issue_tags?: string[] | null
+          key_phrases?: string[] | null
+          language?: string | null
+          language_confidence?: number | null
+          last_analyzed_at?: string | null
+          organization_id: string
+          policy_positions?: string[] | null
+          political_stances?: string[] | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          silence_percentage?: number | null
+          speaker_count?: number | null
+          targets_attacked?: string[] | null
+          targets_supported?: string[] | null
+          tone_primary?: string | null
+          tone_tags?: string[] | null
+          topic_primary?: string | null
+          topic_tags?: string[] | null
+          transcribed_at?: string | null
+          transcript_segments?: Json | null
+          transcript_text: string
+          transcription_confidence?: number | null
+          transcription_model?: string | null
+          updated_at?: string | null
+          urgency_drivers?: string[] | null
+          urgency_level?: string | null
+          user_context_post?: string | null
+          user_context_pre?: string | null
+          values_appealed?: string[] | null
+          video_id: string
+          video_ref?: string | null
+          words_per_minute?: number | null
+          words_total?: number | null
+        }
+        Update: {
+          ad_id?: string
+          analysis_count?: number | null
+          analysis_model?: string | null
+          analysis_version?: string | null
+          analyzed_at?: string | null
+          auto_retry_count?: number
+          cta_text?: string | null
+          cta_type?: string | null
+          donor_pain_points?: string[] | null
+          duration_seconds?: number | null
+          emotional_appeals?: string[] | null
+          emotional_triggers?: string[] | null
+          hallucination_risk?: number | null
+          hook_duration_seconds?: number | null
+          hook_text?: string | null
+          hook_word_count?: number | null
+          id?: string
+          issue_primary?: string | null
+          issue_specifics?: string[] | null
+          issue_tags?: string[] | null
+          key_phrases?: string[] | null
+          language?: string | null
+          language_confidence?: number | null
+          last_analyzed_at?: string | null
+          organization_id?: string
+          policy_positions?: string[] | null
+          political_stances?: string[] | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          silence_percentage?: number | null
+          speaker_count?: number | null
+          targets_attacked?: string[] | null
+          targets_supported?: string[] | null
+          tone_primary?: string | null
+          tone_tags?: string[] | null
+          topic_primary?: string | null
+          topic_tags?: string[] | null
+          transcribed_at?: string | null
+          transcript_segments?: Json | null
+          transcript_text?: string
+          transcription_confidence?: number | null
+          transcription_model?: string | null
+          updated_at?: string | null
+          urgency_drivers?: string[] | null
+          urgency_level?: string | null
+          user_context_post?: string | null
+          user_context_pre?: string | null
+          values_appealed?: string[] | null
+          video_id?: string
+          video_ref?: string | null
+          words_per_minute?: number | null
+          words_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_meta_ad_transcripts_video"
+            columns: ["video_ref"]
+            isOneToOne: false
+            referencedRelation: "meta_ad_videos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_ad_transcripts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_ad_transcripts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "meta_ad_transcripts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      meta_ad_videos: {
+        Row: {
+          ad_id: string
+          audio_extracted: boolean | null
+          audio_filename: string | null
+          created_at: string | null
+          creative_id: string | null
+          downloaded_at: string | null
+          duration_seconds: number | null
+          error_code: string | null
+          error_message: string | null
+          fingerprint_duration_sec: number | null
+          fingerprint_transcript_hash: string | null
+          id: string
+          last_error_at: string | null
+          matched_meta_ad_id: string | null
+          meets_meta_specs: boolean | null
+          meta_spec_issues: Json | null
+          organization_id: string
+          original_filename: string | null
+          resolution_method: string | null
+          retry_count: number | null
+          source: string | null
+          status: string | null
+          thumbnail_timestamp_sec: number | null
+          thumbnail_url: string | null
+          transcribed_at: string | null
+          updated_at: string | null
+          uploaded_by: string | null
+          url_fetched_at: string | null
+          video_aspect_ratio: string | null
+          video_bitrate_kbps: number | null
+          video_codec: string | null
+          video_file_size_bytes: number | null
+          video_frame_rate: number | null
+          video_id: string
+          video_resolution: string | null
+          video_source_expires_at: string | null
+          video_source_url: string | null
+          video_storage_path: string | null
+        }
+        Insert: {
+          ad_id: string
+          audio_extracted?: boolean | null
+          audio_filename?: string | null
+          created_at?: string | null
+          creative_id?: string | null
+          downloaded_at?: string | null
+          duration_seconds?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          fingerprint_duration_sec?: number | null
+          fingerprint_transcript_hash?: string | null
+          id?: string
+          last_error_at?: string | null
+          matched_meta_ad_id?: string | null
+          meets_meta_specs?: boolean | null
+          meta_spec_issues?: Json | null
+          organization_id: string
+          original_filename?: string | null
+          resolution_method?: string | null
+          retry_count?: number | null
+          source?: string | null
+          status?: string | null
+          thumbnail_timestamp_sec?: number | null
+          thumbnail_url?: string | null
+          transcribed_at?: string | null
+          updated_at?: string | null
+          uploaded_by?: string | null
+          url_fetched_at?: string | null
+          video_aspect_ratio?: string | null
+          video_bitrate_kbps?: number | null
+          video_codec?: string | null
+          video_file_size_bytes?: number | null
+          video_frame_rate?: number | null
+          video_id: string
+          video_resolution?: string | null
+          video_source_expires_at?: string | null
+          video_source_url?: string | null
+          video_storage_path?: string | null
+        }
+        Update: {
+          ad_id?: string
+          audio_extracted?: boolean | null
+          audio_filename?: string | null
+          created_at?: string | null
+          creative_id?: string | null
+          downloaded_at?: string | null
+          duration_seconds?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          fingerprint_duration_sec?: number | null
+          fingerprint_transcript_hash?: string | null
+          id?: string
+          last_error_at?: string | null
+          matched_meta_ad_id?: string | null
+          meets_meta_specs?: boolean | null
+          meta_spec_issues?: Json | null
+          organization_id?: string
+          original_filename?: string | null
+          resolution_method?: string | null
+          retry_count?: number | null
+          source?: string | null
+          status?: string | null
+          thumbnail_timestamp_sec?: number | null
+          thumbnail_url?: string | null
+          transcribed_at?: string | null
+          updated_at?: string | null
+          uploaded_by?: string | null
+          url_fetched_at?: string | null
+          video_aspect_ratio?: string | null
+          video_bitrate_kbps?: number | null
+          video_codec?: string | null
+          video_file_size_bytes?: number | null
+          video_frame_rate?: number | null
+          video_id?: string
+          video_resolution?: string | null
+          video_source_expires_at?: string | null
+          video_source_url?: string | null
+          video_storage_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_ad_videos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_ad_videos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "meta_ad_videos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      meta_adsets: {
+        Row: {
+          adset_id: string
+          adset_name: string
+          campaign_id: string
+          created_at: string | null
+          id: string
+          organization_id: string
+          status: string | null
+          targeting_summary: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          adset_id: string
+          adset_name: string
+          campaign_id: string
+          created_at?: string | null
+          id?: string
+          organization_id: string
+          status?: string | null
+          targeting_summary?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          adset_id?: string
+          adset_name?: string
+          campaign_id?: string
+          created_at?: string | null
+          id?: string
+          organization_id?: string
+          status?: string | null
+          targeting_summary?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_adsets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_adsets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "meta_adsets_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "v_integration_summary"
@@ -5187,6 +7250,7 @@ export type Database = {
         Row: {
           actblue_integration_enabled: boolean | null
           actblue_owns_donation_complete: boolean | null
+          avg_match_score: number | null
           consecutive_failures: number | null
           created_at: string
           donation_event_name: string | null
@@ -5199,7 +7263,9 @@ export type Database = {
           id: string
           is_enabled: boolean
           last_error: string | null
+          last_error_message: string | null
           last_event_at: string | null
+          last_event_sent_at: string | null
           last_send_at: string | null
           last_send_status: string | null
           last_success_at: string | null
@@ -5215,6 +7281,7 @@ export type Database = {
         Insert: {
           actblue_integration_enabled?: boolean | null
           actblue_owns_donation_complete?: boolean | null
+          avg_match_score?: number | null
           consecutive_failures?: number | null
           created_at?: string
           donation_event_name?: string | null
@@ -5227,7 +7294,9 @@ export type Database = {
           id?: string
           is_enabled?: boolean
           last_error?: string | null
+          last_error_message?: string | null
           last_event_at?: string | null
+          last_event_sent_at?: string | null
           last_send_at?: string | null
           last_send_status?: string | null
           last_success_at?: string | null
@@ -5243,6 +7312,7 @@ export type Database = {
         Update: {
           actblue_integration_enabled?: boolean | null
           actblue_owns_donation_complete?: boolean | null
+          avg_match_score?: number | null
           consecutive_failures?: number | null
           created_at?: string
           donation_event_name?: string | null
@@ -5255,7 +7325,9 @@ export type Database = {
           id?: string
           is_enabled?: boolean
           last_error?: string | null
+          last_error_message?: string | null
           last_event_at?: string | null
+          last_event_sent_at?: string | null
           last_send_at?: string | null
           last_send_status?: string | null
           last_success_at?: string | null
@@ -5527,8 +7599,10 @@ export type Database = {
           description: string | null
           destination_url: string | null
           detected_text: string | null
+          donor_pain_points: string[] | null
           effectiveness_score: number | null
           emotional_appeal: string | null
+          emotional_triggers: string[] | null
           engagement_rate_ranking: string | null
           extracted_refcode: string | null
           first_seen_at: string | null
@@ -5539,14 +7613,21 @@ export type Database = {
           image_height: number | null
           image_width: number | null
           impressions: number | null
+          issue_primary: string | null
+          issue_specifics: string[] | null
+          issue_tags: string[] | null
           key_quotes: Json | null
           key_themes: string[] | null
+          link_clicks: number | null
+          link_ctr: number | null
           media_source_url: string | null
           media_type: string | null
           meta_image_hash: string | null
           meta_video_id: string | null
           organization_id: string
           performance_tier: string | null
+          policy_positions: string[] | null
+          political_stances: string[] | null
           post_engagement: number | null
           primary_text: string | null
           quality_ranking: string | null
@@ -5560,9 +7641,12 @@ export type Database = {
           sentiment_score: number | null
           shares: number | null
           spend: number | null
+          targets_attacked: string[] | null
+          targets_supported: string[] | null
           thumbnail_url: string | null
           tone: string | null
           topic: string | null
+          topic_coherence_score: number | null
           total_conversion_value: number | null
           total_conversions: number | null
           total_impressions: number | null
@@ -5570,7 +7654,9 @@ export type Database = {
           transcript_confidence: number | null
           transcription_status: string | null
           updated_at: string | null
+          urgency_drivers: string[] | null
           urgency_level: string | null
+          values_appealed: string[] | null
           verbal_themes: string[] | null
           video_avg_watch_time_seconds: number | null
           video_duration_seconds: number | null
@@ -5605,8 +7691,10 @@ export type Database = {
           description?: string | null
           destination_url?: string | null
           detected_text?: string | null
+          donor_pain_points?: string[] | null
           effectiveness_score?: number | null
           emotional_appeal?: string | null
+          emotional_triggers?: string[] | null
           engagement_rate_ranking?: string | null
           extracted_refcode?: string | null
           first_seen_at?: string | null
@@ -5617,14 +7705,21 @@ export type Database = {
           image_height?: number | null
           image_width?: number | null
           impressions?: number | null
+          issue_primary?: string | null
+          issue_specifics?: string[] | null
+          issue_tags?: string[] | null
           key_quotes?: Json | null
           key_themes?: string[] | null
+          link_clicks?: number | null
+          link_ctr?: number | null
           media_source_url?: string | null
           media_type?: string | null
           meta_image_hash?: string | null
           meta_video_id?: string | null
           organization_id: string
           performance_tier?: string | null
+          policy_positions?: string[] | null
+          political_stances?: string[] | null
           post_engagement?: number | null
           primary_text?: string | null
           quality_ranking?: string | null
@@ -5638,9 +7733,12 @@ export type Database = {
           sentiment_score?: number | null
           shares?: number | null
           spend?: number | null
+          targets_attacked?: string[] | null
+          targets_supported?: string[] | null
           thumbnail_url?: string | null
           tone?: string | null
           topic?: string | null
+          topic_coherence_score?: number | null
           total_conversion_value?: number | null
           total_conversions?: number | null
           total_impressions?: number | null
@@ -5648,7 +7746,9 @@ export type Database = {
           transcript_confidence?: number | null
           transcription_status?: string | null
           updated_at?: string | null
+          urgency_drivers?: string[] | null
           urgency_level?: string | null
+          values_appealed?: string[] | null
           verbal_themes?: string[] | null
           video_avg_watch_time_seconds?: number | null
           video_duration_seconds?: number | null
@@ -5683,8 +7783,10 @@ export type Database = {
           description?: string | null
           destination_url?: string | null
           detected_text?: string | null
+          donor_pain_points?: string[] | null
           effectiveness_score?: number | null
           emotional_appeal?: string | null
+          emotional_triggers?: string[] | null
           engagement_rate_ranking?: string | null
           extracted_refcode?: string | null
           first_seen_at?: string | null
@@ -5695,14 +7797,21 @@ export type Database = {
           image_height?: number | null
           image_width?: number | null
           impressions?: number | null
+          issue_primary?: string | null
+          issue_specifics?: string[] | null
+          issue_tags?: string[] | null
           key_quotes?: Json | null
           key_themes?: string[] | null
+          link_clicks?: number | null
+          link_ctr?: number | null
           media_source_url?: string | null
           media_type?: string | null
           meta_image_hash?: string | null
           meta_video_id?: string | null
           organization_id?: string
           performance_tier?: string | null
+          policy_positions?: string[] | null
+          political_stances?: string[] | null
           post_engagement?: number | null
           primary_text?: string | null
           quality_ranking?: string | null
@@ -5716,9 +7825,12 @@ export type Database = {
           sentiment_score?: number | null
           shares?: number | null
           spend?: number | null
+          targets_attacked?: string[] | null
+          targets_supported?: string[] | null
           thumbnail_url?: string | null
           tone?: string | null
           topic?: string | null
+          topic_coherence_score?: number | null
           total_conversion_value?: number | null
           total_conversions?: number | null
           total_impressions?: number | null
@@ -5726,7 +7838,9 @@ export type Database = {
           transcript_confidence?: number | null
           transcription_status?: string | null
           updated_at?: string | null
+          urgency_drivers?: string[] | null
           urgency_level?: string | null
+          values_appealed?: string[] | null
           verbal_themes?: string[] | null
           video_avg_watch_time_seconds?: number | null
           video_duration_seconds?: number | null
@@ -5756,6 +7870,125 @@ export type Database = {
           },
           {
             foreignKeyName: "meta_creative_insights_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      meta_creative_variations: {
+        Row: {
+          ad_id: string
+          asset_hash: string | null
+          asset_index: number
+          asset_text: string | null
+          asset_type: string
+          clicks: number | null
+          conversion_value: number | null
+          conversions: number | null
+          cpa: number | null
+          created_at: string | null
+          creative_insight_id: string | null
+          ctr: number | null
+          id: string
+          impressions: number | null
+          inline_link_clicks: number | null
+          is_estimated: boolean | null
+          link_clicks: number | null
+          link_ctr: number | null
+          organization_id: string
+          performance_rank: number | null
+          purchases: number | null
+          ranking_method: string | null
+          reach: number | null
+          roas: number | null
+          spend: number | null
+          synced_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ad_id: string
+          asset_hash?: string | null
+          asset_index?: number
+          asset_text?: string | null
+          asset_type: string
+          clicks?: number | null
+          conversion_value?: number | null
+          conversions?: number | null
+          cpa?: number | null
+          created_at?: string | null
+          creative_insight_id?: string | null
+          ctr?: number | null
+          id?: string
+          impressions?: number | null
+          inline_link_clicks?: number | null
+          is_estimated?: boolean | null
+          link_clicks?: number | null
+          link_ctr?: number | null
+          organization_id: string
+          performance_rank?: number | null
+          purchases?: number | null
+          ranking_method?: string | null
+          reach?: number | null
+          roas?: number | null
+          spend?: number | null
+          synced_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ad_id?: string
+          asset_hash?: string | null
+          asset_index?: number
+          asset_text?: string | null
+          asset_type?: string
+          clicks?: number | null
+          conversion_value?: number | null
+          conversions?: number | null
+          cpa?: number | null
+          created_at?: string | null
+          creative_insight_id?: string | null
+          ctr?: number | null
+          id?: string
+          impressions?: number | null
+          inline_link_clicks?: number | null
+          is_estimated?: boolean | null
+          link_clicks?: number | null
+          link_ctr?: number | null
+          organization_id?: string
+          performance_rank?: number | null
+          purchases?: number | null
+          ranking_method?: string | null
+          reach?: number | null
+          roas?: number | null
+          spend?: number | null
+          synced_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_creative_variations_creative_insight_id_fkey"
+            columns: ["creative_insight_id"]
+            isOneToOne: false
+            referencedRelation: "meta_creative_insights"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_creative_variations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_creative_variations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "meta_creative_variations_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "v_integration_summary"
@@ -5901,6 +8134,33 @@ export type Database = {
         }
         Relationships: []
       }
+      occupation_categories: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: number
+          pattern: string
+          sort_order: number | null
+          subcategory: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: number
+          pattern: string
+          sort_order?: number | null
+          subcategory?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: number
+          pattern?: string
+          sort_order?: number | null
+          subcategory?: string | null
+        }
+        Relationships: []
+      }
       opportunity_detector_runs: {
         Row: {
           created_at: string | null
@@ -5973,6 +8233,64 @@ export type Database = {
           },
           {
             foreignKeyName: "opportunity_detector_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      org_activity_log: {
+        Row: {
+          action_type: string
+          actor_id: string | null
+          actor_name: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          organization_id: string
+          target_user_id: string | null
+          target_user_name: string | null
+        }
+        Insert: {
+          action_type: string
+          actor_id?: string | null
+          actor_name?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          organization_id: string
+          target_user_id?: string | null
+          target_user_name?: string | null
+        }
+        Update: {
+          action_type?: string
+          actor_id?: string | null
+          actor_name?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          organization_id?: string
+          target_user_id?: string | null
+          target_user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_activity_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_activity_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "org_activity_log_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "v_integration_summary"
@@ -6327,6 +8645,165 @@ export type Database = {
           },
         ]
       }
+      org_topic_affinities: {
+        Row: {
+          affinity_score: number
+          avg_performance: number | null
+          best_performance: number | null
+          created_at: string | null
+          id: string
+          last_used_at: string | null
+          organization_id: string | null
+          source: string | null
+          times_used: number | null
+          topic: string
+          updated_at: string | null
+        }
+        Insert: {
+          affinity_score?: number
+          avg_performance?: number | null
+          best_performance?: number | null
+          created_at?: string | null
+          id?: string
+          last_used_at?: string | null
+          organization_id?: string | null
+          source?: string | null
+          times_used?: number | null
+          topic: string
+          updated_at?: string | null
+        }
+        Update: {
+          affinity_score?: number
+          avg_performance?: number | null
+          best_performance?: number | null
+          created_at?: string | null
+          id?: string
+          last_used_at?: string | null
+          organization_id?: string | null
+          source?: string | null
+          times_used?: number | null
+          topic?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_topic_affinities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_topic_affinities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "org_topic_affinities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      org_trend_relevance_cache: {
+        Row: {
+          computed_at: string | null
+          id: string
+          is_new_opportunity: boolean | null
+          is_proven_topic: boolean | null
+          matched_domains: string[] | null
+          matched_watchlist: string[] | null
+          organization_id: string | null
+          priority_bucket: string | null
+          relevance_flags: string[] | null
+          relevance_reasons: Json | null
+          relevance_score: number
+          trend_event_id: string | null
+        }
+        Insert: {
+          computed_at?: string | null
+          id?: string
+          is_new_opportunity?: boolean | null
+          is_proven_topic?: boolean | null
+          matched_domains?: string[] | null
+          matched_watchlist?: string[] | null
+          organization_id?: string | null
+          priority_bucket?: string | null
+          relevance_flags?: string[] | null
+          relevance_reasons?: Json | null
+          relevance_score: number
+          trend_event_id?: string | null
+        }
+        Update: {
+          computed_at?: string | null
+          id?: string
+          is_new_opportunity?: boolean | null
+          is_proven_topic?: boolean | null
+          matched_domains?: string[] | null
+          matched_watchlist?: string[] | null
+          organization_id?: string | null
+          priority_bucket?: string | null
+          relevance_flags?: string[] | null
+          relevance_reasons?: Json | null
+          relevance_score?: number
+          trend_event_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_trend_relevance_cache_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_trend_relevance_cache_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "org_trend_relevance_cache_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "org_trend_relevance_cache_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "label_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
+          {
+            foreignKeyName: "org_trend_relevance_cache_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_trend_relevance_cache_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events_active"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_trend_relevance_cache_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
+        ]
+      }
       org_trend_scores: {
         Row: {
           computed_at: string | null
@@ -6434,6 +8911,73 @@ export type Database = {
           },
         ]
       }
+      organization_memberships: {
+        Row: {
+          created_at: string | null
+          id: string
+          invited_at: string | null
+          invited_by: string | null
+          is_primary: boolean | null
+          joined_at: string | null
+          metadata: Json | null
+          organization_id: string
+          role: string
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          is_primary?: boolean | null
+          joined_at?: string | null
+          metadata?: Json | null
+          organization_id: string
+          role?: string
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          is_primary?: boolean | null
+          joined_at?: string | null
+          metadata?: Json | null
+          organization_id?: string
+          role?: string
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_memberships_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_memberships_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "organization_memberships_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       organization_mentions: {
         Row: {
           created_at: string
@@ -6472,6 +9016,76 @@ export type Database = {
           source_type?: string
         }
         Relationships: []
+      }
+      organization_meta_settings: {
+        Row: {
+          advantage_audience: boolean | null
+          advantage_plus_creative: boolean | null
+          created_at: string | null
+          default_billing_event: string | null
+          default_objective: string | null
+          default_optimization_goal: string | null
+          meta_instagram_actor_id: string | null
+          meta_instagram_username: string | null
+          meta_page_id: string | null
+          meta_page_name: string | null
+          meta_pixel_id: string | null
+          organization_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          advantage_audience?: boolean | null
+          advantage_plus_creative?: boolean | null
+          created_at?: string | null
+          default_billing_event?: string | null
+          default_objective?: string | null
+          default_optimization_goal?: string | null
+          meta_instagram_actor_id?: string | null
+          meta_instagram_username?: string | null
+          meta_page_id?: string | null
+          meta_page_name?: string | null
+          meta_pixel_id?: string | null
+          organization_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          advantage_audience?: boolean | null
+          advantage_plus_creative?: boolean | null
+          created_at?: string | null
+          default_billing_event?: string | null
+          default_objective?: string | null
+          default_optimization_goal?: string | null
+          meta_instagram_actor_id?: string | null
+          meta_instagram_username?: string | null
+          meta_page_id?: string | null
+          meta_page_name?: string | null
+          meta_pixel_id?: string | null
+          organization_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_meta_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_meta_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "organization_meta_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
       }
       organization_profiles: {
         Row: {
@@ -6732,6 +9346,103 @@ export type Database = {
           },
           {
             foreignKeyName: "outcome_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      password_reset_requests: {
+        Row: {
+          email_hash: string
+          id: string
+          ip_address: unknown
+          requested_at: string
+          success: boolean | null
+          user_agent: string | null
+        }
+        Insert: {
+          email_hash: string
+          id?: string
+          ip_address?: unknown
+          requested_at?: string
+          success?: boolean | null
+          user_agent?: string | null
+        }
+        Update: {
+          email_hash?: string
+          id?: string
+          ip_address?: unknown
+          requested_at?: string
+          success?: boolean | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      pending_member_requests: {
+        Row: {
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          notes: string | null
+          organization_id: string
+          processed_at: string | null
+          processed_by: string | null
+          rejection_reason: string | null
+          requested_by: string
+          requested_role: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          full_name: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          requested_by: string
+          requested_role?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          requested_by?: string
+          requested_role?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_member_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_member_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "pending_member_requests_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "v_integration_summary"
@@ -7152,6 +9863,42 @@ export type Database = {
         }
         Relationships: []
       }
+      privacy_settings: {
+        Row: {
+          analytics_tracking: boolean
+          created_at: string
+          do_not_sell: boolean
+          id: string
+          marketing_emails: boolean
+          product_updates: boolean
+          third_party_sharing: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analytics_tracking?: boolean
+          created_at?: string
+          do_not_sell?: boolean
+          id?: string
+          marketing_emails?: boolean
+          product_updates?: boolean
+          third_party_sharing?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analytics_tracking?: boolean
+          created_at?: string
+          do_not_sell?: boolean
+          id?: string
+          marketing_emails?: boolean
+          product_updates?: boolean
+          third_party_sharing?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       processing_batches: {
         Row: {
           ai_tokens_used: number | null
@@ -7509,6 +10256,7 @@ export type Database = {
           organization_id: string | null
           platform: string | null
           refcode: string
+          sms_campaign_id: string | null
           updated_at: string | null
           utm_campaign: string | null
           utm_medium: string | null
@@ -7529,6 +10277,7 @@ export type Database = {
           organization_id?: string | null
           platform?: string | null
           refcode: string
+          sms_campaign_id?: string | null
           updated_at?: string | null
           utm_campaign?: string | null
           utm_medium?: string | null
@@ -7549,6 +10298,7 @@ export type Database = {
           organization_id?: string | null
           platform?: string | null
           refcode?: string
+          sms_campaign_id?: string | null
           updated_at?: string | null
           utm_campaign?: string | null
           utm_medium?: string | null
@@ -7674,6 +10424,7 @@ export type Database = {
           last_success_at: string | null
           logo_url: string | null
           name: string
+          policy_domains: string[] | null
           political_leaning: string | null
           source_type: string | null
           state_code: string | null
@@ -7705,6 +10456,7 @@ export type Database = {
           last_success_at?: string | null
           logo_url?: string | null
           name: string
+          policy_domains?: string[] | null
           political_leaning?: string | null
           source_type?: string | null
           state_code?: string | null
@@ -7736,6 +10488,7 @@ export type Database = {
           last_success_at?: string | null
           logo_url?: string | null
           name?: string
+          policy_domains?: string[] | null
           political_leaning?: string | null
           source_type?: string | null
           state_code?: string | null
@@ -7746,6 +10499,67 @@ export type Database = {
           url?: string
         }
         Relationships: []
+      }
+      saved_donor_segments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          donor_count_snapshot: number | null
+          filters: Json
+          id: string
+          name: string
+          organization_id: string
+          total_value_snapshot: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          donor_count_snapshot?: number | null
+          filters?: Json
+          id?: string
+          name: string
+          organization_id: string
+          total_value_snapshot?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          donor_count_snapshot?: number | null
+          filters?: Json
+          id?: string
+          name?: string
+          organization_id?: string
+          total_value_snapshot?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_donor_segments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_donor_segments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "saved_donor_segments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
       }
       scheduled_jobs: {
         Row: {
@@ -7869,6 +10683,134 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "export_templates"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      seat_change_log: {
+        Row: {
+          change_type: string
+          changed_by: string
+          created_at: string | null
+          id: string
+          new_bonus: number | null
+          new_limit: number | null
+          old_bonus: number | null
+          old_limit: number | null
+          organization_id: string
+          reason: string | null
+        }
+        Insert: {
+          change_type: string
+          changed_by: string
+          created_at?: string | null
+          id?: string
+          new_bonus?: number | null
+          new_limit?: number | null
+          old_bonus?: number | null
+          old_limit?: number | null
+          organization_id: string
+          reason?: string | null
+        }
+        Update: {
+          change_type?: string
+          changed_by?: string
+          created_at?: string | null
+          id?: string
+          new_bonus?: number | null
+          new_limit?: number | null
+          old_bonus?: number | null
+          old_limit?: number | null
+          organization_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seat_change_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seat_change_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "seat_change_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      seat_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string | null
+          current_seat_limit: number
+          id: string
+          organization_id: string
+          processed_at: string | null
+          processed_by: string | null
+          reason: string | null
+          requested_by: string
+          requested_seats: number
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string | null
+          current_seat_limit: number
+          id?: string
+          organization_id: string
+          processed_at?: string | null
+          processed_by?: string | null
+          reason?: string | null
+          requested_by: string
+          requested_seats: number
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string | null
+          current_seat_limit?: number
+          id?: string
+          organization_id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          reason?: string | null
+          requested_by?: string
+          requested_seats?: number
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seat_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seat_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "seat_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
           },
         ]
       }
@@ -8143,14 +11085,24 @@ export type Database = {
       }
       sms_campaigns: {
         Row: {
+          actblue_form: string | null
+          actblue_refcode: string | null
           amount_raised: number | null
+          analyzed_at: string | null
+          call_to_action: string | null
           campaign_id: string
           campaign_name: string | null
           clicks: number | null
           conversions: number | null
           cost: number | null
           created_at: string | null
+          destination_url: string | null
+          donor_pain_points: string[] | null
+          emotional_triggers: string[] | null
+          extracted_refcode: string | null
           id: string
+          issue_specifics: string[] | null
+          key_themes: string[] | null
           message_text: string | null
           messages_delivered: number | null
           messages_failed: number | null
@@ -8163,17 +11115,33 @@ export type Database = {
           send_date: string | null
           skipped: number | null
           status: string | null
+          tone: string | null
+          topic: string | null
+          topic_summary: string | null
           updated_at: string | null
+          urgency_drivers: string[] | null
+          urgency_level: string | null
+          values_appealed: string[] | null
         }
         Insert: {
+          actblue_form?: string | null
+          actblue_refcode?: string | null
           amount_raised?: number | null
+          analyzed_at?: string | null
+          call_to_action?: string | null
           campaign_id: string
           campaign_name?: string | null
           clicks?: number | null
           conversions?: number | null
           cost?: number | null
           created_at?: string | null
+          destination_url?: string | null
+          donor_pain_points?: string[] | null
+          emotional_triggers?: string[] | null
+          extracted_refcode?: string | null
           id?: string
+          issue_specifics?: string[] | null
+          key_themes?: string[] | null
           message_text?: string | null
           messages_delivered?: number | null
           messages_failed?: number | null
@@ -8186,17 +11154,33 @@ export type Database = {
           send_date?: string | null
           skipped?: number | null
           status?: string | null
+          tone?: string | null
+          topic?: string | null
+          topic_summary?: string | null
           updated_at?: string | null
+          urgency_drivers?: string[] | null
+          urgency_level?: string | null
+          values_appealed?: string[] | null
         }
         Update: {
+          actblue_form?: string | null
+          actblue_refcode?: string | null
           amount_raised?: number | null
+          analyzed_at?: string | null
+          call_to_action?: string | null
           campaign_id?: string
           campaign_name?: string | null
           clicks?: number | null
           conversions?: number | null
           cost?: number | null
           created_at?: string | null
+          destination_url?: string | null
+          donor_pain_points?: string[] | null
+          emotional_triggers?: string[] | null
+          extracted_refcode?: string | null
           id?: string
+          issue_specifics?: string[] | null
+          key_themes?: string[] | null
           message_text?: string | null
           messages_delivered?: number | null
           messages_failed?: number | null
@@ -8209,7 +11193,13 @@ export type Database = {
           send_date?: string | null
           skipped?: number | null
           status?: string | null
+          tone?: string | null
+          topic?: string | null
+          topic_summary?: string | null
           updated_at?: string | null
+          urgency_drivers?: string[] | null
+          urgency_level?: string | null
+          values_appealed?: string[] | null
         }
         Relationships: [
           {
@@ -8249,7 +11239,10 @@ export type Database = {
           conversion_rate: number | null
           conversions: number | null
           created_at: string | null
+          donor_pain_points: string[] | null
+          emotional_triggers: string[] | null
           id: string
+          issue_specifics: string[] | null
           key_themes: string[] | null
           message_text: string
           messages_delivered: number | null
@@ -8263,7 +11256,9 @@ export type Database = {
           tone: string | null
           topic: string | null
           updated_at: string | null
+          urgency_drivers: string[] | null
           urgency_level: string | null
+          values_appealed: string[] | null
         }
         Insert: {
           ai_model_used?: string | null
@@ -8278,7 +11273,10 @@ export type Database = {
           conversion_rate?: number | null
           conversions?: number | null
           created_at?: string | null
+          donor_pain_points?: string[] | null
+          emotional_triggers?: string[] | null
           id?: string
+          issue_specifics?: string[] | null
           key_themes?: string[] | null
           message_text: string
           messages_delivered?: number | null
@@ -8292,7 +11290,9 @@ export type Database = {
           tone?: string | null
           topic?: string | null
           updated_at?: string | null
+          urgency_drivers?: string[] | null
           urgency_level?: string | null
+          values_appealed?: string[] | null
         }
         Update: {
           ai_model_used?: string | null
@@ -8307,7 +11307,10 @@ export type Database = {
           conversion_rate?: number | null
           conversions?: number | null
           created_at?: string | null
+          donor_pain_points?: string[] | null
+          emotional_triggers?: string[] | null
           id?: string
+          issue_specifics?: string[] | null
           key_themes?: string[] | null
           message_text?: string
           messages_delivered?: number | null
@@ -8321,7 +11324,9 @@ export type Database = {
           tone?: string | null
           topic?: string | null
           updated_at?: string | null
+          urgency_drivers?: string[] | null
           urgency_level?: string | null
+          values_appealed?: string[] | null
         }
         Relationships: [
           {
@@ -8862,6 +11867,36 @@ export type Database = {
           },
         ]
       }
+      system_baselines: {
+        Row: {
+          baseline_value: number
+          calculation_method: string | null
+          created_at: string | null
+          id: string
+          last_calculated_at: string | null
+          metric_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          baseline_value?: number
+          calculation_method?: string | null
+          created_at?: string | null
+          id?: string
+          last_calculated_at?: string | null
+          metric_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          baseline_value?: number
+          calculation_method?: string | null
+          created_at?: string | null
+          id?: string
+          last_calculated_at?: string | null
+          metric_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       system_config: {
         Row: {
           created_at: string | null
@@ -9237,6 +12272,101 @@ export type Database = {
         }
         Relationships: []
       }
+      trend_campaign_correlations: {
+        Row: {
+          campaign_id: string
+          campaign_performance: Json | null
+          correlation_score: number
+          created_at: string | null
+          domain_overlap: string[] | null
+          id: string
+          organization_id: string | null
+          outcome_label: string | null
+          performance_vs_baseline: number | null
+          time_delta_hours: number | null
+          topic_overlap: string[] | null
+          trend_event_id: string | null
+        }
+        Insert: {
+          campaign_id: string
+          campaign_performance?: Json | null
+          correlation_score: number
+          created_at?: string | null
+          domain_overlap?: string[] | null
+          id?: string
+          organization_id?: string | null
+          outcome_label?: string | null
+          performance_vs_baseline?: number | null
+          time_delta_hours?: number | null
+          topic_overlap?: string[] | null
+          trend_event_id?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          campaign_performance?: Json | null
+          correlation_score?: number
+          created_at?: string | null
+          domain_overlap?: string[] | null
+          id?: string
+          organization_id?: string | null
+          outcome_label?: string | null
+          performance_vs_baseline?: number | null
+          time_delta_hours?: number | null
+          topic_overlap?: string[] | null
+          trend_event_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trend_campaign_correlations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_campaign_correlations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "trend_campaign_correlations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "trend_campaign_correlations_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "label_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
+          {
+            foreignKeyName: "trend_campaign_correlations_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_campaign_correlations_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_events_active"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_campaign_correlations_trend_event_id_fkey"
+            columns: ["trend_event_id"]
+            isOneToOne: false
+            referencedRelation: "trend_quality_flags"
+            referencedColumns: ["trend_id"]
+          },
+        ]
+      }
       trend_clusters: {
         Row: {
           acceleration: number | null
@@ -9488,8 +12618,11 @@ export type Database = {
           event_key: string
           event_title: string
           evergreen_penalty: number | null
+          evidence_by_domain: Json | null
           evidence_count: number | null
           first_seen_at: string
+          geo_level: string | null
+          geographies: string[] | null
           has_tier12_corroboration: boolean | null
           id: string
           is_breaking: boolean | null
@@ -9501,10 +12634,15 @@ export type Database = {
           label_quality: string | null
           label_source: string | null
           last_seen_at: string
+          legislation_mentioned: string[] | null
           news_source_count: number | null
           opportunity_tier: string | null
+          organizations_mentioned: string[] | null
           peak_at: string | null
           poisson_surprise: number | null
+          policy_domains: string[] | null
+          politicians_mentioned: string[] | null
+          priority_bucket: string | null
           rank_score: number | null
           recency_decay: number | null
           related_entities: string[] | null
@@ -9559,8 +12697,11 @@ export type Database = {
           event_key: string
           event_title: string
           evergreen_penalty?: number | null
+          evidence_by_domain?: Json | null
           evidence_count?: number | null
           first_seen_at?: string
+          geo_level?: string | null
+          geographies?: string[] | null
           has_tier12_corroboration?: boolean | null
           id?: string
           is_breaking?: boolean | null
@@ -9572,10 +12713,15 @@ export type Database = {
           label_quality?: string | null
           label_source?: string | null
           last_seen_at?: string
+          legislation_mentioned?: string[] | null
           news_source_count?: number | null
           opportunity_tier?: string | null
+          organizations_mentioned?: string[] | null
           peak_at?: string | null
           poisson_surprise?: number | null
+          policy_domains?: string[] | null
+          politicians_mentioned?: string[] | null
+          priority_bucket?: string | null
           rank_score?: number | null
           recency_decay?: number | null
           related_entities?: string[] | null
@@ -9630,8 +12776,11 @@ export type Database = {
           event_key?: string
           event_title?: string
           evergreen_penalty?: number | null
+          evidence_by_domain?: Json | null
           evidence_count?: number | null
           first_seen_at?: string
+          geo_level?: string | null
+          geographies?: string[] | null
           has_tier12_corroboration?: boolean | null
           id?: string
           is_breaking?: boolean | null
@@ -9643,10 +12792,15 @@ export type Database = {
           label_quality?: string | null
           label_source?: string | null
           last_seen_at?: string
+          legislation_mentioned?: string[] | null
           news_source_count?: number | null
           opportunity_tier?: string | null
+          organizations_mentioned?: string[] | null
           peak_at?: string | null
           poisson_surprise?: number | null
+          policy_domains?: string[] | null
+          politicians_mentioned?: string[] | null
+          priority_bucket?: string | null
           rank_score?: number | null
           recency_decay?: number | null
           related_entities?: string[] | null
@@ -9815,6 +12969,67 @@ export type Database = {
           },
           {
             foreignKeyName: "trend_feedback_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      trend_filter_log: {
+        Row: {
+          domains_filtered_out: string[] | null
+          domains_shown: string[] | null
+          filters_applied: Json | null
+          id: string
+          new_opportunity_count: number | null
+          organization_id: string | null
+          request_at: string | null
+          total_trends_available: number | null
+          trends_shown: number | null
+          user_id: string | null
+        }
+        Insert: {
+          domains_filtered_out?: string[] | null
+          domains_shown?: string[] | null
+          filters_applied?: Json | null
+          id?: string
+          new_opportunity_count?: number | null
+          organization_id?: string | null
+          request_at?: string | null
+          total_trends_available?: number | null
+          trends_shown?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          domains_filtered_out?: string[] | null
+          domains_shown?: string[] | null
+          filters_applied?: Json | null
+          id?: string
+          new_opportunity_count?: number | null
+          organization_id?: string | null
+          request_at?: string | null
+          total_trends_available?: number | null
+          trends_shown?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trend_filter_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trend_filter_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "trend_filter_log_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "v_integration_summary"
@@ -10164,6 +13379,67 @@ export type Database = {
         }
         Relationships: []
       }
+      user_activity_logs: {
+        Row: {
+          action_type: string
+          created_at: string | null
+          id: string
+          ip_address: unknown
+          metadata: Json | null
+          organization_id: string | null
+          resource_id: string | null
+          resource_type: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          organization_id?: string | null
+          resource_id?: string | null
+          resource_type?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          organization_id?: string | null
+          resource_id?: string | null
+          resource_type?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_activity_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_activity_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "user_activity_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       user_article_preferences: {
         Row: {
           created_at: string | null
@@ -10206,39 +13482,48 @@ export type Database = {
           created_at: string | null
           email: string
           expires_at: string | null
+          failed_attempts: number | null
           id: string
           invitation_type: string
           invited_by: string | null
           organization_id: string | null
+          resend_count: number
           role: string | null
           status: string | null
           token: string
+          used_at: string | null
         }
         Insert: {
           accepted_at?: string | null
           created_at?: string | null
           email: string
           expires_at?: string | null
+          failed_attempts?: number | null
           id?: string
           invitation_type: string
           invited_by?: string | null
           organization_id?: string | null
+          resend_count?: number
           role?: string | null
           status?: string | null
           token?: string
+          used_at?: string | null
         }
         Update: {
           accepted_at?: string | null
           created_at?: string | null
           email?: string
           expires_at?: string | null
+          failed_attempts?: number | null
           id?: string
           invitation_type?: string
           invited_by?: string | null
           organization_id?: string | null
+          resend_count?: number
           role?: string | null
           status?: string | null
           token?: string
+          used_at?: string | null
         }
         Relationships: [
           {
@@ -10264,6 +13549,51 @@ export type Database = {
           },
         ]
       }
+      user_locations: {
+        Row: {
+          city: string | null
+          country: string | null
+          country_name: string | null
+          created_at: string | null
+          id: string
+          ip_address: unknown
+          isp: string | null
+          latitude: number | null
+          longitude: number | null
+          region: string | null
+          timezone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          country_name?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address: unknown
+          isp?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          region?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          country_name?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown
+          isp?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          region?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -10282,6 +13612,253 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      user_sessions: {
+        Row: {
+          city: string | null
+          country: string | null
+          created_at: string | null
+          device_info: Json | null
+          ended_at: string | null
+          expires_at: string
+          id: string
+          ip_address: string | null
+          is_current: boolean | null
+          is_valid: boolean | null
+          last_active_at: string | null
+          last_refresh_at: string | null
+          location_id: string | null
+          organization_id: string | null
+          refresh_count: number | null
+          started_at: string | null
+          updated_at: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          device_info?: Json | null
+          ended_at?: string | null
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          is_current?: boolean | null
+          is_valid?: boolean | null
+          last_active_at?: string | null
+          last_refresh_at?: string | null
+          location_id?: string | null
+          organization_id?: string | null
+          refresh_count?: number | null
+          started_at?: string | null
+          updated_at?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          device_info?: Json | null
+          ended_at?: string | null
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          is_current?: boolean | null
+          is_valid?: boolean | null
+          last_active_at?: string | null
+          last_refresh_at?: string | null
+          location_id?: string | null
+          organization_id?: string | null
+          refresh_count?: number | null
+          started_at?: string | null
+          updated_at?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "user_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "user_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      voter_impact_districts: {
+        Row: {
+          can_impact: boolean
+          cd_code: string
+          cell_phones: number | null
+          cost_estimate: number | null
+          created_at: string
+          didnt_vote_2024: number
+          district_num: number
+          households: number | null
+          id: string
+          margin_pct: number | null
+          margin_votes: number | null
+          muslim_registered: number
+          muslim_unregistered: number
+          muslim_voters: number
+          runner_up: string | null
+          runner_up_party: string | null
+          runner_up_votes: number | null
+          state_code: string
+          total_votes: number | null
+          turnout_pct: number
+          updated_at: string
+          voted_2024: number
+          votes_needed: number | null
+          winner: string | null
+          winner_party: string | null
+          winner_votes: number | null
+        }
+        Insert: {
+          can_impact?: boolean
+          cd_code: string
+          cell_phones?: number | null
+          cost_estimate?: number | null
+          created_at?: string
+          didnt_vote_2024?: number
+          district_num: number
+          households?: number | null
+          id?: string
+          margin_pct?: number | null
+          margin_votes?: number | null
+          muslim_registered?: number
+          muslim_unregistered?: number
+          muslim_voters?: number
+          runner_up?: string | null
+          runner_up_party?: string | null
+          runner_up_votes?: number | null
+          state_code: string
+          total_votes?: number | null
+          turnout_pct?: number
+          updated_at?: string
+          voted_2024?: number
+          votes_needed?: number | null
+          winner?: string | null
+          winner_party?: string | null
+          winner_votes?: number | null
+        }
+        Update: {
+          can_impact?: boolean
+          cd_code?: string
+          cell_phones?: number | null
+          cost_estimate?: number | null
+          created_at?: string
+          didnt_vote_2024?: number
+          district_num?: number
+          households?: number | null
+          id?: string
+          margin_pct?: number | null
+          margin_votes?: number | null
+          muslim_registered?: number
+          muslim_unregistered?: number
+          muslim_voters?: number
+          runner_up?: string | null
+          runner_up_party?: string | null
+          runner_up_votes?: number | null
+          state_code?: string
+          total_votes?: number | null
+          turnout_pct?: number
+          updated_at?: string
+          voted_2024?: number
+          votes_needed?: number | null
+          winner?: string | null
+          winner_party?: string | null
+          winner_votes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voter_impact_districts_state_code_fkey"
+            columns: ["state_code"]
+            isOneToOne: false
+            referencedRelation: "voter_impact_states"
+            referencedColumns: ["state_code"]
+          },
+        ]
+      }
+      voter_impact_states: {
+        Row: {
+          cell_phones: number
+          created_at: string
+          households: number
+          id: string
+          muslim_voters: number
+          political_activists: number
+          political_donors: number
+          registered: number
+          registered_pct: number
+          state_code: string
+          state_name: string
+          updated_at: string
+          vote_2022: number
+          vote_2022_pct: number
+          vote_2024: number
+          vote_2024_pct: number
+        }
+        Insert: {
+          cell_phones?: number
+          created_at?: string
+          households?: number
+          id?: string
+          muslim_voters?: number
+          political_activists?: number
+          political_donors?: number
+          registered?: number
+          registered_pct?: number
+          state_code: string
+          state_name: string
+          updated_at?: string
+          vote_2022?: number
+          vote_2022_pct?: number
+          vote_2024?: number
+          vote_2024_pct?: number
+        }
+        Update: {
+          cell_phones?: number
+          created_at?: string
+          households?: number
+          id?: string
+          muslim_voters?: number
+          political_activists?: number
+          political_donors?: number
+          registered?: number
+          registered_pct?: number
+          state_code?: string
+          state_name?: string
+          updated_at?: string
+          vote_2022?: number
+          vote_2022_pct?: number
+          vote_2024?: number
+          vote_2024_pct?: number
         }
         Relationships: []
       }
@@ -10427,6 +14004,7 @@ export type Database = {
           event_type: string | null
           headers: Json | null
           id: string
+          metadata: Json | null
           organization_id: string | null
           payload: Json | null
           platform: string
@@ -10442,6 +14020,7 @@ export type Database = {
           event_type?: string | null
           headers?: Json | null
           id?: string
+          metadata?: Json | null
           organization_id?: string | null
           payload?: Json | null
           platform: string
@@ -10457,6 +14036,7 @@ export type Database = {
           event_type?: string | null
           headers?: Json | null
           id?: string
+          metadata?: Json | null
           organization_id?: string | null
           payload?: Json | null
           platform?: string
@@ -10923,6 +14503,83 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_user_overview: {
+        Row: {
+          active_sessions_30d: number | null
+          created_at: string | null
+          email: string | null
+          failed_logins_24h: number | null
+          full_name: string | null
+          id: string | null
+          is_locked: boolean | null
+          last_login_at: string | null
+          latest_session: Json | null
+          mfa_enabled_at: string | null
+          organization_id: string | null
+          organization_name: string | null
+          role: string | null
+          status: Database["public"]["Enums"]["user_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_users_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_users_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "client_users_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
+      attribution_quality_metrics: {
+        Row: {
+          date: string | null
+          deterministic_revenue: number | null
+          full_clickid_count: number | null
+          full_clickid_pct: number | null
+          organization_id: string | null
+          probabilistic_revenue: number | null
+          total_fb_donations: number | null
+          total_fb_revenue: number | null
+          truncated_clickid_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "actblue_transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
+      }
       attribution_touchpoints_secure: {
         Row: {
           campaign_id: string | null
@@ -11123,8 +14780,10 @@ export type Database = {
           attributed_ad_id: string | null
           attributed_campaign_id: string | null
           attributed_creative_id: string | null
+          attributed_platform: string | null
           attribution_confidence: number | null
           attribution_method: string | null
+          contribution_form: string | null
           donor_email: string | null
           donor_name: string | null
           is_recurring: boolean | null
@@ -11479,6 +15138,61 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      meta_fundraising_metrics_daily: {
+        Row: {
+          ad_account_id: string | null
+          ad_id: string | null
+          ad_name: string | null
+          adset_id: string | null
+          campaign_id: string | null
+          clicks: number | null
+          conversion_ranking: string | null
+          conversion_value: number | null
+          conversions: number | null
+          cost_per_result: number | null
+          cpc: number | null
+          cpm: number | null
+          created_at: string | null
+          creative_id: string | null
+          ctr: number | null
+          date: string | null
+          engagement_ranking: string | null
+          frequency: number | null
+          id: string | null
+          impressions: number | null
+          link_clicks: number | null
+          link_ctr: number | null
+          meta_roas: number | null
+          organization_id: string | null
+          quality_ranking: string | null
+          reach: number | null
+          spend: number | null
+          synced_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_ad_metrics_daily_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "client_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_ad_metrics_daily_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "org_onboarding_summary"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "meta_ad_metrics_daily_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "v_integration_summary"
+            referencedColumns: ["organization_id"]
+          },
+        ]
       }
       meta_sync_status: {
         Row: {
@@ -12231,6 +15945,10 @@ export type Database = {
         Args: { p_token: string; p_user_id: string }
         Returns: Json
       }
+      accept_organization_invitation: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
       archive_old_data: {
         Args: never
         Returns: {
@@ -12272,6 +15990,25 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      bulk_remove_users: {
+        Args: {
+          p_actor_id?: string
+          p_actor_name?: string
+          p_organization_id: string
+          p_user_ids: string[]
+        }
+        Returns: Json
+      }
+      bulk_update_user_roles: {
+        Args: {
+          p_actor_id?: string
+          p_actor_name?: string
+          p_new_role: string
+          p_organization_id: string
+          p_user_ids: string[]
+        }
+        Returns: Json
       }
       calculate_bluesky_trend_velocity: {
         Args: { topic_name: string }
@@ -12322,6 +16059,18 @@ export type Database = {
         Args: { _organization_id: string }
         Returns: boolean
       }
+      cancel_deletion_request: {
+        Args: { p_request_id: string }
+        Returns: boolean
+      }
+      check_account_lockout: {
+        Args: { p_email: string }
+        Returns: {
+          is_locked: boolean
+          reason: string
+          unlock_at: string
+        }[]
+      }
       check_article_duplicate: {
         Args: { p_canonical_url?: string; p_content_hash: string }
         Returns: {
@@ -12336,6 +16085,14 @@ export type Database = {
       check_failed_attempts_and_lock: {
         Args: { _user_id: string }
         Returns: Json
+      }
+      check_org_membership: {
+        Args: {
+          p_organization_id: string
+          p_roles?: string[]
+          p_user_id: string
+        }
+        Returns: boolean
       }
       check_pipeline_deadman: {
         Args: never
@@ -12357,7 +16114,12 @@ export type Database = {
           stale_rss: number
         }[]
       }
+      cleanup_cron_job_run_details: {
+        Args: { retention_days?: number }
+        Returns: number
+      }
       cleanup_expired_invite_codes: { Args: never; Returns: undefined }
+      cleanup_expired_sessions: { Args: never; Returns: number }
       cleanup_old_cache: { Args: never; Returns: number }
       complete_pipeline_run: {
         Args: {
@@ -12370,9 +16132,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      compute_donor_key: { Args: { email: string }; Returns: string }
       cosine_similarity: { Args: { a: string; b: string }; Returns: number }
       count_keyword_mentions: {
-        Args: { search_keyword: string; time_window?: unknown }
+        Args: { search_keyword: string; time_window?: string }
         Returns: {
           bluesky_count: number
           news_count: number
@@ -12381,8 +16144,18 @@ export type Database = {
         }[]
       }
       count_posts_with_topic: {
-        Args: { time_window?: unknown; topic_name: string }
+        Args: { time_window?: string; topic_name: string }
         Returns: number
+      }
+      create_user_session: {
+        Args: {
+          p_device_info?: Json
+          p_expires_at?: string
+          p_ip_address?: string
+          p_user_agent?: string
+          p_user_id: string
+        }
+        Returns: string
       }
       debug_timezone_totals: {
         Args: { p_date: string; p_org_id: string }
@@ -12420,31 +16193,34 @@ export type Database = {
         }[]
       }
       discover_trending_keywords: {
-        Args: { min_frequency?: number; time_window?: unknown }
+        Args: { min_frequency?: number; time_window?: string }
         Returns: {
           frequency: number
           keyword: string
           source_type: string
         }[]
       }
+      end_all_user_sessions: {
+        Args: { p_except_current?: boolean }
+        Returns: number
+      }
+      end_user_session: { Args: { p_session_id: string }; Returns: boolean }
       get_actblue_daily_rollup: {
         Args: {
           p_end_date: string
           p_organization_id: string
           p_start_date: string
+          p_use_utc?: boolean
         }
         Returns: {
-          avg_donation: number
           day: string
-          donation_count: number
-          gross_donations: number
-          net_donations: number
-          net_revenue: number
+          gross_raised: number
+          net_raised: number
+          recurring_amount: number
           recurring_count: number
-          recurring_revenue: number
+          refund_amount: number
           refund_count: number
-          refunds: number
-          total_fees: number
+          transaction_count: number
           unique_donors: number
         }[]
       }
@@ -12455,31 +16231,56 @@ export type Database = {
           p_end_date: string
           p_organization_id: string
           p_start_date: string
+          p_use_utc?: boolean
         }
         Returns: Json
       }
-      get_actblue_filtered_rollup: {
-        Args: {
-          p_campaign_id?: string
-          p_creative_id?: string
-          p_end_date: string
-          p_organization_id: string
-          p_start_date: string
-          p_timezone?: string
-        }
-        Returns: {
-          day: string
-          donation_count: number
-          gross_raised: number
-          net_raised: number
-          recurring_amount: number
-          recurring_count: number
-          refund_amount: number
-          refund_count: number
-          total_fees: number
-          unique_donors: number
-        }[]
-      }
+      get_actblue_filtered_rollup:
+        | {
+            Args: {
+              p_campaign_id?: string
+              p_creative_id?: string
+              p_end_date: string
+              p_org_id: string
+              p_start_date: string
+              p_timezone?: string
+              p_use_utc?: boolean
+            }
+            Returns: {
+              day: string
+              gross_raised: number
+              net_raised: number
+              recurring_amount: number
+              recurring_count: number
+              refund_amount: number
+              refund_count: number
+              transaction_count: number
+              unique_donors: number
+            }[]
+          }
+        | {
+            Args: {
+              p_campaign_id?: string
+              p_creative_id?: string
+              p_end_date: string
+              p_organization_id: string
+              p_start_date: string
+              p_timezone?: string
+              p_use_utc?: boolean
+            }
+            Returns: {
+              day: string
+              donation_count: number
+              gross_raised: number
+              net_raised: number
+              recurring_amount: number
+              recurring_count: number
+              refund_amount: number
+              refund_count: number
+              total_fees: number
+              unique_donors: number
+            }[]
+          }
       get_actblue_hourly_metrics: {
         Args: { _date: string; _organization_id: string; _timezone?: string }
         Returns: {
@@ -12498,19 +16299,18 @@ export type Database = {
           p_end_date: string
           p_organization_id: string
           p_start_date: string
+          p_use_utc?: boolean
         }
         Returns: {
-          overall_avg_donation: number
-          total_donation_count: number
-          total_fees: number
-          total_gross_donations: number
-          total_net_donations: number
-          total_net_revenue: number
-          total_recurring_count: number
-          total_recurring_revenue: number
-          total_refund_count: number
-          total_refunds: number
-          total_unique_donors: number
+          avg_donation: number
+          gross_raised: number
+          net_raised: number
+          recurring_amount: number
+          recurring_count: number
+          refund_amount: number
+          refund_count: number
+          transaction_count: number
+          unique_donors: number
         }[]
       }
       get_actblue_true_unique_donors: {
@@ -12524,6 +16324,40 @@ export type Database = {
           new_donors: number
           returning_donors: number
           unique_donors: number
+        }[]
+      }
+      get_active_organization_id: { Args: never; Returns: string }
+      get_ad_performance_donations_tz: {
+        Args: {
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+          p_timezone?: string
+        }
+        Returns: {
+          amount: number
+          attributed_ad_id: string
+          attributed_campaign_id: string
+          attributed_creative_id: string
+          attribution_method: string
+          donor_email: string
+          net_amount: number
+          refcode: string
+          transaction_date: string
+        }[]
+      }
+      get_attributed_revenue_tz: {
+        Args: {
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+          p_timezone?: string
+        }
+        Returns: {
+          channel: string
+          donation_count: number
+          gross_raised: number
+          net_raised: number
         }[]
       }
       get_attribution_summary: {
@@ -12567,6 +16401,17 @@ export type Database = {
           transaction_id: string
         }[]
       }
+      get_creative_intelligence: {
+        Args: {
+          p_early_window_days?: number
+          p_end_date: string
+          p_fatigue_threshold?: number
+          p_min_impressions?: number
+          p_organization_id: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
       get_daily_metrics_summary: {
         Args: {
           _end_date: string
@@ -12588,6 +16433,14 @@ export type Database = {
           total_sms_sent: number
         }[]
       }
+      get_dashboard_sparkline_data: {
+        Args: {
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
       get_donation_heatmap: {
         Args: {
           _end_date: string
@@ -12602,8 +16455,35 @@ export type Database = {
           value: number
         }[]
       }
+      get_donor_demographics_cached: {
+        Args: { _organization_id: string }
+        Returns: Json
+      }
       get_donor_demographics_summary: {
         Args: { _organization_id: string }
+        Returns: Json
+      }
+      get_donor_demographics_v2: {
+        Args: {
+          _end_date?: string
+          _organization_id: string
+          _start_date?: string
+        }
+        Returns: Json
+      }
+      get_donor_universe: {
+        Args: {
+          _channel_filter?: string
+          _crossover_only?: boolean
+          _max_amount?: number
+          _min_amount?: number
+          _org_filter?: string[]
+          _page?: number
+          _page_size?: number
+          _recurring_filter?: boolean
+          _search?: string
+          _state_filter?: string
+        }
         Returns: Json
       }
       get_export_data: {
@@ -12622,10 +16502,46 @@ export type Database = {
           expires_at: string
           id: string
           invitation_type: string
+          is_valid: boolean
           organization_id: string
           organization_name: string
           role: string
           status: string
+        }[]
+      }
+      get_link_tracking_metrics: {
+        Args: {
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+        }
+        Returns: {
+          attribution_type: string
+          conversions: number
+          cookie_capture_rate: number
+          meta_ad_clicks: number
+          refcode: string
+          revenue: number
+          total_clicks: number
+          unique_sessions: number
+          with_fbc: number
+          with_fbp: number
+        }[]
+      }
+      get_link_tracking_summary: {
+        Args: {
+          p_end_date: string
+          p_organization_id: string
+          p_start_date: string
+        }
+        Returns: {
+          attributed_revenue: number
+          conversion_rate: number
+          conversions: number
+          cookie_capture_rate: number
+          meta_ad_clicks: number
+          total_clicks: number
+          unique_sessions: number
         }[]
       }
       get_meta_accounts_due_for_sync: {
@@ -12639,6 +16555,28 @@ export type Database = {
           organization_id: string
           organization_name: string
           sync_priority: string
+        }[]
+      }
+      get_org_data_freshness: {
+        Args: { org_ids: string[] }
+        Returns: {
+          days_stale: number
+          last_transaction_at: string
+          org_id: string
+          transaction_count_7d: number
+        }[]
+      }
+      get_org_seat_usage: {
+        Args: { org_id: string }
+        Returns: {
+          available_seats: number
+          bonus_seats: number
+          members_count: number
+          pending_invites_count: number
+          pending_requests_count: number
+          seat_limit: number
+          total_entitled: number
+          total_used: number
         }[]
       }
       get_org_trend_relevance: {
@@ -12656,6 +16594,29 @@ export type Database = {
           trend_event_id: string
           trend_key: string
           urgency_score: number
+        }[]
+      }
+      get_org_webhook_stats: {
+        Args: { org_ids: string[] }
+        Returns: {
+          failure_rate: number
+          failures: number
+          last_error: string
+          last_failure_at: string
+          org_id: string
+          total_events: number
+        }[]
+      }
+      get_organization_members: {
+        Args: { p_organization_id: string }
+        Returns: {
+          email: string
+          full_name: string
+          joined_at: string
+          membership_id: string
+          role: string
+          status: string
+          user_id: string
         }[]
       }
       get_pending_invitations: {
@@ -12683,6 +16644,7 @@ export type Database = {
         }
         Returns: {
           amount: number
+          channel: string
           donor_first_name: string
           id: string
           is_recurring: boolean
@@ -12736,9 +16698,9 @@ export type Database = {
       }
       get_sms_metrics: {
         Args: {
-          p_end_date?: string
+          p_end_date: string
           p_organization_id: string
-          p_start_date?: string
+          p_start_date: string
         }
         Returns: Json
       }
@@ -12778,8 +16740,115 @@ export type Database = {
           unique_donors: number
         }[]
       }
+      get_user_active_sessions: {
+        Args: never
+        Returns: {
+          device_info: Json
+          expires_at: string
+          id: string
+          ip_address: string
+          is_current: boolean
+          last_active_at: string
+          started_at: string
+        }[]
+      }
+      get_user_activity_logs: {
+        Args: {
+          p_action_types?: string[]
+          p_limit?: number
+          p_offset?: number
+          p_user_id: string
+        }
+        Returns: {
+          action_type: string
+          activity_id: string
+          created_at: string
+          ip_address: unknown
+          metadata: Json
+          resource_id: string
+          resource_type: string
+        }[]
+      }
+      get_user_login_history: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: {
+          attempt_id: string
+          attempted_at: string
+          city: string
+          country: string
+          email: string
+          failure_reason: string
+          ip_address: string
+          success: boolean
+          user_agent: string
+        }[]
+      }
+      get_user_management_data: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_org_id?: string
+          p_roles?: string[]
+          p_search?: string
+          p_status?: string
+        }
+        Returns: {
+          active_sessions_30d: number
+          created_at: string
+          email: string
+          failed_logins_24h: number
+          full_name: string
+          id: string
+          is_locked: boolean
+          last_login_at: string
+          latest_session: Json
+          mfa_enabled: boolean
+          organization_id: string
+          organization_name: string
+          role: string
+          status: Database["public"]["Enums"]["user_status"]
+          total_count: number
+        }[]
+      }
       get_user_organization_id: { Args: never; Returns: string }
       get_user_organization_id_safe: { Args: never; Returns: string }
+      get_user_organizations: {
+        Args: { p_user_id?: string }
+        Returns: {
+          is_primary: boolean
+          joined_at: string
+          membership_id: string
+          organization_id: string
+          organization_name: string
+          role: string
+          status: string
+        }[]
+      }
+      get_user_sessions_detailed: {
+        Args: {
+          p_include_expired?: boolean
+          p_limit?: number
+          p_user_id: string
+        }
+        Returns: {
+          city: string
+          country: string
+          country_name: string
+          device_info: Json
+          ended_at: string
+          expires_at: string
+          ip_address: string
+          is_current: boolean
+          is_valid: boolean
+          last_active_at: string
+          latitude: number
+          longitude: number
+          region: string
+          session_id: string
+          started_at: string
+          user_agent: string
+        }[]
+      }
       get_users_with_roles: {
         Args: never
         Returns: {
@@ -12803,6 +16872,10 @@ export type Database = {
           roles: string[]
         }[]
       }
+      has_org_role: {
+        Args: { p_organization_id: string; p_roles: string[] }
+        Returns: boolean
+      }
       has_pii_access:
         | { Args: never; Returns: boolean }
         | { Args: { _organization_id: string }; Returns: boolean }
@@ -12816,6 +16889,14 @@ export type Database = {
       increment_cache_hit: {
         Args: { content_hash_param: string }
         Returns: undefined
+      }
+      increment_invitation_failed_attempts: {
+        Args: { p_invitation_id: string }
+        Returns: undefined
+      }
+      invite_to_organization: {
+        Args: { p_organization_id: string; p_role?: string; p_user_id: string }
+        Returns: Json
       }
       is_account_locked: { Args: { _user_id: string }; Returns: boolean }
       is_client_admin: { Args: never; Returns: boolean }
@@ -12842,6 +16923,21 @@ export type Database = {
         }
         Returns: string
       }
+      log_invitation_event: {
+        Args: {
+          p_email?: string
+          p_error_message?: string
+          p_event_type: string
+          p_invitation_id: string
+          p_invitation_type?: string
+          p_metadata?: Json
+          p_organization_id?: string
+          p_source?: string
+          p_status?: string
+          p_user_id?: string
+        }
+        Returns: string
+      }
       log_job_failure: {
         Args: {
           p_context?: Json
@@ -12859,6 +16955,26 @@ export type Database = {
           _user_id: string
         }
         Returns: string
+      }
+      log_member_invited: {
+        Args: {
+          p_actor_id: string
+          p_actor_name: string
+          p_organization_id: string
+          p_role: string
+          p_target_email: string
+          p_target_name: string
+        }
+        Returns: undefined
+      }
+      log_member_joined: {
+        Args: {
+          p_organization_id: string
+          p_role: string
+          p_user_id: string
+          p_user_name: string
+        }
+        Returns: undefined
       }
       log_onboarding_action: {
         Args: {
@@ -12884,6 +17000,19 @@ export type Database = {
         }
         Returns: string
       }
+      log_seat_change: {
+        Args: {
+          p_change_type: string
+          p_changed_by: string
+          p_new_bonus?: number
+          p_new_limit?: number
+          p_old_bonus?: number
+          p_old_limit?: number
+          p_org_id: string
+          p_reason?: string
+        }
+        Returns: string
+      }
       mask_address: { Args: { address_input: string }; Returns: string }
       mask_email: { Args: { email_input: string }; Returns: string }
       mask_name: { Args: { name_input: string }; Returns: string }
@@ -12897,14 +17026,40 @@ export type Database = {
           rule_id: string
         }[]
       }
+      populate_donor_demographics_bulk: {
+        Args: { _organization_id: string }
+        Returns: Json
+      }
+      purge_old_activity_logs: { Args: never; Returns: undefined }
+      purge_old_location_cache: { Args: never; Returns: undefined }
+      record_login_attempt: {
+        Args: {
+          p_email: string
+          p_failure_reason?: string
+          p_ip_address: unknown
+          p_success: boolean
+          p_user_agent: string
+        }
+        Returns: undefined
+      }
       refresh_analytics_views: { Args: never; Returns: undefined }
       refresh_daily_group_sentiment: { Args: never; Returns: undefined }
       refresh_daily_metrics_summary: { Args: never; Returns: undefined }
+      refresh_demographics_cache: {
+        Args: { _organization_id: string }
+        Returns: Json
+      }
       refresh_materialized_view: {
         Args: { view_name: string }
         Returns: undefined
       }
       refresh_unified_trends: { Args: never; Returns: undefined }
+      refresh_user_session: {
+        Args: { p_new_expires_at?: string; p_session_id: string }
+        Returns: boolean
+      }
+      request_account_deletion: { Args: { p_reason?: string }; Returns: string }
+      request_data_export: { Args: { p_format?: string }; Returns: string }
       reset_circuit_breaker: { Args: { job_id: string }; Returns: undefined }
       resolve_job_failure: {
         Args: { p_failure_id: string }
@@ -12918,6 +17073,14 @@ export type Database = {
           p_start_date?: string
         }
         Returns: string
+      }
+      switch_organization: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      transfer_organization_ownership: {
+        Args: { p_new_owner_id: string; p_organization_id: string }
+        Returns: Json
       }
       unlock_account: {
         Args: { _admin_id: string; _user_id: string }
@@ -13000,6 +17163,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_session_activity: {
+        Args: { p_session_id: string }
+        Returns: boolean
+      }
       update_source_health: {
         Args: {
           p_error_message?: string
@@ -13010,14 +17177,39 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_user_consent: {
+        Args: {
+          p_consent_type: string
+          p_granted: boolean
+          p_ip_address?: unknown
+          p_user_agent?: string
+        }
+        Returns: string
+      }
       user_belongs_to_organization: {
         Args: { _organization_id: string }
         Returns: boolean
       }
       user_needs_mfa: { Args: { _user_id: string }; Returns: Json }
+      validate_password_strength: {
+        Args: { p_password: string }
+        Returns: {
+          is_valid: boolean
+          issues: string[]
+          score: number
+        }[]
+      }
       verify_admin_invite_code: {
         Args: { invite_code: string; user_id: string }
         Returns: boolean
+      }
+      verify_and_use_admin_invite: {
+        Args: { p_code: string; p_user_id: string }
+        Returns: {
+          error_message: string
+          invite_id: string
+          is_valid: boolean
+        }[]
       }
     }
     Enums: {

@@ -9,6 +9,8 @@ import { OnboardingWizard } from "@/components/client/OnboardingWizard";
 import { ClientDashboardCharts } from "@/components/client/ClientDashboardCharts";
 import { ConsolidatedChannelMetrics } from "@/components/client/ConsolidatedChannelMetrics";
 import SyncControls from "@/components/client/SyncControls";
+import { DataSyncStatusBar } from "@/components/client/DataSyncStatusBar";
+import { BackfillStatusBanner } from "@/components/client/BackfillStatusBanner";
 import { PortalErrorBoundary } from "@/components/portal/PortalErrorBoundary";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,16 +23,18 @@ import {
 import { PerformanceControlsToolbar } from "@/components/dashboard/PerformanceControlsToolbar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useDashboardStore, useDateRange, useSelectedCampaignId, useSelectedCreativeId } from "@/stores/dashboardStore";
+import { useDashboardStore, useDateRange } from "@/stores/dashboardStore";
 import { DashboardTopSection } from "@/components/client/DashboardTopSection";
-import { useFilterOptions } from "@/hooks/useFilterOptions";
-import { useClientDashboardMetricsQuery, useRecurringHealthQuery } from "@/queries";
+import { useRecurringHealthQuery } from "@/queries";
+import { useDashboardMetricsV2 } from "@/hooks/useDashboardMetricsV2";
 import { buildHeroKpis } from "@/utils/buildHeroKpis";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { ActBlueMetricsDebug } from "@/components/debug/ActBlueMetricsDebug";
 import { TodayViewDashboard } from "@/components/client/TodayViewDashboard";
 import { useIsSingleDayView } from "@/hooks/useHourlyMetrics";
+import { useInactivityReset } from "@/hooks/useInactivityReset";
+import { useSmartRefresh } from "@/hooks/useSmartRefresh";
 
 // Lazy load Heatmap for performance
 const DonationHeatmap = lazy(() => import("@/components/client/DonationHeatmap"));
@@ -239,51 +243,30 @@ const ClientDashboard = () => {
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const queryClient = useQueryClient();
 
-  // V3: Use Zustand store for global date range and filters
+  // V3: Use Zustand store for global date range
   const dateRange = useDateRange();
-  const selectedCampaignId = useSelectedCampaignId();
-  const selectedCreativeId = useSelectedCreativeId();
   const triggerRefresh = useDashboardStore((s) => s.triggerRefresh);
 
-  // Data fetching with TanStack Query
-  const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useClientDashboardMetricsQuery(organizationId);
+  // Data fetching with unified metrics hook (V2 adapter)
+  const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useDashboardMetricsV2(organizationId);
   const { data: recurringHealthData } = useRecurringHealthQuery(organizationId);
   const isSingleDayView = useIsSingleDayView();
 
-  // Handler for refresh button - invalidates cache and forces fresh fetch
-  const handleRefresh = useCallback(async () => {
-    logger.info('Dashboard refresh triggered', { organizationId });
-    
-    // Invalidate ALL dashboard-related queries to ensure fresh data
-    await queryClient.invalidateQueries({ 
-      queryKey: ['dashboard'],
-      refetchType: 'all'
-    });
-    
-    // Also invalidate related queries that feed into the dashboard
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['actblue'] }),
-      queryClient.invalidateQueries({ queryKey: ['meta-metrics'] }),
-      queryClient.invalidateQueries({ queryKey: ['sms'] }),
-      queryClient.invalidateQueries({ queryKey: ['attribution'] }),
-      queryClient.invalidateQueries({ queryKey: ['recurring-health'] }),
-    ]);
-    
-    // Trigger store refresh (for components listening to refreshKey)
-    triggerRefresh();
-    
-    // Force refetch with network-only behavior
-    await refetch();
-    
-    toast.success('Dashboard refreshed with latest data');
-  }, [queryClient, organizationId, triggerRefresh, refetch]);
+  // Reset date range to "today" after 30 minutes of inactivity
+  useInactivityReset({ enabled: true, timeoutMs: 30 * 60 * 1000 });
 
-  // Fetch filter options for campaigns and creatives
-  const { data: filterOptions } = useFilterOptions(
-    organizationId,
-    dateRange.startDate,
-    dateRange.endDate
-  );
+  // Smart refresh hook - checks freshness and conditionally syncs stale sources
+  const { 
+    handleSmartRefresh, 
+    isRefreshing: isSmartRefreshing,
+    syncingSources 
+  } = useSmartRefresh({
+    organizationId: organizationId || '',
+    onComplete: () => {
+      triggerRefresh();
+      refetch();
+    }
+  });
 
   // Build hero KPIs from query data
   const heroKpis = useMemo(() => {
@@ -376,6 +359,19 @@ const ClientDashboard = () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
 
+    // Check if user was invited (has client_users record)
+    // Invited users should skip onboarding - they don't need to set up the org
+    const { data: clientUser } = await supabase
+      .from("client_users")
+      .select("id")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (clientUser) {
+      // User was invited to an org, skip onboarding wizard
+      return;
+    }
+
     const { data: profile } = await supabase
       .from("profiles")
       .select("onboarding_completed")
@@ -407,6 +403,12 @@ const ClientDashboard = () => {
               animate="visible"
               className="space-y-6"
             >
+              {/* Backfill Status Banner - prominent when import is running */}
+              <BackfillStatusBanner 
+                organizationId={organizationId}
+                className="animate-in fade-in slide-in-from-top-2 duration-300"
+              />
+
               {/* AT A GLANCE: Performance Overview - Premium Header + KPIs */}
               <motion.section variants={sectionVariants}>
                 <DashboardTopSection
@@ -417,12 +419,10 @@ const ClientDashboard = () => {
                   lastUpdated={dataUpdatedAt ? new Date(dataUpdatedAt) : undefined}
                   controls={
                     <PerformanceControlsToolbar
-                      organizationId={organizationId}
-                      campaignOptions={filterOptions?.campaigns || []}
-                      creativeOptions={filterOptions?.creatives || []}
                       showRefresh
-                      onRefresh={handleRefresh}
-                      isRefreshing={isFetching}
+                      onRefresh={handleSmartRefresh}
+                      isRefreshing={isSmartRefreshing || isFetching}
+                      syncingSources={syncingSources}
                     />
                   }
                   kpis={heroKpis}
@@ -439,7 +439,8 @@ const ClientDashboard = () => {
 
               {/* Charts Section - Always render wrapper to prevent CLS */}
               <motion.section variants={sectionVariants}>
-                {(data || (isLoading && !error)) && (
+                {/* Only show "Trends & Drivers" header for multi-day view - single day view has its own header */}
+                {(data || (isLoading && !error)) && !isSingleDayView && (
                   <V3SectionHeader
                     title="Trends & Drivers"
                     subtitle="Revenue trends and attribution breakdown"
@@ -498,25 +499,27 @@ const ClientDashboard = () => {
                 />
               </motion.section>
 
-              {/* TIME ANALYSIS: Calendar Heatmap */}
-              <motion.section variants={sectionVariants}>
-                <CollapsibleSection
-                  title="Time Analysis"
-                  subtitle="Discover peak donation times by day and hour"
-                  icon={Clock}
-                  accent="blue"
-                  isExpanded={showTimeAnalysis}
-                  onToggle={() => setShowTimeAnalysis(!showTimeAnalysis)}
-                >
-                  <Suspense fallback={<V3SectionSkeleton />}>
-                    <DonationHeatmap
-                      organizationId={organizationId}
-                      startDate={dateRange.startDate}
-                      endDate={dateRange.endDate}
-                    />
-                  </Suspense>
-                </CollapsibleSection>
-              </motion.section>
+              {/* TIME ANALYSIS: Calendar Heatmap - hidden for single day views */}
+              {!isSingleDayView && (
+                <motion.section variants={sectionVariants}>
+                  <CollapsibleSection
+                    title="Time Analysis"
+                    subtitle="Discover peak donation times by day and hour"
+                    icon={Clock}
+                    accent="blue"
+                    isExpanded={showTimeAnalysis}
+                    onToggle={() => setShowTimeAnalysis(!showTimeAnalysis)}
+                  >
+                    <Suspense fallback={<V3SectionSkeleton />}>
+                      <DonationHeatmap
+                        organizationId={organizationId}
+                        startDate={dateRange.startDate}
+                        endDate={dateRange.endDate}
+                      />
+                    </Suspense>
+                  </CollapsibleSection>
+                </motion.section>
+              )}
 
               {/* Sync Controls */}
               <motion.section variants={sectionVariants}>

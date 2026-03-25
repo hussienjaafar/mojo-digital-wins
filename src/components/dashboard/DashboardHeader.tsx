@@ -39,6 +39,8 @@ export interface DashboardHeaderProps {
   onRefresh?: () => void;
   /** Is refresh in progress */
   isRefreshing?: boolean;
+  /** Sources currently being synced (for smart refresh feedback) */
+  syncingSources?: string[];
   /** Additional className */
   className?: string;
 }
@@ -50,68 +52,90 @@ export interface DashboardHeaderProps {
 interface RefreshButtonProps {
   onClick: () => void;
   isRefreshing?: boolean;
+  syncingSources?: string[];
 }
 
-const RefreshButton: React.FC<RefreshButtonProps> = ({ onClick, isRefreshing }) => (
-  <TooltipProvider delayDuration={300}>
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onClick}
-          disabled={isRefreshing}
-          className={cn(
-            // Size and shape - Mobile: 44px touch target, Tablet+: 36px
-            "h-11 w-11 sm:h-9 sm:w-9 p-0",
-            "rounded-[var(--portal-radius-sm)]",
-            // Border - override outline variant's border-2 to match 1px date controls
-            "border",
-            // Colors
-            "bg-[hsl(var(--portal-bg-secondary))]",
-            "border-[hsl(var(--portal-border))]",
-            "text-[hsl(var(--portal-text-muted))]",
-            // Dark mode overrides (override outline variant's dark:* classes)
-            "dark:border-[hsl(var(--portal-border))]",
-            "dark:text-[hsl(var(--portal-text-muted))]",
-            // Hover state
-            "hover:bg-[hsl(var(--portal-bg-hover))]",
-            "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
-            "hover:text-[hsl(var(--portal-text-primary))]",
-            "hover:shadow-[0_0_12px_hsl(var(--portal-accent-blue)/0.08)]",
-            // Dark mode hover overrides
-            "dark:hover:bg-[hsl(var(--portal-bg-hover))]",
-            "dark:hover:text-[hsl(var(--portal-text-primary))]",
-            // Focus state - portal-branded ring
-            "focus-visible:ring-2",
-            "focus-visible:ring-[hsl(var(--portal-accent-blue)/0.3)]",
-            "focus-visible:ring-offset-1",
-            "focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
-            // Transition
-            "transition-all",
-            // Disabled state
-            "disabled:opacity-50 disabled:cursor-not-allowed"
-          )}
-          style={{ transition: "all var(--portal-transition-base)" }}
-          aria-label={isRefreshing ? "Refreshing data" : "Refresh data"}
-        >
-          <RefreshCw
+const RefreshButton: React.FC<RefreshButtonProps> = ({ onClick, isRefreshing, syncingSources = [] }) => {
+  // Build tooltip text based on current state
+  const getTooltipText = () => {
+    if (syncingSources.length > 0) {
+      const sourceLabels: Record<string, string> = {
+        meta: 'Meta Ads',
+        actblue: 'ActBlue',
+        switchboard: 'SMS',
+      };
+      const labels = syncingSources.map(s => sourceLabels[s] || s).join(', ');
+      return `Syncing: ${labels}...`;
+    }
+    if (isRefreshing) {
+      return 'Checking freshness...';
+    }
+    return 'Smart refresh – syncs stale data only';
+  };
+
+  return (
+    <TooltipProvider delayDuration={300}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClick}
+            disabled={isRefreshing}
             className={cn(
-              "h-4 w-4",
-              isRefreshing && "animate-spin"
+              // Size and shape - Mobile: 44px touch target, Tablet+: 36px
+              "h-11 w-11 sm:h-9 sm:w-9 p-0",
+              "rounded-[var(--portal-radius-sm)]",
+              // Border - override outline variant's border-2 to match 1px date controls
+              "border",
+              // Colors
+              "bg-[hsl(var(--portal-bg-secondary))]",
+              "border-[hsl(var(--portal-border))]",
+              "text-[hsl(var(--portal-text-muted))]",
+              // Dark mode overrides (override outline variant's dark:* classes)
+              "dark:border-[hsl(var(--portal-border))]",
+              "dark:text-[hsl(var(--portal-text-muted))]",
+              // Hover state
+              "hover:bg-[hsl(var(--portal-bg-hover))]",
+              "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
+              "hover:text-[hsl(var(--portal-text-primary))]",
+              "hover:shadow-[0_0_12px_hsl(var(--portal-accent-blue)/0.08)]",
+              // Dark mode hover overrides
+              "dark:hover:bg-[hsl(var(--portal-bg-hover))]",
+              "dark:hover:text-[hsl(var(--portal-text-primary))]",
+              // Focus state - portal-branded ring
+              "focus-visible:ring-2",
+              "focus-visible:ring-[hsl(var(--portal-accent-blue)/0.3)]",
+              "focus-visible:ring-offset-1",
+              "focus-visible:ring-offset-[hsl(var(--portal-bg-secondary))]",
+              // Transition
+              "transition-all",
+              // Disabled state
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              // Active syncing state - subtle glow
+              syncingSources.length > 0 && "border-[hsl(var(--portal-accent-blue)/0.5)] shadow-[0_0_8px_hsl(var(--portal-accent-blue)/0.15)]"
             )}
-          />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent
-        side="bottom"
-        className="bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]"
-      >
-        <p>{isRefreshing ? "Refreshing..." : "Refresh data"}</p>
-      </TooltipContent>
-    </Tooltip>
-  </TooltipProvider>
-);
+            style={{ transition: "all var(--portal-transition-base)" }}
+            aria-label={isRefreshing ? "Refreshing data" : "Refresh data"}
+          >
+            <RefreshCw
+              className={cn(
+                "h-4 w-4",
+                isRefreshing && "animate-spin"
+              )}
+            />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="bottom"
+          className="bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]"
+        >
+          <p>{getTooltipText()}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
 
 // ============================================================================
 // Status Badge Row Builder
@@ -161,6 +185,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   showRefresh = false,
   onRefresh,
   isRefreshing = false,
+  syncingSources = [],
   className,
 }) => {
   // Build status badge row for TitleBlock
@@ -241,7 +266,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   {
                     variant: "segmented",
                     trailingControl: (
-                      <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
+                      <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} syncingSources={syncingSources} />
                     ),
                   }
                 );
@@ -250,7 +275,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               return (
                 <div className={cn("min-w-0 w-full", "flex flex-wrap items-center gap-2")}>
                   {dateControls}
-                  <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
+                  <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} syncingSources={syncingSources} />
                 </div>
               );
             })()}

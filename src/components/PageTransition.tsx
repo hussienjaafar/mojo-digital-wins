@@ -14,10 +14,13 @@ interface PageTransitionProps {
 export function PageTransition({ children, className }: PageTransitionProps) {
   const location = useLocation();
 
+  // Skip animation for /experience route to eliminate delay on high-intent CTA click
+  const skipAnimation = location.pathname === "/experience";
+
   return (
     <div
       className={cn(
-        "animate-fade-in-up",
+        !skipAnimation && "animate-fade-in-up",
         className
       )}
       key={location.pathname}

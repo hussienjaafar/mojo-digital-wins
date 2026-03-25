@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   V3Card,
@@ -10,16 +10,20 @@ import {
   V3LoadingState,
   V3ErrorState,
   V3EmptyState,
-  V3DataTable,
-  type V3Column,
+  V3InsightBadge,
 } from "@/components/v3";
-import { MessageSquare, DollarSign, Target, TrendingUp, BarChart3, AlertTriangle, Filter, Info, CheckCircle2, AlertCircle } from "lucide-react";
+import { MessageSquare, DollarSign, Target, TrendingUp, BarChart3, AlertTriangle, Filter, LayoutGrid, List, Sparkles } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { format, parseISO } from "date-fns";
-import { EChartsLineChart, EChartsBarChart } from "@/components/charts/echarts";
+import { EChartsBarChart, EChartsCombinationChart } from "@/components/charts/echarts";
+import { SmallMultiplesChart } from "@/components/charts";
 import { useSMSMetricsUnified } from "@/hooks/useActBlueMetrics";
-import { formatRatio, formatCurrency, formatNumber, formatPercent } from "@/lib/chart-formatters";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useIsSingleDayView } from "@/hooks/useHourlyMetrics";
+import { formatRatio, formatCurrency, formatNumber } from "@/lib/chart-formatters";
+import { SMSCampaignCard, type SMSCampaignData } from "./SMSCampaignCard";
+import { supabase } from "@/integrations/supabase/client";
+import { getOrgToday } from "@/lib/timezone";
 
 type Props = {
   organizationId: string;
@@ -44,6 +48,11 @@ const itemVariants = {
 const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
   const [performanceFilter, setPerformanceFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Detect single-day view
+  const isSingleDay = useIsSingleDayView();
 
   // Use unified SMS metrics hook with explicit date range (fixes date mismatch issue)
   const { data, isLoading, error, refetch } = useSMSMetricsUnified(organizationId, startDate, endDate);
@@ -56,6 +65,19 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
     summary: data?.summary,
     previousPeriod: data?.previousPeriod,
   }), [data]);
+
+  // Derive latest data date and check for stale data
+  const latestDataDate = useMemo(() => {
+    if ((dailyMetrics as any[]).length === 0) return null;
+    return (dailyMetrics as any[])[(dailyMetrics as any[]).length - 1].date;
+  }, [dailyMetrics]);
+
+  // Uses org timezone for accurate "today" detection
+  const isShowingStaleData = useMemo(() => {
+    if (!latestDataDate) return false;
+    const today = getOrgToday();
+    return startDate === today && latestDataDate !== today;
+  }, [latestDataDate, startDate]);
 
   // Current period totals from unified RPC (now includes SMS-specific fields)
   const totals = useMemo(() => ({
@@ -111,6 +133,55 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
     return filtered;
   }, [campaigns, campaignFilter, performanceFilter]);
 
+  // Map campaigns to card format
+  const campaignCards: SMSCampaignData[] = useMemo(() => 
+    filteredCampaigns.map((c: any) => ({
+      campaign_id: c.campaign_id,
+      campaign_name: c.campaign_name || c.campaign_id,
+      topic: c.topic,
+      topic_summary: c.topic_summary,
+      tone: c.tone,
+      urgency_level: c.urgency_level,
+      call_to_action: c.call_to_action,
+      key_themes: c.key_themes,
+      sent: c.sent || 0,
+      raised: c.raised || 0,
+      donations: c.donations || 0,
+      last_donation: c.last_donation,
+      send_date: c.send_date,
+    })), [filteredCampaigns]);
+
+  // Check if any campaigns need analysis
+  const unanalyzedCount = useMemo(() => 
+    campaigns.filter((c: any) => !c.analyzed_at && c.sent > 0).length, 
+    [campaigns]
+  );
+
+  // Trigger analysis for unanalyzed campaigns
+  const triggerAnalysis = async () => {
+    if (isAnalyzing || unanalyzedCount === 0) return;
+    
+    setIsAnalyzing(true);
+    try {
+      await supabase.functions.invoke('analyze-sms-campaigns', {
+        body: { organization_id: organizationId, batch_size: 10 }
+      });
+      // Refetch data after analysis
+      setTimeout(() => refetch(), 2000);
+    } catch (err) {
+      console.error('Failed to analyze campaigns:', err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Auto-trigger analysis on mount if there are unanalyzed campaigns
+  useEffect(() => {
+    if (unanalyzedCount > 0 && !isAnalyzing) {
+      triggerAnalysis();
+    }
+  }, [unanalyzedCount]); // Only run when unanalyzedCount changes
+
   // Campaign comparison chart data (by raised amount since we may not have cost data)
   const roiComparisonData = useMemo(() => (campaigns as any[])
     .filter((c: any) => (c.raised || 0) > 0)
@@ -126,10 +197,12 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
     })), [campaigns]);
 
   // Trend chart data - correctly map sent and conversions
+  // Combined chart data with activity metrics + revenue
   const trendChartData = useMemo(() => (dailyMetrics as any[]).map((d: any) => ({
     name: format(parseISO(d.date), 'MMM d'),
     Sent: d.sent || 0,
     Conversions: d.donations || 0,
+    Raised: d.amountRaised || 0,
   })), [dailyMetrics]);
 
   // Show loading state
@@ -169,56 +242,15 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
     );
   }
 
-  // Get attribution metadata from RPC response
-  const attributionMetadata = data?.metadata;
-
   return (
     <div className="space-y-6">
-      {/* Attribution Status Banner */}
-      <div className="flex items-center gap-3 p-3 rounded-lg bg-[hsl(var(--portal-card-bg))] border border-[hsl(var(--portal-border))]">
-        {totals.conversions > 0 ? (
-          <CheckCircle2 className="h-5 w-5 text-[hsl(var(--portal-success))] flex-shrink-0" />
-        ) : (
-          <AlertCircle className="h-5 w-5 text-[hsl(var(--portal-accent-amber))] flex-shrink-0" />
-        )}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">
-              Attribution Status
-            </span>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <Info className="h-3.5 w-3.5 text-[hsl(var(--portal-text-muted))]" />
-                </TooltipTrigger>
-                <TooltipContent side="right" className="max-w-xs">
-                  <p className="text-xs">
-                    SMS attribution uses refcode patterns (txt*, sms*) to identify donations originating from SMS campaigns.
-                    {attributionMetadata?.refcodePatterns && (
-                      <span className="block mt-1 text-[hsl(var(--portal-text-muted))]">
-                        Patterns: {attributionMetadata.refcodePatterns.join(', ')}
-                      </span>
-                    )}
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-          <p className="text-xs text-[hsl(var(--portal-text-muted))] mt-0.5">
-            {totals.conversions > 0 ? (
-              <>
-                <span className="text-[hsl(var(--portal-success))] font-medium">{totals.conversions} donations</span> attributed to SMS • {formatCurrency(totals.raised)} raised
-              </>
-            ) : totals.sent > 0 ? (
-              <>
-                {formatNumber(totals.sent)} messages sent • No attributed donations yet in this period
-              </>
-            ) : (
-              <>No SMS activity found in this date range</>
-            )}
-          </p>
-        </div>
-      </div>
+      {/* Stale data indicator */}
+      {isShowingStaleData && latestDataDate && (
+        <V3InsightBadge type="anomaly-high">
+          Showing data from {format(parseISO(latestDataDate), 'MMM d')} — today's data not yet synced
+        </V3InsightBadge>
+      )}
+
       {/* V3 KPI Cards with Period Comparison */}
       <motion.div
         className="grid grid-cols-2 md:grid-cols-5 gap-3"
@@ -273,24 +305,72 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </motion.div>
       </motion.div>
 
-      {/* Performance Trend Chart */}
-      {trendChartData.length > 0 && (
+      {/* Multi-Day View: Main Combo Chart - Messages Sent (bars) + Dollars Raised (line) */}
+      {!isSingleDay && trendChartData.length > 0 && (
         <V3ChartWrapper
-          title="Performance Trend"
+          title="SMS Activity & Revenue"
           icon={TrendingUp}
-          ariaLabel="SMS campaign performance trend chart showing messages sent and conversions over time"
-          description="Line chart displaying daily SMS send volume and conversion trends"
+          ariaLabel="SMS messages sent and revenue trends over time"
+          description="Messages sent as bars, dollars raised as line"
           accent="purple"
         >
-          <EChartsLineChart
+          <EChartsCombinationChart
             data={trendChartData}
             xAxisKey="name"
             series={[
-              { dataKey: "Sent", name: "Messages Sent", color: "hsl(var(--portal-accent-purple))" },
-              { dataKey: "Conversions", name: "Conversions", color: "hsl(var(--portal-success))" },
+              { 
+                dataKey: "Sent", 
+                name: "Messages Sent", 
+                type: "bar",
+                color: "#A855F7",
+                yAxisIndex: 0,
+                valueType: "number",
+                barOpacity: 0.6,
+              },
+              { 
+                dataKey: "Raised", 
+                name: "Dollars Raised", 
+                type: "line",
+                color: "#F59E0B",
+                yAxisIndex: 1,
+                valueType: "currency",
+                smooth: true,
+                lineWidth: 2,
+              },
             ]}
-            valueType="number"
+            dualYAxis
+            yAxisNameLeft="Sent"
+            yAxisNameRight="Raised"
+            yAxisValueTypeLeft="number"
+            yAxisValueTypeRight="currency"
             height={280}
+            showLegend
+          />
+        </V3ChartWrapper>
+      )}
+
+      {/* Multi-Day View: Conversions Trend - Auto-scaling sparkline */}
+      {!isSingleDay && trendChartData.length > 0 && (
+        <V3ChartWrapper
+          title="Conversion Trend"
+          icon={Target}
+          ariaLabel="SMS conversion trend over time"
+          description="Auto-scaled to show conversion patterns clearly"
+          accent="green"
+        >
+          <SmallMultiplesChart
+            data={trendChartData}
+            xAxisKey="name"
+            panels={[
+              { 
+                label: "Conversions", 
+                dataKey: "Conversions", 
+                color: "#22C55E",
+                valueType: "number",
+                icon: Target,
+              },
+            ]}
+            panelHeight={72}
           />
         </V3ChartWrapper>
       )}
@@ -316,13 +396,53 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
         </V3ChartWrapper>
       )}
 
-      {/* Campaign Details Table with Filters */}
+      {/* Campaign Details with AI-Powered Topic Labels */}
       <V3Card accent="purple">
         <V3CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <V3CardTitle>Campaign Details</V3CardTitle>
+            <div className="flex items-center gap-3">
+              <V3CardTitle>Campaign Details</V3CardTitle>
+              {isAnalyzing && (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground animate-pulse">
+                  <Sparkles className="h-3 w-3" />
+                  Analyzing...
+                </span>
+              )}
+              {unanalyzedCount > 0 && !isAnalyzing && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={triggerAnalysis}
+                  className="h-7 text-xs gap-1.5"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Analyze {unanalyzedCount} campaigns
+                </Button>
+              )}
+            </div>
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-[hsl(var(--portal-text-muted))]" aria-hidden="true" />
+              {/* View toggle */}
+              <div className="flex items-center border rounded-md">
+                <Button
+                  variant={viewMode === "cards" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("cards")}
+                  className="h-8 px-2 rounded-r-none"
+                  aria-label="Card view"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === "list" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  className="h-8 px-2 rounded-l-none"
+                  aria-label="List view"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+              <Filter className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Select value={performanceFilter} onValueChange={setPerformanceFilter}>
                 <SelectTrigger className="w-[140px] h-8 text-xs" aria-label="Filter by performance">
                   <SelectValue placeholder="Performance" />
@@ -337,64 +457,53 @@ const SMSMetrics = ({ organizationId, startDate, endDate }: Props) => {
           </div>
         </V3CardHeader>
         <V3CardContent>
-          <V3DataTable
-            data={filteredCampaigns}
-            getRowKey={(row) => row.campaign_id}
-            pagination
-            pageSize={10}
-            emptyTitle="No campaigns match the selected filters"
-            emptyDescription="Try adjusting your filter criteria"
-            columns={[
-              {
-                key: "campaign_name",
-                header: "Campaign",
-                sortable: true,
-                sortFn: (a, b) => (a.campaign_name || a.campaign_id || '').localeCompare(b.campaign_name || b.campaign_id || ''),
-                render: (row) => <span className="font-medium text-[hsl(var(--portal-text-primary))]">{row.campaign_name || row.campaign_id}</span>,
-              },
-              {
-                key: "donations",
-                header: "Donations",
-                align: "right",
-                sortable: true,
-                sortFn: (a, b) => (a.donations || 0) - (b.donations || 0),
-                render: (row) => formatNumber(row.donations || 0),
-              },
-              {
-                key: "donors",
-                header: "Donors",
-                align: "right",
-                sortable: true,
-                sortFn: (a, b) => (a.donors || 0) - (b.donors || 0),
-                hideOnMobile: true,
-                render: (row) => formatNumber(row.donors || 0),
-              },
-              {
-                key: "raised",
-                header: "Raised",
-                align: "right",
-                sortable: true,
-                sortFn: (a, b) => (a.raised || 0) - (b.raised || 0),
-                render: (row) => formatCurrency(row.raised || 0),
-              },
-              {
-                key: "net",
-                header: "Net",
-                align: "right",
-                sortable: true,
-                sortFn: (a, b) => (a.net || 0) - (b.net || 0),
-                hideOnMobile: true,
-                render: (row) => formatCurrency(row.net || 0),
-              },
-              {
-                key: "last_donation",
-                header: "Last Activity",
-                align: "right",
-                hideOnMobile: true,
-                render: (row) => row.last_donation ? format(parseISO(row.last_donation), 'MMM d') : '—',
-              },
-            ] as V3Column<typeof filteredCampaigns[0]>[]}
-          />
+          {campaignCards.length === 0 ? (
+            <V3EmptyState
+              title="No campaigns match the selected filters"
+              description="Try adjusting your filter criteria"
+            />
+          ) : viewMode === "cards" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {campaignCards.map((campaign, index) => (
+                <SMSCampaignCard 
+                  key={campaign.campaign_id} 
+                  campaign={campaign} 
+                  index={index}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {campaignCards.map((campaign, index) => (
+                <motion.div
+                  key={campaign.campaign_id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.03 }}
+                  className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:border-border bg-card/30 hover:bg-card/60 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {campaign.topic && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 shrink-0">
+                        {campaign.topic}
+                      </span>
+                    )}
+                    <span className="font-medium text-sm truncate">{campaign.campaign_name}</span>
+                    {campaign.topic_summary && (
+                      <span className="text-xs text-muted-foreground truncate hidden lg:block max-w-xs">
+                        {campaign.topic_summary}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 text-sm shrink-0">
+                    <span className="text-muted-foreground">{formatNumber(campaign.sent)} sent</span>
+                    <span className="font-medium text-emerald-600 dark:text-emerald-400">{formatCurrency(campaign.raised)}</span>
+                    <span>{campaign.donations} donations</span>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </V3CardContent>
       </V3Card>
     </div>

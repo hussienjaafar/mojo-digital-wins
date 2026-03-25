@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import {
+  validateTopicExtraction,
+  calculateDynamicConfidence,
+  combineConfidenceScores,
+  type TopicExtractionResult
+} from '../_shared/topic-validation.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,7 +33,18 @@ interface MetaCreativeInsight {
 }
 
 interface AIAnalysisResult {
+  // Specific issue extraction (NEW)
+  issue_primary: string;           // e.g., "anti-Israel military aid", "pro-immigration"
+  issue_tags: string[];
+  political_stances: string[];     // e.g., ["anti-AIPAC", "pro-ceasefire"]
+  targets_attacked: string[];      // People/orgs criticized
+  targets_supported: string[];     // People/orgs praised
+  policy_positions: string[];      // Specific policies advocated
+
+  // Generic topic for backwards compatibility
   topic: string;
+
+  // Original fields
   tone: string;
   sentiment_score: number;
   sentiment_label: string;
@@ -35,6 +52,13 @@ interface AIAnalysisResult {
   emotional_appeal: string;
   key_themes: string[];
   verbal_themes?: string[];
+
+  // Donor psychology
+  donor_pain_points?: string[];
+  values_appealed?: string[];
+
+  // LLM self-evaluation (Task 3: Topic Validation)
+  confidence_rating?: number; // 1-5 scale
 }
 
 interface VisualAnalysisResult {
@@ -123,25 +147,51 @@ serve(async (req) => {
 
         // Text analysis if we have text
         if (textContent.trim()) {
-          const analysisPrompt = `Analyze this Meta (Facebook/Instagram) ad creative and extract the following information. Return ONLY a valid JSON object with no additional text.
+          const analysisPrompt = `Analyze this Meta (Facebook/Instagram) ad creative and extract SPECIFIC political issues, not generic categories.
+
+CRITICAL: Be VERY SPECIFIC about what the ad is actually about:
+- NOT "foreign policy" but "anti-Israel military aid" or "pro-ceasefire Gaza"
+- NOT "immigration" but "anti-Laken Riley Act pro-immigrant" or "sanctuary city defense"
+- NOT "democracy" but "anti-AIPAC money in politics" or "anti-Ritchie Torres sellout"
 
 Ad Creative Content:
 ${textContent}
 
 Creative Type: ${creative.creative_type}
 
-Extract:
-1. topic: The main topic/subject (e.g., "healthcare", "immigration", "voting rights", "climate", "education", "fundraising general", "candidate promotion")
-2. tone: The emotional tone (e.g., "urgent", "emotional", "factual", "grateful", "angry", "hopeful", "fearful", "inspiring", "celebratory")
-3. sentiment_score: A number from -1.0 (very negative) to 1.0 (very positive)
-4. sentiment_label: "positive", "negative", or "neutral"
-5. urgency_level: "low", "medium", "high", or "critical"
-6. emotional_appeal: Primary emotional appeal type (e.g., "fear", "hope", "anger", "pride", "urgency", "compassion", "solidarity", "outrage")
-7. key_themes: Array of 2-5 key themes/keywords in the creative
-${creative.audio_transcript ? '8. verbal_themes: Array of 2-4 key themes specifically from the spoken audio' : ''}
+Extract and return ONLY valid JSON:
 
-Return only valid JSON in this exact format:
-{"topic":"string","tone":"string","sentiment_score":0.0,"sentiment_label":"string","urgency_level":"string","emotional_appeal":"string","key_themes":["theme1","theme2"]${creative.audio_transcript ? ',"verbal_themes":["theme1"]' : ''}}`;
+SPECIFIC ISSUES (most important):
+- issue_primary: The EXACT issue (e.g., "anti-Israel military aid", "pro-immigration anti-deportation")
+- issue_tags: Array of ALL specific issues mentioned
+- political_stances: Stances taken (e.g., ["anti-AIPAC", "pro-ceasefire", "anti-incumbent"])
+- targets_attacked: People/orgs criticized (e.g., ["Ritchie Torres", "AIPAC", "Netanyahu"])
+- targets_supported: People/orgs praised (e.g., ["Michael Blake", "progressive movement"])
+- policy_positions: Specific policies advocated (e.g., ["end military aid to Israel"])
+
+DONOR PSYCHOLOGY:
+- donor_pain_points: What problems would compel donation? Be specific!
+- values_appealed: Core values triggered (e.g., ["justice", "solidarity", "anti-corruption"])
+
+GENERAL (backwards compatible):
+- topic: General category (healthcare, immigration, foreign_policy, elections, civil_rights, economy, other)
+- tone: Emotional tone (urgent, hopeful, angry, compassionate, fearful, inspiring, informative)
+- sentiment_score: -1.0 to 1.0
+- sentiment_label: "positive", "negative", or "neutral"
+- urgency_level: "low", "medium", "high", or "critical"
+- emotional_appeal: Primary appeal (fear, hope, anger, pride, solidarity, outrage)
+- key_themes: Array of 2-5 key themes
+${creative.audio_transcript ? '- verbal_themes: Array of 2-4 themes from spoken audio' : ''}
+
+CONFIDENCE SELF-EVALUATION:
+- confidence_rating: Rate your confidence in this analysis from 1-5:
+  * 5 = very confident, well-structured ad with clear messaging
+  * 4 = confident, clear content with minor ambiguity
+  * 3 = moderately confident, some unclear elements
+  * 2 = low confidence, significant ambiguity
+  * 1 = very low confidence, unclear or confusing content
+
+Return ONLY valid JSON.`;
 
           const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
             method: 'POST',
@@ -181,6 +231,34 @@ Return only valid JSON in this exact format:
               const jsonMatch = responseText.match(/\{[\s\S]*\}/);
               if (jsonMatch) {
                 analysis = JSON.parse(jsonMatch[0]);
+
+                // Task 3: Validate topic extraction
+                if (analysis) {
+                  const topicData: TopicExtractionResult = {
+                    issue_primary: analysis.issue_primary || null,
+                    issue_tags: analysis.issue_tags || null,
+                    political_stances: analysis.political_stances || null,
+                    donor_pain_points: analysis.donor_pain_points || null,
+                    policy_positions: analysis.policy_positions || null,
+                    targets_attacked: analysis.targets_attacked || null,
+                    targets_supported: analysis.targets_supported || null,
+                    values_appealed: analysis.values_appealed || null,
+                  };
+
+                  const validation = validateTopicExtraction(topicData);
+
+                  if (!validation.isValid) {
+                    console.warn(`[analyze-meta-creatives] Low coherence for creative ${creative.id}:`, {
+                      creative_id: creative.id,
+                      coherence_score: validation.coherenceScore,
+                      diversity_score: validation.diversityScore,
+                      issues: validation.issues
+                    });
+                  }
+
+                  // Store validation metrics in analysis for later use
+                  (analysis as any).validation = validation;
+                }
               }
             } catch (parseError) {
               console.error(`Error parsing AI response for creative ${creative.id}:`, parseError);
@@ -281,12 +359,60 @@ Return only valid JSON:
         const updateData: any = {
           analyzed_at: new Date().toISOString(),
           ai_model_used: 'google/gemini-2.5-flash',
-          analysis_confidence: 0.85,
           effectiveness_score: effectivenessScore,
           performance_tier: performanceTier,
         };
 
         if (analysis) {
+          // Task 3: Calculate dynamic confidence from LLM self-rating
+          const llmConfidence = calculateDynamicConfidence(analysis.confidence_rating, 3);
+
+          // Log warning if LLM didn't provide confidence_rating
+          if (analysis.confidence_rating === undefined || analysis.confidence_rating === null) {
+            console.warn(`[analyze-meta-creatives] LLM did not provide confidence_rating for creative ${creative.id}, using default (3)`);
+          }
+
+          // Get validation results
+          const validation = (analysis as any).validation || {
+            coherenceScore: 0.5, // Default fallback
+            diversityScore: 0.5,
+            issues: []
+          };
+
+          // Combine LLM confidence and coherence score
+          const finalConfidence = combineConfidenceScores(llmConfidence, validation.coherenceScore);
+
+          updateData.analysis_confidence = finalConfidence;
+          updateData.topic_coherence_score = validation.coherenceScore;
+
+          // Log validation metrics for monitoring
+          console.log(`[analyze-meta-creatives] Validation metrics for ${creative.id}:`, {
+            creative_id: creative.id,
+            llm_confidence_rating: analysis.confidence_rating,
+            llm_confidence: llmConfidence,
+            coherence_score: validation.coherenceScore,
+            diversity_score: validation.diversityScore,
+            final_confidence: finalConfidence,
+            validation_issues: validation.issues
+          });
+
+          // Specific issue extraction (NEW)
+          updateData.issue_primary = analysis.issue_primary || null;
+          updateData.issue_tags = analysis.issue_tags || [];
+          updateData.political_stances = analysis.political_stances || [];
+          updateData.targets_attacked = analysis.targets_attacked || [];
+          updateData.targets_supported = analysis.targets_supported || [];
+          updateData.policy_positions = analysis.policy_positions || [];
+
+          // Donor psychology
+          if (analysis.donor_pain_points) {
+            updateData.donor_pain_points = analysis.donor_pain_points;
+          }
+          if (analysis.values_appealed) {
+            updateData.values_appealed = analysis.values_appealed;
+          }
+
+          // Original fields (backwards compatible)
           updateData.topic = analysis.topic;
           updateData.tone = analysis.tone;
           updateData.sentiment_score = analysis.sentiment_score;
@@ -319,7 +445,7 @@ Return only valid JSON:
         }
 
         analyzed++;
-        console.log(`Successfully analyzed creative ${creative.id}: topic=${analysis?.topic || 'N/A'}, tier=${performanceTier}`);
+        console.log(`Successfully analyzed creative ${creative.id}: topic=${analysis?.topic || 'N/A'}, tier=${performanceTier}, confidence=${updateData.analysis_confidence?.toFixed(2) || 'N/A'}`);
 
         // Small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 300));

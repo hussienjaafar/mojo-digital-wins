@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import {
   LayoutDashboard,
   Bell,
@@ -17,6 +18,7 @@ import {
   RefreshCw,
   FlaskConical,
   Newspaper,
+  MousePointerClick,
 } from "lucide-react";
 import {
   Sidebar,
@@ -31,6 +33,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useCAPIStatus } from "@/hooks/useCAPIStatus";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type { SidebarNavSection } from "@/lib/design-tokens";
 
 interface AppSidebarProps {
@@ -39,7 +43,10 @@ interface AppSidebarProps {
 
 export function AppSidebar({ organizationId }: AppSidebarProps) {
   const { state } = useSidebar();
+  const isMobile = useIsMobile();
   const location = useLocation();
+  const { data: capiStatus } = useCAPIStatus(organizationId || null);
+  const { isAdmin } = useIsAdmin();
   const [stats, setStats] = useState({
     alerts: 0,
     actions: 0,
@@ -88,63 +95,75 @@ export function AppSidebar({ organizationId }: AppSidebarProps) {
   const isActive = (path: string) => location.pathname === path;
 
   // New Information Architecture structure
-  const sections = useMemo(() => [
-    {
-      label: "Overview",
-      items: [
-        { title: "Dashboard", url: "/client/dashboard", icon: LayoutDashboard },
-      ],
-    },
-    {
-      label: "Acquisition",
-      items: [
-        { title: "Opportunities", url: "/client/opportunities", icon: Target, badge: stats.opportunities },
-        { title: "Suggested Actions", url: "/client/actions", icon: Zap, badge: stats.actions },
-      ],
-    },
-    {
-      label: "Donors",
-      items: [
-        { title: "Demographics", url: "/client/demographics", icon: Users },
-        { title: "Attribution & Performance", url: "/client/journey", icon: GitBranch },
-        { title: "Donor Intelligence", url: "/client/donor-intelligence", icon: Brain },
-        { title: "Recurring Health", url: "/client/recurring-health", icon: RefreshCw },
-      ],
-    },
-    {
-      label: "Creative Intelligence",
-      items: [
-        { title: "Creative Analysis", url: "/client/creative-intelligence", icon: Sparkles },
-        { title: "Ad Performance", url: "/client/ad-performance", icon: Target },
-        { title: "A/B Test Analytics", url: "/client/ab-tests", icon: FlaskConical },
-      ],
-    },
-    {
-      label: "Media & News",
-      items: [
-        { title: "Media Intelligence", url: "/client/media-intelligence", icon: Eye },
-        { title: "News & Trends", url: "/client/news-trends", icon: Newspaper },
-        { title: "Polling Intelligence", url: "/client/polling", icon: BarChart3 },
-      ],
-    },
-    {
-      label: "Watchlist & Alerts",
-      items: [
-        { title: "Entity Watchlist", url: "/client/watchlist", icon: Eye },
-        { title: "Critical Alerts", url: "/client/alerts", icon: Bell, badge: stats.alerts },
-        { title: "Polling Alerts", url: "/client/polling-alerts", icon: BarChart3 },
-      ],
-    },
-    {
-      label: "Settings",
-      items: [
-        { title: "Profile", url: "/client/profile", icon: User },
-        { title: "Settings", url: "/client/settings", icon: Settings },
-      ],
-    },
-  ], [stats]);
+  const sections = useMemo(() => {
+    const baseSections = [
+      {
+        label: "Overview",
+        items: [
+          { title: "Dashboard", url: "/client/dashboard", icon: LayoutDashboard },
+        ],
+      },
+      {
+        label: "Acquisition",
+        items: [
+          { title: "Opportunities", url: "/client/opportunities", icon: Target, badge: stats.opportunities },
+          { title: "Suggested Actions", url: "/client/actions", icon: Zap, badge: stats.actions },
+          // Conditionally add Link Tracking if CAPI is enabled
+          ...(capiStatus?.isConfigured && capiStatus?.isEnabled 
+            ? [{ title: "Link Tracking", url: "/client/link-tracking", icon: MousePointerClick }]
+            : []),
+        ],
+      },
+      {
+        label: "Donors",
+        items: [
+          { title: "Demographics", url: "/client/demographics", icon: Users },
+          { title: "Attribution & Performance", url: "/client/journey", icon: GitBranch },
+          { title: "Donor Intelligence", url: "/client/donor-intelligence", icon: Brain },
+          { title: "Recurring Health", url: "/client/recurring-health", icon: RefreshCw },
+        ],
+      },
+      {
+        label: "Creative Intelligence",
+        items: [
+          { title: "Creative Analysis", url: "/client/creative-intelligence", icon: Sparkles },
+          // Only show V2 to system admins until fully operational
+          ...(isAdmin 
+            ? [{ title: "Creative V2 (Test)", url: "/client/creative-intelligence-v2", icon: FlaskConical }]
+            : []),
+          { title: "Ad Performance", url: "/client/ad-performance", icon: Target },
+          { title: "A/B Test Analytics", url: "/client/ab-tests", icon: FlaskConical },
+        ],
+      },
+      {
+        label: "Media & News",
+        items: [
+          { title: "Media Intelligence", url: "/client/media-intelligence", icon: Eye },
+          { title: "News & Trends", url: "/client/news-trends", icon: Newspaper },
+          { title: "Polling Intelligence", url: "/client/polling", icon: BarChart3 },
+        ],
+      },
+      {
+        label: "Watchlist & Alerts",
+        items: [
+          { title: "Entity Watchlist", url: "/client/watchlist", icon: Eye },
+          { title: "Critical Alerts", url: "/client/alerts", icon: Bell, badge: stats.alerts },
+          { title: "Polling Alerts", url: "/client/polling-alerts", icon: BarChart3 },
+        ],
+      },
+      {
+        label: "Settings",
+        items: [
+          { title: "Profile", url: "/client/profile", icon: User },
+          { title: "Settings", url: "/client/settings", icon: Settings },
+        ],
+      },
+    ];
+    return baseSections;
+  }, [stats, capiStatus, isAdmin]);
 
-  const isCollapsed = state === "collapsed";
+  // On mobile, always show labels (never collapsed)
+  const isCollapsed = !isMobile && state === "collapsed";
 
   return (
     <Sidebar collapsible="icon" className="portal-sidebar">

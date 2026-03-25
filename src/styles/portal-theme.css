@@ -113,6 +113,19 @@
   --portal-z-sticky: 100;
   --portal-z-modal: 1000;
   --portal-z-tooltip: 1100;
+
+  /* === CATEGORICAL CHART PALETTE (10 colors - Colorblind Safe) === */
+  /* Okabe-Ito + Tableau-inspired palette with maximum adjacent contrast */
+  --portal-chart-1: 199 89% 48%;    /* Sky Blue #0EA5E9 */
+  --portal-chart-2: 25 95% 53%;     /* Orange #F97316 - high contrast vs blue */
+  --portal-chart-3: 173 80% 40%;    /* Teal #14B8A6 */
+  --portal-chart-4: 347 77% 60%;    /* Rose #F43F5E */
+  --portal-chart-5: 258 89% 66%;    /* Violet #8B5CF6 */
+  --portal-chart-6: 38 92% 50%;     /* Amber #F59E0B */
+  --portal-chart-7: 160 84% 39%;    /* Emerald #10B981 */
+  --portal-chart-8: 292 84% 61%;    /* Fuchsia #D946EF */
+  --portal-chart-9: 188 94% 43%;    /* Cyan #06B6D4 */
+  --portal-chart-10: 84 81% 44%;    /* Lime #84CC16 */
 }
 
 /* Portal-specific class wrapper - DARK MODE */
@@ -154,6 +167,18 @@
   /* Backwards compatibility aliases */
   --portal-bg: 220 15% 8%;                   /* Alias for --portal-bg-primary */
   --portal-bg-card: 220 15% 12%;             /* Alias for --portal-bg-secondary */
+  
+  /* === CATEGORICAL CHART PALETTE - DARK MODE (Brighter for dark backgrounds) === */
+  --portal-chart-1: 199 95% 55%;
+  --portal-chart-2: 25 98% 58%;
+  --portal-chart-3: 173 85% 48%;
+  --portal-chart-4: 347 82% 65%;
+  --portal-chart-5: 258 92% 72%;
+  --portal-chart-6: 38 95% 55%;
+  --portal-chart-7: 160 88% 45%;
+  --portal-chart-8: 292 88% 68%;
+  --portal-chart-9: 188 98% 50%;
+  --portal-chart-10: 84 85% 52%;
   
   /* === PORTAL GRADIENTS - DARK MODE === */
   --portal-gradient-card: linear-gradient(135deg, hsl(220 15% 12%) 0%, hsl(220 15% 14%) 100%);

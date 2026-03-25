@@ -1,5 +1,7 @@
 /**
  * V3 Donut Chart Data Preprocessing Utilities
+ * 
+ * V3.1 Upgrade: 10-color colorblind-safe palette with index-first assignment
  * Handles Top N + Other aggregation, label normalization, and stable colors
  */
 
@@ -19,11 +21,12 @@ export interface ProcessedDonutData {
   hasOther: boolean;
 }
 
-// Stable color mapping based on category name hash
+// 10-color categorical palette from design tokens
 const colorPalette = getChartColors();
 
 /**
  * Generate a stable hash for a string to ensure consistent color assignment
+ * Used as fallback for overflow slices (11+)
  */
 function hashString(str: string): number {
   let hash = 0;
@@ -36,11 +39,17 @@ function hashString(str: string): number {
 }
 
 /**
- * Get a stable color for a category name
- * Ensures the same category always gets the same color across renders
+ * Get a stable color for a category
+ * 
+ * V3.1: Uses INDEX-FIRST assignment for top slices to ensure maximum visual contrast.
+ * The palette is ordered: blue → orange → teal → rose → violet → amber → emerald → fuchsia → cyan → lime
+ * Adjacent slices get maximally different hues.
+ * 
+ * @param name - Category name (used for special cases and hash fallback)
+ * @param index - Slice index (0-based, determines color for top 10 slices)
  */
 export function getStableColor(name: string, index: number): string {
-  // Special colors for known categories
+  // Special muted colors for known aggregation categories
   const specialColors: Record<string, string> = {
     'other': 'hsl(var(--portal-text-muted) / 0.4)',
     'not provided': 'hsl(var(--portal-text-muted) / 0.3)',
@@ -53,7 +62,14 @@ export function getStableColor(name: string, index: number): string {
     return specialColors[lowerName];
   }
 
-  // Use hash for deterministic color selection
+  // INDEX-FIRST ASSIGNMENT for top slices (ensures max contrast)
+  // The first 10 slices get colors 0-9 in order
+  // This guarantees adjacent slices have maximum hue separation
+  if (index < colorPalette.length) {
+    return colorPalette[index];
+  }
+
+  // Hash fallback only for overflow (11+ slices) - maintains consistency across views
   const hash = hashString(lowerName);
   return colorPalette[hash % colorPalette.length];
 }

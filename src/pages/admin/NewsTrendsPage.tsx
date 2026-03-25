@@ -40,6 +40,10 @@ const DEFAULT_FILTERS: FilterState = {
   highConfidenceOnly: false,
   geography: 'all',
   topics: [],
+  policyDomains: [],
+  showNewOpportunities: false,
+  showProvenTopics: false,
+  minRelevance: 0,
 };
 
 const DEFAULT_PREFERENCES = {

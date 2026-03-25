@@ -20,6 +20,7 @@ import CampaignAttributionManager from "@/components/admin/CampaignAttributionMa
 import SyncScheduler from "@/components/admin/SyncScheduler";
 import EmailReportManager from "@/components/admin/EmailReportManager";
 import { DataBackfillPanel } from "@/components/admin/DataBackfillPanel";
+import { BackfillMonitorPanel } from "@/components/admin/BackfillMonitorPanel";
 import { OnboardingBackfillPanel } from "@/components/admin/OnboardingBackfillPanel";
 import AdminActivityAlerts from "@/components/admin/AdminActivityAlerts";
 import UsageAnalytics from "@/components/admin/UsageAnalytics";
@@ -52,6 +53,9 @@ import { IntegrationCenter } from "@/components/admin/integrations/IntegrationCe
 import { AuditActivityCenter } from "@/components/admin/audit/AuditActivityCenter";
 import { BulkOperations } from "@/components/admin/bulk/BulkOperations";
 import { EnvironmentBanner } from "@/components/admin/EnvironmentBanner";
+import { RedirectLinkAnalytics } from "@/components/analytics/RedirectLinkAnalytics";
+import { VoterImpactDataImport } from "@/components/admin/VoterImpactDataImport";
+import { DonorUniverse } from "@/components/admin/DonorUniverse";
 
 type ContactSubmission = {
   id: string;
@@ -133,6 +137,17 @@ const Admin = () => {
   useEffect(() => {
     localStorage.setItem('admin-active-tab', activeTab);
   }, [activeTab]);
+
+  // Handle navigation to standalone pages - must be in useEffect, not during render
+  useEffect(() => {
+    if (activeTab === "voter-impact-map") {
+      navigate("/admin/voter-impact-map");
+    } else if (activeTab === "contacts") {
+      navigate("/admin/contacts");
+    } else if (activeTab === "ad-copy-studio") {
+      navigate("/admin/ad-copy-studio");
+    }
+  }, [activeTab, navigate]);
 
   // Get current section title for breadcrumb
   const getCurrentSectionTitle = () => {
@@ -347,6 +362,7 @@ const Admin = () => {
       case "scheduler":
         return (
           <div className="space-y-6">
+            <BackfillMonitorPanel />
             <OnboardingBackfillPanel />
             <DataBackfillPanel />
             <OpsPanel />
@@ -356,7 +372,8 @@ const Admin = () => {
       case "users":
         return <UserManagement />;
       case "contacts":
-        return <EnhancedContactManagement />;
+        // Navigation handled in useEffect
+        return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
       case "newsletter":
         return (
           <div className="space-y-4">
@@ -398,8 +415,20 @@ const Admin = () => {
         return <UsageAnalytics />;
       case "client-health":
         return <ClientHealthOverview />;
+      case "redirect-clicks":
+        return <RedirectLinkAnalytics title="Redirect Link Click Analytics" />;
       case "coverage-governance":
         return <CoverageGovernancePanel />;
+      case "voter-impact-map":
+        // Navigation handled in useEffect
+        return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
+      case "ad-copy-studio":
+        // Navigation handled in useEffect
+        return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
+      case "voter-data-import":
+        return <VoterImpactDataImport />;
+      case "donor-universe":
+        return <DonorUniverse />;
       default:
         return <AnalyticsDashboard />;
     }

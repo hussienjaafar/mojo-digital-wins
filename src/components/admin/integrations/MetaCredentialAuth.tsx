@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Facebook, Key, Loader2, CheckCircle2, Building2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Facebook, Key, Loader2, CheckCircle2, Building2, AlertCircle, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
 interface MetaAdAccount {
   id: string;
   account_id: string;
@@ -36,6 +35,8 @@ export function MetaCredentialAuth({
   const [authMethod, setAuthMethod] = useState<'oauth' | 'manual'>('oauth');
   const [isConnecting, setIsConnecting] = useState(false);
   const [oauthStep, setOauthStep] = useState<'idle' | 'authenticating' | 'selecting' | 'saving'>('idle');
+  const [authStartTime, setAuthStartTime] = useState<number | null>(null);
+  const [showTimeoutHelp, setShowTimeoutHelp] = useState(false);
   
   // OAuth state
   const [accessToken, setAccessToken] = useState('');
@@ -47,9 +48,53 @@ export function MetaCredentialAuth({
   const [manualToken, setManualToken] = useState('');
   const [manualAdAccountId, setManualAdAccountId] = useState('');
   const [manualBusinessManagerId, setManualBusinessManagerId] = useState('');
+  
+  // Search state
+  const [accountSearch, setAccountSearch] = useState('');
+  const [needsAccountSelection, setNeedsAccountSelection] = useState(false);
+  
+  // Filter accounts based on search
+  const filteredAccounts = useMemo(() => {
+    if (!accountSearch.trim()) return adAccounts;
+    const search = accountSearch.toLowerCase();
+    return adAccounts.filter(account => 
+      account.name.toLowerCase().includes(search) ||
+      account.account_id.toLowerCase().includes(search) ||
+      (account.business_name?.toLowerCase().includes(search) ?? false)
+    );
+  }, [adAccounts, accountSearch]);
   const [showManualToken, setShowManualToken] = useState(false);
 
-  // Listen for OAuth callback
+  // Check if credentials exist but no ad_account_id is selected
+  useEffect(() => {
+    const checkExistingCredentials = async () => {
+      try {
+        const { data } = await supabase
+          .from('client_api_credentials')
+          .select('encrypted_credentials')
+          .eq('organization_id', organizationId)
+          .eq('platform', 'meta')
+          .single();
+
+        if (!data) return;
+
+        const creds = data.encrypted_credentials as Record<string, any>;
+        if (creds?.access_token && !creds?.ad_account_id && creds?.ad_accounts?.length > 0) {
+          // Connected but no account selected — show selection UI
+          setAccessToken(creds.access_token);
+          setAdAccounts(creds.ad_accounts);
+          setMetaUserInfo(creds.meta_user_name ? { name: creds.meta_user_name, id: creds.meta_user_id } : null);
+          setOauthStep('selecting');
+          setNeedsAccountSelection(true);
+        }
+      } catch (err) {
+        // Ignore — not connected yet
+      }
+    };
+    checkExistingCredentials();
+  }, [organizationId]);
+
+  // Listen for OAuth callback via postMessage
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
@@ -73,19 +118,43 @@ export function MetaCredentialAuth({
     return () => window.removeEventListener('message', handleMessage);
   }, [organizationId]);
 
+  // Listen for OAuth callback via localStorage (fallback when window.opener is lost)
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'meta_oauth_result' && e.newValue) {
+        try {
+          const result = JSON.parse(e.newValue);
+          localStorage.removeItem('meta_oauth_result');
+          if (result.error) {
+            toast.error(result.errorDescription || 'OAuth authentication failed');
+            setOauthStep('idle');
+            setIsConnecting(false);
+          } else if (result.code && result.state) {
+            handleOAuthCallback(result.code, result.state);
+          }
+        } catch (err) {
+          console.error('Failed to parse OAuth result from storage:', err);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [organizationId]);
+
   const handleOAuthCallback = async (code: string, state: string) => {
     try {
       setOauthStep('authenticating');
 
       const { data, error } = await supabase.functions.invoke('meta-oauth-callback', {
-        body: { code, state, organizationId }
+        body: { code, state, redirectUri: `${window.location.origin}/meta-oauth-callback` }
       });
 
       if (error) throw error;
 
-      if (data.access_token) {
-        setAccessToken(data.access_token);
-        setMetaUserInfo(data.user);
+      if (data.accessToken) {
+        setAccessToken(data.accessToken);
+        setMetaUserInfo(data.metaUser);
         setAdAccounts(data.adAccounts || []);
         setOauthStep('selecting');
         
@@ -106,6 +175,13 @@ export function MetaCredentialAuth({
   const handleStartOAuth = async () => {
     setIsConnecting(true);
     setOauthStep('authenticating');
+    setShowTimeoutHelp(false);
+
+    // Show timeout help after 30 seconds
+    setTimeout(() => setShowTimeoutHelp(true), 30000);
+
+    // Clear any stale result
+    localStorage.removeItem('meta_oauth_result');
 
     try {
       const redirectUri = `${window.location.origin}/meta-oauth-callback`;
@@ -132,6 +208,30 @@ export function MetaCredentialAuth({
         'meta-oauth',
         `width=${width},height=${height},left=${left},top=${top},popup=1`
       );
+
+      // Poll localStorage as safety fallback (storage events may not fire in all scenarios)
+      const pollInterval = setInterval(() => {
+        const result = localStorage.getItem('meta_oauth_result');
+        if (result) {
+          clearInterval(pollInterval);
+          try {
+            const parsed = JSON.parse(result);
+            localStorage.removeItem('meta_oauth_result');
+            if (parsed.error) {
+              toast.error(parsed.errorDescription || 'OAuth authentication failed');
+              setOauthStep('idle');
+              setIsConnecting(false);
+            } else if (parsed.code && parsed.state) {
+              handleOAuthCallback(parsed.code, parsed.state);
+            }
+          } catch (e) {
+            console.error('Failed to parse OAuth result:', e);
+          }
+        }
+      }, 500);
+
+      // Stop polling after 5 minutes
+      setTimeout(() => clearInterval(pollInterval), 5 * 60 * 1000);
     } catch (err: any) {
       console.error('OAuth init error:', err);
       toast.error(err.message || 'Failed to start OAuth flow');
@@ -140,20 +240,56 @@ export function MetaCredentialAuth({
     }
   };
 
-  const handleSelectAccount = () => {
+  const handleSelectAccount = async () => {
     if (!selectedAccountId || !accessToken) return;
 
     const account = adAccounts.find(a => a.id === selectedAccountId);
     if (!account) return;
 
-    onSuccess({
-      access_token: accessToken,
-      ad_account_id: account.account_id,
-      business_manager_id: account.business_name || undefined
-    });
+    try {
+      // Persist ad_account_id to DB immediately so sync functions can use it
+      const { data: existing } = await supabase
+        .from('client_api_credentials')
+        .select('encrypted_credentials')
+        .eq('organization_id', organizationId)
+        .eq('platform', 'meta')
+        .single();
 
-    toast.success(`Connected to ${account.name}`);
-    setOauthStep('idle');
+      const existingCreds = (existing?.encrypted_credentials as Record<string, any>) || {};
+
+      const { error } = await supabase
+        .from('client_api_credentials')
+        .update({
+          encrypted_credentials: {
+            ...existingCreds,
+            ad_account_id: account.account_id,
+            ad_account_name: account.name,
+            business_manager_id: account.business_name || existingCreds.business_manager_id,
+          },
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('organization_id', organizationId)
+        .eq('platform', 'meta');
+
+      if (error) {
+        console.error('Failed to save ad account selection:', error);
+        toast.error('Failed to save ad account selection');
+        return;
+      }
+
+      onSuccess({
+        access_token: accessToken,
+        ad_account_id: account.account_id,
+        business_manager_id: account.business_name || undefined,
+      });
+
+      toast.success(`Connected to ${account.name}`);
+      setOauthStep('idle');
+    } catch (err) {
+      console.error('Error saving ad account:', err);
+      toast.error('Failed to save ad account selection');
+    }
   };
 
   const handleManualSubmit = () => {
@@ -241,6 +377,27 @@ export function MetaCredentialAuth({
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
               <p className="text-muted-foreground">Authenticating with Facebook...</p>
               <p className="text-sm text-muted-foreground mt-2">Complete login in the popup window</p>
+              {showTimeoutHelp && (
+                <div className="mt-4 space-y-2">
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Taking longer than expected? The popup may have closed. Try again or use manual entry.
+                    </AlertDescription>
+                  </Alert>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setOauthStep('idle');
+                      setIsConnecting(false);
+                      setShowTimeoutHelp(false);
+                    }}
+                  >
+                    Try Again
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -265,37 +422,55 @@ export function MetaCredentialAuth({
                     </AlertDescription>
                   </Alert>
                 ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {adAccounts.map((account) => (
-                      <div
-                        key={account.id}
-                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
-                          selectedAccountId === account.id
-                            ? 'border-blue-500 bg-blue-500/10'
-                            : 'hover:bg-muted/50'
-                        }`}
-                        onClick={() => setSelectedAccountId(account.id)}
-                      >
-                        <div className="min-w-0">
-                          <p className="font-medium truncate">{account.name}</p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className="text-xs text-muted-foreground">
-                              {account.account_id}
-                            </span>
-                            {account.business_name && (
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Building2 className="w-3 h-3" />
-                                {account.business_name}
-                              </span>
-                            )}
-                            <span className="text-xs text-muted-foreground">
-                              {account.currency}
-                            </span>
-                          </div>
-                        </div>
-                        {getAccountStatusBadge(account.account_status)}
+                  <div className="space-y-2">
+                    {adAccounts.length > 3 && (
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search accounts..."
+                          value={accountSearch}
+                          onChange={(e) => setAccountSearch(e.target.value)}
+                          className="pl-9"
+                        />
                       </div>
-                    ))}
+                    )}
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {filteredAccounts.map((account) => (
+                        <div
+                          key={account.id}
+                          className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                            selectedAccountId === account.id
+                              ? 'border-blue-500 bg-blue-500/10'
+                              : 'hover:bg-muted/50'
+                          }`}
+                          onClick={() => setSelectedAccountId(account.id)}
+                        >
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">{account.name}</p>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <span className="text-xs text-muted-foreground">
+                                {account.account_id}
+                              </span>
+                              {account.business_name && (
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Building2 className="w-3 h-3" />
+                                  {account.business_name}
+                                </span>
+                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {account.currency}
+                              </span>
+                            </div>
+                          </div>
+                          {getAccountStatusBadge(account.account_status)}
+                        </div>
+                      ))}
+                      {filteredAccounts.length === 0 && accountSearch && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No accounts match "{accountSearch}"
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

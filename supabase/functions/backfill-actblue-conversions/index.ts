@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, validateCronOrAdmin, checkRateLimit } from "../_shared/security.ts";
+import { calculateMatchScore, getMatchQualityLabel } from "../_shared/capi-utils.ts";
 
 const corsHeaders = getCorsHeaders();
 const API_VERSION = "v22.0";
@@ -137,7 +138,7 @@ serve(async (req) => {
       .from('client_api_credentials')
       .select('organization_id, encrypted_credentials')
       .in('organization_id', orgIds)
-      .eq('platform', 'meta')
+      .eq('platform', 'meta_capi')
       .eq('is_active', true);
 
     // Get access tokens - try decrypt first, fallback to plain JSON
@@ -215,9 +216,9 @@ serve(async (req) => {
       const attributionKey = `${tx.organization_id}|${tx.refcode}`;
       const campaignId = attributionMap.get(attributionKey) || tx.source_campaign || null;
 
-      // Generate event_id - deterministic for enrichment mode
+      // Generate event_id - use lineitem_id directly for enrichment mode to match ActBlue's pixel
       const eventId = orgConfig.is_enrichment_only
-        ? await hashSHA256(`enrichment:${tx.organization_id}:${tx.transaction_id}`)
+        ? String(tx.transaction_id)  // Match ActBlue's pixel event_id for deduplication
         : `backfill_${tx.transaction_id}`;
 
       // Build user_data with full PII (hashed)
@@ -297,6 +298,14 @@ serve(async (req) => {
         }
       }
 
+      // Calculate match quality metrics
+      const matchScore = calculateMatchScore(userData, {
+        fbp: userData.fbp || null,
+        fbc: userData.fbc || null,
+        external_id: userData.external_id || null,
+      });
+      const matchQuality = getMatchQualityLabel(matchScore, userData);
+
       const eventTime = Math.floor(new Date(tx.transaction_date).getTime() / 1000);
       const customData = {
         value: Number(tx.amount) || 0,
@@ -370,6 +379,8 @@ serve(async (req) => {
             status: 'sent',
             delivered_at: new Date().toISOString(),
             is_enrichment_only: orgConfig.is_enrichment_only,
+            match_score: matchScore,
+            match_quality: matchQuality,
             meta_response: {
               events_received: result.events_received,
               fbtrace_id: result.fbtrace_id,

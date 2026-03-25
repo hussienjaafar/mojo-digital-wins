@@ -88,6 +88,59 @@ interface DataFreshnessInfo {
   campaignsWithoutData: number;
 }
 
+// Meta API only allows fetching data from the last ~13 months (395 days)
+const MAX_META_LOOKBACK_DAYS = 395;
+
+/**
+ * Fetch with exponential backoff retry for rate limit (429) responses.
+ * Meta API commonly returns 429 when hitting rate limits.
+ * Includes timeout protection to prevent hanging requests.
+ *
+ * @param fn - Function that returns a Promise<Response>
+ * @param maxRetries - Maximum number of retry attempts (default: 3)
+ * @param baseDelay - Base delay in milliseconds (default: 1000)
+ * @param timeoutMs - Request timeout in milliseconds (default: 60000)
+ * @returns Promise<Response>
+ */
+async function fetchWithRetry(
+  fn: () => Promise<Response>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000,
+  timeoutMs: number = 60000
+): Promise<Response> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fn();
+      clearTimeout(timeoutId);
+
+      if (response.status === 429 && attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+        console.log(`[RETRY] Rate limited (429), retrying in ${Math.round(delay)}ms... (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      return response;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        console.log(`[TIMEOUT] Request timed out after ${timeoutMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+        if (attempt < maxRetries) {
+          const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+        throw new Error(`Request timed out after ${maxRetries + 1} attempts`);
+      }
+      throw error;
+    }
+  }
+  throw new Error('Max retries exceeded for Meta API request');
+}
+
 /**
  * Calculate the optimal date range for Meta API requests.
  * Meta typically has a 24-48 hour data processing delay.
@@ -140,7 +193,7 @@ async function checkDataFreshness(adAccountId: string, accessToken: string): Pro
   try {
     // Query account-level insights to check most recent data
     const testUrl = `https://graph.facebook.com/v22.0/${adAccountId}/insights?fields=impressions,date_stop&date_preset=last_7d&access_token=${accessToken}`;
-    const response = await fetch(testUrl);
+    const response = await fetchWithRetry(() => fetch(testUrl));
     const data = await response.json();
     
     if (data.error) {
@@ -203,7 +256,20 @@ serve(async (req) => {
       );
     }
 
-    const { organization_id, start_date, end_date, mode, check_freshness_only } = parsedBody.data;
+    let { organization_id, start_date, end_date, mode, check_freshness_only } = parsedBody.data;
+
+    // --- DATE VALIDATION: Enforce 13-month lookback limit ---
+    // Meta API only allows fetching data from the last ~13 months
+    if (start_date) {
+      const minAllowedDate = new Date();
+      minAllowedDate.setDate(minAllowedDate.getDate() - MAX_META_LOOKBACK_DAYS);
+      const minAllowedStr = minAllowedDate.toISOString().split('T')[0];
+
+      if (start_date < minAllowedStr) {
+        console.log(`[DATE VALIDATION] Requested start_date ${start_date} exceeds 13-month limit. Clamping to ${minAllowedStr}`);
+        start_date = minAllowedStr;
+      }
+    }
 
     // --- SECURITY: Authentication checks ---
     const internalKey = req.headers.get('x-internal-key');
@@ -319,9 +385,22 @@ serve(async (req) => {
     const credentials = credData.encrypted_credentials as unknown as MetaCredentials;
     const { access_token } = credentials;
     
-    // Auto-add act_ prefix if missing (users often copy just the numeric ID)
+    // Resolve ad_account_id: direct field, or fallback only if single account
     let ad_account_id = credentials.ad_account_id;
-    if (ad_account_id && !ad_account_id.startsWith('act_')) {
+
+    if (!ad_account_id) {
+      const accounts = (credentials as any).ad_accounts;
+      if (accounts?.length === 1) {
+        ad_account_id = accounts[0].account_id;
+        console.log(`[sync-meta-ads] Auto-selected single ad account: ${ad_account_id}`);
+      } else if (accounts?.length > 1) {
+        throw new Error(`Multiple ad accounts available (${accounts.length}). Please select one in Settings > Integrations.`);
+      } else {
+        throw new Error('No ad_account_id configured. Please re-connect Meta and select an ad account.');
+      }
+    }
+
+    if (!ad_account_id.startsWith('act_')) {
       ad_account_id = `act_${ad_account_id}`;
       console.log(`Added act_ prefix to ad_account_id: ${ad_account_id}`);
     }
@@ -365,8 +444,8 @@ serve(async (req) => {
 
     // Fetch campaigns
     const campaignsUrl = `https://graph.facebook.com/v22.0/${ad_account_id}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget,start_time,stop_time&access_token=${access_token}`;
-    
-    const campaignsResponse = await fetch(campaignsUrl);
+
+    const campaignsResponse = await fetchWithRetry(() => fetch(campaignsUrl));
     const campaignsData = await campaignsResponse.json();
 
     if (campaignsData.error) {
@@ -397,6 +476,48 @@ serve(async (req) => {
       if (insertError) {
         console.error(`Error storing campaign ${campaign.id}:`, insertError);
       }
+    }
+
+    // ========== FETCH AND STORE AD SETS ==========
+    console.log(`[SYNC-META-ADS] Fetching ad sets for account ${ad_account_id}`);
+    
+    let adsetsProcessed = 0;
+    try {
+      const adsetsUrl = `https://graph.facebook.com/v22.0/${ad_account_id}/adsets?fields=id,name,campaign_id,status,targeting&limit=500&access_token=${access_token}`;
+      const adsetsResponse = await fetchWithRetry(() => fetch(adsetsUrl));
+      const adsetsData = await adsetsResponse.json();
+      
+      if (!adsetsData.error && adsetsData.data) {
+        const adsets = adsetsData.data || [];
+        console.log(`[SYNC-META-ADS] Found ${adsets.length} ad sets`);
+        
+        for (const adset of adsets) {
+          const { error: adsetError } = await supabase
+            .from('meta_adsets')
+            .upsert({
+              organization_id,
+              adset_id: adset.id,
+              adset_name: adset.name,
+              campaign_id: adset.campaign_id,
+              status: adset.status || 'UNKNOWN',
+              targeting_summary: adset.targeting || {},
+            }, {
+              onConflict: 'organization_id,adset_id'
+            });
+          
+          if (adsetError) {
+            console.error(`[SYNC-META-ADS] Error storing adset ${adset.id}:`, adsetError.message);
+          } else {
+            adsetsProcessed++;
+          }
+        }
+        
+        console.log(`[SYNC-META-ADS] Stored ${adsetsProcessed} ad sets`);
+      } else if (adsetsData.error) {
+        console.error(`[SYNC-META-ADS] Error fetching ad sets: ${adsetsData.error.message}`);
+      }
+    } catch (adsetErr) {
+      console.error(`[SYNC-META-ADS] Exception fetching ad sets:`, adsetErr);
     }
 
     // Fetch campaign attribution mappings
@@ -430,8 +551,8 @@ serve(async (req) => {
         const adsUrl = `https://graph.facebook.com/v22.0/${campaign.id}/ads?fields=id,name,creative{id,name,object_story_spec{link_data{link,message,name,description,call_to_action},video_data{video_id,title,link_description,call_to_action,image_url},photo_data{caption}},asset_feed_spec{bodies,titles,descriptions,call_to_action_types,videos,link_urls},video_id,thumbnail_url,effective_object_story_id}&access_token=${access_token}`;
         
         console.log(`[DEBUG][sync-meta-ads] Fetching ads URL: ${adsUrl.replace(access_token, 'REDACTED')}`);
-        
-        const adsResponse = await fetch(adsUrl);
+
+        const adsResponse = await fetchWithRetry(() => fetch(adsUrl));
         const adsData = await adsResponse.json();
         
         if (!adsData.error && adsData.data) {
@@ -529,7 +650,7 @@ serve(async (req) => {
               try {
                 console.log(`[DEBUG][sync-meta-ads] No URL in object_story_spec, fetching creative ${creative.id} directly...`);
                 const creativeUrl = `https://graph.facebook.com/v22.0/${creative.id}?fields=object_story_spec,effective_object_story_id&access_token=${access_token}`;
-                const creativeResponse = await fetch(creativeUrl);
+                const creativeResponse = await fetchWithRetry(() => fetch(creativeUrl));
                 const creativeData = await creativeResponse.json();
                 
                 if (!creativeData.error) {
@@ -549,7 +670,7 @@ serve(async (req) => {
                     console.log(`[DEBUG][sync-meta-ads] Trying effective_object_story_id: ${creativeData.effective_object_story_id}`);
                     try {
                       const postUrl = `https://graph.facebook.com/v22.0/${creativeData.effective_object_story_id}?fields=call_to_action,link&access_token=${access_token}`;
-                      const postResponse = await fetch(postUrl);
+                      const postResponse = await fetchWithRetry(() => fetch(postUrl));
                       const postData = await postResponse.json();
                       
                       if (!postData.error) {
@@ -702,7 +823,7 @@ serve(async (req) => {
                   
                   // Fetch video details including source URL and high-res picture
                   const videoDetailsUrl = `https://graph.facebook.com/v22.0/${videoId}?fields=source,picture,thumbnails{uri,height,width}&access_token=${access_token}`;
-                  const videoDetailsResponse = await fetch(videoDetailsUrl);
+                  const videoDetailsResponse = await fetchWithRetry(() => fetch(videoDetailsUrl));
                   const videoDetails = await videoDetailsResponse.json();
                   
                   console.log(`[VIDEO][DEBUG] Video ${videoId} API response:`, JSON.stringify(videoDetails, null, 2).substring(0, 500));
@@ -713,7 +834,7 @@ serve(async (req) => {
                     // Try alternate approach: fetch without 'source' field (may be restricted)
                     console.log(`[VIDEO][DEBUG] Trying alternate endpoint without source field...`);
                     const altUrl = `https://graph.facebook.com/v22.0/${videoId}?fields=picture,thumbnails{uri,height,width}&access_token=${access_token}`;
-                    const altResponse = await fetch(altUrl);
+                    const altResponse = await fetchWithRetry(() => fetch(altUrl));
                     const altData = await altResponse.json();
                     
                     if (!altData.error) {
@@ -750,7 +871,7 @@ serve(async (req) => {
                 // For image creatives, try to get a higher resolution thumbnail
                 try {
                   const creativeDetailsUrl = `https://graph.facebook.com/v22.0/${creative.id}?fields=thumbnail_url,image_url,object_story_spec&thumbnail_height=720&access_token=${access_token}`;
-                  const creativeDetailsResponse = await fetch(creativeDetailsUrl);
+                  const creativeDetailsResponse = await fetchWithRetry(() => fetch(creativeDetailsUrl));
                   const creativeDetails = await creativeDetailsResponse.json();
                   
                   if (!creativeDetails.error) {
@@ -781,9 +902,9 @@ serve(async (req) => {
               let commentsCount = 0, sharesCount = 0, postEngagement = 0;
               
               try {
-                const adInsightsResponse = await fetch(adInsightsUrl);
+                const adInsightsResponse = await fetchWithRetry(() => fetch(adInsightsUrl));
                 const adInsightsData = await adInsightsResponse.json();
-                
+
                 if (!adInsightsData.error && adInsightsData.data && adInsightsData.data.length > 0) {
                   const insight = adInsightsData.data[0];
                   impressions = parseInt(insight.impressions) || 0;
@@ -797,32 +918,58 @@ serve(async (req) => {
                   conversionRanking = insight.conversion_rate_ranking || '';
                   
                   // Extract video engagement metrics
+                  // FIXED: Meta returns action_type as 'video_view' OR 'video_thruplay' depending on campaign type
+                  // Try both action types for reliable extraction
                   if (insight.video_play_actions) {
-                    const playAction = insight.video_play_actions.find((a: any) => a.action_type === 'video_view');
+                    const playAction = insight.video_play_actions.find((a: any) => 
+                      a.action_type === 'video_view' || a.action_type === 'video_play'
+                    );
                     videoPlays = parseInt(playAction?.value) || 0;
                   }
                   if (insight.video_thruplay_watched_actions) {
-                    const thruplayAction = insight.video_thruplay_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    // Try 'video_view' first (common), then 'video_thruplay' (explicit)
+                    let thruplayAction = insight.video_thruplay_watched_actions.find((a: any) => 
+                      a.action_type === 'video_view'
+                    );
+                    if (!thruplayAction) {
+                      thruplayAction = insight.video_thruplay_watched_actions.find((a: any) => 
+                        a.action_type === 'video_thruplay'
+                      );
+                    }
+                    // Fallback: if array has exactly one element, use it
+                    if (!thruplayAction && insight.video_thruplay_watched_actions.length === 1) {
+                      thruplayAction = insight.video_thruplay_watched_actions[0];
+                    }
                     videoThruplay = parseInt(thruplayAction?.value) || 0;
                   }
                   if (insight.video_p25_watched_actions) {
-                    const p25Action = insight.video_p25_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    const p25Action = insight.video_p25_watched_actions.find((a: any) => 
+                      a.action_type === 'video_view' || a.action_type === 'video_p25_watched'
+                    ) || insight.video_p25_watched_actions[0];
                     videoP25 = parseInt(p25Action?.value) || 0;
                   }
                   if (insight.video_p50_watched_actions) {
-                    const p50Action = insight.video_p50_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    const p50Action = insight.video_p50_watched_actions.find((a: any) => 
+                      a.action_type === 'video_view' || a.action_type === 'video_p50_watched'
+                    ) || insight.video_p50_watched_actions[0];
                     videoP50 = parseInt(p50Action?.value) || 0;
                   }
                   if (insight.video_p75_watched_actions) {
-                    const p75Action = insight.video_p75_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    const p75Action = insight.video_p75_watched_actions.find((a: any) => 
+                      a.action_type === 'video_view' || a.action_type === 'video_p75_watched'
+                    ) || insight.video_p75_watched_actions[0];
                     videoP75 = parseInt(p75Action?.value) || 0;
                   }
                   if (insight.video_p100_watched_actions) {
-                    const p100Action = insight.video_p100_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    const p100Action = insight.video_p100_watched_actions.find((a: any) => 
+                      a.action_type === 'video_view' || a.action_type === 'video_p100_watched'
+                    ) || insight.video_p100_watched_actions[0];
                     videoP100 = parseInt(p100Action?.value) || 0;
                   }
                   if (insight.video_avg_time_watched_actions) {
-                    const avgTimeAction = insight.video_avg_time_watched_actions.find((a: any) => a.action_type === 'video_view');
+                    const avgTimeAction = insight.video_avg_time_watched_actions.find((a: any) => 
+                      a.action_type === 'video_view' || a.action_type === 'video_avg_time_watched'
+                    ) || insight.video_avg_time_watched_actions[0];
                     videoAvgWatchTime = parseFloat(avgTimeAction?.value) || 0;
                   }
                   
@@ -886,62 +1033,75 @@ serve(async (req) => {
               const creativeRoas = spend > 0 ? conversionValue / spend : 0;
               
               // Store creative insight with enhanced fields including video/social engagement metrics
+              // PIPELINE FIX: Only include performance metrics if we actually received data (avoid overwriting with zeros)
+              const hasPerformanceData = impressions > 0 || clicks > 0 || spend > 0;
+              
+              const baseCreativeData: Record<string, any> = {
+                organization_id,
+                campaign_id: campaign.id,
+                ad_id: ad.id,
+                creative_id: creative.id,
+                primary_text: primaryText || null,
+                headline: headline || null,
+                description: description || null,
+                call_to_action_type: callToActionType || null,
+                video_url: videoId ? `https://www.facebook.com/video.php?v=${videoId}` : null,
+                thumbnail_url: highResThumbnail, // High-res thumbnail
+                creative_type: creativeType,
+                // PHASE 2: Store media identifiers for video/image pipeline
+                meta_video_id: videoId || null,
+                meta_image_hash: imageHash,
+                media_type: mediaType,
+                // PHASE 3: Store actual playable video source URL
+                media_source_url: mediaSourceUrl,
+                // NEW: Store destination URL and extracted refcode for attribution matching
+                destination_url: destinationUrl,
+                extracted_refcode: extractedRefcode,
+                refcode_source: refcodeSource,
+                // PHASE 3: Track first seen for time-aware model
+                first_seen_at: new Date().toISOString(),
+              };
+              
+              // Only include performance metrics if we have actual data from Meta API
+              // This prevents overwriting existing metrics with zeros when Meta returns empty insights
+              if (hasPerformanceData) {
+                baseCreativeData.impressions = impressions;
+                baseCreativeData.clicks = clicks;
+                baseCreativeData.spend = spend;
+                baseCreativeData.conversions = conversions;
+                baseCreativeData.conversion_value = conversionValue;
+                baseCreativeData.ctr = ctr; // Stored as decimal (0.025 = 2.5%)
+                baseCreativeData.roas = creativeRoas; // Uses conversion_value which may come from purchase_roas
+                // Video engagement metrics
+                baseCreativeData.video_plays = videoPlays;
+                baseCreativeData.video_thruplay = videoThruplay;
+                baseCreativeData.video_p25 = videoP25;
+                baseCreativeData.video_p50 = videoP50;
+                baseCreativeData.video_p75 = videoP75;
+                baseCreativeData.video_p100 = videoP100;
+                baseCreativeData.video_avg_watch_time_seconds = videoAvgWatchTime;
+                // Social engagement metrics
+                baseCreativeData.reactions_total = reactionsTotal;
+                baseCreativeData.reactions_like = reactionsLike;
+                baseCreativeData.reactions_love = reactionsLove;
+                baseCreativeData.reactions_other = reactionsOther;
+                baseCreativeData.comments = commentsCount;
+                baseCreativeData.shares = sharesCount;
+                baseCreativeData.post_engagement = postEngagement;
+                // Quality rankings
+                baseCreativeData.frequency = frequency;
+                baseCreativeData.quality_ranking = qualityRanking;
+                baseCreativeData.engagement_rate_ranking = engagementRanking;
+                baseCreativeData.conversion_rate_ranking = conversionRanking;
+                
+                console.log(`[CREATIVE ${ad.id}] Storing performance: ${impressions} imp, ${clicks} clicks, $${spend.toFixed(2)} spend`);
+              } else {
+                console.log(`[CREATIVE ${ad.id}] No performance data from Meta - preserving existing metrics`);
+              }
+              
               const { error: creativeError } = await supabase
                 .from('meta_creative_insights')
-                .upsert({
-                  organization_id,
-                  campaign_id: campaign.id,
-                  ad_id: ad.id,
-                  creative_id: creative.id,
-                  primary_text: primaryText || null,
-                  headline: headline || null,
-                  description: description || null,
-                  call_to_action_type: callToActionType || null,
-                  video_url: videoId ? `https://www.facebook.com/video.php?v=${videoId}` : null,
-                  thumbnail_url: highResThumbnail, // High-res thumbnail
-                  creative_type: creativeType,
-                  // PHASE 2: Store media identifiers for video/image pipeline
-                  meta_video_id: videoId || null,
-                  meta_image_hash: imageHash,
-                  media_type: mediaType,
-                  // PHASE 3: Store actual playable video source URL
-                  media_source_url: mediaSourceUrl,
-                  // NEW: Store destination URL and extracted refcode for attribution matching
-                  destination_url: destinationUrl,
-                  extracted_refcode: extractedRefcode,
-                  refcode_source: refcodeSource,
-                  // Performance metrics
-                  impressions,
-                  clicks,
-                  spend,
-                  conversions,
-                  conversion_value: conversionValue,
-                  ctr, // Stored as decimal (0.025 = 2.5%)
-                  roas: creativeRoas, // Uses conversion_value which may come from purchase_roas
-                  // Video engagement metrics
-                  video_plays: videoPlays,
-                  video_thruplay: videoThruplay,
-                  video_p25: videoP25,
-                  video_p50: videoP50,
-                  video_p75: videoP75,
-                  video_p100: videoP100,
-                  video_avg_watch_time_seconds: videoAvgWatchTime,
-                  // Social engagement metrics
-                  reactions_total: reactionsTotal,
-                  reactions_like: reactionsLike,
-                  reactions_love: reactionsLove,
-                  reactions_other: reactionsOther,
-                  comments: commentsCount,
-                  shares: sharesCount,
-                  post_engagement: postEngagement,
-                  // Quality rankings
-                  frequency,
-                  quality_ranking: qualityRanking,
-                  engagement_rate_ranking: engagementRanking,
-                  conversion_rate_ranking: conversionRanking,
-                  // PHASE 3: Track first seen for time-aware model
-                  first_seen_at: new Date().toISOString(),
-                }, {
+                .upsert(baseCreativeData, {
                   onConflict: 'organization_id,campaign_id,ad_id'
                 });
               
@@ -949,6 +1109,71 @@ serve(async (req) => {
                 console.error(`Error storing creative insight for ad ${ad.id}:`, creativeError);
               } else {
                 creativesProcessed++;
+                
+                // === NEW: Store individual creative variations ===
+                // Parse and store individual text variations from asset_feed_spec
+                if (creative.asset_feed_spec) {
+                  const feedSpec = creative.asset_feed_spec;
+                  const variationsToInsert: any[] = [];
+                  const syncedAt = new Date().toISOString();
+                  
+                  // Store body (primary text) variations
+                  if (feedSpec.bodies && feedSpec.bodies.length > 0) {
+                    for (let i = 0; i < feedSpec.bodies.length; i++) {
+                      variationsToInsert.push({
+                        organization_id,
+                        ad_id: ad.id,
+                        asset_type: 'body',
+                        asset_index: i,
+                        asset_text: feedSpec.bodies[i].text || null,
+                        synced_at: syncedAt,
+                      });
+                    }
+                  }
+                  
+                  // Store title (headline) variations
+                  if (feedSpec.titles && feedSpec.titles.length > 0) {
+                    for (let i = 0; i < feedSpec.titles.length; i++) {
+                      variationsToInsert.push({
+                        organization_id,
+                        ad_id: ad.id,
+                        asset_type: 'title',
+                        asset_index: i,
+                        asset_text: feedSpec.titles[i].text || null,
+                        synced_at: syncedAt,
+                      });
+                    }
+                  }
+                  
+                  // Store description variations
+                  if (feedSpec.descriptions && feedSpec.descriptions.length > 0) {
+                    for (let i = 0; i < feedSpec.descriptions.length; i++) {
+                      variationsToInsert.push({
+                        organization_id,
+                        ad_id: ad.id,
+                        asset_type: 'description',
+                        asset_index: i,
+                        asset_text: feedSpec.descriptions[i].text || null,
+                        synced_at: syncedAt,
+                      });
+                    }
+                  }
+                  
+                  if (variationsToInsert.length > 0) {
+                    console.log(`[VARIATIONS] Storing ${variationsToInsert.length} text variations for ad ${ad.id}`);
+                    const { error: varError } = await supabase
+                      .from('meta_creative_variations')
+                      .upsert(variationsToInsert, {
+                        onConflict: 'organization_id,ad_id,asset_type,asset_index'
+                      });
+                    
+                    if (varError) {
+                      console.error(`[VARIATIONS] Error storing variations for ad ${ad.id}:`, varError);
+                    } else {
+                      console.log(`[VARIATIONS] Stored ${variationsToInsert.length} variations successfully`);
+                    }
+                  }
+                }
                 
                 // Store refcode mapping for deterministic attribution
                 if (extractedRefcode) {
@@ -1014,8 +1239,8 @@ serve(async (req) => {
         console.log(`Fetching demographic breakdown for campaign ${campaign.id}`);
         
         const demographicUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,actions,action_values&breakdowns=age,gender&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&access_token=${access_token}`;
-        
-        const demographicResponse = await fetch(demographicUrl);
+
+        const demographicResponse = await fetchWithRetry(() => fetch(demographicUrl));
         const demographicData = await demographicResponse.json();
         
         if (!demographicData.error && demographicData.data && demographicData.data.length > 0) {
@@ -1059,8 +1284,8 @@ serve(async (req) => {
         console.log(`Fetching placement breakdown for campaign ${campaign.id}`);
         
         const placementUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,actions&breakdowns=publisher_platform,device_platform&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&access_token=${access_token}`;
-        
-        const placementResponse = await fetch(placementUrl);
+
+        const placementResponse = await fetchWithRetry(() => fetch(placementUrl));
         const placementResult = await placementResponse.json();
         
         if (!placementResult.error && placementResult.data && placementResult.data.length > 0) {
@@ -1087,8 +1312,8 @@ serve(async (req) => {
       
       // ========== Original: Fetch campaign-level insights with enhanced fields ==========
       const insightsUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,reach,actions,action_values,cpc,cpm,ctr,frequency,cost_per_action_type&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&time_increment=1&access_token=${access_token}`;
-      
-      const insightsResponse = await fetch(insightsUrl);
+
+      const insightsResponse = await fetchWithRetry(() => fetch(insightsUrl));
       const insightsData = await insightsResponse.json();
 
       if (insightsData.error) {
@@ -1136,7 +1361,7 @@ serve(async (req) => {
       // Fetch demographic breakdown for campaign-level aggregation
       try {
         const demoAggUrl = `https://graph.facebook.com/v22.0/${campaign.id}/insights?fields=impressions,clicks,spend,actions&breakdowns=age,gender&time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&access_token=${access_token}`;
-        const demoAggResponse = await fetch(demoAggUrl);
+        const demoAggResponse = await fetchWithRetry(() => fetch(demoAggUrl));
         const demoAggData = await demoAggResponse.json();
         
         if (!demoAggData.error && demoAggData.data) {
@@ -1286,9 +1511,12 @@ serve(async (req) => {
 
     try {
       // Fetch account-level insights broken down by ad with daily granularity
+      // UPDATED: Added inline_link_clicks, outbound_clicks, and inline_link_click_ctr for Link CTR metrics
+      // inline_link_clicks is the most reliable source for conversion campaigns
       const adInsightsUrl = `https://graph.facebook.com/v22.0/${ad_account_id}/insights?` +
         `level=ad&` +
         `fields=ad_id,ad_name,campaign_id,adset_id,impressions,clicks,spend,reach,cpc,cpm,ctr,frequency,` +
+        `inline_link_clicks,outbound_clicks,inline_link_click_ctr,` + // Link CTR metrics (inline_link_clicks is primary source)
         `actions,action_values,cost_per_action_type,purchase_roas,quality_ranking,engagement_rate_ranking,conversion_rate_ranking&` +
         `time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&` +
         `time_increment=1&` + // Daily granularity
@@ -1300,7 +1528,7 @@ serve(async (req) => {
       let nextUrl: string | null = adInsightsUrl;
 
       while (nextUrl) {
-        const adInsightsRes: Response = await fetch(nextUrl);
+        const adInsightsRes: Response = await fetchWithRetry(() => fetch(nextUrl as string));
         const adInsightsData: { error?: { message: string }; data?: any[]; paging?: { next?: string } } = await adInsightsRes.json();
 
         if (adInsightsData.error) {
@@ -1351,6 +1579,36 @@ serve(async (req) => {
           // Normalize CTR to decimal (Meta returns as percentage)
           const normalizedCtr = (parseFloat(insight.ctr) || 0) / 100;
 
+          // Extract Link CTR metrics with multi-source fallback
+          // Priority: inline_link_clicks (most reliable) → outbound_clicks → actions:link_click
+          let linkClicks = 0;
+          
+          // Try 1: inline_link_clicks (direct field from Meta - works for all campaign types)
+          if (insight.inline_link_clicks) {
+            linkClicks = parseInt(insight.inline_link_clicks) || 0;
+          }
+          
+          // Try 2: outbound_clicks action array (traffic campaigns)
+          if (linkClicks === 0 && insight.outbound_clicks) {
+            const outboundAction = insight.outbound_clicks.find((a: any) => 
+              a.action_type === 'outbound_click'
+            );
+            if (outboundAction) linkClicks = parseInt(outboundAction.value) || 0;
+          }
+          
+          // Try 3: actions array with link_click type (conversion campaigns fallback)
+          if (linkClicks === 0 && insight.actions) {
+            const linkAction = insight.actions.find((a: any) => a.action_type === 'link_click');
+            if (linkAction) linkClicks = parseInt(linkAction.value) || 0;
+          }
+
+          // Meta's inline_link_click_ctr is returned as percentage (e.g., 2.5 for 2.5%)
+          const linkCtr = insight.inline_link_click_ctr 
+            ? parseFloat(insight.inline_link_click_ctr) / 100 
+            : (parseInt(insight.impressions) > 0 && linkClicks > 0
+              ? linkClicks / parseInt(insight.impressions) 
+              : null);
+
           // Look up creative_id from meta_creative_insights if we have it
           let creativeId: string | null = null;
           const { data: creativeMapping } = await supabase
@@ -1365,7 +1623,7 @@ serve(async (req) => {
             creativeId = creativeMapping.creative_id;
           }
 
-          // Upsert to meta_ad_metrics_daily
+          // Upsert to meta_ad_metrics_daily with link CTR metrics
           const { error: dailyError } = await supabase
             .from('meta_ad_metrics_daily')
             .upsert({
@@ -1384,6 +1642,8 @@ serve(async (req) => {
               cpc: parseFloat(insight.cpc) || null,
               cpm: parseFloat(insight.cpm) || null,
               ctr: normalizedCtr || null,
+              link_clicks: linkClicks, // NEW: Link clicks
+              link_ctr: linkCtr, // NEW: Link CTR
               frequency: parseFloat(insight.frequency) || null,
               conversions,
               conversion_value: conversionValue,
@@ -1415,6 +1675,296 @@ serve(async (req) => {
 
     } catch (adLevelError) {
       console.error(`[AD-LEVEL METRICS] Error fetching ad-level insights:`, adLevelError);
+    }
+
+    // ========== ASSET-LEVEL BREAKDOWN: Fetch performance by text variation ==========
+    // ENHANCED: Follows Gemini Pro's Meta API best practices:
+    // - Separate API calls for each breakdown type (combining often fails)
+    // - CPA-first ranking with CTR fallback
+    // - Minimum 500 impressions threshold for reliable data
+    // - Include reach and inline_link_clicks fields
+    
+    const MIN_IMPRESSIONS_THRESHOLD = 500; // Assets below this are excluded from ranking
+    let variationBreakdownsProcessed = 0;
+    
+    try {
+      console.log(`[ASSET BREAKDOWNS] Fetching asset-level performance breakdowns...`);
+      console.log(`[ASSET BREAKDOWNS] Using minimum impressions threshold: ${MIN_IMPRESSIONS_THRESHOLD}`);
+      
+      // Meta supports breakdowns by body_asset, title_asset, description_asset for DCO ads
+      // CRITICAL: Separate API calls per Gemini guidance (combining breakdowns often fails)
+      const breakdownTypes = ['body_asset', 'title_asset', 'description_asset'] as const;
+      
+      for (const breakdownType of breakdownTypes) {
+        try {
+          // ENHANCED API FIELDS: Include reach and inline_link_clicks per Gemini guidance
+          const assetBreakdownUrl = `https://graph.facebook.com/v22.0/${ad_account_id}/insights?` +
+            `level=ad&` +
+            `breakdowns=${breakdownType}&` +
+            `fields=ad_id,impressions,spend,inline_link_clicks,actions,action_values,reach&` +
+            `time_range={"since":"${dateRanges.since}","until":"${dateRanges.until}"}&` +
+            `filtering=[{"field":"ad.effective_status","operator":"IN","value":["ACTIVE","PAUSED","ARCHIVED"]}]&` +
+            `limit=500&` +
+            `access_token=${access_token}`;
+          
+          console.log(`[ASSET BREAKDOWNS][${breakdownType}] Fetching...`);
+          const breakdownRes = await fetchWithRetry(() => fetch(assetBreakdownUrl));
+          const breakdownData = await breakdownRes.json();
+          
+          // ENHANCED LOGGING: Log raw API response for debugging
+          console.log(`[ASSET BREAKDOWNS][${breakdownType}] Raw API response:`, 
+            JSON.stringify(breakdownData, null, 2).substring(0, 1500));
+          
+          if (breakdownData.error) {
+            console.log(`[ASSET BREAKDOWNS][${breakdownType}] Error code: ${breakdownData.error.code}`);
+            console.log(`[ASSET BREAKDOWNS][${breakdownType}] Error message: ${breakdownData.error.message}`);
+            console.log(`[ASSET BREAKDOWNS][${breakdownType}] Error subcode: ${breakdownData.error.error_subcode || 'none'}`);
+            console.log(`[ASSET BREAKDOWNS] Note: ${breakdownType} breakdown not available (may not have DCO ads)`);
+            continue;
+          }
+          
+          const breakdowns = breakdownData.data || [];
+          console.log(`[ASSET BREAKDOWNS][${breakdownType}] Processing ${breakdowns.length} records`);
+          
+          let skippedLowImpressions = 0;
+          
+          for (const breakdown of breakdowns) {
+            if (!breakdown.ad_id) continue;
+            
+            // The asset text is returned in the breakdown field name (e.g., body_asset, title_asset)
+            const assetText = breakdown[breakdownType];
+            if (!assetText) continue;
+            
+            // Map breakdown type to our asset_type
+            const assetType = breakdownType === 'body_asset' ? 'body' 
+              : breakdownType === 'title_asset' ? 'title' 
+              : 'description';
+            
+            // Extract metrics - ENHANCED with reach and inline_link_clicks
+            const impressions = parseInt(breakdown.impressions) || 0;
+            const spend = parseFloat(breakdown.spend) || 0;
+            const reach = parseInt(breakdown.reach) || 0;
+            const inlineLinkClicks = parseInt(breakdown.inline_link_clicks) || 0;
+            
+            // ENHANCED: Check minimum impressions threshold
+            if (impressions < MIN_IMPRESSIONS_THRESHOLD) {
+              skippedLowImpressions++;
+              continue; // Skip assets with insufficient data for reliable ranking
+            }
+            
+            // Extract purchases (conversions) - ENHANCED per Gemini guidance
+            let purchases = 0;
+            if (breakdown.actions) {
+              // Check multiple action types for purchases
+              const purchaseAction = breakdown.actions.find((a: any) => 
+                a.action_type === 'purchase' || 
+                a.action_type === 'offsite_conversion.fb_pixel_purchase' ||
+                a.action_type === 'lead' // Fallback for lead-gen campaigns
+              );
+              if (purchaseAction) purchases = parseInt(purchaseAction.value) || 0;
+            }
+            
+            // Extract conversion value
+            let conversionValue = 0;
+            if (breakdown.action_values) {
+              const valueAction = breakdown.action_values.find((a: any) => 
+                a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase'
+              );
+              if (valueAction) conversionValue = parseFloat(valueAction.value) || 0;
+            }
+            
+            // ENHANCED CALCULATIONS per Gemini guidance
+            // CPA = spend / purchases (primary ranking metric, lower is better)
+            const cpa = purchases > 0 ? spend / purchases : null;
+            
+            // CTR = inline_link_clicks / impressions * 100 (fallback metric, higher is better)
+            const ctr = impressions > 0 ? inlineLinkClicks / impressions : null;
+            
+            // ROAS for reference
+            const roas = spend > 0 ? conversionValue / spend : null;
+            
+            // Determine ranking method
+            const rankingMethod = cpa !== null && cpa > 0 ? 'cpa' : 'ctr';
+            
+            // Legacy fields for backward compatibility
+            const clicks = inlineLinkClicks; // Use link clicks as primary click metric
+            const conversions = purchases;
+            
+            // Normalize asset text for matching (handle whitespace, encoding differences)
+            const normalizedAssetText = assetText.trim().replace(/\s+/g, ' ').toLowerCase();
+            
+            // First try exact match
+            let { data: matchedVariation, error: matchError } = await supabase
+              .from('meta_creative_variations')
+              .select('id, asset_text')
+              .eq('organization_id', organization_id)
+              .eq('ad_id', breakdown.ad_id)
+              .eq('asset_type', assetType)
+              .eq('asset_text', assetText)
+              .single();
+            
+            // If exact match fails, try normalized text matching
+            if (!matchedVariation && !matchError) {
+              // Get all variations for this ad/type and find best match
+              const { data: allVariations } = await supabase
+                .from('meta_creative_variations')
+                .select('id, asset_text')
+                .eq('organization_id', organization_id)
+                .eq('ad_id', breakdown.ad_id)
+                .eq('asset_type', assetType);
+              
+              if (allVariations && allVariations.length > 0) {
+                // Try normalized match
+                matchedVariation = allVariations.find(v => {
+                  if (!v.asset_text) return false;
+                  const normalizedStored = v.asset_text.trim().replace(/\s+/g, ' ').toLowerCase();
+                  return normalizedStored === normalizedAssetText;
+                }) || null;
+                
+                // If still no match, try prefix matching (first 100 chars)
+                if (!matchedVariation && normalizedAssetText.length > 50) {
+                  const prefix = normalizedAssetText.slice(0, 100);
+                  matchedVariation = allVariations.find(v => {
+                    if (!v.asset_text) return false;
+                    const normalizedStored = v.asset_text.trim().replace(/\s+/g, ' ').toLowerCase();
+                    return normalizedStored.startsWith(prefix) || prefix.startsWith(normalizedStored.slice(0, 100));
+                  }) || null;
+                }
+              }
+            }
+            
+            if (matchedVariation) {
+              // ENHANCED: Update with new CPA/ranking fields
+              const { error: updateError } = await supabase
+                .from('meta_creative_variations')
+                .update({
+                  impressions,
+                  clicks,
+                  spend,
+                  conversions,
+                  conversion_value: conversionValue,
+                  ctr,
+                  link_clicks: inlineLinkClicks,
+                  link_ctr: ctr, // Link CTR is same as our calculated CTR
+                  roas,
+                  // NEW FIELDS for CPA-first ranking
+                  cpa,
+                  purchases,
+                  reach,
+                  inline_link_clicks: inlineLinkClicks,
+                  ranking_method: rankingMethod,
+                  is_estimated: false, // This is actual Meta data
+                  synced_at: new Date().toISOString(),
+                })
+                .eq('id', matchedVariation.id);
+              
+              if (!updateError) {
+                variationBreakdownsProcessed++;
+                console.log(`[ASSET BREAKDOWNS] ✓ Matched ${assetType} for ad ${breakdown.ad_id}: ${impressions} imp, ${purchases} purchases, CPA=${cpa ? '$' + cpa.toFixed(2) : 'N/A'}, ranking by ${rankingMethod}`);
+              }
+            } else {
+              console.log(`[ASSET BREAKDOWNS] ✗ No match for ${assetType} in ad ${breakdown.ad_id}: "${assetText.slice(0, 50)}..."`);
+            }
+          }
+          
+          if (skippedLowImpressions > 0) {
+            console.log(`[ASSET BREAKDOWNS][${breakdownType}] Skipped ${skippedLowImpressions} assets below ${MIN_IMPRESSIONS_THRESHOLD} impressions threshold`);
+          }
+        } catch (breakdownErr) {
+          console.error(`[ASSET BREAKDOWNS] Error fetching ${breakdownType}:`, breakdownErr);
+        }
+      }
+      
+      console.log(`[ASSET BREAKDOWNS] Updated ${variationBreakdownsProcessed} variation records with performance data`);
+      
+      // Trigger variation aggregation for any remaining zero-metric variations
+      if (variationBreakdownsProcessed === 0) {
+        console.log(`[ASSET BREAKDOWNS] No direct matches - triggering fallback aggregation...`);
+        try {
+          const aggregateResponse = await fetch(
+            `${supabaseUrl}/functions/v1/aggregate-variation-metrics`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseKey}`,
+              },
+              body: JSON.stringify({ organization_id }),
+            }
+          );
+          const aggResult = await aggregateResponse.json();
+          console.log(`[ASSET BREAKDOWNS] Fallback aggregation result:`, aggResult);
+        } catch (aggError) {
+          console.error(`[ASSET BREAKDOWNS] Fallback aggregation failed:`, aggError);
+        }
+      }
+      
+      // ENHANCED RANKING: CPA-first with CTR fallback
+      if (variationBreakdownsProcessed > 0) {
+        console.log(`[ASSET BREAKDOWNS] Updating performance rankings with CPA-first algorithm...`);
+        
+        // Get all variations for this org that meet the minimum threshold
+        const { data: allVariations } = await supabase
+          .from('meta_creative_variations')
+          .select('id, ad_id, asset_type, cpa, ctr, impressions, purchases')
+          .eq('organization_id', organization_id)
+          .gte('impressions', MIN_IMPRESSIONS_THRESHOLD);
+        
+        if (allVariations) {
+          // Group by ad_id + asset_type
+          const groups: Record<string, typeof allVariations> = {};
+          for (const v of allVariations) {
+            const key = `${v.ad_id}:${v.asset_type}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(v);
+          }
+          
+          // ENHANCED RANKING per Gemini guidance:
+          // Primary: CPA ascending (lower = better, more cost-efficient)
+          // Fallback: CTR descending (higher = better engagement)
+          for (const group of Object.values(groups)) {
+            group.sort((a, b) => {
+              // If both have CPA, compare CPA (lower wins)
+              if (a.cpa && a.cpa > 0 && b.cpa && b.cpa > 0) {
+                return a.cpa - b.cpa;
+              }
+              // If only one has CPA, that one wins (has actual conversion data)
+              if (a.cpa && a.cpa > 0 && (!b.cpa || b.cpa === 0)) return -1;
+              if ((!a.cpa || a.cpa === 0) && b.cpa && b.cpa > 0) return 1;
+              // Fallback to CTR (higher wins)
+              return (b.ctr || 0) - (a.ctr || 0);
+            });
+
+            // Update ranks
+            for (let i = 0; i < group.length; i++) {
+              const rankingMethod = group[i].cpa && group[i].cpa > 0 ? 'cpa' : 'ctr';
+              await supabase
+                .from('meta_creative_variations')
+                .update({ 
+                  performance_rank: i + 1,
+                  ranking_method: rankingMethod
+                })
+                .eq('id', group[i].id);
+            }
+          }
+          console.log(`[ASSET BREAKDOWNS] CPA-first rankings updated for ${Object.keys(groups).length} variation groups`);
+        }
+        
+        // Mark low-impression variations with null rank (insufficient data)
+        const { error: lowImpError } = await supabase
+          .from('meta_creative_variations')
+          .update({ performance_rank: null, ranking_method: null })
+          .eq('organization_id', organization_id)
+          .lt('impressions', MIN_IMPRESSIONS_THRESHOLD)
+          .gt('impressions', 0);
+        
+        if (!lowImpError) {
+          console.log(`[ASSET BREAKDOWNS] Cleared rankings for low-impression variations (below ${MIN_IMPRESSIONS_THRESHOLD})`);
+        }
+      }
+      
+    } catch (assetBreakdownError) {
+      console.error(`[ASSET BREAKDOWNS] Error:`, assetBreakdownError);
     }
 
     // Update freshness info
@@ -1454,6 +2004,7 @@ serve(async (req) => {
 
     console.log(`=== META ADS SYNC COMPLETE ===`);
     console.log(`Campaigns: ${campaigns.length}`);
+    console.log(`Ad sets processed: ${adsetsProcessed}`);
     console.log(`Creatives processed: ${creativesProcessed}`);
     console.log(`Total insight records: ${totalInsightRecords}`);
     console.log(`Ad-level daily records: ${adLevelRecords}`);
@@ -1461,17 +2012,41 @@ serve(async (req) => {
     console.log(`Placement breakdowns captured: ${placementRecords}`);
     console.log(`Actual data range: ${earliestDataDate || 'none'} to ${latestDataDate || 'none'}`);
     console.log(`Data freshness: ${freshnessInfo.dataLagReason}`);
+    
+    // PIPELINE FIX: Trigger creative metrics aggregation to backfill from campaign-level data
+    let aggregationResult = null;
+    try {
+      console.log(`[SYNC-META-ADS] Triggering creative metrics aggregation...`);
+      const aggregateResponse = await fetch(
+        `${Deno.env.get('SUPABASE_URL')}/functions/v1/aggregate-creative-metrics`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({ organization_id }),
+        }
+      );
+      aggregationResult = await aggregateResponse.json();
+      console.log(`[SYNC-META-ADS] Aggregation result:`, aggregationResult);
+    } catch (aggError) {
+      console.error(`[SYNC-META-ADS] Aggregation failed (non-fatal):`, aggError);
+    }
+    
     console.log(`=== END SYNC ===`);
 
     return new Response(
       JSON.stringify({
         success: true,
         campaigns: campaigns.length,
+        adsets_processed: adsetsProcessed,
         creatives_processed: creativesProcessed,
         insight_records: totalInsightRecords,
         ad_level_daily_records: adLevelRecords,
         demographic_breakdowns: demographicRecords,
         placement_breakdowns: placementRecords,
+        aggregation: aggregationResult,
         data_freshness: {
           latest_data_date: latestDataDate,
           earliest_data_date: earliestDataDate,

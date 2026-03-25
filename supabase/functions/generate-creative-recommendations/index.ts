@@ -259,9 +259,11 @@ function analyzePatterns(creatives: any[], learnings: any[]) {
   });
 
   // Calculate WEIGHTED averages (more accurate than simple average)
+  // PHASE 4 FIX: Lowered thresholds to work with smaller datasets
+  // Changed from count >= 2 && impressions > 100 to count >= 1 (no impression requirement)
   const sortByWeightedAvg = (data: Record<string, { count: number; totalRoas: number; totalImpressions: number; roasValues?: number[] }>) =>
     Object.entries(data)
-      .filter(([_, v]) => v.count >= 2 && v.totalImpressions > 100) // Require minimum sample
+      .filter(([_, v]) => v.count >= 1) // Removed impression threshold for smaller datasets
       .map(([k, v]) => {
         const avgRoas = v.totalImpressions > 0 ? v.totalRoas / v.totalImpressions : 0;
         // Calculate variance for confidence scoring

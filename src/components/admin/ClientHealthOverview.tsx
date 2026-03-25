@@ -151,9 +151,12 @@ export default function ClientHealthOverview() {
         : platform === 'meta' ? 'sync-meta-ads'
         : 'sync-switchboard-sms';
       
-      const { error } = await supabase.functions.invoke(functionName, {
-        body: { organization_id: orgId }
-      });
+      const body: Record<string, string> = { organization_id: orgId };
+      if (platform === 'meta') {
+        body.start_date = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        body.end_date = new Date().toISOString().split('T')[0];
+      }
+      const { error } = await supabase.functions.invoke(functionName, { body });
       
       if (error) throw error;
       

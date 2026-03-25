@@ -1,29 +1,23 @@
 /**
  * =============================================================================
- * TRANSCRIBE META AD VIDEO
+ * TRANSCRIBE META AD VIDEO - v3.1
  * =============================================================================
  *
- * Downloads a video from its source URL and transcribes it using OpenAI Whisper.
- * Then analyzes the transcript for tone, topic, hook structure, and other features.
+ * Downloads videos from Meta and transcribes using OpenAI Whisper.
+ * Analysis step migrated to Lovable AI Gateway (google/gemini-3-flash-preview).
  *
- * Modes:
- * - Single video: Provide video_id to transcribe one video
- * - Batch: Provide organization_id + limit to process pending videos
+ * v3.1: Hallucination detection + auto-retry with language hint.
  *
- * Features analyzed:
- * - Speaker count and words per minute
- * - Hook (first 3 seconds)
- * - Topic classification
- * - Tone analysis (urgent, hopeful, angry, etc.)
- * - Sentiment score
- * - Call-to-action detection
- * - Key phrases extraction
- *
+ * Note: Whisper transcription still requires OPENAI_API_KEY.
+ * Analysis uses Lovable AI with tool calling for structured output.
  * =============================================================================
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { callLovableAIWithTools, AIGatewayError } from "../_shared/ai-client.ts";
+import { buildTranscriptAnalysisPrompt, TRANSCRIPT_ANALYSIS_TOOL } from "../_shared/prompts.ts";
+import { detectHallucination, computeConfidence, checkSemanticCoherence } from "../_shared/hallucination-detection.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,6 +28,7 @@ interface TranscriptSegment {
   start: number;
   end: number;
   text: string;
+  no_speech_prob?: number;
 }
 
 interface TranscriptionResult {
@@ -43,453 +38,361 @@ interface TranscriptionResult {
   duration: number;
 }
 
-interface AnalysisResult {
-  topic_primary: string;
-  topic_tags: string[];
-  tone_primary: string;
-  tone_tags: string[];
-  sentiment_score: number;
-  sentiment_label: string;
-  cta_text: string | null;
-  cta_type: string | null;
-  urgency_level: string;
-  emotional_appeals: string[];
-  key_phrases: string[];
-  hook_text: string;
-  hook_word_count: number;
-  speaker_count: number;
-}
-
-/**
- * Download video to memory and return as blob
- */
-async function downloadVideo(sourceUrl: string): Promise<Blob | null> {
+function getFilenameFromUrl(url: string): string {
+  const validExtensions = ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm'];
   try {
-    console.log(`[TRANSCRIBE] Downloading video from: ${sourceUrl.substring(0, 80)}...`);
-    const response = await fetch(sourceUrl);
-
-    if (!response.ok) {
-      console.error(`[TRANSCRIBE] Download failed: ${response.status} ${response.statusText}`);
-      return null;
-    }
-
-    const blob = await response.blob();
-    console.log(`[TRANSCRIBE] Downloaded ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
-    return blob;
-  } catch (err) {
-    console.error(`[TRANSCRIBE] Download error:`, err);
-    return null;
-  }
+    const urlObj = new URL(url);
+    const filename = urlObj.pathname.split('/').pop() || 'audio.m4a';
+    const ext = filename.split('.').pop()?.toLowerCase();
+    if (ext && validExtensions.includes(ext)) return filename;
+    return 'audio.m4a';
+  } catch { return 'audio.m4a'; }
 }
 
-/**
- * Transcribe video using OpenAI Whisper API
- */
+async function downloadMedia(sourceUrl: string): Promise<{ blob: Blob; filename: string } | null> {
+  try {
+    console.log(`[TRANSCRIBE] Downloading media from: ${sourceUrl.substring(0, 80)}...`);
+    const response = await fetch(sourceUrl);
+    if (!response.ok) { console.error(`[TRANSCRIBE] Download failed: ${response.status}`); return null; }
+    const blob = await response.blob();
+    const filename = getFilenameFromUrl(sourceUrl);
+    console.log(`[TRANSCRIBE] Downloaded ${(blob.size / 1024 / 1024).toFixed(2)} MB as ${filename}`);
+    return { blob, filename };
+  } catch (err) { console.error(`[TRANSCRIBE] Download error:`, err); return null; }
+}
+
 async function transcribeWithWhisper(
-  videoBlob: Blob,
-  openaiApiKey: string
+  mediaBlob: Blob,
+  filename: string,
+  openaiApiKey: string,
+  options?: { language?: string; prompt?: string },
 ): Promise<TranscriptionResult | null> {
   try {
-    console.log(`[TRANSCRIBE] Calling Whisper API...`);
-
+    const retryLabel = options?.language ? ' (retry with language hint)' : '';
+    console.log(`[TRANSCRIBE] Calling Whisper API${retryLabel} with file: ${filename}...`);
     const formData = new FormData();
-    formData.append('file', videoBlob, 'video.mp4');
+    formData.append('file', mediaBlob, filename);
     formData.append('model', 'whisper-1');
     formData.append('response_format', 'verbose_json');
     formData.append('timestamp_granularities[]', 'segment');
 
+    if (options?.language) formData.append('language', options.language);
+    if (options?.prompt) formData.append('prompt', options.prompt);
+
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-      },
+      headers: { 'Authorization': `Bearer ${openaiApiKey}` },
       body: formData,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[TRANSCRIBE] Whisper API error: ${response.status} - ${errorText}`);
-      return null;
-    }
+    if (!response.ok) { const t = await response.text(); console.error(`[TRANSCRIBE] Whisper error: ${response.status} - ${t}`); return null; }
 
     const result = await response.json();
     console.log(`[TRANSCRIBE] Transcription complete. Duration: ${result.duration}s, Language: ${result.language}`);
-
     return {
       text: result.text,
       segments: (result.segments || []).map((s: any) => ({
         start: s.start,
         end: s.end,
         text: s.text,
+        no_speech_prob: s.no_speech_prob,
       })),
       language: result.language,
       duration: result.duration,
     };
-  } catch (err) {
-    console.error(`[TRANSCRIBE] Whisper error:`, err);
-    return null;
-  }
+  } catch (err) { console.error(`[TRANSCRIBE] Whisper error:`, err); return null; }
 }
 
 /**
- * Analyze transcript using GPT-4 for content features
+ * Analyze transcript using Lovable AI Gateway with tool calling
  */
-async function analyzeTranscript(
-  transcript: string,
-  openaiApiKey: string
-): Promise<AnalysisResult | null> {
+async function analyzeTranscript(transcript: string): Promise<any | null> {
   try {
-    console.log(`[TRANSCRIBE] Analyzing transcript with GPT-4...`);
-
-    const systemPrompt = `You are an expert at analyzing political and nonprofit fundraising video ad scripts.
-Analyze the provided transcript and extract key features that correlate with ad performance.
-Be specific and use the exact categories provided.
-
-Return a JSON object with these exact fields:
-- topic_primary: Main topic (one of: immigration, healthcare, economy, climate, democracy, social_justice, education, gun_safety, reproductive_rights, veterans, other)
-- topic_tags: Array of all relevant topics
-- tone_primary: Primary tone (one of: urgent, hopeful, angry, compassionate, fearful, inspiring, informative, personal_story)
-- tone_tags: Array of all detected tones
-- sentiment_score: Number from -1 (very negative) to 1 (very positive)
-- sentiment_label: "positive", "negative", or "neutral"
-- cta_text: The call-to-action phrase if present, or null
-- cta_type: One of: "donate", "sign_petition", "share", "learn_more", "volunteer", "vote", or null
-- urgency_level: "low", "medium", "high", or "extreme"
-- emotional_appeals: Array of emotions targeted (fear, hope, anger, compassion, pride, guilt, etc.)
-- key_phrases: Top 5 most impactful phrases from the transcript
-- hook_text: First 15 words or first sentence, whichever is shorter
-- hook_word_count: Number of words in the hook
-- speaker_count: Estimated number of distinct speakers (1 if single narrator)`;
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4-turbo-preview',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Analyze this video ad transcript:\n\n${transcript}` },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.3,
-      }),
+    console.log(`[TRANSCRIBE] Analyzing with Lovable AI (gemini-3-flash-preview)...`);
+    const systemPrompt = buildTranscriptAnalysisPrompt();
+    const { result } = await callLovableAIWithTools<any>({
+      model: 'google/gemini-3-flash-preview',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Analyze this political video ad transcript:\n\n${transcript}` },
+      ],
+      temperature: 0.1,
+      tools: [TRANSCRIPT_ANALYSIS_TOOL],
+      toolChoice: { type: "function", function: { name: "analyze_transcript" } },
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[TRANSCRIBE] GPT-4 API error: ${response.status} - ${errorText}`);
-      return null;
-    }
-
-    const result = await response.json();
-    const content = result.choices?.[0]?.message?.content;
-
-    if (!content) {
-      console.error(`[TRANSCRIBE] No content in GPT-4 response`);
-      return null;
-    }
-
-    const analysis = JSON.parse(content);
-    console.log(`[TRANSCRIBE] Analysis complete. Topic: ${analysis.topic_primary}, Tone: ${analysis.tone_primary}`);
-
-    return analysis;
-  } catch (err) {
-    console.error(`[TRANSCRIBE] Analysis error:`, err);
-    return null;
-  }
+    console.log(`[TRANSCRIBE] Analysis complete. Issue: ${result.issue_primary}, Topic: ${result.topic_primary}`);
+    return result;
+  } catch (err) { console.error(`[TRANSCRIBE] Analysis error:`, err); return null; }
 }
 
-/**
- * Calculate speaking metrics from transcript
- */
-function calculateSpeakingMetrics(
-  transcript: string,
-  durationSeconds: number,
-  segments: TranscriptSegment[]
-): { wordsTotal: number; wordsPerMinute: number; silencePercentage: number } {
+function calculateSpeakingMetrics(transcript: string, durationSeconds: number, segments: TranscriptSegment[]) {
   const words = transcript.split(/\s+/).filter(w => w.length > 0);
   const wordsTotal = words.length;
   const durationMinutes = durationSeconds / 60;
   const wordsPerMinute = durationMinutes > 0 ? wordsTotal / durationMinutes : 0;
-
-  // Calculate silence percentage from segment gaps
   let speakingTime = 0;
-  for (const segment of segments) {
-    speakingTime += segment.end - segment.start;
-  }
-  const silencePercentage = durationSeconds > 0
-    ? ((durationSeconds - speakingTime) / durationSeconds) * 100
-    : 0;
-
+  for (const segment of segments) { speakingTime += segment.end - segment.start; }
+  const silencePercentage = durationSeconds > 0 ? ((durationSeconds - speakingTime) / durationSeconds) * 100 : 0;
   return { wordsTotal, wordsPerMinute, silencePercentage };
 }
 
-/**
- * Extract hook from first few seconds
- */
-function extractHook(
-  segments: TranscriptSegment[],
-  maxSeconds: number = 3
-): { text: string; duration: number; wordCount: number } {
+function extractHook(segments: TranscriptSegment[], maxSeconds = 3) {
   const hookSegments = segments.filter(s => s.start < maxSeconds);
   const text = hookSegments.map(s => s.text).join(' ').trim();
   const words = text.split(/\s+/).filter(w => w.length > 0);
-
-  // Limit to first 15 words
-  const limitedText = words.slice(0, 15).join(' ');
-
   return {
-    text: limitedText,
+    text: words.slice(0, 15).join(' '),
     duration: hookSegments.length > 0 ? Math.min(hookSegments[hookSegments.length - 1].end, maxSeconds) : 0,
     wordCount: Math.min(words.length, 15),
   };
 }
 
 serve(async (req) => {
-  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const {
-      organization_id,
-      video_id,
-      ad_id,
-      limit = 5,
-      mode = 'single', // 'single' or 'batch'
-    } = await req.json();
+    const { organization_id, video_id, ad_id, limit = 5, mode = 'single' } = await req.json();
 
     if (!organization_id) {
-      return new Response(
-        JSON.stringify({ error: 'organization_id is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'organization_id is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Initialize Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get OpenAI API key
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
-      return new Response(
-        JSON.stringify({ error: 'OPENAI_API_KEY not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'OPENAI_API_KEY not configured (required for Whisper)' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Get videos to process
+    async function isCancelled(videoDbId: string): Promise<boolean> {
+      const { data } = await supabase.from('meta_ad_videos').select('status').eq('id', videoDbId).single();
+      return data?.status === 'CANCELLED';
+    }
+
     let videosToProcess: any[] = [];
 
     if (mode === 'single' && video_id) {
-      // Single video mode
-      const { data, error } = await supabase
-        .from('meta_ad_videos')
-        .select('*')
-        .eq('organization_id', organization_id)
-        .eq('video_id', video_id)
-        .single();
-
-      if (error || !data) {
-        return new Response(
-          JSON.stringify({ error: 'Video not found' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
+      const { data, error } = await supabase.from('meta_ad_videos').select('*').eq('organization_id', organization_id).eq('id', video_id).single();
+      if (error || !data) return new Response(JSON.stringify({ error: 'Video not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      if (data.status === 'CANCELLED') return new Response(JSON.stringify({ success: true, message: 'Video was cancelled', results: [{ video_id, status: 'cancelled' }] }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       videosToProcess = [data];
     } else {
-      // Batch mode - get pending videos with source URLs
-      const { data, error } = await supabase
-        .from('meta_ad_videos')
-        .select('*')
-        .eq('organization_id', organization_id)
-        .eq('status', 'URL_FETCHED')
-        .order('created_at', { ascending: true })
-        .limit(limit);
-
-      if (error) {
-        return new Response(
-          JSON.stringify({ error: `Database error: ${error.message}` }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
+      const { data, error } = await supabase.from('meta_ad_videos').select('*').eq('organization_id', organization_id).eq('status', 'URL_FETCHED').order('created_at', { ascending: true }).limit(limit);
+      if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       videosToProcess = data || [];
     }
 
     console.log(`[TRANSCRIBE] Processing ${videosToProcess.length} videos`);
 
-    // Stats
     let transcribed = 0;
     let failed = 0;
-    const results: Array<{ video_id: string; status: string; error?: string }> = [];
+    const results: Array<{ video_id: string; status: string; error?: string; hallucination_risk?: number }> = [];
 
     for (const video of videosToProcess) {
-      console.log(`[TRANSCRIBE] Processing video ${video.video_id} for ad ${video.ad_id}`);
+      console.log(`[TRANSCRIBE] Processing video ${video.video_id}`);
 
-      // Check if source URL exists
-      if (!video.video_source_url) {
-        console.log(`[TRANSCRIBE] No source URL for video ${video.video_id}, skipping`);
-        results.push({ video_id: video.video_id, status: 'skipped', error: 'No source URL' });
-        continue;
+      if (await isCancelled(video.id)) { results.push({ video_id: video.video_id, status: 'cancelled' }); continue; }
+      if (!video.video_source_url) { results.push({ video_id: video.video_id, status: 'skipped', error: 'No source URL' }); continue; }
+
+      const mediaResult = await downloadMedia(video.video_source_url);
+      if (!mediaResult) {
+        await supabase.from('meta_ad_videos').update({ status: 'URL_EXPIRED', error_code: 'DOWNLOAD_FAILED', error_message: 'Failed to download media', last_error_at: new Date().toISOString(), retry_count: (video.retry_count || 0) + 1, updated_at: new Date().toISOString() }).eq('id', video.id);
+        failed++; results.push({ video_id: video.video_id, status: 'failed', error: 'Download failed' }); continue;
       }
 
-      // Download video
-      const videoBlob = await downloadVideo(video.video_source_url);
-      if (!videoBlob) {
-        // Update status to URL_EXPIRED or error
-        await supabase
-          .from('meta_ad_videos')
-          .update({
-            status: 'URL_EXPIRED',
-            error_code: 'DOWNLOAD_FAILED',
-            error_message: 'Failed to download video - URL may have expired',
-            last_error_at: new Date().toISOString(),
-            retry_count: (video.retry_count || 0) + 1,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', video.id);
+      if (await isCancelled(video.id)) { results.push({ video_id: video.video_id, status: 'cancelled' }); continue; }
 
-        failed++;
-        results.push({ video_id: video.video_id, status: 'failed', error: 'Download failed' });
-        continue;
-      }
+      await supabase.from('meta_ad_videos').update({ status: 'DOWNLOADED', downloaded_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', video.id);
 
-      // Update status to DOWNLOADED
-      await supabase
-        .from('meta_ad_videos')
-        .update({
-          status: 'DOWNLOADED',
-          downloaded_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', video.id);
-
-      // Transcribe with Whisper
-      const transcription = await transcribeWithWhisper(videoBlob, openaiApiKey);
+      // First transcription attempt
+      let transcription = await transcribeWithWhisper(mediaResult.blob, mediaResult.filename, openaiApiKey);
       if (!transcription) {
-        await supabase
-          .from('meta_ad_videos')
-          .update({
-            status: 'TRANSCRIPT_FAILED',
-            error_code: 'WHISPER_FAILED',
-            error_message: 'Whisper transcription failed',
-            last_error_at: new Date().toISOString(),
-            retry_count: (video.retry_count || 0) + 1,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', video.id);
-
-        failed++;
-        results.push({ video_id: video.video_id, status: 'failed', error: 'Transcription failed' });
-        continue;
+        await supabase.from('meta_ad_videos').update({ status: 'TRANSCRIPT_FAILED', error_code: 'WHISPER_FAILED', error_message: 'Whisper transcription failed', last_error_at: new Date().toISOString(), retry_count: (video.retry_count || 0) + 1, updated_at: new Date().toISOString() }).eq('id', video.id);
+        failed++; results.push({ video_id: video.video_id, status: 'failed', error: 'Transcription failed' }); continue;
       }
 
-      // Analyze transcript
-      const analysis = await analyzeTranscript(transcription.text, openaiApiKey);
+      // Hallucination detection (now includes repetition check)
+      let autoRetryCount = 0;
+      let hallucinationCheck = detectHallucination(transcription.segments, transcription.language, transcription.text);
 
-      // Calculate speaking metrics
-      const speakingMetrics = calculateSpeakingMetrics(
-        transcription.text,
-        transcription.duration,
-        transcription.segments
-      );
+      // Semantic coherence check for borderline cases (no_speech_prob 0.2-0.5 range or any detection)
+      const avgNoSpeechProb = transcription.segments
+        .map(s => s.no_speech_prob ?? 0)
+        .reduce((a, b) => a + b, 0) / (transcription.segments.length || 1);
+      
+      if (avgNoSpeechProb > 0.2 || hallucinationCheck.hallucinationRisk > 0) {
+        console.log(`[TRANSCRIBE] Running semantic coherence check (avgNoSpeechProb=${avgNoSpeechProb.toFixed(2)}, risk=${hallucinationCheck.hallucinationRisk.toFixed(2)})...`);
+        const semanticResult = await checkSemanticCoherence(transcription.text);
+        if (!semanticResult.isCoherent) {
+          console.log(`[TRANSCRIBE] Semantic check: transcript is HALLUCINATED`);
+          hallucinationCheck = {
+            ...hallucinationCheck,
+            hallucinationRisk: Math.max(hallucinationCheck.hallucinationRisk, 0.85),
+            shouldRetry: true,
+            reason: [hallucinationCheck.reason, 'LLM semantic check: hallucinated'].filter(Boolean).join('; '),
+          };
+        }
+      }
 
-      // Extract hook
+      if (hallucinationCheck.shouldRetry) {
+        console.log(`[TRANSCRIBE] Hallucination detected (risk=${hallucinationCheck.hallucinationRisk.toFixed(2)}, reason: ${hallucinationCheck.reason}). Retrying...`);
+        autoRetryCount = 1;
+
+        // Try to find and use the original video from storage
+        let retryBlob = mediaResult.blob;
+        let retryFilename = mediaResult.filename;
+        
+        // Look up the video_storage_path from the database
+        const { data: videoRecord } = await supabase
+          .from('meta_ad_videos')
+          .select('video_storage_path, original_filename')
+          .eq('id', video.id)
+          .single();
+        
+        const videoStoragePath = (videoRecord as any)?.video_storage_path;
+        if (videoStoragePath) {
+          console.log(`[TRANSCRIBE] Found video_storage_path: ${videoStoragePath}, attempting download...`);
+          const { data: videoData } = await supabase.storage.from('meta-ad-videos').download(videoStoragePath);
+          if (videoData) {
+            console.log(`[TRANSCRIBE] Using original video file for retry (${(videoData.size / 1024 / 1024).toFixed(2)} MB)`);
+            retryBlob = videoData;
+            retryFilename = 'video.mp4';
+          } else {
+            console.log(`[TRANSCRIBE] Original video not found at stored path, retrying with same audio`);
+          }
+        } else {
+          console.log(`[TRANSCRIBE] No video_storage_path in DB, retrying with same audio + language hint`);
+        }
+
+        const retryResult = await transcribeWithWhisper(retryBlob, retryFilename, openaiApiKey, {
+          language: 'en',
+          prompt: 'Political advocacy advertisement about policy and community organizing.',
+        });
+
+        if (retryResult) {
+          const retryCheck = detectHallucination(retryResult.segments, retryResult.language, retryResult.text);
+          
+          // Also run semantic check on retry
+          const retrySemanticResult = await checkSemanticCoherence(retryResult.text);
+          let retryRisk = retryCheck.hallucinationRisk;
+          if (!retrySemanticResult.isCoherent) {
+            retryRisk = Math.max(retryRisk, 0.85);
+          }
+          
+          console.log(`[TRANSCRIBE] Retry result: risk=${retryRisk.toFixed(2)} (semantic: ${retrySemanticResult.isCoherent ? 'coherent' : 'hallucinated'})`);
+          // Use retry if it's better
+          if (retryRisk < hallucinationCheck.hallucinationRisk) {
+            transcription = retryResult;
+          }
+        }
+      }
+
+      // Final hallucination risk after potential retry
+      const finalCheck = detectHallucination(transcription.segments, transcription.language, transcription.text);
+      
+      // Run final semantic check if risk is still borderline
+      let finalRisk = finalCheck.hallucinationRisk;
+      if (finalRisk < 0.5 && avgNoSpeechProb > 0.2) {
+        const finalSemantic = await checkSemanticCoherence(transcription.text);
+        if (!finalSemantic.isCoherent) {
+          finalRisk = Math.max(finalRisk, 0.85);
+          console.log(`[TRANSCRIBE] Final semantic check elevated risk to ${finalRisk.toFixed(2)}`);
+        }
+      }
+      const transcriptionConfidence = computeConfidence(finalRisk);
+
+      if (await isCancelled(video.id)) { results.push({ video_id: video.video_id, status: 'cancelled' }); continue; }
+
+      // Only analyze if confidence is reasonable
+      const analysis = finalRisk < 0.8
+        ? await analyzeTranscript(transcription.text)
+        : null;
+
+      if (finalRisk >= 0.8) {
+        console.log(`[TRANSCRIBE] Skipping analysis for hallucinated transcript (risk=${finalRisk.toFixed(2)})`);
+      }
+
+      const speakingMetrics = calculateSpeakingMetrics(transcription.text, transcription.duration, transcription.segments);
       const hook = extractHook(transcription.segments);
 
-      // Store transcript
-      const { error: transcriptError } = await supabase
-        .from('meta_ad_transcripts')
-        .upsert({
-          organization_id,
-          ad_id: video.ad_id,
-          video_id: video.video_id,
-          video_ref: video.id,
-          transcript_text: transcription.text,
-          transcript_segments: transcription.segments,
-          duration_seconds: transcription.duration,
-          language: transcription.language,
-          language_confidence: 0.95, // Whisper doesn't return confidence, assume high
-          speaker_count: analysis?.speaker_count || 1,
-          words_total: speakingMetrics.wordsTotal,
-          words_per_minute: speakingMetrics.wordsPerMinute,
-          silence_percentage: speakingMetrics.silencePercentage,
-          hook_text: analysis?.hook_text || hook.text,
-          hook_duration_seconds: hook.duration,
-          hook_word_count: analysis?.hook_word_count || hook.wordCount,
-          topic_primary: analysis?.topic_primary || null,
-          topic_tags: analysis?.topic_tags || [],
-          tone_primary: analysis?.tone_primary || null,
-          tone_tags: analysis?.tone_tags || [],
-          sentiment_score: analysis?.sentiment_score || null,
-          sentiment_label: analysis?.sentiment_label || null,
-          cta_text: analysis?.cta_text || null,
-          cta_type: analysis?.cta_type || null,
-          urgency_level: analysis?.urgency_level || null,
-          emotional_appeals: analysis?.emotional_appeals || [],
-          key_phrases: analysis?.key_phrases || [],
-          transcription_model: 'whisper-1',
-          transcription_confidence: 0.95,
-          analysis_model: analysis ? 'gpt-4-turbo-preview' : null,
-          analysis_version: '1.0',
-          transcribed_at: new Date().toISOString(),
-          analyzed_at: analysis ? new Date().toISOString() : null,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'organization_id,ad_id,video_id'
-        });
+      const { error: transcriptError } = await supabase.from('meta_ad_transcripts').upsert({
+        organization_id,
+        ad_id: video.ad_id,
+        video_id: video.video_id,
+        video_ref: video.id,
+        transcript_text: transcription.text,
+        transcript_segments: transcription.segments,
+        duration_seconds: Math.round(transcription.duration),
+        language: transcription.language,
+        language_confidence: transcriptionConfidence,
+        speaker_count: analysis?.speaker_count || 1,
+        words_total: speakingMetrics.wordsTotal,
+        words_per_minute: Math.round(speakingMetrics.wordsPerMinute),
+        silence_percentage: speakingMetrics.silencePercentage,
+        hook_text: analysis?.hook_text || hook.text,
+        hook_duration_seconds: hook.duration,
+        hook_word_count: analysis?.hook_word_count || hook.wordCount,
+        issue_primary: analysis?.issue_primary || null,
+        issue_tags: analysis?.issue_tags || [],
+        political_stances: analysis?.political_stances || [],
+        targets_attacked: analysis?.targets_attacked || [],
+        targets_supported: analysis?.targets_supported || [],
+        policy_positions: analysis?.policy_positions || [],
+        donor_pain_points: analysis?.donor_pain_points || [],
+        values_appealed: analysis?.values_appealed || [],
+        urgency_drivers: analysis?.urgency_drivers || [],
+        topic_primary: analysis?.topic_primary || null,
+        topic_tags: analysis?.topic_tags || [],
+        tone_primary: analysis?.tone_primary || null,
+        tone_tags: analysis?.tone_tags || [],
+        sentiment_score: analysis?.sentiment_score || null,
+        sentiment_label: analysis?.sentiment_label || null,
+        cta_text: analysis?.cta_text || null,
+        cta_type: analysis?.cta_type || null,
+        urgency_level: analysis?.urgency_level || null,
+        emotional_appeals: analysis?.emotional_appeals || [],
+        key_phrases: analysis?.key_phrases || [],
+        transcription_model: 'whisper-1',
+        transcription_confidence: transcriptionConfidence,
+        hallucination_risk: finalRisk,
+        auto_retry_count: autoRetryCount,
+        analysis_model: analysis ? 'google/gemini-3-flash-preview' : null,
+        analysis_version: '3.1',
+        transcribed_at: new Date().toISOString(),
+        analyzed_at: analysis ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'organization_id,ad_id,video_id' });
 
       if (transcriptError) {
         console.error(`[TRANSCRIBE] Error storing transcript:`, transcriptError);
-        failed++;
-        results.push({ video_id: video.video_id, status: 'failed', error: 'Database error' });
-        continue;
+        failed++; results.push({ video_id: video.video_id, status: 'failed', error: transcriptError.message }); continue;
       }
 
-      // Update video status
-      await supabase
-        .from('meta_ad_videos')
-        .update({
-          status: 'TRANSCRIBED',
-          duration_seconds: transcription.duration,
-          transcribed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', video.id);
+      await supabase.from('meta_ad_videos').update({ status: 'TRANSCRIBED', duration_seconds: Math.round(transcription.duration), transcribed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', video.id);
 
       transcribed++;
-      results.push({ video_id: video.video_id, status: 'transcribed' });
-      console.log(`[TRANSCRIBE] Successfully transcribed video ${video.video_id}`);
+      results.push({ video_id: video.video_id, status: 'transcribed', hallucination_risk: finalRisk });
+      console.log(`[TRANSCRIBE] Successfully transcribed video ${video.video_id} (hallucination_risk=${finalRisk.toFixed(2)})`);
     }
 
     console.log(`[TRANSCRIBE] Complete. Transcribed: ${transcribed}, Failed: ${failed}`);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        stats: {
-          processed: videosToProcess.length,
-          transcribed,
-          failed,
-        },
-        results,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({
+      success: true,
+      version: '3.1',
+      stats: { processed: videosToProcess.length, transcribed, failed },
+      results,
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (err) {
     console.error('[TRANSCRIBE] Unhandled error:', err);
-    return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    if (err instanceof AIGatewayError) {
+      return new Response(JSON.stringify({ error: err.message }), { status: err.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : 'Unknown error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

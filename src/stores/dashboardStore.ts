@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { subDays, format } from 'date-fns';
+import { format } from 'date-fns';
 
 // ============================================================================
 // Types
@@ -10,12 +10,48 @@ export type ChannelFilter = 'all' | 'meta' | 'sms' | 'donations';
 export type ViewMode = 'overview' | 'detailed';
 
 export type KpiKey =
+  // Dashboard KPIs
   | 'netRevenue'
   | 'netRoi'
   | 'refundRate'
   | 'currentMrr'
   | 'newMrr'
-  | 'uniqueDonors';
+  | 'uniqueDonors'
+  // Donation Metrics KPIs
+  | 'grossRaised'
+  | 'totalDonations'
+  | 'avgDonation'
+  | 'recurringPercent'
+  | 'netRaisedDonations'
+  | 'recurringRevenue'
+  | 'refundAmount'
+  // Channel Details - Donation KPIs (prefixed to avoid collision with Hero section)
+  | 'channel_grossRaised'
+  | 'channel_uniqueDonors'
+  | 'channel_avgDonation'
+  | 'channel_recurringPercent'
+  | 'channel_netRaisedDonations'
+  | 'channel_totalDonations'
+  | 'channel_recurringRevenue'
+  | 'channel_refundAmount'
+  // Creative Intelligence KPIs
+  | 'totalCreatives'
+  | 'activeVariations'
+  | 'avgRoas'
+  | 'topPerformers'
+  | 'needsWork'
+  | 'aiAnalyzed'
+  | 'videos'
+  | 'images'
+  | 'total'
+  | 'variations'
+  // Creative Intelligence Dashboard KPIs
+  | 'ci_totalCreatives'
+  | 'ci_totalSpend'
+  | 'ci_totalRevenue'
+  | 'ci_overallRoas'
+  | 'ci_scalable'
+  | 'ci_needsAttention';
 
 export type SeriesKey =
   | 'donations'
@@ -49,12 +85,48 @@ interface DateRange {
  * - uniqueDonors → [] (no donor count series in chart today)
  */
 export const KPI_TO_SERIES_MAP: Record<KpiKey, SeriesKey[]> = {
+  // Dashboard KPIs
   netRevenue: ['netDonations'],
   netRoi: [], // Derived metric - highlighting spend series would be misleading
   refundRate: ['refunds', 'donations'],
   currentMrr: [], // No recurring-specific series in Fundraising chart
   newMrr: [], // No recurring-specific series in Fundraising chart
   uniqueDonors: [], // No donor count series in Fundraising chart
+  // Donation Metrics KPIs
+  grossRaised: ['donations'],
+  totalDonations: ['donations'],
+  avgDonation: [],
+  recurringPercent: [],
+  netRaisedDonations: ['netDonations'],
+  recurringRevenue: [],
+  refundAmount: ['refunds'],
+  // Channel Details - Donation KPIs (same series associations)
+  channel_grossRaised: ['donations'],
+  channel_uniqueDonors: [],
+  channel_avgDonation: [],
+  channel_recurringPercent: [],
+  channel_netRaisedDonations: ['netDonations'],
+  channel_totalDonations: ['donations'],
+  channel_recurringRevenue: [],
+  channel_refundAmount: ['refunds'],
+  // Creative Intelligence KPIs (no chart series associations)
+  totalCreatives: [],
+  activeVariations: [],
+  avgRoas: [],
+  topPerformers: [],
+  needsWork: [],
+  aiAnalyzed: [],
+  videos: [],
+  images: [],
+  total: [],
+  variations: [],
+  // Creative Intelligence Dashboard KPIs
+  ci_totalCreatives: [],
+  ci_totalSpend: [],
+  ci_totalRevenue: [],
+  ci_overallRoas: [],
+  ci_scalable: [],
+  ci_needsAttention: [],
 };
 
 /**
@@ -73,6 +145,13 @@ export const SERIES_TO_KPI_MAP: Record<SeriesKey, KpiKey[]> = {
 };
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/** Session staleness threshold: 24 hours in milliseconds */
+const STALENESS_THRESHOLD_MS = 24 * 60 * 60 * 1000;
+
+// ============================================================================
 // Store Interface
 // ============================================================================
 
@@ -81,17 +160,12 @@ interface DashboardState {
   dateRange: DateRange;
   setDateRange: (startDate: string, endDate: string) => void;
 
+  // Last accessed timestamp (for session freshness check)
+  lastAccessedAt: number | null;
+
   // Channel filter
   selectedChannel: ChannelFilter;
   setSelectedChannel: (channel: ChannelFilter) => void;
-
-  // Campaign filter (null = all campaigns)
-  selectedCampaignId: string | null;
-  setSelectedCampaignId: (campaignId: string | null) => void;
-
-  // Creative filter (null = all creatives)
-  selectedCreativeId: string | null;
-  setSelectedCreativeId: (creativeId: string | null) => void;
 
   // View mode
   viewMode: ViewMode;
@@ -144,22 +218,20 @@ const getDefaultDateRange = (): DateRange => ({
 export const useDashboardStore = create<DashboardState>()(
   persist(
     (set) => ({
-      // Date range
+      // Date range - defaults to today
       dateRange: getDefaultDateRange(),
       setDateRange: (startDate, endDate) =>
-        set({ dateRange: { startDate, endDate } }),
+        set({ 
+          dateRange: { startDate, endDate },
+          lastAccessedAt: Date.now(), // Update access timestamp on date change
+        }),
+
+      // Last accessed timestamp
+      lastAccessedAt: null,
 
       // Channel filter
       selectedChannel: 'all',
       setSelectedChannel: (channel) => set({ selectedChannel: channel }),
-
-      // Campaign filter
-      selectedCampaignId: null,
-      setSelectedCampaignId: (campaignId) => set({ selectedCampaignId: campaignId }),
-
-      // Creative filter
-      selectedCreativeId: null,
-      setSelectedCreativeId: (creativeId) => set({ selectedCreativeId: creativeId }),
 
       // View mode
       viewMode: 'overview',
@@ -203,14 +275,13 @@ export const useDashboardStore = create<DashboardState>()(
         set({
           dateRange: getDefaultDateRange(),
           selectedChannel: 'all',
-          selectedCampaignId: null,
-          selectedCreativeId: null,
           viewMode: 'overview',
           comparisonEnabled: false,
           selectedKpiKey: null,
           highlightedKpiKey: null,
           highlightedDate: null,
           isDrilldownOpen: false,
+          lastAccessedAt: Date.now(),
         }),
     }),
     {
@@ -219,11 +290,25 @@ export const useDashboardStore = create<DashboardState>()(
       partialize: (state) => ({
         dateRange: state.dateRange,
         selectedChannel: state.selectedChannel,
-        selectedCampaignId: state.selectedCampaignId,
-        selectedCreativeId: state.selectedCreativeId,
         viewMode: state.viewMode,
         comparisonEnabled: state.comparisonEnabled,
+        lastAccessedAt: state.lastAccessedAt,
       }),
+      // Handle session freshness on rehydration
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          const now = Date.now();
+          const lastAccess = state.lastAccessedAt;
+          
+          // If session is stale (>24 hours) or no previous access, reset to today
+          if (!lastAccess || (now - lastAccess) > STALENESS_THRESHOLD_MS) {
+            state.dateRange = getDefaultDateRange();
+          }
+          
+          // Update last accessed timestamp
+          state.lastAccessedAt = now;
+        }
+      },
     }
   )
 );
@@ -234,8 +319,6 @@ export const useDashboardStore = create<DashboardState>()(
 
 export const useDateRange = () => useDashboardStore((s) => s.dateRange);
 export const useSelectedChannel = () => useDashboardStore((s) => s.selectedChannel);
-export const useSelectedCampaignId = () => useDashboardStore((s) => s.selectedCampaignId);
-export const useSelectedCreativeId = () => useDashboardStore((s) => s.selectedCreativeId);
 export const useViewMode = () => useDashboardStore((s) => s.viewMode);
 export const useRefreshKey = () => useDashboardStore((s) => s.refreshKey);
 export const useComparisonEnabled = () => useDashboardStore((s) => s.comparisonEnabled);

@@ -76,9 +76,9 @@ async function fetchDashboardKPIs(
       prevEnd.toISOString().split("T")[0]
     ),
 
-    // Meta ads spend
-    supabase
-      .from("meta_ad_metrics")
+    // Meta ads spend - filtered to fundraising campaigns only
+    (supabase as any)
+      .from("meta_fundraising_metrics_daily")
       .select("spend, impressions, clicks")
       .eq("organization_id", organizationId)
       .gte("date", startDate)
@@ -114,8 +114,8 @@ async function fetchDashboardKPIs(
 
   // Calculate previous period spend for ROI comparison
   const [prevMetaMetrics, prevSmsMetrics] = await Promise.all([
-    supabase
-      .from("meta_ad_metrics")
+    (supabase as any)
+      .from("meta_fundraising_metrics_daily")
       .select("spend")
       .eq("organization_id", organizationId)
       .gte("date", prevStart.toISOString().split("T")[0])

@@ -42,6 +42,8 @@ export interface EChartsPieChartProps {
   emptyMessage?: string;
   /** Disable hover emphasis to prevent slices from disappearing on hover */
   disableHoverEmphasis?: boolean;
+  /** Enable pattern decals for colorblind accessibility (stripes/dots on each slice) */
+  useDecals?: boolean;
 }
 
 const colorPalette = getChartColors();
@@ -61,6 +63,7 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
   onSliceClick,
   emptyMessage = "No data available",
   disableHoverEmphasis = true,
+  useDecals = false,
 }) => {
   // Handle empty data
   if (!isLoading && (!data || data.length === 0)) {
@@ -107,13 +110,22 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
 
   const option = React.useMemo<EChartsOption>(() => {
     const innerRadius = variant === "donut" ? "50%" : 0;
-    const outerRadius = showLegend && legendPosition === "right" ? "70%" : "75%";
+    const outerRadius = showLabels
+      ? (showLegend && legendPosition === "right" ? "55%" : "65%")
+      : (showLegend && legendPosition === "right" ? "65%" : "75%");
     const centerX = showLegend && legendPosition === "right" ? "35%" : "50%";
 
     return {
       animation: true,
       animationDuration: 500,
       animationEasing: "cubicOut",
+      // Accessibility - enable decals (stripes/dots) for colorblind users
+      aria: {
+        enabled: true,
+        decal: {
+          show: useDecals,
+        },
+      },
       // Prevent axis pointer from triggering emphasis on hover
       ...(disableHoverEmphasis && {
         axisPointer: { triggerEmphasis: false },
@@ -183,16 +195,28 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
                 formatter: (params: any) => {
                   const percent = ((params.value / total) * 100);
                   if (percent < labelThreshold) return "";
-                  return `${params.name}\n${percent.toFixed(0)}%`;
+                  return `{name|${params.name}}\n{value|${percent.toFixed(1)}%}`;
                 },
-                color: "hsl(var(--portal-text-secondary))",
-                fontSize: 11,
-                lineHeight: 16,
+                rich: {
+                  name: {
+                    fontSize: 11,
+                    color: "hsl(var(--portal-text-secondary))",
+                    lineHeight: 16,
+                  },
+                  value: {
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "hsl(var(--portal-text-primary))",
+                    lineHeight: 18,
+                  },
+                },
               }
             : { show: false },
           labelLine: showLabels
             ? {
                 show: true,
+                length: 20,
+                length2: 15,
                 lineStyle: {
                   color: "hsl(var(--portal-border))",
                 },
@@ -220,7 +244,7 @@ export const EChartsPieChart: React.FC<EChartsPieChartProps> = ({
         },
       ],
     };
-  }, [chartData, variant, showLabels, labelThreshold, showLegend, legendPosition, total, formatValue, showPercentage, disableHoverEmphasis]);
+  }, [chartData, variant, showLabels, labelThreshold, showLegend, legendPosition, total, formatValue, showPercentage, disableHoverEmphasis, useDecals]);
 
   const handleEvents = React.useMemo(() => {
     if (!onSliceClick) return undefined;

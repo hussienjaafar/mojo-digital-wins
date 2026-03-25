@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useImpersonation } from '@/contexts/ImpersonationContext';
+import { useImpersonationSafe } from '@/contexts/ImpersonationContext';
+import { proxyQuery, proxyRpc } from '@/lib/supabaseProxy';
 
 export const useClientOrganization = () => {
-  const { impersonatedOrgId, isImpersonating } = useImpersonation();
+  const { impersonatedOrgId, isImpersonating } = useImpersonationSafe();
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadOrganizationId = async () => {
+      // Priority 1: Impersonation context (admin viewing as org or using selector)
       if (isImpersonating && impersonatedOrgId) {
         setOrganizationId(impersonatedOrgId);
         setIsLoading(false);
@@ -22,11 +24,29 @@ export const useClientOrganization = () => {
           return;
         }
 
-        const { data: clientUser } = await (supabase as any)
-          .from('client_users')
-          .select('organization_id')
-          .eq('id', session.user.id)
-          .maybeSingle();
+        // Check if user is admin (using proxy for CORS compatibility)
+        const { data: isAdminUser } = await proxyRpc("has_role", {
+          _user_id: session.user.id,
+          _role: "admin",
+        });
+
+        if (isAdminUser) {
+          // Priority 2: Admin's localStorage selection (from org selector)
+          const savedOrgId = localStorage.getItem("selectedOrganizationId");
+          if (savedOrgId) {
+            setOrganizationId(savedOrgId);
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // Priority 3: Client user's assigned organization (using proxy for CORS)
+        const { data: clientUser } = await proxyQuery<{ organization_id: string }>({
+          table: 'client_users',
+          select: 'organization_id',
+          filters: { id: session.user.id },
+          single: true,
+        });
 
         if (clientUser) {
           setOrganizationId(clientUser.organization_id);
@@ -40,6 +60,31 @@ export const useClientOrganization = () => {
 
     loadOrganizationId();
   }, [impersonatedOrgId, isImpersonating]);
+
+  // Listen for organization changes (both same-tab custom events and cross-tab storage events)
+  useEffect(() => {
+    // Handle same-tab organization changes via custom event
+    const handleOrgChange = () => {
+      const newOrgId = localStorage.getItem('selectedOrganizationId');
+      if (newOrgId && newOrgId !== organizationId) {
+        setOrganizationId(newOrgId);
+      }
+    };
+    
+    // Handle cross-tab storage changes
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'selectedOrganizationId' && e.newValue) {
+        setOrganizationId(e.newValue);
+      }
+    };
+    
+    window.addEventListener('organizationChanged', handleOrgChange);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('organizationChanged', handleOrgChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [organizationId]);
 
   return { organizationId, isLoading, isImpersonating };
 };

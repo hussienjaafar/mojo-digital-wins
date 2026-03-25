@@ -36,6 +36,7 @@ export interface RecentDonation {
   transaction_date: string;
   is_recurring: boolean;
   refcode: string | null;
+  channel: string | null;
 }
 
 export interface TodayMetricsData {
@@ -129,6 +130,7 @@ async function fetchRecentDonations(
     transaction_date: row.transaction_date,
     is_recurring: row.is_recurring || false,
     refcode: row.refcode || null,
+    channel: row.channel || null,
   }));
 }
 

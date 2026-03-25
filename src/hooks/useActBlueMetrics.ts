@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDateRange } from "@/stores/dashboardStore";
 import type { AttributionChannel } from "@/utils/channelDetection";
+import { STALE_TIMES, GC_TIMES } from "@/lib/query-config";
 
 
 // ==================== Types ====================
@@ -98,19 +99,230 @@ export interface UseActBlueMetricsOptions {
   campaignId?: string | null;
   creativeId?: string | null;
   enabled?: boolean;
+  useUtc?: boolean; // Optional override for UTC mode
 }
 
 // ==================== Query Keys ====================
 
 export const actBlueMetricsKeys = {
   all: ['actblue-metrics'] as const,
-  dashboard: (orgId: string, startDate: string, endDate: string, campaignId?: string | null, creativeId?: string | null) =>
-    [...actBlueMetricsKeys.all, 'dashboard', orgId, startDate, endDate, campaignId, creativeId] as const,
+  dashboard: (orgId: string, startDate: string, endDate: string, campaignId?: string | null, creativeId?: string | null, useUtc?: boolean) =>
+    [...actBlueMetricsKeys.all, 'dashboard', orgId, startDate, endDate, campaignId, creativeId, useUtc] as const,
   sms: (orgId: string, startDate: string, endDate: string) =>
     [...actBlueMetricsKeys.all, 'sms', orgId, startDate, endDate] as const,
   health: (orgId: string) =>
     [...actBlueMetricsKeys.all, 'health', orgId] as const,
 };
+
+// ==================== RPC Response Types (match database output) ====================
+
+interface RPCSummary {
+  gross_donations: number;
+  net_donations: number;
+  total_fees: number;
+  refunds: number;
+  donation_count: number;
+  refund_count: number;
+  recurring_count: number;
+  recurring_revenue: number;
+  unique_donors: number;
+}
+
+interface RPCDaily {
+  day: string;
+  gross_donations: number;
+  net_donations: number;
+  donation_count: number;
+  unique_donors?: number;
+  recurring_count?: number;
+  recurring_revenue?: number;
+}
+
+interface RPCChannel {
+  channel: string;
+  revenue: number;
+  net_revenue?: number;
+  count: number;
+  donors?: number;
+}
+
+interface RPCResponse {
+  summary: RPCSummary;
+  daily: RPCDaily[];
+  channels: RPCChannel[];
+  timezone: string;
+}
+
+// ==================== Data Transformation ====================
+
+/**
+ * Transforms the RPC response (database field names) to frontend interface names.
+ * This is necessary because the database uses snake_case and different naming conventions.
+ */
+function transformRPCResponse(
+  raw: RPCResponse,
+  startDate: string,
+  endDate: string
+): ActBlueMetricsData {
+  const summary = raw.summary || {} as RPCSummary;
+  
+  const totalDonations = summary.donation_count || 0;
+  const totalRaised = summary.gross_donations || 0;
+  const totalNet = summary.net_donations || 0;
+  const uniqueDonors = summary.unique_donors || 0;
+  const averageDonation = totalDonations > 0 ? totalRaised / totalDonations : 0;
+  const recurringCount = summary.recurring_count || 0;
+  const recurringAmount = summary.recurring_revenue || 0;
+  const recurringRate = totalDonations > 0 ? (recurringCount / totalDonations) * 100 : 0;
+  const refundCount = summary.refund_count || 0;
+  const refundAmount = summary.refunds || 0;
+  const refundRate = totalDonations > 0 ? (refundCount / totalDonations) * 100 : 0;
+
+  // Transform daily data
+  const dailyRollup: ActBlueDailyRollup[] = (raw.daily || []).map(d => ({
+    date: d.day,
+    donations: d.donation_count || 0,
+    raised: d.gross_donations || 0,
+    net: d.net_donations || 0,
+    donors: d.unique_donors || 0,
+    recurring_donations: d.recurring_count || 0,
+    recurring_amount: d.recurring_revenue || 0,
+  }));
+
+  // Transform channel breakdown
+  const channelBreakdown: ActBlueChannelBreakdown[] = (raw.channels || []).map(c => ({
+    channel: c.channel as AttributionChannel,
+    donations: c.count || 0,
+    raised: c.revenue || 0,
+    net: c.net_revenue || c.revenue || 0,
+    donors: c.donors || 0,
+  }));
+
+  // Calculate attribution metrics from channel data
+  const attributedCount = channelBreakdown
+    .filter(c => c.channel !== 'unattributed' && c.channel !== 'other')
+    .reduce((sum, c) => sum + c.donations, 0);
+
+  return {
+    summary: {
+      totalDonations,
+      totalRaised,
+      totalNet,
+      totalFees: summary.total_fees || 0,
+      uniqueDonors,
+      averageDonation,
+      recurringCount,
+      recurringAmount,
+      recurringRate,
+      refundCount,
+      refundAmount,
+      refundRate,
+    },
+    dailyRollup,
+    channelBreakdown,
+    previousPeriod: {
+      totalDonations: 0,
+      totalRaised: 0,
+      totalNet: 0,
+      uniqueDonors: 0,
+      recurringCount: 0,
+      recurringAmount: 0,
+    },
+    trends: {
+      raisedTrend: null,
+      donationsTrend: null,
+      donorsTrend: null,
+      recurringTrend: null,
+    },
+    attribution: {
+      attributedCount,
+      totalCount: totalDonations,
+      attributionRate: totalDonations > 0 ? Math.round((attributedCount / totalDonations) * 100) : 0,
+    },
+    metadata: {
+      timezone: raw.timezone || 'America/New_York',
+      startDate,
+      endDate,
+      previousStartDate: '',
+      previousEndDate: '',
+      generatedAt: new Date().toISOString(),
+    },
+  };
+}
+
+// ==================== Sparkline Computation ====================
+
+/**
+ * Compute sparkline coordinates from daily rollup data.
+ * Takes the last 7 days of data and normalizes to 0-100 range.
+ */
+function computeSparklines(dailyRollup: ActBlueDailyRollup[]): SparklineData {
+  // Take last 7 days (or all if fewer)
+  const recentDays = dailyRollup.slice(-7);
+  
+  if (recentDays.length === 0) {
+    return { 
+      raised: [], 
+      donations: [], 
+      donors: [], 
+      recurring: [] 
+    };
+  }
+
+  const normalize = (values: number[]): Array<{x: number; y: number}> => {
+    const max = Math.max(...values, 1);
+    return values.map((v, i) => ({
+      x: (i / Math.max(values.length - 1, 1)) * 100,
+      y: (v / max) * 100,
+    }));
+  };
+
+  return {
+    raised: normalize(recentDays.map(d => d.raised)),
+    donations: normalize(recentDays.map(d => d.donations)),
+    donors: normalize(recentDays.map(d => d.donors)),
+    recurring: normalize(recentDays.map(d => d.recurring_amount)),
+  };
+}
+
+export interface SparklineData {
+  raised: Array<{x: number; y: number}>;
+  donations: Array<{x: number; y: number}>;
+  donors: Array<{x: number; y: number}>;
+  recurring: Array<{x: number; y: number}>;
+}
+
+// ==================== Previous Period Calculation ====================
+
+/**
+ * Calculate the previous period date range based on current range.
+ * If current is 7 days, previous is the 7 days before that.
+ */
+function calculatePreviousPeriod(startDate: string, endDate: string): { prevStart: string; prevEnd: string } {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const periodLength = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  
+  const prevEnd = new Date(start);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+  
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevStart.getDate() - periodLength + 1);
+  
+  return {
+    prevStart: prevStart.toISOString().split('T')[0],
+    prevEnd: prevEnd.toISOString().split('T')[0],
+  };
+}
+
+/**
+ * Calculate percentage trend between current and previous values.
+ * Returns null if previous is 0 or undefined.
+ */
+function calculateTrend(current: number, previous: number): number | null {
+  if (previous === 0) return current > 0 ? 100 : null;
+  return Math.round(((current - previous) / previous) * 100);
+}
 
 // ==================== Data Fetching ====================
 
@@ -119,26 +331,85 @@ async function fetchActBlueMetrics(
   startDate: string,
   endDate: string,
   campaignId?: string | null,
-  creativeId?: string | null
+  creativeId?: string | null,
+  useUtc: boolean = false
 ): Promise<ActBlueMetricsData> {
-  const { data, error } = await supabase.rpc('get_actblue_dashboard_metrics', {
-    p_organization_id: organizationId,
-    p_start_date: startDate,
-    p_end_date: endDate,
-    p_campaign_id: campaignId || null,
-    p_creative_id: creativeId || null,
-  });
+  // Calculate previous period dates
+  const { prevStart, prevEnd } = calculatePreviousPeriod(startDate, endDate);
 
-  if (error) {
-    console.error('[useActBlueMetrics] RPC error:', error);
-    throw new Error(`Failed to fetch ActBlue metrics: ${error.message}`);
+  // Fetch current and previous period in parallel
+  const [currentResult, prevResult] = await Promise.all([
+    supabase.rpc('get_actblue_dashboard_metrics', {
+      p_organization_id: organizationId,
+      p_start_date: startDate,
+      p_end_date: endDate,
+      p_campaign_id: campaignId || null,
+      p_creative_id: creativeId || null,
+      p_use_utc: useUtc,
+    }),
+    supabase.rpc('get_actblue_dashboard_metrics', {
+      p_organization_id: organizationId,
+      p_start_date: prevStart,
+      p_end_date: prevEnd,
+      p_campaign_id: campaignId || null,
+      p_creative_id: creativeId || null,
+      p_use_utc: useUtc,
+    }),
+  ]);
+
+  if (currentResult.error) {
+    console.error('[useActBlueMetrics] RPC error:', currentResult.error);
+    throw new Error(`Failed to fetch ActBlue metrics: ${currentResult.error.message}`);
   }
 
-  if (!data) {
+  if (!currentResult.data) {
     throw new Error('No data returned from get_actblue_dashboard_metrics');
   }
 
-  return data as unknown as ActBlueMetricsData;
+  // Transform RPC response to match frontend interface
+  const transformed = transformRPCResponse(
+    currentResult.data as unknown as RPCResponse, 
+    startDate, 
+    endDate
+  );
+
+  // Extract previous period summary if available
+  const prevData = prevResult.data as unknown as RPCResponse | null;
+  const prevSummary = prevData?.summary;
+
+  // Populate previous period data
+  if (prevSummary) {
+    transformed.previousPeriod = {
+      totalDonations: prevSummary.donation_count || 0,
+      totalRaised: prevSummary.gross_donations || 0,
+      totalNet: prevSummary.net_donations || 0,
+      uniqueDonors: prevSummary.unique_donors || 0,
+      recurringCount: prevSummary.recurring_count || 0,
+      recurringAmount: prevSummary.recurring_revenue || 0,
+    };
+
+    // Calculate trends
+    transformed.trends = {
+      raisedTrend: calculateTrend(transformed.summary.totalRaised, prevSummary.gross_donations || 0),
+      donationsTrend: calculateTrend(transformed.summary.totalDonations, prevSummary.donation_count || 0),
+      donorsTrend: calculateTrend(transformed.summary.uniqueDonors, prevSummary.unique_donors || 0),
+      recurringTrend: calculateTrend(transformed.summary.recurringAmount, prevSummary.recurring_revenue || 0),
+    };
+  }
+
+  // Update metadata with previous period dates
+  transformed.metadata.previousStartDate = prevStart;
+  transformed.metadata.previousEndDate = prevEnd;
+
+  // Compute sparklines from daily data
+  (transformed as ActBlueMetricsDataWithSparklines).sparklines = computeSparklines(transformed.dailyRollup);
+
+  return transformed;
+}
+
+// Extended interface with sparklines
+export interface ActBlueMetricsDataWithSparklines extends ActBlueMetricsData {
+  sparklines: SparklineData;
 }
 
 // ==================== Hook ====================
@@ -146,6 +417,8 @@ async function fetchActBlueMetrics(
 /**
  * Primary hook for fetching all ActBlue dashboard metrics.
  * Uses the unified `get_actblue_dashboard_metrics` RPC.
+ * 
+ * Always uses Eastern Time boundaries to match ActBlue's Fundraising Performance dashboard.
  */
 export function useActBlueMetrics(
   organizationId: string | undefined,
@@ -160,18 +433,20 @@ export function useActBlueMetrics(
       startDate,
       endDate,
       campaignId,
-      creativeId
+      creativeId,
+      false // Always use ET (not UTC)
     ),
     queryFn: () => fetchActBlueMetrics(
       organizationId!,
       startDate,
       endDate,
       campaignId,
-      creativeId
+      creativeId,
+      false // Always use ET (not UTC)
     ),
     enabled: enabled && !!organizationId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: STALE_TIMES.dashboard, // Consistent with other dashboard hooks
+    gcTime: GC_TIMES.dashboard,
   });
 }
 
@@ -259,6 +534,15 @@ export interface SMSMetricsData {
     optOuts: number;
     first_donation: string;
     last_donation: string;
+    send_date?: string;
+    // AI analysis fields
+    topic?: string | null;
+    topic_summary?: string | null;
+    tone?: string | null;
+    urgency_level?: string | null;
+    call_to_action?: string | null;
+    key_themes?: string[] | null;
+    analyzed_at?: string | null;
   }>;
   dailyMetrics: Array<{
     date: string;

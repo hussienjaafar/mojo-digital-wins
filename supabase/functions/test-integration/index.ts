@@ -210,7 +210,8 @@ async function testSwitchboardIntegration(
 
 async function testActBlueIntegration(
   credentials: any,
-  organizationId: string
+  organizationId: string,
+  supabase: any
 ): Promise<TestResult> {
   const startTime = Date.now();
   const result: TestResult = {
@@ -224,40 +225,124 @@ async function testActBlueIntegration(
   };
 
   try {
-    // ActBlue uses webhook validation - we verify the webhook secret exists
+    // Get credential values
     const webhookSecret = credentials.webhook_secret;
     const entityId = credentials.entity_id;
+    const csvUsername = credentials.username;
+    const csvPassword = credentials.password;
+    const webhookUsername = credentials.webhook_username;
+    const webhookPassword = credentials.webhook_password;
 
-    if (!webhookSecret && !entityId) {
-      result.status = 'invalid_credentials';
-      result.message = 'Missing webhook secret or entity ID';
-      result.latencyMs = Date.now() - startTime;
-      return result;
+    // Check credential configuration
+    const hasWebhookCreds = webhookUsername && webhookPassword;
+    const hasCsvCreds = csvUsername && csvPassword && entityId;
+    
+    // Track what's configured
+    const configStatus = {
+      hasWebhookSecret: !!webhookSecret,
+      hasWebhookCreds,
+      hasCsvCreds,
+      hasEntityId: !!entityId,
+    };
+
+    // Query webhook health from webhook_logs
+    const { data: recentWebhooks } = await supabase
+      .from('webhook_logs')
+      .select('processing_status, error_message, received_at')
+      .eq('organization_id', organizationId)
+      .eq('platform', 'actblue')
+      .gte('received_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      .order('received_at', { ascending: false })
+      .limit(50);
+
+    let webhookHealth = null;
+    if (recentWebhooks && recentWebhooks.length > 0) {
+      const successCount = recentWebhooks.filter((w: any) => w.processing_status === 'success').length;
+      const failureCount = recentWebhooks.filter((w: any) => w.processing_status === 'failed').length;
+      const failureRate = recentWebhooks.length > 0 ? failureCount / recentWebhooks.length : 0;
+      const recentErrors = [...new Set(
+        recentWebhooks
+          .filter((w: any) => w.error_message)
+          .map((w: any) => w.error_message)
+          .slice(0, 3)
+      )];
+      
+      webhookHealth = {
+        totalEvents: recentWebhooks.length,
+        successCount,
+        failureCount,
+        failureRate,
+        recentErrors,
+        lastEventAt: recentWebhooks[0]?.received_at,
+      };
     }
 
-    // For ActBlue, we can't directly call their API without a webhook event
-    // So we verify the credentials are present and properly formatted
-    const isValidSecret = webhookSecret && webhookSecret.length >= 16;
-    const isValidEntityId = entityId && /^\d+$/.test(entityId.toString());
+    // Query data freshness from actblue_transactions
+    const { data: lastTransaction } = await supabase
+      .from('actblue_transactions')
+      .select('transaction_date, created_at')
+      .eq('organization_id', organizationId)
+      .order('transaction_date', { ascending: false })
+      .limit(1)
+      .single();
+
+    const { count: recentTxCount } = await supabase
+      .from('actblue_transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', organizationId)
+      .gte('transaction_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
+    const dataHealth = {
+      lastTransactionDate: lastTransaction?.transaction_date || null,
+      transactionsLast7Days: recentTxCount || 0,
+      daysStale: lastTransaction?.transaction_date 
+        ? Math.floor((Date.now() - new Date(lastTransaction.transaction_date).getTime()) / (24 * 60 * 60 * 1000))
+        : null,
+    };
 
     result.latencyMs = Date.now() - startTime;
 
-    if (isValidSecret || isValidEntityId) {
-      result.success = true;
-      result.status = 'success';
-      result.message = 'ActBlue credentials verified (format check)';
-      result.details = {
-        hasWebhookSecret: !!webhookSecret,
-        hasEntityId: !!entityId,
-        note: 'Full validation occurs on next webhook event',
-      };
-    } else {
+    // Determine overall health
+    const hasWebhookIssues = webhookHealth && webhookHealth.failureRate > 0.1;
+    const isDataStale = dataHealth.daysStale !== null && dataHealth.daysStale > 1;
+
+    if (hasWebhookIssues) {
       result.status = 'invalid_credentials';
-      result.message = 'Credentials appear malformed';
-      result.details = {
-        secretValid: isValidSecret,
-        entityIdValid: isValidEntityId,
-      };
+      result.message = `Webhook authentication failing (${webhookHealth!.failureCount} of ${webhookHealth!.totalEvents} events failed)`;
+      if (webhookHealth!.recentErrors.length > 0) {
+        result.message += `: ${webhookHealth!.recentErrors[0]}`;
+      }
+      result.success = false;
+    } else if (!hasCsvCreds && !hasWebhookCreds) {
+      result.status = 'invalid_credentials';
+      result.message = 'Missing both CSV and webhook credentials';
+      result.success = false;
+    } else if (isDataStale && webhookHealth && webhookHealth.totalEvents === 0) {
+      result.status = 'error';
+      result.message = `Data is ${dataHealth.daysStale} days stale and no webhook events received`;
+      result.success = false;
+    } else {
+      result.status = 'success';
+      result.message = 'ActBlue integration operational';
+      result.success = true;
+    }
+
+    result.details = {
+      configStatus,
+      webhookHealth,
+      dataHealth,
+      recommendations: [],
+    };
+
+    // Add recommendations
+    if (hasWebhookIssues) {
+      result.details.recommendations.push('Update webhook credentials in ActBlue dashboard');
+    }
+    if (isDataStale) {
+      result.details.recommendations.push(`Run CSV backfill for the last ${dataHealth.daysStale} days`);
+    }
+    if (!hasWebhookCreds) {
+      result.details.recommendations.push('Configure webhook credentials for real-time data');
     }
 
     return result;
@@ -337,7 +422,7 @@ serve(async (req) => {
             result = await testSwitchboardIntegration(credData, cred.organization_id);
             break;
           case 'actblue':
-            result = await testActBlueIntegration(credData, cred.organization_id);
+            result = await testActBlueIntegration(credData, cred.organization_id, supabase);
             break;
           default:
             result = {

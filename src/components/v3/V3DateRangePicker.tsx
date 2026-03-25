@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { useDashboardStore } from "@/stores/dashboardStore";
 
-type PresetKey = 'today' | '7d' | '14d' | '30d' | '90d' | 'mtd' | 'last-month' | 'custom';
+type PresetKey = 'today' | 'yesterday' | '7d' | '14d' | '30d' | '90d' | 'mtd' | 'last-month' | 'custom';
 type CompareMode = 'none' | 'previous' | 'last-month' | 'last-year';
 
 interface Preset {
@@ -31,21 +31,29 @@ const presets: Record<PresetKey, Preset> = {
     label: "Today",
     getValue: () => ({ start: new Date(), end: new Date() }),
   },
+  yesterday: {
+    label: "Yesterday",
+    getValue: () => {
+      const yesterday = subDays(new Date(), 1);
+      return { start: yesterday, end: yesterday };
+    },
+  },
   "7d": {
     label: "Last 7 days",
-    getValue: () => ({ start: subDays(new Date(), 7), end: new Date() }),
+    // subDays(6) gives us 7 days inclusive: today + 6 previous days
+    getValue: () => ({ start: subDays(new Date(), 6), end: new Date() }),
   },
   "14d": {
     label: "Last 14 days",
-    getValue: () => ({ start: subDays(new Date(), 14), end: new Date() }),
+    getValue: () => ({ start: subDays(new Date(), 13), end: new Date() }),
   },
   "30d": {
     label: "Last 30 days",
-    getValue: () => ({ start: subDays(new Date(), 30), end: new Date() }),
+    getValue: () => ({ start: subDays(new Date(), 29), end: new Date() }),
   },
   "90d": {
     label: "Last 90 days",
-    getValue: () => ({ start: subDays(new Date(), 90), end: new Date() }),
+    getValue: () => ({ start: subDays(new Date(), 89), end: new Date() }),
   },
   mtd: {
     label: "Month to date",
@@ -71,8 +79,17 @@ const presets: Record<PresetKey, Preset> = {
 function detectPresetFromDateRange(startDate: string, endDate: string): PresetKey {
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
+  const yesterdayStr = format(subDays(today, 1), "yyyy-MM-dd");
   
-  // Only match presets if the end date is today
+  // Check for single-day presets first
+  if (startDate === endDate) {
+    if (startDate === todayStr) return "today";
+    if (startDate === yesterdayStr) return "yesterday";
+    // Any other single day is custom
+    return "custom";
+  }
+  
+  // Only match multi-day presets if the end date is today
   if (endDate !== todayStr) {
     return "custom";
   }
@@ -82,7 +99,6 @@ function detectPresetFromDateRange(startDate: string, endDate: string): PresetKe
   const daysDiff = differenceInDays(end, start);
   
   // Match against known presets with small tolerance
-  if (daysDiff === 0) return "today";
   if (daysDiff >= 6 && daysDiff <= 8) return "7d";
   if (daysDiff >= 13 && daysDiff <= 15) return "14d";
   if (daysDiff >= 29 && daysDiff <= 31) return "30d";
@@ -214,10 +230,16 @@ export const V3DateRangePicker: React.FC<V3DateRangePickerProps> = ({
           >
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
-            {Object.entries(presets).map(([key, preset]) => (
-              <SelectItem key={key} value={key}>
-                {preset.label}
+          <SelectContent 
+            className="!bg-[hsl(var(--portal-bg-secondary))] border border-[hsl(var(--portal-border))] rounded-lg shadow-lg z-[200]"
+          >
+            {(['today', 'yesterday', '7d', '14d', '30d', '90d', 'mtd', 'last-month', 'custom'] as const).map((key) => (
+              <SelectItem 
+                key={key} 
+                value={key}
+                className="text-[hsl(var(--portal-text-primary))] hover:bg-[hsl(var(--portal-bg-hover))] focus:bg-[hsl(var(--portal-bg-hover))] cursor-pointer"
+              >
+                {presets[key].label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -266,7 +288,7 @@ export const V3DateRangePicker: React.FC<V3DateRangePickerProps> = ({
             selected={{ from: startDate, to: endDate }}
             onSelect={handleDateSelect}
             numberOfMonths={2}
-            defaultMonth={subDays(new Date(), 30)}
+            defaultMonth={new Date()}
             className="p-3 pointer-events-auto"
           />
         </PopoverContent>

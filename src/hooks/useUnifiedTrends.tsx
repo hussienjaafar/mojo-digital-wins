@@ -169,8 +169,20 @@ export const useUnifiedTrends = (options: UseUnifiedTrendsOptions = {}) => {
         }
       }
 
+      // PHASE 2 FIX: Deduplicate by cluster_id before transformation, keeping highest rank_score
+      const deduplicatedEvents = Array.from(
+        (eventsData || []).reduce((map: Map<string, any>, event: any) => {
+          const key = event.cluster_id || event.id;
+          const existing = map.get(key);
+          if (!existing || (event.rank_score || 0) > (existing.rank_score || 0)) {
+            map.set(key, event);
+          }
+          return map;
+        }, new Map<string, any>()).values()
+      );
+
       // Transform trend_events to UnifiedTrend format
-      let enrichedTrends = (eventsData || [])
+      let enrichedTrends = deduplicatedEvents
         .filter((event: any) => {
           if (!excludeEvergreen) return true;
           

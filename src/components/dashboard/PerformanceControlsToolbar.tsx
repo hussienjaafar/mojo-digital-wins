@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { DayPicker, type DateRange, type SelectRangeEventHandler } from "react-day-picker";
 import { cn } from "@/lib/utils";
+import { getOrgNow, getOrgToday } from "@/lib/timezone";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -46,22 +47,20 @@ import { useDashboardStore } from "@/stores/dashboardStore";
 // Types
 // ============================================================================
 
-export type PresetKey = "today" | "7d" | "14d" | "30d" | "90d" | "custom";
+export type PresetKey = "today" | "yesterday" | "7d" | "14d" | "30d" | "90d" | "custom";
 type LayoutMode = "lg" | "md" | "sm" | "xs";
 
 interface PerformanceControlsToolbarProps {
   /** Organization ID for filters */
   organizationId?: string;
-  /** Filter options for campaigns */
-  campaignOptions?: { id: string; label: string }[];
-  /** Filter options for creatives */
-  creativeOptions?: { id: string; label: string }[];
   /** Show refresh button */
   showRefresh?: boolean;
   /** Refresh handler */
   onRefresh?: () => void;
   /** Is refresh in progress */
   isRefreshing?: boolean;
+  /** Sources currently being synced (for smart refresh feedback) */
+  syncingSources?: string[];
   /** Additional className */
   className?: string;
 }
@@ -74,32 +73,60 @@ const presets: Record<PresetKey, { label: string; shortLabel: string; getValue: 
   today: {
     label: "Today",
     shortLabel: "Today",
-    getValue: () => ({ start: new Date(), end: new Date() }),
+    getValue: () => {
+      const now = getOrgNow();
+      return { start: now, end: now };
+    },
+  },
+  yesterday: {
+    label: "Yesterday",
+    shortLabel: "Yest",
+    getValue: () => {
+      const now = getOrgNow();
+      const yesterday = subDays(now, 1);
+      return { start: yesterday, end: yesterday };
+    },
   },
   "7d": {
     label: "Last 7 days",
     shortLabel: "7D",
-    getValue: () => ({ start: subDays(new Date(), 7), end: new Date() }),
+    getValue: () => {
+      const now = getOrgNow();
+      // 6 days back = 7 days inclusive (today + 6 previous days)
+      return { start: subDays(now, 6), end: now };
+    },
   },
   "14d": {
     label: "Last 14 days",
     shortLabel: "14D",
-    getValue: () => ({ start: subDays(new Date(), 14), end: new Date() }),
+    getValue: () => {
+      const now = getOrgNow();
+      return { start: subDays(now, 13), end: now };
+    },
   },
   "30d": {
     label: "Last 30 days",
     shortLabel: "30D",
-    getValue: () => ({ start: subDays(new Date(), 30), end: new Date() }),
+    getValue: () => {
+      const now = getOrgNow();
+      return { start: subDays(now, 29), end: now };
+    },
   },
   "90d": {
     label: "Last 90 days",
     shortLabel: "90D",
-    getValue: () => ({ start: subDays(new Date(), 90), end: new Date() }),
+    getValue: () => {
+      const now = getOrgNow();
+      return { start: subDays(now, 89), end: now };
+    },
   },
   custom: {
     label: "Custom range",
     shortLabel: "Custom",
-    getValue: () => ({ start: subDays(new Date(), 30), end: new Date() }),
+    getValue: () => {
+      const now = getOrgNow();
+      return { start: subDays(now, 30), end: now };
+    },
   },
 };
 
@@ -110,14 +137,19 @@ const presets: Record<PresetKey, { label: string; shortLabel: string; getValue: 
 /**
  * Detects which preset matches the given date range.
  * Returns 'custom' if no preset matches.
+ * Uses organization timezone for accurate "today" detection.
  */
 function detectPresetFromDateRange(startDate: string, endDate: string): PresetKey {
-  const today = new Date();
-  const todayStr = format(today, "yyyy-MM-dd");
+  const todayStr = getOrgToday();
+  const now = getOrgNow();
+  const yesterdayStr = format(subDays(now, 1), "yyyy-MM-dd");
   
-  // Check for "today" preset first (single day = today)
-  if (startDate === endDate && startDate === todayStr) {
-    return "today";
+  // Check for single-day presets first
+  if (startDate === endDate) {
+    if (startDate === todayStr) return "today";
+    if (startDate === yesterdayStr) return "yesterday";
+    // Any other single day is custom
+    return "custom";
   }
   
   // Only match other presets if the end date is today
@@ -576,179 +608,65 @@ DateRangeButton.displayName = "DateRangeButton";
 interface RefreshButtonProps {
   onClick: () => void;
   isRefreshing?: boolean;
+  syncingSources?: string[];
 }
 
-const RefreshButton: React.FC<RefreshButtonProps> = ({ onClick, isRefreshing }) => (
-  <TooltipProvider delayDuration={300}>
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={onClick}
-          disabled={isRefreshing}
-          className={cn(
-            "h-9 w-9",
-            "rounded-[var(--portal-radius-sm)]",
-            "border border-[hsl(var(--portal-border))]",
-            "bg-[hsl(var(--portal-bg-secondary))]",
-            "text-[hsl(var(--portal-text-muted))]",
-            "hover:bg-[hsl(var(--portal-bg-hover))]",
-            "hover:text-[hsl(var(--portal-text-primary))]",
-            "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
-            "focus-visible:ring-2",
-            "focus-visible:ring-[hsl(var(--portal-accent-blue)/0.3)]",
-            "transition-all",
-            "disabled:opacity-50"
-          )}
-          aria-label={isRefreshing ? "Refreshing data" : "Refresh data"}
-        >
-          <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent
-        side="bottom"
-        className="bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]"
-      >
-        <p>{isRefreshing ? "Refreshing..." : "Refresh data"}</p>
-      </TooltipContent>
-    </Tooltip>
-  </TooltipProvider>
-);
-
-// ============================================================================
-// Filter Button (icon-only for toolbar)
-// ============================================================================
-
-interface FilterControlProps {
-  campaignOptions: { id: string; label: string }[];
-  creativeOptions: { id: string; label: string }[];
-  selectedCampaignId: string | null;
-  selectedCreativeId: string | null;
-  onCampaignChange: (value: string | null) => void;
-  onCreativeChange: (value: string | null) => void;
-  layoutMode: LayoutMode;
-}
-
-const FilterControl: React.FC<FilterControlProps> = ({
-  campaignOptions,
-  creativeOptions,
-  selectedCampaignId,
-  selectedCreativeId,
-  onCampaignChange,
-  onCreativeChange,
-  layoutMode,
-}) => {
-  const hasFilters = campaignOptions.length > 0 || creativeOptions.length > 0;
-  if (!hasFilters) return null;
-
-  const showBothDropdowns = layoutMode === "lg" || layoutMode === "md";
+const RefreshButton: React.FC<RefreshButtonProps> = ({ onClick, isRefreshing, syncingSources = [] }) => {
+  // Build tooltip text based on current state
+  const getTooltipText = () => {
+    if (syncingSources.length > 0) {
+      const sourceLabels: Record<string, string> = {
+        meta: 'Meta Ads',
+        actblue: 'ActBlue',
+        switchboard: 'SMS',
+      };
+      const labels = syncingSources.map(s => sourceLabels[s] || s).join(', ');
+      return `Syncing: ${labels}...`;
+    }
+    if (isRefreshing) {
+      return 'Checking freshness...';
+    }
+    return 'Smart refresh – syncs stale data only';
+  };
 
   return (
-    <div className="flex items-center gap-1.5">
-      {/* Filter icon */}
-      <div
-        className={cn(
-          "flex h-9 w-9 items-center justify-center shrink-0",
-          "rounded-[var(--portal-radius-sm)]",
-          "border border-[hsl(var(--portal-border))]",
-          "bg-[hsl(var(--portal-bg-secondary))]",
-          "text-[hsl(var(--portal-text-muted))]"
-        )}
-        aria-hidden="true"
-      >
-        <Filter className="h-3.5 w-3.5" />
-      </div>
-
-      {/* Campaign dropdown */}
-      {campaignOptions.length > 0 && (
-        <Select
-          value={selectedCampaignId || "all"}
-          onValueChange={(v) => onCampaignChange(v === "all" ? null : v)}
-        >
-          <SelectTrigger
+    <TooltipProvider delayDuration={300}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onClick}
+            disabled={isRefreshing}
             className={cn(
-              "h-9 text-xs",
+              "h-9 w-9",
               "rounded-[var(--portal-radius-sm)]",
               "border border-[hsl(var(--portal-border))]",
               "bg-[hsl(var(--portal-bg-secondary))]",
-              "text-[hsl(var(--portal-text-primary))]",
+              "text-[hsl(var(--portal-text-muted))]",
               "hover:bg-[hsl(var(--portal-bg-hover))]",
-              "focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.3)]",
-              "transition-colors",
-              selectedCampaignId && "border-[hsl(var(--portal-accent-blue))]",
-              showBothDropdowns ? "w-[120px]" : "w-[100px]"
+              "hover:text-[hsl(var(--portal-text-primary))]",
+              "hover:border-[hsl(var(--portal-accent-blue)/0.5)]",
+              "focus-visible:ring-2",
+              "focus-visible:ring-[hsl(var(--portal-accent-blue)/0.3)]",
+              "transition-all",
+              "disabled:opacity-50",
+              // Active syncing state - subtle glow
+              syncingSources.length > 0 && "border-[hsl(var(--portal-accent-blue)/0.5)] shadow-[0_0_8px_hsl(var(--portal-accent-blue)/0.15)]"
             )}
-            aria-label="Filter by campaign"
+            aria-label={isRefreshing ? "Refreshing data" : "Refresh data"}
           >
-            <span className="truncate">
-              <SelectValue placeholder="Campaigns" />
-            </span>
-          </SelectTrigger>
-          <SelectContent
-            className={cn(
-              "z-[100]",
-              "bg-[hsl(var(--portal-bg-secondary))]",
-              "border-[hsl(var(--portal-border))]",
-              "rounded-[var(--portal-radius-sm)]",
-              "shadow-lg",
-              "opacity-100"
-            )}
-          >
-            <SelectItem value="all" className="text-xs">All Campaigns</SelectItem>
-            {campaignOptions.map((opt) => (
-              <SelectItem key={opt.id} value={opt.id} className="text-xs truncate">
-                {opt.label.length > 20 ? `${opt.label.slice(0, 20)}...` : opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
-      {/* Creative dropdown - only show in lg/md modes */}
-      {showBothDropdowns && creativeOptions.length > 0 && (
-        <Select
-          value={selectedCreativeId || "all"}
-          onValueChange={(v) => onCreativeChange(v === "all" ? null : v)}
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="bottom"
+          className="bg-[hsl(var(--portal-bg-elevated))] border-[hsl(var(--portal-border))] text-[hsl(var(--portal-text-primary))]"
         >
-          <SelectTrigger
-            className={cn(
-              "h-9 w-[120px] text-xs",
-              "rounded-[var(--portal-radius-sm)]",
-              "border border-[hsl(var(--portal-border))]",
-              "bg-[hsl(var(--portal-bg-secondary))]",
-              "text-[hsl(var(--portal-text-primary))]",
-              "hover:bg-[hsl(var(--portal-bg-hover))]",
-              "focus:ring-2 focus:ring-[hsl(var(--portal-accent-blue)/0.3)]",
-              "transition-colors",
-              selectedCreativeId && "border-[hsl(var(--portal-accent-blue))]"
-            )}
-            aria-label="Filter by creative"
-          >
-            <span className="truncate">
-              <SelectValue placeholder="Creatives" />
-            </span>
-          </SelectTrigger>
-          <SelectContent
-            className={cn(
-              "z-[100]",
-              "bg-[hsl(var(--portal-bg-secondary))]",
-              "border-[hsl(var(--portal-border))]",
-              "rounded-[var(--portal-radius-sm)]",
-              "shadow-lg",
-              "opacity-100"
-            )}
-          >
-            <SelectItem value="all" className="text-xs">All Creatives</SelectItem>
-            {creativeOptions.map((opt) => (
-              <SelectItem key={opt.id} value={opt.id} className="text-xs truncate">
-                {opt.label.length > 20 ? `${opt.label.slice(0, 20)}...` : opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-    </div>
+          <p>{getTooltipText()}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };
 
@@ -757,11 +675,10 @@ const FilterControl: React.FC<FilterControlProps> = ({
 // ============================================================================
 
 export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProps> = ({
-  campaignOptions = [],
-  creativeOptions = [],
   showRefresh = false,
   onRefresh,
   isRefreshing = false,
+  syncingSources = [],
   className,
 }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -781,12 +698,6 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
       setSelectedPreset(detectedPreset);
     }
   }, [dateRange.startDate, dateRange.endDate]);
-
-  // Filter state from store
-  const selectedCampaignId = useDashboardStore((s) => s.selectedCampaignId);
-  const selectedCreativeId = useDashboardStore((s) => s.selectedCreativeId);
-  const setSelectedCampaignId = useDashboardStore((s) => s.setSelectedCampaignId);
-  const setSelectedCreativeId = useDashboardStore((s) => s.setSelectedCreativeId);
 
   // Parse store dates
   const parseStoreDate = (dateStr: string): Date =>
@@ -840,9 +751,8 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
     }
   };
 
-  const hasFilters = campaignOptions.length > 0 || creativeOptions.length > 0;
   const showSegmentedPresets = layoutMode === "lg";
-  const presetKeys: PresetKey[] = ["today", "7d", "14d", "30d", "90d"];
+  const presetKeys: PresetKey[] = ["today", "yesterday", "7d", "14d", "30d", "90d"];
 
   return (
     <div
@@ -909,62 +819,17 @@ export const PerformanceControlsToolbar: React.FC<PerformanceControlsToolbarProp
                 selected={draftRange}
                 onSelect={handleDateSelect}
                 numberOfMonths={layoutMode === "lg" && containerWidth >= 768 ? 2 : 1}
-                defaultMonth={subDays(new Date(), 30)}
+                defaultMonth={new Date()}
               />
             </PopoverContent>
           </Popover>
         </div>
 
-        {/* Filters inline on wide layouts (wraps to a second line if needed) */}
-        {hasFilters && layoutMode === "lg" && (
-          <div className="min-w-0">
-            <FilterControl
-              campaignOptions={campaignOptions}
-              creativeOptions={creativeOptions}
-              selectedCampaignId={selectedCampaignId}
-              selectedCreativeId={selectedCreativeId}
-              onCampaignChange={setSelectedCampaignId}
-              onCreativeChange={setSelectedCreativeId}
-              layoutMode={layoutMode}
-            />
-          </div>
-        )}
-
         {/* Refresh button - always visible in row 1 */}
         {showRefresh && onRefresh && (
-          <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} />
+          <RefreshButton onClick={onRefresh} isRefreshing={isRefreshing} syncingSources={syncingSources} />
         )}
       </div>
-
-      {/* Row 2 (md): Filters */}
-      {hasFilters && layoutMode === "md" && (
-        <div className="min-w-0 w-full">
-          <FilterControl
-            campaignOptions={campaignOptions}
-            creativeOptions={creativeOptions}
-            selectedCampaignId={selectedCampaignId}
-            selectedCreativeId={selectedCreativeId}
-            onCampaignChange={setSelectedCampaignId}
-            onCreativeChange={setSelectedCreativeId}
-            layoutMode={layoutMode}
-          />
-        </div>
-      )}
-
-      {/* Row 2 (sm/xs): Filters stacked */}
-      {hasFilters && (layoutMode === "sm" || layoutMode === "xs") && (
-        <div className="flex items-center gap-1.5 w-full min-w-0 overflow-x-auto">
-          <FilterControl
-            campaignOptions={campaignOptions}
-            creativeOptions={creativeOptions}
-            selectedCampaignId={selectedCampaignId}
-            selectedCreativeId={selectedCreativeId}
-            onCampaignChange={setSelectedCampaignId}
-            onCreativeChange={setSelectedCreativeId}
-            layoutMode={layoutMode}
-          />
-        </div>
-      )}
     </div>
   );
 };

@@ -87,22 +87,23 @@ const presets: Record<PresetKey, Preset> = {
   "7d": {
     label: "Last 7 days",
     shortLabel: "7D",
-    getValue: () => ({ start: subDays(new Date(), 7), end: new Date() }),
+    // 6 days back = 7 days inclusive (today + 6 previous days)
+    getValue: () => ({ start: subDays(new Date(), 6), end: new Date() }),
   },
   "14d": {
     label: "Last 14 days",
     shortLabel: "14D",
-    getValue: () => ({ start: subDays(new Date(), 14), end: new Date() }),
+    getValue: () => ({ start: subDays(new Date(), 13), end: new Date() }),
   },
   "30d": {
     label: "Last 30 days",
     shortLabel: "30D",
-    getValue: () => ({ start: subDays(new Date(), 30), end: new Date() }),
+    getValue: () => ({ start: subDays(new Date(), 29), end: new Date() }),
   },
   "90d": {
     label: "Last 90 days",
     shortLabel: "90D",
-    getValue: () => ({ start: subDays(new Date(), 90), end: new Date() }),
+    getValue: () => ({ start: subDays(new Date(), 89), end: new Date() }),
   },
   mtd: {
     label: "Month to date",

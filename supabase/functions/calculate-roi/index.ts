@@ -71,6 +71,19 @@ serve(async (req) => {
       );
     }
 
+    // Use service role for writes and org lookups (after auth check)
+    const serviceClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+    // Fetch organization timezone for accurate date calculations
+    const { data: orgData } = await serviceClient
+      .from('client_organizations')
+      .select('org_timezone')
+      .eq('id', organization_id)
+      .single();
+    
+    const orgTimezone = orgData?.org_timezone || 'America/New_York';
+    console.log(`[ROI] Using timezone: ${orgTimezone} for organization ${organization_id}`);
+
     // Default to last 30 days if no dates provided
     const endDateObj = end_date ? new Date(end_date) : new Date();
     const startDateObj = start_date ? new Date(start_date) : new Date(endDateObj.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -87,9 +100,6 @@ serve(async (req) => {
       dates.push(currentDate.toISOString().split('T')[0]);
       currentDate.setDate(currentDate.getDate() + 1);
     }
-
-    // Use service role for writes only (after auth check)
-    const serviceClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
     // Process each date
     for (const date of dates) {
@@ -118,27 +128,49 @@ serve(async (req) => {
       const totalSmsSent = smsCampaigns?.reduce((sum, m) => sum + (m.messages_sent || 0), 0) || 0;
       const totalSmsConversions = smsCampaigns?.reduce((sum, m) => sum + (m.conversions || 0), 0) || 0;
 
-      // Fetch ActBlue transactions for the date (donations and refunds separately for net revenue)
-      const { data: transactions } = await supabase
-        .from('actblue_transactions')
-        .select('amount, net_amount, donor_email, transaction_type')
+      // Fetch ActBlue transactions for the date using timezone-aware RPC
+      // This ensures consistent results with what the dashboard shows
+      const { data: periodSummary } = await serviceClient.rpc('get_actblue_period_summary', {
+        p_organization_id: organization_id,
+        p_start_date: date,
+        p_end_date: date
+      });
+
+      // Also fetch raw transactions for unique donor calculation
+      // Use timezone-aware date conversion in SQL via the secure view
+      const { data: transactions } = await serviceClient
+        .from('actblue_transactions_secure')
+        .select('amount, net_amount, donor_email, transaction_type, transaction_date')
         .eq('organization_id', organization_id)
         .gte('transaction_date', `${date}T00:00:00`)
         .lt('transaction_date', `${date}T23:59:59.999`);
 
-      // Calculate net funds raised: donations - refunds/cancellations
-      // Use net_amount when available (already excludes fees), fall back to amount
-      const donations = (transactions || []).filter(t => t.transaction_type === 'donation');
-      const refunds = (transactions || []).filter(t => t.transaction_type === 'refund' || t.transaction_type === 'cancellation');
+      // Use RPC data when available (timezone-aware), fallback to raw calculation
+      let totalFundsRaised: number;
+      let totalDonations: number;
+      let newDonors: number;
+      let refundAmount = 0;
 
-      const grossDonations = donations.reduce((sum, t) => sum + parseFloat(t.net_amount || t.amount || '0'), 0);
-      const refundAmount = refunds.reduce((sum, t) => sum + Math.abs(parseFloat(t.net_amount || t.amount || '0')), 0);
-      const totalFundsRaised = grossDonations - refundAmount; // Net revenue
-      const totalDonations = donations.length;
+      if (periodSummary && periodSummary.length > 0) {
+        // Use the timezone-aware RPC results
+        const summary = periodSummary[0];
+        totalFundsRaised = parseFloat(summary.net_raised || '0');
+        totalDonations = parseInt(summary.total_donations || '0', 10);
+        newDonors = parseInt(summary.unique_donors || '0', 10);
+        refundAmount = parseFloat(summary.refund_total || '0');
+      } else {
+        // Fallback: Calculate from raw transactions
+        const donations = (transactions || []).filter((t: any) => t.transaction_type === 'donation');
+        const refunds = (transactions || []).filter((t: any) => t.transaction_type === 'refund' || t.transaction_type === 'cancellation');
 
-      // Calculate unique donors (only from donations, not refunds)
-      const uniqueEmails = new Set(donations.map(t => t.donor_email).filter(Boolean));
-      const newDonors = uniqueEmails.size;
+        const grossDonations = donations.reduce((sum: number, t: any) => sum + parseFloat(t.net_amount || t.amount || '0'), 0);
+        refundAmount = refunds.reduce((sum: number, t: any) => sum + Math.abs(parseFloat(t.net_amount || t.amount || '0')), 0);
+        totalFundsRaised = grossDonations - refundAmount;
+        totalDonations = donations.length;
+
+        const uniqueEmails = new Set(donations.map((t: any) => t.donor_email).filter(Boolean));
+        newDonors = uniqueEmails.size;
+      }
 
       // Calculate ROI using net revenue
       const totalSpent = totalAdSpend + totalSmsCost;
@@ -148,7 +180,7 @@ serve(async (req) => {
 
       // Log refund impact for observability
       if (refundAmount > 0) {
-        console.log(`[ROI] ${date}: Refund/cancellation amount: $${refundAmount.toFixed(2)} (${refunds.length} transactions)`);
+        console.log(`[ROI] ${date}: Refund/cancellation amount: $${refundAmount.toFixed(2)}`);
       }
 
       // Upsert aggregated metrics using service role

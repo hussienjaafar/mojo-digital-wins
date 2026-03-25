@@ -58,13 +58,17 @@ export interface V3DonutChartProps {
   emptyDescription?: string;
   /** Enable ARIA accessibility descriptions */
   enableAccessibility?: boolean;
+  /** Enable pattern decals for colorblind accessibility (stripes/dots on each slice) */
+  useDecals?: boolean;
   /** Custom data processing options */
   dataOptions?: ProcessDonutDataOptions;
   /** Disable hover emphasis to prevent visual glitches */
   disableHoverEmphasis?: boolean;
+  /** Override the calculated total for center display (use canonical value) */
+  overrideTotal?: number;
 }
 
-export const V3DonutChart: React.FC<V3DonutChartProps> = ({
+const V3DonutChartInner: React.FC<V3DonutChartProps> = ({
   data,
   height = 300,
   className,
@@ -79,8 +83,10 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
   emptyMessage = "No data available",
   emptyDescription = "There is no data to display in this chart.",
   enableAccessibility = true,
+  useDecals = false,
   dataOptions,
   disableHoverEmphasis = true,
+  overrideTotal,
 }) => {
   // Track selected/hovered slice for center label
   const [hoveredSlice, setHoveredSlice] = useState<{ name: string; value: number; percent: number } | null>(null);
@@ -108,48 +114,18 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
     });
   }, [data, topN, includeNotProvided, dataOptions]);
 
-  // Handle loading
-  if (isLoading) {
-    return (
-      <div className={className} style={{ height: typeof height === 'number' ? height : undefined }}>
-        <V3LoadingState variant="chart" />
-      </div>
-    );
-  }
-
-  // Handle empty data
-  if (!processedData.items || processedData.items.length === 0) {
-    return (
-      <div className={className} style={{ height: typeof height === 'number' ? height : undefined }}>
-        <V3EmptyState
-          title={emptyMessage}
-          description={emptyDescription}
-          accent="blue"
-        />
-      </div>
-    );
-  }
-
   // Current display state (selected takes priority over hovered)
   const displaySlice = selectedSlice || hoveredSlice;
+  
+  // Use overrideTotal if provided (canonical value), otherwise use calculated total
+  const effectiveTotal = overrideTotal ?? processedData.total;
 
-  // Build ECharts option
+  // Build ECharts option - MUST be before early returns per hooks rules
   const option = useMemo<EChartsOption>(() => {
     const isRightLegend = showLegend && legendPosition === "right";
     const innerRadius = "55%";
     const outerRadius = isRightLegend ? "75%" : "80%";
     const centerX = isRightLegend ? "30%" : "50%";
-
-    // Build legend data with formatted values
-    const legendData = processedData.items.map((item, index) => {
-      const percent = processedData.total > 0 
-        ? ((item.value / processedData.total) * 100).toFixed(1) 
-        : '0';
-      return {
-        name: item.name,
-        displayName: `${item.name}  ${formatValue(item.value, true)}  (${percent}%)`,
-      };
-    });
 
     // Chart data with styling
     const chartData = processedData.items.map((item, index) => ({
@@ -192,7 +168,7 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
           style: {
             text: displaySlice 
               ? formatValue(displaySlice.value)
-              : formatValue(processedData.total),
+              : formatValue(effectiveTotal),
             textAlign: "center",
             fill: "hsl(var(--portal-text-primary))",
             fontSize: 22,
@@ -229,12 +205,12 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
       animation: true,
       animationDuration: 600,
       animationEasing: "cubicOut",
-      // Accessibility
+      // Accessibility - enable decals (stripes/dots) for colorblind users
       ...(enableAccessibility && {
         aria: {
           enabled: true,
           decal: {
-            show: false, // Can enable for colorblind support
+            show: useDecals, // Enable pattern fills for colorblind accessibility
           },
         },
       }),
@@ -253,8 +229,9 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
           box-shadow: 0 8px 24px rgba(0,0,0,0.12);
         `,
         formatter: (params: any) => {
-          const percent = processedData.total > 0 
-            ? ((params.value / processedData.total) * 100).toFixed(1) 
+          // Use effectiveTotal for accurate percentage calculation
+          const percent = effectiveTotal > 0 
+            ? ((params.value / effectiveTotal) * 100).toFixed(1) 
             : '0';
           const rank = params.data?.rank || 1;
           const valueFormatted = formatValue(params.value);
@@ -303,8 +280,8 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
               formatter: (params: any) => {
                 const item = processedData.items.find(i => i.name === params.name);
                 if (!item) return params.name;
-                const percent = processedData.total > 0 
-                  ? ((item.value / processedData.total) * 100).toFixed(1) 
+                const percent = effectiveTotal > 0 
+                  ? ((item.value / effectiveTotal) * 100).toFixed(1) 
                   : '0';
                 return `${params.name}: ${formatValue(item.value)} (${percent}%)`;
               },
@@ -316,8 +293,8 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
             formatter: (name: string) => {
               const item = processedData.items.find(i => i.name === name);
               if (!item) return name;
-              const percent = processedData.total > 0 
-                ? ((item.value / processedData.total) * 100).toFixed(0) 
+              const percent = effectiveTotal > 0 
+                ? ((item.value / effectiveTotal) * 100).toFixed(0) 
                 : '0';
               // Truncate long names
               const displayName = name.length > 14 ? name.substring(0, 14) + '…' : name;
@@ -384,14 +361,17 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
     centerLabel, 
     displaySlice, 
     enableAccessibility,
+    useDecals,
+    disableHoverEmphasis,
+    effectiveTotal,
   ]);
 
   // Event handlers
   const handleEvents = useMemo(() => ({
     mouseover: (params: any) => {
       if (params.seriesType === 'pie') {
-        const percent = processedData.total > 0 
-          ? (params.value / processedData.total) * 100 
+        const percent = effectiveTotal > 0 
+          ? (params.value / effectiveTotal) * 100 
           : 0;
         setHoveredSlice({
           name: params.name,
@@ -405,8 +385,8 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
     },
     click: (params: any) => {
       if (params.seriesType === 'pie') {
-        const percent = processedData.total > 0 
-          ? (params.value / processedData.total) * 100 
+        const percent = effectiveTotal > 0 
+          ? (params.value / effectiveTotal) * 100 
           : 0;
         const clickedSlice = {
           name: params.name,
@@ -424,7 +404,29 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
         }
       }
     },
-  }), [processedData.total, selectedSlice, onSliceSelect]);
+  }), [effectiveTotal, selectedSlice, onSliceSelect]);
+
+  // Handle loading - AFTER all hooks
+  if (isLoading) {
+    return (
+      <div className={className} style={{ height: typeof height === 'number' ? height : undefined }}>
+        <V3LoadingState variant="chart" />
+      </div>
+    );
+  }
+
+  // Handle empty data - AFTER all hooks
+  if (!processedData.items || processedData.items.length === 0) {
+    return (
+      <div className={className} style={{ height: typeof height === 'number' ? height : undefined }}>
+        <V3EmptyState
+          title={emptyMessage}
+          description={emptyDescription}
+          accent="blue"
+        />
+      </div>
+    );
+  }
 
   return (
     <EChartsBase
@@ -437,5 +439,44 @@ export const V3DonutChart: React.FC<V3DonutChartProps> = ({
     />
   );
 };
+
+/**
+ * Memoized V3DonutChart to prevent unnecessary re-renders.
+ * Uses shallow comparison for primitive props and JSON comparison for data array.
+ */
+export const V3DonutChart = React.memo(V3DonutChartInner, (prevProps, nextProps) => {
+  // Fast path: check primitives first
+  if (
+    prevProps.height !== nextProps.height ||
+    prevProps.valueType !== nextProps.valueType ||
+    prevProps.isLoading !== nextProps.isLoading ||
+    prevProps.showLegend !== nextProps.showLegend ||
+    prevProps.legendPosition !== nextProps.legendPosition ||
+    prevProps.topN !== nextProps.topN ||
+    prevProps.includeNotProvided !== nextProps.includeNotProvided ||
+    prevProps.className !== nextProps.className ||
+    prevProps.centerLabel !== nextProps.centerLabel ||
+    prevProps.overrideTotal !== nextProps.overrideTotal
+  ) {
+    return false; // Props changed, re-render
+  }
+
+  // Deep compare data array (main performance concern)
+  if (prevProps.data.length !== nextProps.data.length) return false;
+  
+  // Compare each data item by value and name (most common changes)
+  for (let i = 0; i < prevProps.data.length; i++) {
+    if (
+      prevProps.data[i].name !== nextProps.data[i].name ||
+      prevProps.data[i].value !== nextProps.data[i].value
+    ) {
+      return false;
+    }
+  }
+
+  return true; // Props are equal, skip re-render
+});
+
+V3DonutChart.displayName = 'V3DonutChart';
 
 export default V3DonutChart;

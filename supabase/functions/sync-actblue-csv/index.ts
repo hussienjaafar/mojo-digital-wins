@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
+import { normalizeActBlueTimestamp } from "../_shared/actblue-timezone.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -798,11 +799,13 @@ serve(async (req) => {
                 entity_id: row.entity_id || config.entity_id,
                 committee_name: row.recipient || null,
                 fec_id: row.fec_id || null,
-                recurring_period: row.recurring_total_months ? 'monthly' : null,
+                recurring_period: row.recurring_total_months ? 'monthly' : (row.recur_weekly === 'true' || row.recur_weekly === 'TRUE' ? 'weekly' : null),
                 recurring_duration: parseInt(row.recurring_total_months) || null,
-                is_recurring: !!row.recurring_total_months,
+                // Fixed: recurring if has recurring_total_months > 0 OR weekly recurring is set
+                is_recurring: (parseInt(row.recurring_total_months) > 0) || (row.recur_weekly === 'true' || row.recur_weekly === 'TRUE'),
                 transaction_type: transactionType,
-                transaction_date: row.paid_at || row.date,
+                // Normalize timestamp to UTC - ActBlue CSV uses Eastern Time
+                transaction_date: normalizeActBlueTimestamp(row.paid_at || row.date),
               };
 
               if (existing) {
@@ -861,9 +864,10 @@ serve(async (req) => {
                 } else {
                   totalInserted++;
 
-                  // Update donor demographics for new transactions
+                  // Update donor demographics for new transactions with aggregate calculation
                   if (row.donor_email) {
-                    await supabase.from('donor_demographics')
+                    // First upsert the donor record
+                    const { data: demoData } = await supabase.from('donor_demographics')
                       .upsert({
                         organization_id: orgId,
                         donor_email: row.donor_email,
@@ -877,11 +881,42 @@ serve(async (req) => {
                         phone: row.donor_phone || null,
                         employer: row.donor_employer || null,
                         occupation: row.donor_occupation || null,
-                        last_donation_date: row.paid_at || row.date,
+                        last_donation_date: normalizeActBlueTimestamp(row.paid_at || row.date),
                       }, {
                         onConflict: 'organization_id,donor_email',
                         ignoreDuplicates: false,
-                      });
+                      })
+                      .select('id')
+                      .single();
+                    
+                    // Then calculate and update aggregates from transaction history
+                    if (demoData) {
+                      const { data: txData } = await supabase
+                        .from('actblue_transactions')
+                        .select('amount, recurring_period, transaction_type, transaction_date')
+                        .eq('organization_id', orgId)
+                        .ilike('donor_email', row.donor_email);
+                      
+                      if (txData && txData.length > 0) {
+                        const donations = txData.filter(t => t.transaction_type === 'donation');
+                        const totalDonated = donations.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+                        const donationCount = donations.length;
+                        const dates = donations.map(t => t.transaction_date).filter(Boolean).sort();
+                        const isRecurring = txData.some(tx => 
+                          tx.recurring_period && tx.recurring_period !== 'once' && tx.recurring_period !== ''
+                        );
+                        
+                        await supabase.from('donor_demographics')
+                          .update({
+                            total_donated: totalDonated,
+                            donation_count: donationCount,
+                            first_donation_date: dates[0] || null,
+                            last_donation_date: dates[dates.length - 1] || null,
+                            is_recurring: isRecurring,
+                          })
+                          .eq('id', demoData.id);
+                      }
+                    }
                   }
                 }
               }

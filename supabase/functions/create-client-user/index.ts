@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.81.1';
+import { welcome } from "../_shared/email-templates/templates/transactional.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const SENDER_EMAIL = Deno.env.get("SENDER_EMAIL") || "hussein@ryzeup.io";
+const SENDER_EMAIL = Deno.env.get("SENDER_EMAIL");  // Required - no fallback
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const PUBLIC_SITE_URL = Deno.env.get("PUBLIC_SITE_URL") || "https://your-app.com";
@@ -89,30 +90,36 @@ const handler = async (req: Request): Promise<Response> => {
         );
       }
     } else {
-      // Caller is a client user - verify they can create users in target org
-      const canManageUsers = ['admin', 'manager'].includes(callerClientUser.role);
-      const sameOrg = callerClientUser.organization_id === organization_id;
+      // SEAT-BASED BILLING: Only platform admins can create organization members directly
+      // Organizations must request members through pending_member_requests
+      console.error("Unauthorized: Only platform admins can create organization members (seat-based billing)");
+      return new Response(
+        JSON.stringify({ 
+          error: "Only platform administrators can add organization members. Please submit a member request instead.",
+          code: "SEAT_BILLING_RESTRICTION",
+          success: false 
+        }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
-      if (!canManageUsers || !sameOrg) {
-        console.error("Unauthorized: caller cannot create users in this organization");
-        return new Response(
-          JSON.stringify({ error: "You can only create users in your own organization with admin/manager role", success: false }),
-          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
+    // Validate seat availability before creating user
+    const { data: seatUsage } = await supabaseAdmin.rpc("get_org_seat_usage", {
+      org_id: organization_id
+    });
 
-      // Prevent privilege escalation - can't create users with higher role than yourself
-      const roleHierarchy = { 'viewer': 1, 'editor': 2, 'manager': 3, 'admin': 4 };
-      const callerLevel = roleHierarchy[callerClientUser.role as keyof typeof roleHierarchy] || 0;
-      const newUserLevel = roleHierarchy[role as keyof typeof roleHierarchy] || 0;
-
-      if (newUserLevel > callerLevel) {
-        console.error("Privilege escalation attempt blocked");
-        return new Response(
-          JSON.stringify({ error: "You cannot create users with a higher role than your own", success: false }),
-          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
+    if (seatUsage && seatUsage.length > 0 && seatUsage[0].available_seats <= 0) {
+      console.error("Seat limit reached for organization:", organization_id);
+      return new Response(
+        JSON.stringify({
+          error: "Organization has reached its seat limit. Please increase the seat limit before adding new members.",
+          code: "SEAT_LIMIT_REACHED",
+          seat_limit: seatUsage[0].seat_limit,
+          total_used: seatUsage[0].total_used,
+          success: false
+        }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
     }
 
     // Check if user already exists
@@ -204,103 +211,15 @@ const handler = async (req: Request): Promise<Response> => {
     // Send welcome email via Resend with secure reset link (no plaintext password)
     if (RESEND_API_KEY) {
       const resetLink = resetData?.properties?.action_link || loginUrl;
-      
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-              body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                line-height: 1.6;
-                color: #333;
-                max-width: 600px;
-                margin: 0 auto;
-                padding: 20px;
-                background-color: #f5f5f5;
-              }
-              .container {
-                background-color: white;
-                border-radius: 8px;
-                padding: 40px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-              }
-              .header {
-                text-align: center;
-                margin-bottom: 30px;
-              }
-              h1 {
-                color: #667eea;
-                margin: 0;
-                font-size: 24px;
-              }
-              .info-box {
-                background-color: #f8f9fa;
-                border-radius: 6px;
-                padding: 20px;
-                margin: 20px 0;
-              }
-              .login-button {
-                display: inline-block;
-                padding: 14px 32px;
-                background: linear-gradient(135deg, #667eea 0%, #5568d3 100%);
-                color: white;
-                text-decoration: none;
-                border-radius: 6px;
-                font-weight: 600;
-                margin: 20px 0;
-              }
-              .footer {
-                margin-top: 40px;
-                padding-top: 20px;
-                border-top: 1px solid #e0e0e0;
-                text-align: center;
-                color: #666;
-                font-size: 14px;
-              }
-              .warning {
-                font-size: 12px;
-                color: #888;
-                margin-top: 15px;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>Welcome to ${org?.name || 'the Portal'}</h1>
-              </div>
-              
-              <div class="content">
-                <p>Hello ${full_name},</p>
-                
-                <p>Your client portal account has been created. Click the button below to set your password and access your account:</p>
-                
-                <div class="info-box">
-                  <p><strong>Email:</strong> ${email}</p>
-                  <p><strong>Role:</strong> ${role}</p>
-                </div>
-                
-                <div style="text-align: center;">
-                  <a href="${resetLink}" class="login-button">
-                    Set Your Password
-                  </a>
-                </div>
-                
-                <p class="warning">
-                  This link will expire in 24 hours. If you didn't request this account, please ignore this email.
-                </p>
-              </div>
-              
-              <div class="footer">
-                <p>This is an automated message. Please do not reply to this email.</p>
-              </div>
-            </div>
-          </body>
-        </html>
-      `;
+
+      const htmlContent = welcome({
+        fullName: full_name,
+        email: email,
+        organizationName: org?.name || 'Client Portal',
+        role: role,
+        resetUrl: resetLink,
+        expiresIn: '24 hours',
+      });
 
       try {
         const emailResponse = await fetch("https://api.resend.com/emails", {
