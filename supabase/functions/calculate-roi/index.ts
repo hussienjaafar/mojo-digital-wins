@@ -130,10 +130,11 @@ serve(async (req) => {
 
       // Fetch ActBlue transactions for the date using timezone-aware RPC
       // This ensures consistent results with what the dashboard shows
-      const { data: periodSummary } = await serviceClient.rpc('get_actblue_period_summary', {
+      const { data: dashboardMetrics } = await serviceClient.rpc('get_actblue_dashboard_metrics', {
         p_organization_id: organization_id,
         p_start_date: date,
-        p_end_date: date
+        p_end_date: date,
+        p_use_utc: false
       });
 
       // Also fetch raw transactions for unique donor calculation
