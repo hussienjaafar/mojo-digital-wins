@@ -103,11 +103,12 @@ serve(async (req) => {
 
       for (const date of dates) {
         try {
-          // Use timezone-aware RPC for ActBlue data
-          const { data: periodSummary, error: rpcError } = await supabase.rpc('get_actblue_period_summary', {
+          // Use unified timezone-aware RPC for ActBlue data
+          const { data: dashboardMetrics, error: rpcError } = await supabase.rpc('get_actblue_dashboard_metrics', {
             p_organization_id: org.id,
             p_start_date: date,
-            p_end_date: date
+            p_end_date: date,
+            p_use_utc: false
           });
 
           if (rpcError) {
