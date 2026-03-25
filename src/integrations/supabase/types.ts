@@ -16205,25 +16205,6 @@ export type Database = {
         Returns: number
       }
       end_user_session: { Args: { p_session_id: string }; Returns: boolean }
-      get_actblue_daily_rollup: {
-        Args: {
-          p_end_date: string
-          p_organization_id: string
-          p_start_date: string
-          p_use_utc?: boolean
-        }
-        Returns: {
-          day: string
-          gross_raised: number
-          net_raised: number
-          recurring_amount: number
-          recurring_count: number
-          refund_amount: number
-          refund_count: number
-          transaction_count: number
-          unique_donors: number
-        }[]
-      }
       get_actblue_dashboard_metrics: {
         Args: {
           p_campaign_id?: string
@@ -16235,52 +16216,6 @@ export type Database = {
         }
         Returns: Json
       }
-      get_actblue_filtered_rollup:
-        | {
-            Args: {
-              p_campaign_id?: string
-              p_creative_id?: string
-              p_end_date: string
-              p_org_id: string
-              p_start_date: string
-              p_timezone?: string
-              p_use_utc?: boolean
-            }
-            Returns: {
-              day: string
-              gross_raised: number
-              net_raised: number
-              recurring_amount: number
-              recurring_count: number
-              refund_amount: number
-              refund_count: number
-              transaction_count: number
-              unique_donors: number
-            }[]
-          }
-        | {
-            Args: {
-              p_campaign_id?: string
-              p_creative_id?: string
-              p_end_date: string
-              p_organization_id: string
-              p_start_date: string
-              p_timezone?: string
-              p_use_utc?: boolean
-            }
-            Returns: {
-              day: string
-              donation_count: number
-              gross_raised: number
-              net_raised: number
-              recurring_amount: number
-              recurring_count: number
-              refund_amount: number
-              refund_count: number
-              total_fees: number
-              unique_donors: number
-            }[]
-          }
       get_actblue_hourly_metrics: {
         Args: { _date: string; _organization_id: string; _timezone?: string }
         Returns: {
@@ -16291,38 +16226,6 @@ export type Database = {
           hour_label: string
           net_amount: number
           recurring_count: number
-          unique_donors: number
-        }[]
-      }
-      get_actblue_period_summary: {
-        Args: {
-          p_end_date: string
-          p_organization_id: string
-          p_start_date: string
-          p_use_utc?: boolean
-        }
-        Returns: {
-          avg_donation: number
-          gross_raised: number
-          net_raised: number
-          recurring_amount: number
-          recurring_count: number
-          refund_amount: number
-          refund_count: number
-          transaction_count: number
-          unique_donors: number
-        }[]
-      }
-      get_actblue_true_unique_donors: {
-        Args: {
-          p_end_date: string
-          p_organization_id: string
-          p_start_date: string
-          p_timezone?: string
-        }
-        Returns: {
-          new_donors: number
-          returning_donors: number
           unique_donors: number
         }[]
       }

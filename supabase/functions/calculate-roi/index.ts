@@ -130,10 +130,11 @@ serve(async (req) => {
 
       // Fetch ActBlue transactions for the date using timezone-aware RPC
       // This ensures consistent results with what the dashboard shows
-      const { data: periodSummary } = await serviceClient.rpc('get_actblue_period_summary', {
+      const { data: dashboardMetrics } = await serviceClient.rpc('get_actblue_dashboard_metrics', {
         p_organization_id: organization_id,
         p_start_date: date,
-        p_end_date: date
+        p_end_date: date,
+        p_use_utc: false
       });
 
       // Also fetch raw transactions for unique donor calculation
@@ -151,13 +152,13 @@ serve(async (req) => {
       let newDonors: number;
       let refundAmount = 0;
 
-      if (periodSummary && periodSummary.length > 0) {
-        // Use the timezone-aware RPC results
-        const summary = periodSummary[0];
-        totalFundsRaised = parseFloat(summary.net_raised || '0');
-        totalDonations = parseInt(summary.total_donations || '0', 10);
+      if (dashboardMetrics && dashboardMetrics.summary) {
+        // Use the unified timezone-aware RPC results
+        const summary = dashboardMetrics.summary;
+        totalFundsRaised = parseFloat(summary.net_donations || '0');
+        totalDonations = parseInt(summary.donation_count || '0', 10);
         newDonors = parseInt(summary.unique_donors || '0', 10);
-        refundAmount = parseFloat(summary.refund_total || '0');
+        refundAmount = parseFloat(summary.refunds || '0');
       } else {
         // Fallback: Calculate from raw transactions
         const donations = (transactions || []).filter((t: any) => t.transaction_type === 'donation');

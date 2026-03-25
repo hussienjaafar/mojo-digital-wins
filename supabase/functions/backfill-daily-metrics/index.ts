@@ -103,11 +103,12 @@ serve(async (req) => {
 
       for (const date of dates) {
         try {
-          // Use timezone-aware RPC for ActBlue data
-          const { data: periodSummary, error: rpcError } = await supabase.rpc('get_actblue_period_summary', {
+          // Use unified timezone-aware RPC for ActBlue data
+          const { data: dashboardMetrics, error: rpcError } = await supabase.rpc('get_actblue_dashboard_metrics', {
             p_organization_id: org.id,
             p_start_date: date,
-            p_end_date: date
+            p_end_date: date,
+            p_use_utc: false
           });
 
           if (rpcError) {
@@ -138,17 +139,16 @@ serve(async (req) => {
           const totalSmsSent = smsCampaigns?.reduce((sum, m) => sum + (m.messages_sent || 0), 0) || 0;
           const totalSmsConversions = smsCampaigns?.reduce((sum, m) => sum + (m.conversions || 0), 0) || 0;
 
-          // Extract ActBlue data from RPC - use correct field names from get_actblue_period_summary
+          // Extract ActBlue data from unified RPC (returns JSON with summary object)
           let totalFundsRaised = 0;
           let totalDonations = 0;
           let newDonors = 0;
 
-          if (periodSummary && periodSummary.length > 0) {
-            const summary = periodSummary[0];
-            // RPC returns: total_net_donations, total_donation_count, total_unique_donors
-            totalFundsRaised = parseFloat(summary.total_net_donations || summary.total_net_revenue || '0');
-            totalDonations = parseInt(summary.total_donation_count || '0', 10);
-            newDonors = parseInt(summary.total_unique_donors || '0', 10);
+          if (dashboardMetrics && dashboardMetrics.summary) {
+            const summary = dashboardMetrics.summary;
+            totalFundsRaised = parseFloat(summary.net_donations || '0');
+            totalDonations = parseInt(summary.donation_count || '0', 10);
+            newDonors = parseInt(summary.unique_donors || '0', 10);
           }
 
           // Calculate ROI
