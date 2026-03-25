@@ -1,113 +1,138 @@
 /**
  * ActBlue RPC Client - Single Source of Truth
- * 
+ *
  * This module provides shared RPC wrapper functions for ActBlue data.
  * All hooks should import from here to ensure consistent field mapping.
- * 
- * RPC Field Mapping (actual RPC response → frontend interface):
- * - gross_raised → gross_raised
- * - net_raised → net_raised  
- * - transaction_count → donation_count
- * - recurring_count → recurring_count
- * - recurring_amount → recurring_revenue
- * - refund_count → refund_count
- * - refund_amount → refunds
- * - unique_donors → unique_donors
- * - avg_donation → avg_donation
- * 
- * Note: total_fees is calculated as (gross_raised - net_raised) since
- * the RPC doesn't return an explicit fee field.
+ *
+ * Internally calls the unified `get_actblue_dashboard_metrics` RPC which
+ * returns summary + daily + channels in a single call. The individual
+ * fetch functions extract the relevant portion and map field names to
+ * match the DailyRollupRow and PeriodSummary interfaces.
+ *
+ * RPC Response Field Mapping (dashboard_metrics → frontend interface):
+ * - summary.gross_donations → gross_raised
+ * - summary.net_donations → net_raised
+ * - summary.donation_count → donation_count
+ * - summary.recurring_count → recurring_count
+ * - summary.recurring_revenue → recurring_revenue
+ * - summary.refund_count → refund_count
+ * - summary.refunds → refunds
+ * - summary.unique_donors → unique_donors
+ * - summary.total_fees → total_fees
  */
 
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
 import type { DailyRollupRow, PeriodSummary } from "@/queries/useActBlueDailyRollupQuery";
 
-/**
- * Fetch daily ActBlue rollup from the canonical RPC.
- * Uses org timezone for day bucketing - the SINGLE SOURCE OF TRUTH.
- */
-export async function fetchDailyRollup(
-  organizationId: string,
-  startDate: string,
-  endDate: string
-): Promise<DailyRollupRow[]> {
-  const { data, error } = await (supabase as any).rpc('get_actblue_daily_rollup', {
-    p_organization_id: organizationId,
-    p_start_date: startDate,
-    p_end_date: endDate,
-  });
-
-  if (error) {
-    logger.error('Failed to fetch ActBlue daily rollup', { error, organizationId, startDate, endDate });
-    throw new Error(`Failed to fetch daily rollup: ${error.message}`);
-  }
-
-  // Map RPC field names to frontend interface names
-  // RPC returns: gross_raised, net_raised, transaction_count, recurring_count, 
-  // recurring_amount, refund_count, refund_amount, unique_donors
-  return (data || []).map((row: any) => {
-    const grossDonations = Number(row.gross_raised) || 0;
-    const netDonations = Number(row.net_raised) || 0;
-    const donationCount = Number(row.transaction_count) || 0;
-    const recurringCount = Number(row.recurring_count) || 0;
-    const recurringRevenue = Number(row.recurring_amount) || 0;
-    const refundCount = Number(row.refund_count) || 0;
-    const refundAmount = Number(row.refund_amount) || 0;
-    const totalFees = grossDonations - netDonations; // Fees = gross - net
-
-    return {
-      day: row.day,
-      gross_raised: grossDonations,
-      net_raised: netDonations,
-      refunds: refundAmount,
-      net_revenue: netDonations - refundAmount,
-      total_fees: totalFees,
-      donation_count: donationCount,
-      unique_donors: Number(row.unique_donors) || 0,
-      refund_count: refundCount,
-      recurring_count: recurringCount,
-      one_time_count: donationCount - recurringCount,
-      recurring_revenue: recurringRevenue,
-      one_time_revenue: netDonations - recurringRevenue,
-      fee_percentage: grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0,
-      refund_rate: donationCount > 0 ? (refundCount / donationCount) * 100 : 0,
-    };
-  });
+/** Shape of the unified RPC JSON response */
+interface DashboardMetricsResponse {
+  summary: {
+    gross_donations: number;
+    net_donations: number;
+    total_fees: number;
+    refunds: number;
+    donation_count: number;
+    refund_count: number;
+    recurring_count: number;
+    recurring_revenue: number;
+    unique_donors: number;
+  };
+  daily: Array<{
+    day: string;
+    gross_donations: number;
+    net_donations: number;
+    donation_count: number;
+    unique_donors?: number;
+    recurring_count?: number;
+    recurring_revenue?: number;
+  }>;
+  channels: Array<{
+    channel: string;
+    revenue: number;
+    net_revenue?: number;
+    count: number;
+    donors?: number;
+  }>;
+  timezone: string;
 }
 
 /**
- * Fetch ActBlue period summary from the canonical RPC.
- * Uses org timezone for day bucketing - the SINGLE SOURCE OF TRUTH.
+ * Internal: call the unified get_actblue_dashboard_metrics RPC once
+ * and return the raw JSON response.
  */
-export async function fetchPeriodSummary(
+async function fetchDashboardMetrics(
   organizationId: string,
   startDate: string,
   endDate: string
-): Promise<PeriodSummary> {
-  const { data, error } = await (supabase as any).rpc('get_actblue_period_summary', {
+): Promise<DashboardMetricsResponse> {
+  const { data, error } = await supabase.rpc('get_actblue_dashboard_metrics', {
     p_organization_id: organizationId,
     p_start_date: startDate,
     p_end_date: endDate,
+    p_campaign_id: null,
+    p_creative_id: null,
+    p_use_utc: false,
   });
 
   if (error) {
-    logger.error('Failed to fetch ActBlue period summary', { error, organizationId, startDate, endDate });
-    throw new Error(`Failed to fetch period summary: ${error.message}`);
+    logger.error('Failed to fetch ActBlue dashboard metrics', { error, organizationId, startDate, endDate });
+    throw new Error(`Failed to fetch dashboard metrics: ${error.message}`);
   }
 
-  // Map RPC field names to frontend interface names
-  // RPC returns: gross_raised, net_raised, transaction_count, recurring_count, 
-  // recurring_amount, refund_count, refund_amount, unique_donors, avg_donation
-  const row = data?.[0] || {};
-  const grossDonations = Number(row.gross_raised) || 0;
-  const netDonations = Number(row.net_raised) || 0;
-  const donationCount = Number(row.transaction_count) || 0;
+  if (!data) {
+    throw new Error('No data returned from get_actblue_dashboard_metrics');
+  }
+
+  return data as unknown as DashboardMetricsResponse;
+}
+
+/**
+ * Map a daily row from the unified RPC to the DailyRollupRow interface.
+ */
+function mapDailyRow(row: DashboardMetricsResponse['daily'][number]): DailyRollupRow {
+  const grossDonations = Number(row.gross_donations) || 0;
+  const netDonations = Number(row.net_donations) || 0;
+  const donationCount = Number(row.donation_count) || 0;
   const recurringCount = Number(row.recurring_count) || 0;
-  const recurringRevenue = Number(row.recurring_amount) || 0;
-  const refundCount = Number(row.refund_count) || 0;
-  const refundAmount = Number(row.refund_amount) || 0;
-  const totalFees = grossDonations - netDonations; // Fees = gross - net
+  const recurringRevenue = Number(row.recurring_revenue) || 0;
+  const totalFees = grossDonations - netDonations;
+  // Note: daily rows from dashboard_metrics don't include refund breakdown
+  // Refunds are in the summary only; daily refunds default to 0
+  const refundAmount = 0;
+  const refundCount = 0;
+
+  return {
+    day: row.day,
+    gross_raised: grossDonations,
+    net_raised: netDonations,
+    refunds: refundAmount,
+    net_revenue: netDonations - refundAmount,
+    total_fees: totalFees,
+    donation_count: donationCount,
+    unique_donors: Number(row.unique_donors) || 0,
+    refund_count: refundCount,
+    recurring_count: recurringCount,
+    one_time_count: donationCount - recurringCount,
+    recurring_revenue: recurringRevenue,
+    one_time_revenue: netDonations - recurringRevenue,
+    fee_percentage: grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0,
+    refund_rate: 0,
+  };
+}
+
+/**
+ * Map the summary from the unified RPC to the PeriodSummary interface.
+ */
+function mapSummary(summary: DashboardMetricsResponse['summary'], dailyCount: number): PeriodSummary {
+  const grossDonations = Number(summary.gross_donations) || 0;
+  const netDonations = Number(summary.net_donations) || 0;
+  const donationCount = Number(summary.donation_count) || 0;
+  const recurringCount = Number(summary.recurring_count) || 0;
+  const recurringRevenue = Number(summary.recurring_revenue) || 0;
+  const refundCount = Number(summary.refund_count) || 0;
+  const refundAmount = Number(summary.refunds) || 0;
+  const totalFees = Number(summary.total_fees) || (grossDonations - netDonations);
 
   return {
     gross_raised: grossDonations,
@@ -116,7 +141,7 @@ export async function fetchPeriodSummary(
     net_revenue: netDonations - refundAmount,
     total_fees: totalFees,
     donation_count: donationCount,
-    unique_donors_approx: Number(row.unique_donors) || 0,
+    unique_donors_approx: Number(summary.unique_donors) || 0,
     refund_count: refundCount,
     recurring_count: recurringCount,
     one_time_count: donationCount - recurringCount,
@@ -124,23 +149,52 @@ export async function fetchPeriodSummary(
     one_time_revenue: netDonations - recurringRevenue,
     avg_fee_percentage: grossDonations > 0 ? (totalFees / grossDonations) * 100 : 0,
     refund_rate: donationCount > 0 ? (refundCount / donationCount) * 100 : 0,
-    avg_donation: Number(row.avg_donation) || (grossDonations / (donationCount || 1)),
-    days_with_donations: 0, // Not provided by RPC, compute separately if needed
+    avg_donation: grossDonations / (donationCount || 1),
+    days_with_donations: dailyCount,
   };
 }
 
 /**
- * Fetch both daily rollup and period summary in parallel
+ * Fetch daily ActBlue rollup via the unified dashboard metrics RPC.
+ * Preserves the DailyRollupRow interface for downstream consumers.
+ */
+export async function fetchDailyRollup(
+  organizationId: string,
+  startDate: string,
+  endDate: string
+): Promise<DailyRollupRow[]> {
+  const response = await fetchDashboardMetrics(organizationId, startDate, endDate);
+  return (response.daily || []).map(mapDailyRow);
+}
+
+/**
+ * Fetch ActBlue period summary via the unified dashboard metrics RPC.
+ * Preserves the PeriodSummary interface for downstream consumers.
+ */
+export async function fetchPeriodSummary(
+  organizationId: string,
+  startDate: string,
+  endDate: string
+): Promise<PeriodSummary> {
+  const response = await fetchDashboardMetrics(organizationId, startDate, endDate);
+  const daysWithDonations = (response.daily || []).filter(d => (Number(d.donation_count) || 0) > 0).length;
+  return mapSummary(response.summary || {} as DashboardMetricsResponse['summary'], daysWithDonations);
+}
+
+/**
+ * Fetch both daily rollup and period summary in a single RPC call.
+ * Previously made 2 parallel calls; now makes just 1.
  */
 export async function fetchActBlueRollup(
   organizationId: string,
   startDate: string,
   endDate: string
 ): Promise<{ dailyData: DailyRollupRow[]; summary: PeriodSummary }> {
-  const [dailyData, summary] = await Promise.all([
-    fetchDailyRollup(organizationId, startDate, endDate),
-    fetchPeriodSummary(organizationId, startDate, endDate),
-  ]);
+  const response = await fetchDashboardMetrics(organizationId, startDate, endDate);
+
+  const dailyData = (response.daily || []).map(mapDailyRow);
+  const daysWithDonations = dailyData.filter(d => d.donation_count > 0).length;
+  const summary = mapSummary(response.summary || {} as DashboardMetricsResponse['summary'], daysWithDonations);
 
   return { dailyData, summary };
 }

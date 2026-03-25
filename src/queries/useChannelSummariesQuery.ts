@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { parseISO, isValid, differenceInCalendarDays, format } from "date-fns";
 import { channelKeys } from "./queryKeys";
+import { fetchPeriodSummary } from "@/lib/actblueRpcClient";
 
 // ============================================================================
 // Types
@@ -224,27 +225,8 @@ async function fetchDonationsSummary(
   startDate: string,
   endDate: string
 ): Promise<DonationsSummary> {
-  // Use canonical RPC for timezone-aware, single-source-of-truth metrics
-  const { data, error } = await (supabase as any).rpc('get_actblue_period_summary', {
-    p_organization_id: organizationId,
-    p_start_date: startDate,
-    p_end_date: endDate,
-  });
-
-  if (error) {
-    console.error("[useChannelSummariesQuery] Donations RPC error:", error);
-    throw error;
-  }
-
-  // Map RPC field names (gross_raised, net_raised, transaction_count, etc.)
-  const row = data?.[0] || {};
-  const grossDonations = Number(row.gross_raised) || 0;
-  const netDonations = Number(row.net_raised) || 0;
-  const donationCount = Number(row.transaction_count) || 0;
-  const refundCount = Number(row.refund_count) || 0;
-  const refundAmount = Number(row.refund_amount) || 0;
-  const uniqueDonors = Number(row.unique_donors) || 0;
-  const avgDonation = Number(row.avg_donation) || 0;
+  // Use the unified actblueRpcClient (calls get_actblue_dashboard_metrics internally)
+  const summary = await fetchPeriodSummary(organizationId, startDate, endDate);
 
   // For lastDataDate, we need a separate lightweight query
   const { data: latestTxn } = await supabase
@@ -259,15 +241,15 @@ async function fetchDonationsSummary(
   const lastDataDate = latestTxn?.[0]?.transaction_date?.split("T")[0] || null;
 
   return {
-    totalGross: grossDonations,
-    totalNet: netDonations,
-    refundAmount,
-    refundCount,
-    donors: uniqueDonors,
-    avgNet: avgDonation,
-    transactionCount: donationCount,
+    totalGross: summary.gross_raised,
+    totalNet: summary.net_raised,
+    refundAmount: summary.refunds,
+    refundCount: summary.refund_count,
+    donors: summary.unique_donors_approx,
+    avgNet: summary.avg_donation,
+    transactionCount: summary.donation_count,
     lastDataDate,
-    hasData: donationCount > 0,
+    hasData: summary.donation_count > 0,
   };
 }
 
