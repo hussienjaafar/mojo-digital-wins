@@ -16313,19 +16313,6 @@ export type Database = {
           unique_donors: number
         }[]
       }
-      get_actblue_true_unique_donors: {
-        Args: {
-          p_end_date: string
-          p_organization_id: string
-          p_start_date: string
-          p_timezone?: string
-        }
-        Returns: {
-          new_donors: number
-          returning_donors: number
-          unique_donors: number
-        }[]
-      }
       get_active_organization_id: { Args: never; Returns: string }
       get_ad_performance_donations_tz: {
         Args: {
