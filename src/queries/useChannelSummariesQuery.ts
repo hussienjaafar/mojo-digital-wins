@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { parseISO, isValid, differenceInCalendarDays, format } from "date-fns";
 import { channelKeys } from "./queryKeys";
-import { fetchPeriodSummary } from "@/lib/actblueRpcClient";
+import { fetchPeriodSummary, fetchSmsChannelFromActBlue } from "@/lib/actblueRpcClient";
 
 // ============================================================================
 // Types
@@ -205,9 +205,26 @@ async function fetchSmsSummary(
   const raised = summary.totalRaised || 0;
   const cost = summary.totalCost || 0;
   const roi = cost > 0 ? raised / cost : 0;
-  
+
   // Get last data date from most recent campaign
   const lastDataDate = campaigns[0]?.send_date?.split("T")[0] || null;
+
+  // If the SMS platform has no data, fall back to ActBlue channel breakdown
+  // (ActBlue tracks which form each donation came through, e.g. mpac-sms2)
+  if ((summary.campaignCount || 0) === 0) {
+    const actBlueSms = await fetchSmsChannelFromActBlue(organizationId, startDate, endDate);
+    if (actBlueSms.donations > 0) {
+      return {
+        sent: 0,
+        raised: actBlueSms.raised,
+        cost: 0,
+        roi: 0,
+        campaignCount: 0,
+        lastDataDate: null,
+        hasData: true,
+      };
+    }
+  }
 
   return {
     sent,

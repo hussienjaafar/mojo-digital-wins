@@ -151,32 +151,36 @@ export function OrganizationIntegrationsPanel({
 
   const handleTest = async (integrationId: string): Promise<boolean> => {
     try {
-      // Simulate test - in real implementation this would call an edge function
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const success = Math.random() > 0.2;
-      
-      await supabase
-        .from('client_api_credentials')
-        .update({
-          last_tested_at: new Date().toISOString(),
-          last_test_status: success ? 'success' : 'failed',
-          last_test_error: success ? null : 'Connection timeout',
-        })
-        .eq('id', integrationId);
+      const integration = data?.integrations.find(i => i.id === integrationId);
+      if (!integration) return false;
+
+      const { data: result, error } = await supabase.functions.invoke('test-integration', {
+        body: {
+          organization_id: organizationId,
+          platform: integration.platform,
+        },
+      });
+
+      if (error) throw error;
+
+      const success = result?.success ?? false;
 
       await fetchIntegrations();
-      
+
       toast({
         title: success ? 'Connection successful' : 'Connection failed',
-        description: success 
-          ? 'The integration is working correctly' 
-          : 'Failed to connect. Check credentials.',
+        description: result?.message || (success ? 'Working correctly' : 'Check credentials.'),
         variant: success ? 'default' : 'destructive',
       });
-      
+
       return success;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error testing connection:', error);
+      toast({
+        title: 'Test failed',
+        description: error.message || 'Could not reach test endpoint',
+        variant: 'destructive',
+      });
       return false;
     }
   };

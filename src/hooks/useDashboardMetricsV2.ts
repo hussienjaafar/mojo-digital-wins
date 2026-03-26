@@ -53,7 +53,9 @@ interface DashboardMetricsV2Data {
   smsConversions: number;
   directDonations: number;
   attributionFallbackMode: boolean;
-  
+  metaAttributedRevenue: number;
+  smsAttributedRevenue: number;
+
   // Additional fields for ClientDashboardCharts
   channelBreakdown: ChannelBreakdown[];
   smsMessagesSent: number;
@@ -295,12 +297,14 @@ function transformToLegacyFormat(
     timeSeries,
     metaSpend: channelSpend.metaSpend,
     smsSpend: channelSpend.smsSpend,
-    metaConversions: channelSpend.metaConversions,
-    smsConversions: channelSpend.smsConversions,
+    metaConversions: metaChannel?.donations || channelSpend.metaConversions,
+    smsConversions: smsChannel?.donations || 0,
     directDonations,
     attributionFallbackMode: false, // Unified hook uses proper attribution
+    metaAttributedRevenue,
+    smsAttributedRevenue,
     channelBreakdown: legacyChannelBreakdown,
-    smsMessagesSent: 0, // Will be populated from SMS metrics if needed
+    smsMessagesSent: 0, // SMS platform sends - separate from ActBlue attribution
     _unified: unified,
   };
 }

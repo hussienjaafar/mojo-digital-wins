@@ -23,6 +23,8 @@ interface ClientDashboardChartsProps {
   metaConversions: number;
   smsConversions: number;
   smsMessagesSent: number;
+  smsAttributedRevenue: number;
+  metaAttributedRevenue: number;
   directDonations: number;
   startDate: string;
   endDate: string;
@@ -150,6 +152,8 @@ export const ClientDashboardCharts = ({
   metaConversions,
   smsConversions,
   smsMessagesSent,
+  smsAttributedRevenue,
+  metaAttributedRevenue,
   directDonations,
   startDate,
   endDate,
@@ -339,7 +343,7 @@ export const ClientDashboardCharts = ({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">SMS Campaigns</p>
                   <p className="text-xs text-[hsl(var(--portal-text-muted))]">
-                    {smsMessagesSent.toLocaleString()} sent
+                    {smsAttributedRevenue > 0 ? formatCurrency(smsAttributedRevenue) + ' raised' : smsMessagesSent > 0 ? smsMessagesSent.toLocaleString() + ' sent' : 'No data'}
                   </p>
                 </div>
                 <div className="text-right">

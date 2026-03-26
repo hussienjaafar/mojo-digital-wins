@@ -198,3 +198,23 @@ export async function fetchActBlueRollup(
 
   return { dailyData, summary };
 }
+
+/**
+ * Fetch SMS channel data from the ActBlue RPC channel breakdown.
+ * Used as a fallback when the sms_campaigns table has no data,
+ * since ActBlue tracks which form (e.g. mpac-sms2) each donation came through.
+ */
+export async function fetchSmsChannelFromActBlue(
+  organizationId: string,
+  startDate: string,
+  endDate: string
+): Promise<{ donations: number; raised: number; net: number }> {
+  const response = await fetchDashboardMetrics(organizationId, startDate, endDate);
+  const smsChannel = (response.channels || []).find(c => c.channel === 'sms');
+
+  return {
+    donations: smsChannel?.count || 0,
+    raised: Number(smsChannel?.revenue || 0),
+    net: Number(smsChannel?.net_revenue || smsChannel?.revenue || 0),
+  };
+}

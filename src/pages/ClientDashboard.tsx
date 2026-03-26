@@ -460,6 +460,8 @@ const ClientDashboard = () => {
                       metaConversions={data.metaConversions}
                       smsConversions={data.smsConversions}
                       smsMessagesSent={data.smsMessagesSent}
+                      smsAttributedRevenue={data.smsAttributedRevenue}
+                      metaAttributedRevenue={data.metaAttributedRevenue}
                       directDonations={data.directDonations}
                       startDate={dateRange.startDate}
                       endDate={dateRange.endDate}
