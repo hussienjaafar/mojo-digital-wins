@@ -42,7 +42,8 @@ SELECT
           WHEN NOT cac.is_active THEN 'disabled'
           WHEN cac.last_sync_status IN ('error', 'failed') THEN 'error'
           WHEN cac.last_tested_at IS NOT NULL AND cac.last_test_status != 'success' THEN 'credentials_invalid'
-          WHEN cac.last_sync_at IS NULL THEN 'untested'
+          WHEN cac.last_sync_at IS NULL AND (cac.last_tested_at IS NULL OR cac.last_test_status != 'success') THEN 'untested'
+          WHEN cac.last_sync_at IS NULL AND cac.last_test_status = 'success' THEN 'healthy'
           WHEN cac.platform = 'meta' AND EXTRACT(EPOCH FROM (NOW() - cac.last_sync_at)) / 3600.0 > 48 THEN 'stale'
           WHEN cac.platform = 'switchboard' AND EXTRACT(EPOCH FROM (NOW() - cac.last_sync_at)) / 3600.0 > 2 THEN 'stale'
           WHEN cac.platform = 'actblue' AND EXTRACT(EPOCH FROM (NOW() - cac.last_sync_at)) / 3600.0 > 24 THEN 'stale'
@@ -54,18 +55,23 @@ SELECT
     '[]'::jsonb
   ) AS integrations,
   COUNT(cac.id)::int AS total_count,
-  -- Healthy: active, sync not stale, no errors, test passed or untested
+  -- Healthy: active, no errors, and either (synced recently) or (never synced but test passed)
   COUNT(CASE WHEN cac.is_active
     AND COALESCE(cac.last_sync_status, '') != 'error'
     AND COALESCE(cac.last_sync_status, '') != 'failed'
     AND (cac.last_tested_at IS NULL OR cac.last_test_status = 'success')
-    AND cac.last_sync_at IS NOT NULL
-    AND CASE
-      WHEN cac.platform = 'meta' THEN EXTRACT(EPOCH FROM (NOW() - cac.last_sync_at)) / 3600.0 <= 48
-      WHEN cac.platform = 'switchboard' THEN EXTRACT(EPOCH FROM (NOW() - cac.last_sync_at)) / 3600.0 <= 2
-      WHEN cac.platform = 'actblue' THEN EXTRACT(EPOCH FROM (NOW() - cac.last_sync_at)) / 3600.0 <= 24
-      ELSE EXTRACT(EPOCH FROM (NOW() - cac.last_sync_at)) / 3600.0 <= 48
-    END
+    AND (
+      -- Never synced but test passed = healthy (credentials verified)
+      (cac.last_sync_at IS NULL AND cac.last_test_status = 'success')
+      OR
+      -- Synced within freshness window
+      (cac.last_sync_at IS NOT NULL AND CASE
+        WHEN cac.platform = 'meta' THEN EXTRACT(EPOCH FROM (NOW() - cac.last_sync_at)) / 3600.0 <= 48
+        WHEN cac.platform = 'switchboard' THEN EXTRACT(EPOCH FROM (NOW() - cac.last_sync_at)) / 3600.0 <= 2
+        WHEN cac.platform = 'actblue' THEN EXTRACT(EPOCH FROM (NOW() - cac.last_sync_at)) / 3600.0 <= 24
+        ELSE EXTRACT(EPOCH FROM (NOW() - cac.last_sync_at)) / 3600.0 <= 48
+      END)
+    )
     THEN 1 END)::int AS healthy_count,
   COUNT(CASE WHEN cac.last_sync_status IN ('error', 'failed') THEN 1 END)::int AS error_count,
   COUNT(CASE WHEN NOT cac.is_active THEN 1 END)::int AS disabled_count,
