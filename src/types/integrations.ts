@@ -11,6 +11,8 @@ export type IntegrationHealthStatus =
 
 export type SyncStatus = 'success' | 'error' | 'failed' | 'pending' | null;
 
+export type ComputedIntegrationStatus = 'healthy' | 'error' | 'stale' | 'untested' | 'credentials_invalid' | 'disabled';
+
 export interface IntegrationDetail {
   id: string;
   platform: IntegrationPlatform;
@@ -22,6 +24,12 @@ export interface IntegrationDetail {
   last_tested_at: string | null;
   last_test_status: string | null;
   created_at: string | null;
+  // Health fields from updated view
+  sync_age_hours: number | null;
+  is_sync_stale: boolean;
+  test_passed: boolean | null;
+  test_age_hours: number | null;
+  computed_status: ComputedIntegrationStatus;
 }
 
 export interface WebhookStats {

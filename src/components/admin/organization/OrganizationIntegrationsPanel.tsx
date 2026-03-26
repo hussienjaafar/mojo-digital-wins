@@ -41,6 +41,7 @@ interface IntegrationData {
   healthyCount: number;
   errorCount: number;
   untestedCount: number;
+  staleCount: number;
   healthStatus: IntegrationHealthStatus;
 }
 
@@ -115,6 +116,7 @@ export function OrganizationIntegrationsPanel({
           healthyCount: summaryData.healthy_count || 0,
           errorCount: summaryData.error_count || 0,
           untestedCount: summaryData.untested_count || 0,
+          staleCount: summaryData.stale_count || 0,
           healthStatus: (summaryData.health_status as IntegrationHealthStatus) || 'no_setup',
         });
       } else {
@@ -124,6 +126,7 @@ export function OrganizationIntegrationsPanel({
           healthyCount: 0,
           errorCount: 0,
           untestedCount: 0,
+          staleCount: 0,
           healthStatus: 'no_setup',
         });
       }
@@ -286,6 +289,11 @@ export function OrganizationIntegrationsPanel({
               {data.errorCount > 0 && (
                 <span className="text-[hsl(var(--portal-error))]">
                   {data.errorCount} Failing
+                </span>
+              )}
+              {data.staleCount > 0 && (
+                <span className="text-[hsl(var(--portal-warning))]">
+                  {data.staleCount} Stale
                 </span>
               )}
               {data.untestedCount > 0 && (

@@ -114,39 +114,52 @@ export function IntegrationDetailCard({
   };
 
   const getStatusConfig = () => {
-    if (!integration.is_active) {
-      return {
-        icon: <Circle className="h-4 w-4 text-[hsl(var(--portal-text-tertiary))]" />,
-        label: 'Disabled',
-        color: 'text-[hsl(var(--portal-text-tertiary))]',
-      };
+    const status = integration.computed_status;
+
+    switch (status) {
+      case 'healthy':
+        return {
+          icon: <CheckCircle className="h-4 w-4 text-[hsl(var(--portal-success))]" />,
+          label: 'Healthy',
+          color: 'text-[hsl(var(--portal-success))]',
+        };
+      case 'error':
+        return {
+          icon: <XCircle className="h-4 w-4 text-[hsl(var(--portal-error))]" />,
+          label: 'Sync Failed',
+          color: 'text-[hsl(var(--portal-error))]',
+        };
+      case 'stale':
+        return {
+          icon: <Clock className="h-4 w-4 text-[hsl(var(--portal-warning))]" />,
+          label: 'Stale',
+          color: 'text-[hsl(var(--portal-warning))]',
+        };
+      case 'credentials_invalid':
+        return {
+          icon: <AlertTriangle className="h-4 w-4 text-[hsl(var(--portal-error))]" />,
+          label: 'Credentials Failed',
+          color: 'text-[hsl(var(--portal-error))]',
+        };
+      case 'untested':
+        return {
+          icon: <Clock className="h-4 w-4 text-[hsl(var(--portal-warning))]" />,
+          label: 'Untested',
+          color: 'text-[hsl(var(--portal-warning))]',
+        };
+      case 'disabled':
+        return {
+          icon: <Circle className="h-4 w-4 text-[hsl(var(--portal-text-tertiary))]" />,
+          label: 'Disabled',
+          color: 'text-[hsl(var(--portal-text-tertiary))]',
+        };
+      default:
+        return {
+          icon: <Circle className="h-4 w-4 text-[hsl(var(--portal-text-tertiary))]" />,
+          label: 'Pending',
+          color: 'text-[hsl(var(--portal-text-tertiary))]',
+        };
     }
-    if (integration.last_sync_status === 'success') {
-      return {
-        icon: <CheckCircle className="h-4 w-4 text-[hsl(var(--portal-success))]" />,
-        label: 'Connected',
-        color: 'text-[hsl(var(--portal-success))]',
-      };
-    }
-    if (integration.last_sync_status === 'error' || integration.last_sync_status === 'failed') {
-      return {
-        icon: <XCircle className="h-4 w-4 text-[hsl(var(--portal-error))]" />,
-        label: 'Failed',
-        color: 'text-[hsl(var(--portal-error))]',
-      };
-    }
-    if (!integration.last_tested_at) {
-      return {
-        icon: <Clock className="h-4 w-4 text-[hsl(var(--portal-warning))]" />,
-        label: 'Untested',
-        color: 'text-[hsl(var(--portal-warning))]',
-      };
-    }
-    return {
-      icon: <Circle className="h-4 w-4 text-[hsl(var(--portal-text-tertiary))]" />,
-      label: 'Pending',
-      color: 'text-[hsl(var(--portal-text-tertiary))]',
-    };
   };
 
   const getLastSyncText = () => {
