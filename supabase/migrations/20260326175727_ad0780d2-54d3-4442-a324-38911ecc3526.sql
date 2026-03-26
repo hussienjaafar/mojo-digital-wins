@@ -1,0 +1,1 @@
+UPDATE scheduled_jobs SET last_run_status = 'failed', last_run_at = NOW() WHERE job_name = 'Sync Switchboard SMS' AND last_run_status = 'running';
