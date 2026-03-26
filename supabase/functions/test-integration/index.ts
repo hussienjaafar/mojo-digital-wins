@@ -141,7 +141,7 @@ async function testSwitchboardIntegration(
 
   try {
     const apiKey = credentials.api_key;
-    const campaignId = credentials.campaign_id;
+    const accountId = credentials.account_id;
 
     if (!apiKey) {
       result.status = 'invalid_credentials';
@@ -150,19 +150,25 @@ async function testSwitchboardIntegration(
       return result;
     }
 
-    // Test by calling the Switchboard API health endpoint or campaigns list
+    if (!accountId) {
+      result.status = 'invalid_credentials';
+      result.message = 'Missing account ID';
+      result.latencyMs = Date.now() - startTime;
+      return result;
+    }
+
+    // Test by calling the Switchboard API broadcasts endpoint
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    // Switchboard API base URL - adjust based on actual API
-    const baseUrl = credentials.base_url || 'https://api.switchboard.sms';
-    
+    const basicAuth = btoa(`${accountId}:${apiKey}`);
+
     const response = await fetch(
-      `${baseUrl}/v1/campaigns`,
-      { 
+      `https://api.oneswitchboard.com/v1/broadcasts`,
+      {
         signal: controller.signal,
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Basic ${basicAuth}`,
           'Content-Type': 'application/json',
         },
       }
@@ -191,7 +197,7 @@ async function testSwitchboardIntegration(
     result.status = 'success';
     result.message = 'Switchboard API connection verified';
     result.details = {
-      campaignsCount: Array.isArray(data) ? data.length : (data.campaigns?.length || 0),
+      broadcastsCount: Array.isArray(data) ? data.length : (data.data?.length || 0),
     };
     return result;
 
