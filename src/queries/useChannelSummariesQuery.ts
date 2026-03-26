@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { parseISO, isValid, differenceInCalendarDays, format } from "date-fns";
 import { channelKeys } from "./queryKeys";
-import { fetchPeriodSummary, fetchSmsChannelFromActBlue } from "@/lib/actblueRpcClient";
+import { fetchPeriodSummary } from "@/lib/actblueRpcClient";
 
 // ============================================================================
 // Types
@@ -209,22 +209,8 @@ async function fetchSmsSummary(
   // Get last data date from most recent campaign
   const lastDataDate = campaigns[0]?.send_date?.split("T")[0] || null;
 
-  // If the SMS platform has no data, fall back to ActBlue channel breakdown
-  // (ActBlue tracks which form each donation came through, e.g. mpac-sms2)
-  if ((summary.campaignCount || 0) === 0) {
-    const actBlueSms = await fetchSmsChannelFromActBlue(organizationId, startDate, endDate);
-    if (actBlueSms.donations > 0) {
-      return {
-        sent: 0,
-        raised: actBlueSms.raised,
-        cost: 0,
-        roi: 0,
-        campaignCount: 0,
-        lastDataDate: null,
-        hasData: true,
-      };
-    }
-  }
+  // The get_sms_metrics RPC now queries actblue_transactions.attributed_channel = 'sms'
+  // directly, so raised/donations are always accurate without fallback
 
   return {
     sent,

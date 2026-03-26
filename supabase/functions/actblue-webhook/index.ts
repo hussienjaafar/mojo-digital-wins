@@ -320,7 +320,7 @@ serve(async (req) => {
     const refcodes = parsedPayload.contribution.refcodes || {};
     let refcode = refcodes.refcode || null;
     
-    // Extract source campaign from refcode
+    // Legacy source_campaign (deprecated — use attributed_channel instead)
     let sourceCampaign = null;
     if (refcode) {
       const lowerRefcode = refcode.toLowerCase();
@@ -421,6 +421,75 @@ serve(async (req) => {
       }
     }
 
+    // === Unified Attribution ===
+    // Single priority chain: refcode_mappings (already done above) → sms_campaigns → patterns
+    let attributedChannel = determinedSource || 'other';
+    let smsCampaignId: string | null = null;
+
+    // If refcode_mappings gave us a platform, use it (Priority 1 — already set in determinedSource)
+    // Otherwise, check sms_campaigns for refcode/form match (Priority 2 & 4)
+    if (!mapping) {
+      // Priority 2: sms_campaigns refcode match
+      if (refcode) {
+        const { data: smsCamp } = await supabase
+          .from('sms_campaigns')
+          .select('id')
+          .eq('organization_id', organization_id)
+          .or(`actblue_refcode.ilike.${refcode},extracted_refcode.ilike.${refcode}`)
+          .order('send_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (smsCamp?.id) {
+          attributedChannel = 'sms';
+          smsCampaignId = smsCamp.id;
+        }
+      }
+
+      // Priority 3: refcode2 fb_ prefix
+      if (attributedChannel === 'other' && refcode2Value?.startsWith('fb_')) {
+        attributedChannel = 'meta';
+      }
+
+      // Priority 4: sms_campaigns form name match
+      if (attributedChannel === 'other' && contribution.contributionForm) {
+        const cf = contribution.contributionForm.toLowerCase();
+        const { data: smsCamps } = await supabase
+          .from('sms_campaigns')
+          .select('id, actblue_form')
+          .eq('organization_id', organization_id)
+          .not('actblue_form', 'is', null)
+          .order('send_date', { ascending: false })
+          .limit(10);
+        if (smsCamps) {
+          const match = smsCamps.find((sc: any) => sc.actblue_form && cf.includes(sc.actblue_form.toLowerCase()));
+          if (match) {
+            attributedChannel = 'sms';
+            smsCampaignId = match.id;
+          }
+        }
+      }
+
+      // Priority 5: contribution_form patterns
+      if (attributedChannel === 'other' && contribution.contributionForm) {
+        const cf = contribution.contributionForm.toLowerCase();
+        if (cf.includes('sms') || cf.includes('text')) attributedChannel = 'sms';
+        else if (cf.includes('meta')) attributedChannel = 'meta';
+      }
+
+      // Priority 6: refcode patterns
+      if (attributedChannel === 'other' && refcode) {
+        const rc = refcode.toLowerCase();
+        if (rc.includes('sms') || rc.includes('text') || rc.startsWith('txt')) attributedChannel = 'sms';
+        else if (rc.includes('fb') || rc.includes('facebook') || rc.includes('ig') || rc.includes('instagram') || rc.includes('meta')) attributedChannel = 'meta';
+        else if (rc.includes('email') || rc.startsWith('em')) attributedChannel = 'email';
+        else if (rc.includes('organic') || rc.includes('direct')) attributedChannel = 'organic';
+      }
+    }
+
+    // Sync source_campaign with attributed_channel for backward compatibility
+    determinedSource = attributedChannel;
+    console.log(`[ACTBLUE] Attribution: ${attributedChannel}${smsCampaignId ? ` (sms_campaign: ${smsCampaignId})` : ''}`);
+
     // Store transaction data (RLS-compatible with service role)
     // Now capturing ALL available ActBlue fields for complete analytics
     const { error: insertError } = await supabase
@@ -462,6 +531,8 @@ serve(async (req) => {
         click_id: clickId,
         fbclid,
         source_campaign: determinedSource,
+        attributed_channel: attributedChannel,
+        sms_campaign_id: smsCampaignId,
         ab_test_name: safeString(contribution.abTestName),
         ab_test_variation: safeString(contribution.abTestVariation),
         is_mobile: safeBool(contribution.isMobile),
