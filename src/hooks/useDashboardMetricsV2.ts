@@ -180,7 +180,7 @@ function transformToLegacyFormat(
   channelSpend: ChannelSpendData,
   sparklineExtras?: SparklineExtras
 ): DashboardMetricsV2Data {
-  const { summary, previousPeriod, dailyRollup, sparklines, channelBreakdown } = unified;
+  const { summary, previousPeriod, previousDailyRollup, dailyRollup, sparklines, channelBreakdown } = unified;
 
   // Calculate ROI and attributed revenue from channel breakdown
   const metaChannel = channelBreakdown.find(c => c.channel === 'meta');
@@ -255,19 +255,23 @@ function transformToLegacyFormat(
   });
 
   // Map daily rollup to timeSeries with spend data
-  const timeSeries: DashboardTimeSeriesPoint[] = dailyRollup.map((d) => ({
-    name: d.date,
-    donations: d.raised,
-    netDonations: d.net,
-    refunds: 0, // Would need separate refund data per day
-    metaSpend: metaSpendByDate.get(d.date) || 0,
-    smsSpend: smsSpendByDate.get(d.date) || 0,
-    donationsPrev: 0,
-    netDonationsPrev: 0,
-    refundsPrev: 0,
-    metaSpendPrev: 0,
-    smsSpendPrev: 0,
-  }));
+  // Align previous period by day index (not date) since periods are shifted
+  const timeSeries: DashboardTimeSeriesPoint[] = dailyRollup.map((d, i) => {
+    const prevDay = previousDailyRollup?.[i];
+    return {
+      name: d.date,
+      donations: d.raised,
+      netDonations: d.net,
+      refunds: 0, // Daily refund breakdown not available from RPC
+      metaSpend: metaSpendByDate.get(d.date) || 0,
+      smsSpend: smsSpendByDate.get(d.date) || 0,
+      donationsPrev: prevDay?.raised || 0,
+      netDonationsPrev: prevDay?.net || 0,
+      refundsPrev: 0,
+      metaSpendPrev: 0,
+      smsSpendPrev: 0,
+    };
+  });
 
   // Calculate direct donations from channel breakdown - use donation COUNT not revenue
   const directDonations = channelBreakdown

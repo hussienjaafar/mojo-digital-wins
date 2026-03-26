@@ -88,6 +88,7 @@ export interface ActBlueMetadata {
 export interface ActBlueMetricsData {
   summary: ActBlueSummary;
   previousPeriod: ActBluePreviousPeriod;
+  previousDailyRollup: ActBlueDailyRollup[];
   trends: ActBlueTrends;
   dailyRollup: ActBlueDailyRollup[];
   channelBreakdown: ActBlueChannelBreakdown[];
@@ -228,6 +229,7 @@ function transformRPCResponse(
       recurringCount: 0,
       recurringAmount: 0,
     },
+    previousDailyRollup: [],
     trends: {
       raisedTrend: null,
       donationsTrend: null,
@@ -395,6 +397,19 @@ async function fetchActBlueMetrics(
       donorsTrend: calculateTrend(transformed.summary.uniqueDonors, prevSummary.unique_donors || 0),
       recurringTrend: calculateTrend(transformed.summary.recurringAmount, prevSummary.recurring_revenue || 0),
     };
+
+    // Extract previous period daily data for comparison chart overlay
+    if (prevData?.daily) {
+      transformed.previousDailyRollup = (prevData.daily || []).map(d => ({
+        date: d.day,
+        donations: d.donation_count || 0,
+        raised: d.gross_donations || 0,
+        net: d.net_donations || 0,
+        donors: d.unique_donors || 0,
+        recurring_donations: d.recurring_count || 0,
+        recurring_amount: d.recurring_revenue || 0,
+      }));
+    }
   }
 
   // Update metadata with previous period dates

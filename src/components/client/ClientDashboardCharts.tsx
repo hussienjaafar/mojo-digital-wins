@@ -171,22 +171,26 @@ export const ClientDashboardCharts = ({
     return `$${value.toFixed(0)}`;
   }, []);
 
+  // Only show refunds/SMS lines if there's actual data (avoid flat $0 clutter)
+  const hasRefundData = timeSeries.some(d => d.refunds > 0);
+  const hasSmsSpendData = timeSeries.some(d => d.smsSpend > 0);
+
   // Memoized ECharts series configuration with seriesKey for cross-highlighting
   // yAxisIndex: 0 = Revenue (left axis), 1 = Spend (right axis)
   const echartsSeriesConfig = useMemo((): LineSeriesConfig[] => {
     const base: LineSeriesConfig[] = valueMode === "net"
       ? [
           { dataKey: "netDonations", name: "Net donations", color: palette.net, type: "area", areaStyle: { opacity: 0.1 }, seriesKey: "netDonations" as SeriesKey, yAxisIndex: 0 },
-          { dataKey: "refunds", name: "Refunds (negative)", color: palette.refunds, lineStyle: { type: "dashed" }, seriesKey: "refunds" as SeriesKey, yAxisIndex: 0 },
+          ...(hasRefundData ? [{ dataKey: "refunds", name: "Refunds", color: palette.refunds, lineStyle: { type: "dashed" as const }, seriesKey: "refunds" as SeriesKey, yAxisIndex: 0 }] : []),
           { dataKey: "metaSpend", name: "Meta spend", color: palette.meta, seriesKey: "metaSpend" as SeriesKey, yAxisIndex: 1 },
-          { dataKey: "smsSpend", name: "SMS spend", color: palette.sms, seriesKey: "smsSpend" as SeriesKey, yAxisIndex: 1 },
+          ...(hasSmsSpendData ? [{ dataKey: "smsSpend", name: "SMS spend", color: palette.sms, seriesKey: "smsSpend" as SeriesKey, yAxisIndex: 1 }] : []),
         ]
       : [
           { dataKey: "donations", name: "Gross donations", color: palette.gross, type: "area", areaStyle: { opacity: 0.1 }, seriesKey: "donations" as SeriesKey, yAxisIndex: 0 },
           { dataKey: "netDonations", name: "Net donations", color: palette.net, seriesKey: "netDonations" as SeriesKey, yAxisIndex: 0 },
-          { dataKey: "refunds", name: "Refunds (negative)", color: palette.refunds, lineStyle: { type: "dashed" }, seriesKey: "refunds" as SeriesKey, yAxisIndex: 0 },
+          ...(hasRefundData ? [{ dataKey: "refunds", name: "Refunds", color: palette.refunds, lineStyle: { type: "dashed" as const }, seriesKey: "refunds" as SeriesKey, yAxisIndex: 0 }] : []),
           { dataKey: "metaSpend", name: "Meta spend", color: palette.meta, seriesKey: "metaSpend" as SeriesKey, yAxisIndex: 1 },
-          { dataKey: "smsSpend", name: "SMS spend", color: palette.sms, seriesKey: "smsSpend" as SeriesKey, yAxisIndex: 1 },
+          ...(hasSmsSpendData ? [{ dataKey: "smsSpend", name: "SMS spend", color: palette.sms, seriesKey: "smsSpend" as SeriesKey, yAxisIndex: 1 }] : []),
         ];
 
     if (!comparisonEnabled) return base;
@@ -203,7 +207,7 @@ export const ClientDashboardCharts = ({
         ];
 
     return [...base, ...compare];
-  }, [comparisonEnabled, valueMode]);
+  }, [comparisonEnabled, valueMode, hasRefundData, hasSmsSpendData]);
 
   return (
     <div className="space-y-[var(--portal-space-lg)]">
