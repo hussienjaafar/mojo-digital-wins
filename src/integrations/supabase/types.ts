@@ -15934,6 +15934,7 @@ export type Database = {
           organization_id: string | null
           organization_name: string | null
           organization_slug: string | null
+          stale_count: number | null
           total_count: number | null
           untested_count: number | null
         }
