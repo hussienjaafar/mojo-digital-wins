@@ -15,54 +15,45 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  const maxIterations = 100;
   const startTime = Date.now();
-  const timeoutMs = 55_000; // 55s safety margin
+  const timeoutMs = 55_000;
   const results: string[] = [];
-  let totalUpdated = 0;
-  let iteration = 0;
+  let grandTotal = 0;
 
   try {
-    for (iteration = 0; iteration < maxIterations; iteration++) {
-      if (Date.now() - startTime > timeoutMs) {
-        results.push(`Stopped at iteration ${iteration} due to timeout`);
-        break;
+    // 7 steps, each pattern. Loop each step until it returns 0.
+    for (let step = 1; step <= 7; step++) {
+      let stepTotal = 0;
+      let iter = 0;
+      while (true) {
+        if (Date.now() - startTime > timeoutMs) {
+          results.push(`Step ${step}: timeout after ${iter} iterations, ${stepTotal} updated`);
+          return respond(results, grandTotal, startTime, false);
+        }
+        const { data, error } = await supabase.rpc("backfill_attribution_step", { p_step: step, p_limit: 500 });
+        if (error) {
+          results.push(`Step ${step} error: ${error.message}`);
+          break;
+        }
+        const updated = data as number;
+        stepTotal += updated;
+        iter++;
+        if (updated === 0) break;
       }
-
-      const { data, error } = await supabase.rpc("backfill_attribution_batch", { p_limit: 2000 });
-      if (error) {
-        results.push(`Error at iteration ${iteration}: ${error.message}`);
-        break;
-      }
-
-      const resultStr = data as string;
-      results.push(`Iteration ${iteration}: ${resultStr}`);
-
-      // Parse counts from result string like "sms_form:0 meta_form:0 ..."
-      const counts = resultStr.match(/\d+/g)?.map(Number) || [];
-      const batchTotal = counts.reduce((a, b) => a + b, 0);
-      totalUpdated += batchTotal;
-
-      if (batchTotal === 0) {
-        results.push("No more records to update - backfill complete!");
-        break;
-      }
+      grandTotal += stepTotal;
+      results.push(`Step ${step}: ${stepTotal} updated in ${iter} iterations`);
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        iterations: iteration,
-        total_updated: totalUpdated,
-        elapsed_ms: Date.now() - startTime,
-        details: results,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return respond(results, grandTotal, startTime, true);
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: String(err), iterations: iteration, details: results }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    results.push(`Fatal: ${String(err)}`);
+    return respond(results, grandTotal, startTime, false, 500);
   }
 });
+
+function respond(details: string[], total: number, startTime: number, complete: boolean, status = 200) {
+  return new Response(
+    JSON.stringify({ success: status === 200, complete, total_updated: total, elapsed_ms: Date.now() - startTime, details }),
+    { status, headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" } }
+  );
+}
