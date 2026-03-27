@@ -16,44 +16,45 @@ Deno.serve(async (req) => {
   );
 
   const startTime = Date.now();
-  const timeoutMs = 55_000;
   const results: string[] = [];
   let grandTotal = 0;
 
   try {
-    // 7 steps, each pattern. Loop each step until it returns 0.
-    for (let step = 1; step <= 7; step++) {
-      let stepTotal = 0;
-      let iter = 0;
-      while (true) {
-        if (Date.now() - startTime > timeoutMs) {
-          results.push(`Step ${step}: timeout after ${iter} iterations, ${stepTotal} updated`);
-          return respond(results, grandTotal, startTime, false);
-        }
-        const { data, error } = await supabase.rpc("backfill_attribution_step", { p_step: step, p_limit: 500 });
-        if (error) {
-          results.push(`Step ${step} error: ${error.message}`);
-          break;
-        }
-        const updated = data as number;
-        stepTotal += updated;
-        iter++;
-        if (updated === 0) break;
+    // Get all org IDs with 'other' transactions
+    const { data: orgs, error: orgErr } = await supabase
+      .from("actblue_transactions")
+      .select("organization_id")
+      .eq("attributed_channel", "other")
+      .limit(1000);
+
+    if (orgErr) throw new Error(orgErr.message);
+
+    const uniqueOrgs = [...new Set((orgs || []).map((r: any) => r.organization_id))];
+    results.push(`Found ${uniqueOrgs.length} orgs with 'other' transactions`);
+
+    for (const orgId of uniqueOrgs) {
+      if (Date.now() - startTime > 50000) {
+        results.push(`Timeout - stopping. Processed so far.`);
+        break;
       }
-      grandTotal += stepTotal;
-      results.push(`Step ${step}: ${stepTotal} updated in ${iter} iterations`);
+      const { data, error } = await supabase.rpc("backfill_attribution_by_org", { p_org_id: orgId });
+      if (error) {
+        results.push(`Org ${orgId}: ERROR ${error.message}`);
+        continue;
+      }
+      results.push(`Org ${orgId}: ${data}`);
+      const match = String(data).match(/^(\d+)/);
+      if (match) grandTotal += parseInt(match[1]);
     }
 
-    return respond(results, grandTotal, startTime, true);
+    return new Response(
+      JSON.stringify({ success: true, total_updated: grandTotal, elapsed_ms: Date.now() - startTime, details: results }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (err) {
-    results.push(`Fatal: ${String(err)}`);
-    return respond(results, grandTotal, startTime, false, 500);
+    return new Response(
+      JSON.stringify({ error: String(err), total_updated: grandTotal, details: results }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });
-
-function respond(details: string[], total: number, startTime: number, complete: boolean, status = 200) {
-  return new Response(
-    JSON.stringify({ success: status === 200, complete, total_updated: total, elapsed_ms: Date.now() - startTime, details }),
-    { status, headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" } }
-  );
-}
