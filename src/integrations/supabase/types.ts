@@ -15998,6 +15998,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      backfill_attribution_batch: { Args: never; Returns: string }
       bulk_remove_users: {
         Args: {
           p_actor_id?: string
