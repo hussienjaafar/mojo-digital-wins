@@ -1,0 +1,12 @@
+CREATE OR REPLACE FUNCTION backfill_attribution_batch(p_limit INT DEFAULT 500) RETURNS TEXT LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE r1 INT := 0; r2 INT := 0; r3 INT := 0; r4 INT := 0; r5 INT := 0; r6 INT := 0; r7 INT := 0;
+BEGIN
+  UPDATE actblue_transactions SET attributed_channel='sms' WHERE id IN (SELECT id FROM actblue_transactions WHERE attributed_channel='other' AND contribution_form IS NOT NULL AND (LOWER(contribution_form) LIKE '%sms%' OR LOWER(contribution_form) LIKE '%text%') LIMIT p_limit); GET DIAGNOSTICS r1 = ROW_COUNT;
+  UPDATE actblue_transactions SET attributed_channel='meta' WHERE id IN (SELECT id FROM actblue_transactions WHERE attributed_channel='other' AND contribution_form IS NOT NULL AND LOWER(contribution_form) LIKE '%meta%' LIMIT p_limit); GET DIAGNOSTICS r2 = ROW_COUNT;
+  UPDATE actblue_transactions SET attributed_channel='sms' WHERE id IN (SELECT id FROM actblue_transactions WHERE attributed_channel='other' AND refcode IS NOT NULL AND (refcode ILIKE '%sms%' OR refcode ILIKE '%text%' OR refcode ILIKE 'txt%') LIMIT p_limit); GET DIAGNOSTICS r3 = ROW_COUNT;
+  UPDATE actblue_transactions SET attributed_channel='meta' WHERE id IN (SELECT id FROM actblue_transactions WHERE attributed_channel='other' AND refcode IS NOT NULL AND (refcode ILIKE '%fb%' OR refcode ILIKE '%facebook%' OR refcode ILIKE '%ig%' OR refcode ILIKE '%instagram%' OR refcode ILIKE '%meta%') LIMIT p_limit); GET DIAGNOSTICS r4 = ROW_COUNT;
+  UPDATE actblue_transactions SET attributed_channel='email' WHERE id IN (SELECT id FROM actblue_transactions WHERE attributed_channel='other' AND refcode IS NOT NULL AND (refcode ILIKE '%email%' OR refcode ILIKE '%em_%') LIMIT p_limit); GET DIAGNOSTICS r5 = ROW_COUNT;
+  UPDATE actblue_transactions SET attributed_channel='organic' WHERE id IN (SELECT id FROM actblue_transactions WHERE attributed_channel='other' AND refcode IS NOT NULL AND (refcode ILIKE '%organic%' OR refcode ILIKE '%direct%') LIMIT p_limit); GET DIAGNOSTICS r6 = ROW_COUNT;
+  UPDATE actblue_transactions SET attributed_channel='meta' WHERE id IN (SELECT id FROM actblue_transactions WHERE attributed_channel='other' AND refcode2 IS NOT NULL AND LOWER(refcode2) LIKE 'fb_%' LIMIT p_limit); GET DIAGNOSTICS r7 = ROW_COUNT;
+  RETURN r1||','||r2||','||r3||','||r4||','||r5||','||r6||','||r7;
+END; $$
