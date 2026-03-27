@@ -147,6 +147,7 @@ export type Database = {
           ab_test_variation: string | null
           addr1: string | null
           amount: number
+          attributed_channel: string | null
           card_type: string | null
           city: string | null
           click_id: string | null
@@ -188,6 +189,7 @@ export type Database = {
           refcode_custom: string | null
           refcode2: string | null
           smart_boost_amount: number | null
+          sms_campaign_id: string | null
           source_campaign: string | null
           state: string | null
           text_message_option: string | null
@@ -201,6 +203,7 @@ export type Database = {
           ab_test_variation?: string | null
           addr1?: string | null
           amount: number
+          attributed_channel?: string | null
           card_type?: string | null
           city?: string | null
           click_id?: string | null
@@ -242,6 +245,7 @@ export type Database = {
           refcode_custom?: string | null
           refcode2?: string | null
           smart_boost_amount?: number | null
+          sms_campaign_id?: string | null
           source_campaign?: string | null
           state?: string | null
           text_message_option?: string | null
@@ -255,6 +259,7 @@ export type Database = {
           ab_test_variation?: string | null
           addr1?: string | null
           amount?: number
+          attributed_channel?: string | null
           card_type?: string | null
           city?: string | null
           click_id?: string | null
@@ -296,6 +301,7 @@ export type Database = {
           refcode_custom?: string | null
           refcode2?: string | null
           smart_boost_amount?: number | null
+          sms_campaign_id?: string | null
           source_campaign?: string | null
           state?: string | null
           text_message_option?: string | null
