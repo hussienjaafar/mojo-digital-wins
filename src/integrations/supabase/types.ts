@@ -16001,6 +16001,10 @@ export type Database = {
       backfill_attribution_batch:
         | { Args: never; Returns: string }
         | { Args: { p_limit?: number }; Returns: string }
+      backfill_attribution_step: {
+        Args: { p_limit?: number; p_step: number }
+        Returns: number
+      }
       bulk_remove_users: {
         Args: {
           p_actor_id?: string
