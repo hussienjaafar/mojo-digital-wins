@@ -364,8 +364,8 @@ export const ClientDashboardCharts = ({
                   <DollarSign className="h-4 w-4 text-[hsl(var(--portal-success))]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Direct Donations</p>
-                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">No attribution</p>
+                  <p className="text-sm font-medium text-[hsl(var(--portal-text-primary))]">Organic / Direct</p>
+                  <p className="text-xs text-[hsl(var(--portal-text-muted))]">No campaign tracking</p>
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold text-[hsl(var(--portal-text-primary))] tabular-nums">

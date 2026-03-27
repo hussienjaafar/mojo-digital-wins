@@ -284,8 +284,9 @@ function transformToLegacyFormat(
     sms: 'SMS',
     email: 'Email',
     organic: 'Organic',
-    other: 'Other',
-    unattributed: 'Direct',
+    other: 'Organic / Direct',
+    unattributed: 'Organic / Direct',
+    direct: 'Direct',
   };
   
   const legacyChannelBreakdown: ChannelBreakdown[] = channelBreakdown.map((c) => ({
