@@ -654,6 +654,60 @@ serve(async (req) => {
             console.log(`[SCHEDULER] sync_sms_attribution completed: ${itemsProcessed} matched`);
             break;
 
+          case 'backfill_actblue':
+            console.log('[SCHEDULER] Running ActBlue daily backfill');
+            // Fetch all orgs with active ActBlue credentials
+            const { data: abOrgs } = await supabase
+              .from('client_api_credentials')
+              .select('organization_id')
+              .eq('platform', 'actblue')
+              .eq('is_active', true);
+
+            let abProcessed = 0;
+            for (const org of abOrgs || []) {
+              const abResponse = await supabase.functions.invoke('backfill-actblue-csv-orchestrator', {
+                body: { organization_id: org.organization_id, days_back: 7 }
+              });
+              if (!abResponse.error) abProcessed++;
+            }
+            result = { organizations_backfilled: abProcessed };
+            itemsProcessed = abProcessed;
+            console.log(`[SCHEDULER] backfill_actblue completed: ${abProcessed} orgs`);
+            break;
+
+          case 'reconcile_actblue':
+            console.log('[SCHEDULER] Running ActBlue data reconciliation');
+            const reconcileResponse = await supabase.functions.invoke('reconcile-actblue-data', {
+              body: {},
+              headers: authHeaders
+            });
+            if (reconcileResponse.error) throw new Error(reconcileResponse.error.message);
+            result = reconcileResponse.data;
+            itemsProcessed = result?.organizations_checked || result?.processed || 0;
+            console.log(`[SCHEDULER] reconcile_actblue completed: ${itemsProcessed} orgs checked`);
+            break;
+
+          case 'calculate_roi':
+            console.log('[SCHEDULER] Running daily ROI calculation');
+            // Calculate ROI for all orgs with ActBlue data
+            const { data: roiOrgs } = await supabase
+              .from('client_api_credentials')
+              .select('organization_id')
+              .eq('platform', 'actblue')
+              .eq('is_active', true);
+
+            let roiProcessed = 0;
+            for (const org of roiOrgs || []) {
+              const roiResponse = await supabase.functions.invoke('calculate-roi', {
+                body: { organization_id: org.organization_id }
+              });
+              if (!roiResponse.error) roiProcessed++;
+            }
+            result = { organizations_calculated: roiProcessed };
+            itemsProcessed = roiProcessed;
+            console.log(`[SCHEDULER] calculate_roi completed: ${roiProcessed} orgs`);
+            break;
+
           case 'batch_analyze_content':
             console.log('[SCHEDULER] Running batch content analysis');
             const batchAnalyzeResponse = await supabase.functions.invoke('batch-analyze-content', { 
