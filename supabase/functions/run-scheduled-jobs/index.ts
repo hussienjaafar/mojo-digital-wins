@@ -642,6 +642,18 @@ serve(async (req) => {
             itemsProcessed = smsProcessed;
             break;
 
+          case 'sync_sms_attribution':
+            console.log('[SCHEDULER] Running SMS attribution backfill');
+            const attrResponse = await supabase.functions.invoke('sync-sms-campaign-attribution', {
+              body: {},
+              headers: authHeaders
+            });
+            if (attrResponse.error) throw new Error(attrResponse.error.message);
+            result = attrResponse.data;
+            itemsProcessed = result?.transactions_matched || result?.processed || 0;
+            console.log(`[SCHEDULER] sync_sms_attribution completed: ${itemsProcessed} matched`);
+            break;
+
           case 'batch_analyze_content':
             console.log('[SCHEDULER] Running batch content analysis');
             const batchAnalyzeResponse = await supabase.functions.invoke('batch-analyze-content', { 
