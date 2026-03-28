@@ -84,7 +84,7 @@ async function fetchRefcodePerformance(organizationId: string): Promise<RefcodeP
 
   if (error) throw error;
 
-  const result = data as {
+  const result = data as unknown as {
     refcodes: RefcodePerformance[];
     channels: ChannelSummary[];
     retention: {
