@@ -109,7 +109,7 @@ async function fetchRefcodePerformance(organizationId: string): Promise<RefcodeP
   // Get refcode performance data
   const { data: refcodeData, error: refcodeError } = await supabase
     .from("actblue_transactions")
-    .select("refcode, donor_email, amount, is_recurring")
+    .select("refcode, donor_email, amount, is_recurring, attributed_channel")
     .eq("organization_id", organizationId)
     .neq("transaction_type", "refund");
 
