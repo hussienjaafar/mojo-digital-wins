@@ -16003,7 +16003,7 @@ export type Database = {
         | { Args: { p_limit?: number }; Returns: string }
       backfill_attribution_by_org: {
         Args: { p_org_id: string }
-        Returns: string
+        Returns: number
       }
       backfill_attribution_step: {
         Args: { p_limit?: number; p_step: number }
