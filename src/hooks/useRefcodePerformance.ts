@@ -125,10 +125,12 @@ async function fetchRefcodePerformance(organizationId: string): Promise<RefcodeP
     donors: Set<string>;
     totalRevenue: number;
     recurringCount: number;
+    channel: ChannelType;
   }>();
 
   for (const t of transactions) {
     const refcode = t.refcode || "(no refcode)";
+    const channel = (t.attributed_channel as ChannelType) || inferChannel(t.refcode);
     
     if (!refcodeMap.has(refcode)) {
       refcodeMap.set(refcode, {
@@ -136,6 +138,7 @@ async function fetchRefcodePerformance(organizationId: string): Promise<RefcodeP
         donors: new Set(),
         totalRevenue: 0,
         recurringCount: 0,
+        channel,
       });
     }
     
