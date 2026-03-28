@@ -172,7 +172,7 @@ async function fetchRefcodePerformance(organizationId: string): Promise<RefcodeP
   }>();
 
   for (const t of transactions) {
-    const channel = inferChannel(t.refcode);
+    const channel = (t.attributed_channel as ChannelType) || inferChannel(t.refcode);
     
     if (!channelMap.has(channel)) {
       channelMap.set(channel, {
