@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
 
     results.push(`Processing ${targetOrgs.length} orgs`);
     const STEPS = 4;
-    const BATCH_LIMIT = 20000;
+    const BATCH_LIMIT = 5000;
 
     for (const orgId of targetOrgs) {
       let orgTotal = 0;
