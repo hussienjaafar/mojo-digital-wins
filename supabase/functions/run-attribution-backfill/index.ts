@@ -15,45 +15,34 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  const startTime = Date.now();
-  const results: string[] = [];
-  let grandTotal = 0;
-
   try {
-    // Get all org IDs with 'other' transactions
-    const { data: orgs, error: orgErr } = await supabase
-      .from("actblue_transactions")
-      .select("organization_id")
-      .eq("attributed_channel", "other")
-      .limit(1000);
+    const body = await req.json().catch(() => ({}));
+    const orgId = body?.org_id;
+    const step = body?.step || 1;
+    const batchSize = body?.batch_size || 2000;
 
-    if (orgErr) throw new Error(orgErr.message);
-
-    const uniqueOrgs = [...new Set((orgs || []).map((r: any) => r.organization_id))];
-    results.push(`Found ${uniqueOrgs.length} orgs with 'other' transactions`);
-
-    for (const orgId of uniqueOrgs) {
-      if (Date.now() - startTime > 50000) {
-        results.push(`Timeout - stopping. Processed so far.`);
-        break;
-      }
-      const { data, error } = await supabase.rpc("backfill_attribution_by_org", { p_org_id: orgId });
-      if (error) {
-        results.push(`Org ${orgId}: ERROR ${error.message}`);
-        continue;
-      }
-      results.push(`Org ${orgId}: ${data}`);
-      const match = String(data).match(/^(\d+)/);
-      if (match) grandTotal += parseInt(match[1]);
+    if (!orgId) {
+      return new Response(JSON.stringify({ error: "org_id required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
 
+    const { data, error } = await supabase.rpc("backfill_attribution_step", {
+      p_org_id: orgId,
+      p_step: step,
+      p_limit: batchSize,
+    });
+
+    if (error) throw error;
+    const count = Number(data) || 0;
+
     return new Response(
-      JSON.stringify({ success: true, total_updated: grandTotal, elapsed_ms: Date.now() - startTime, details: results }),
+      JSON.stringify({ step, updated: count, has_more: count >= batchSize }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: String(err), total_updated: grandTotal, details: results }),
+      JSON.stringify({ error: String(err) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
