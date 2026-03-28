@@ -16005,10 +16005,12 @@ export type Database = {
         Args: { p_org_id: string }
         Returns: number
       }
-      backfill_attribution_step: {
-        Args: { p_limit?: number; p_step: number }
-        Returns: number
-      }
+      backfill_attribution_step:
+        | {
+            Args: { p_limit?: number; p_org_id: string; p_step: number }
+            Returns: number
+          }
+        | { Args: { p_limit?: number; p_step: number }; Returns: number }
       bulk_remove_users: {
         Args: {
           p_actor_id?: string
