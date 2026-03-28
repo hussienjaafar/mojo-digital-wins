@@ -89,7 +89,8 @@ const CHANNEL_LABELS: Record<ChannelType, string> = {
   sms: "SMS",
   email: "Email",
   organic: "Organic",
-  direct: "Direct/Other",
+  direct: "Direct",
+  other: "Other",
 };
 
 // ============================================================================
