@@ -20,21 +20,37 @@ Deno.serve(async (req) => {
   let grandTotal = 0;
 
   try {
-    // Get all org IDs with 'other' transactions
-    const { data: orgs, error: orgErr } = await supabase
-      .from("actblue_transactions")
-      .select("organization_id")
-      .eq("attributed_channel", "other")
-      .limit(1000);
+    // Accept optional org_id parameter
+    let targetOrgs: string[] = [];
+    try {
+      const body = await req.json();
+      if (body?.org_id) targetOrgs = [body.org_id];
+    } catch { /* no body, run for all */ }
 
-    if (orgErr) throw new Error(orgErr.message);
+    if (targetOrgs.length === 0) {
+      // Get all distinct org IDs with 'other' transactions
+      const { data: orgs, error: orgErr } = await supabase
+        .rpc("get_orgs_with_other_attribution");
 
-    const uniqueOrgs = [...new Set((orgs || []).map((r: any) => r.organization_id))];
-    results.push(`Found ${uniqueOrgs.length} orgs with 'other' transactions`);
+      if (orgErr) {
+        // Fallback: query distinct org IDs
+        const { data: fallbackOrgs, error: fbErr } = await supabase
+          .from("actblue_transactions")
+          .select("organization_id")
+          .eq("attributed_channel", "other")
+          .limit(5000);
+        if (fbErr) throw new Error(fbErr.message);
+        targetOrgs = [...new Set((fallbackOrgs || []).map((r: any) => r.organization_id))];
+      } else {
+        targetOrgs = (orgs || []).map((r: any) => r.organization_id);
+      }
+    }
 
-    for (const orgId of uniqueOrgs) {
+    results.push(`Processing ${targetOrgs.length} orgs`);
+
+    for (const orgId of targetOrgs) {
       if (Date.now() - startTime > 50000) {
-        results.push(`Timeout - stopping. Processed so far.`);
+        results.push(`Timeout - stopping.`);
         break;
       }
       const { data, error } = await supabase.rpc("backfill_attribution_by_org", { p_org_id: orgId });
@@ -42,9 +58,9 @@ Deno.serve(async (req) => {
         results.push(`Org ${orgId}: ERROR ${error.message}`);
         continue;
       }
-      results.push(`Org ${orgId}: ${data}`);
-      const match = String(data).match(/^(\d+)/);
-      if (match) grandTotal += parseInt(match[1]);
+      const count = Number(data) || 0;
+      results.push(`Org ${orgId}: ${count} updated`);
+      grandTotal += count;
     }
 
     return new Response(
