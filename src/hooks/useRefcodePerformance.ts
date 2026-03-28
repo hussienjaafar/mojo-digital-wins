@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 // Types
 // ============================================================================
 
-export type ChannelType = "meta" | "sms" | "email" | "organic" | "direct";
+export type ChannelType = "meta" | "sms" | "email" | "organic" | "direct" | "other";
 
 export interface RefcodePerformance {
   refcode: string;
