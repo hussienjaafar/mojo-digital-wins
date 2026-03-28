@@ -15,70 +15,34 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  const startTime = Date.now();
-  const results: string[] = [];
-  let grandTotal = 0;
-
   try {
-    let targetOrgs: string[] = [];
-    try {
-      const body = await req.json();
-      if (body?.org_id) targetOrgs = [body.org_id];
-    } catch { /* no body */ }
+    const body = await req.json().catch(() => ({}));
+    const orgId = body?.org_id;
+    const step = body?.step || 1;
+    const batchSize = body?.batch_size || 2000;
 
-    if (targetOrgs.length === 0) {
-      const { data: fallbackOrgs, error: fbErr } = await supabase
-        .from("actblue_transactions")
-        .select("organization_id")
-        .eq("attributed_channel", "other")
-        .limit(5000);
-      if (fbErr) throw new Error(fbErr.message);
-      targetOrgs = [...new Set((fallbackOrgs || []).map((r: any) => r.organization_id))];
+    if (!orgId) {
+      return new Response(JSON.stringify({ error: "org_id required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
 
-    results.push(`Processing ${targetOrgs.length} orgs`);
-    const STEPS = 4;
-    const BATCH_LIMIT = 5000;
+    const { data, error } = await supabase.rpc("backfill_attribution_step", {
+      p_org_id: orgId,
+      p_step: step,
+      p_limit: batchSize,
+    });
 
-    for (const orgId of targetOrgs) {
-      let orgTotal = 0;
-      for (let step = 1; step <= STEPS; step++) {
-        // Loop each step until no more rows match
-        let stepTotal = 0;
-        while (true) {
-          if (Date.now() - startTime > 50000) {
-            results.push(`Timeout at org ${orgId} step ${step}`);
-            return new Response(
-              JSON.stringify({ success: false, total_updated: grandTotal, details: results, timed_out: true }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-          }
-          const { data, error } = await supabase.rpc("backfill_attribution_step", {
-            p_org_id: orgId,
-            p_step: step,
-            p_limit: BATCH_LIMIT,
-          });
-          if (error) {
-            results.push(`Org ${orgId} step ${step}: ERROR ${error.message}`);
-            break;
-          }
-          const count = Number(data) || 0;
-          stepTotal += count;
-          if (count < BATCH_LIMIT) break; // done with this step
-        }
-        orgTotal += stepTotal;
-      }
-      grandTotal += orgTotal;
-      results.push(`Org ${orgId}: ${orgTotal} updated`);
-    }
+    if (error) throw error;
+    const count = Number(data) || 0;
 
     return new Response(
-      JSON.stringify({ success: true, total_updated: grandTotal, elapsed_ms: Date.now() - startTime, details: results }),
+      JSON.stringify({ step, updated: count, has_more: count >= batchSize }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: String(err), total_updated: grandTotal, details: results }),
+      JSON.stringify({ error: String(err) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
