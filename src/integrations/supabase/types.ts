@@ -16617,6 +16617,10 @@ export type Database = {
           upsell_succeeded: number
         }[]
       }
+      get_refcode_channel_performance: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
       get_sms_metrics: {
         Args: {
           p_end_date: string
