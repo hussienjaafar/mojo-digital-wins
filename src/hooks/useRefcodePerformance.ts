@@ -150,7 +150,7 @@ async function fetchRefcodePerformance(organizationId: string): Promise<RefcodeP
   const refcodes: RefcodePerformance[] = Array.from(refcodeMap.entries())
     .map(([refcode, data]) => ({
       refcode,
-      channel: inferChannel(refcode === "(no refcode)" ? null : refcode),
+      channel: refcodeMap.get(refcode)!.channel,
       donationCount: data.donationCount,
       uniqueDonors: data.donors.size,
       totalRevenue: data.totalRevenue,
