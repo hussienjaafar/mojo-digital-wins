@@ -28,6 +28,7 @@ const CHANNEL_COLORS: Record<ChannelType, string> = {
   email: "bg-[hsl(var(--portal-accent-purple)/0.1)] text-[hsl(var(--portal-accent-purple))] border-[hsl(var(--portal-accent-purple)/0.2)]",
   organic: "bg-[hsl(var(--portal-warning)/0.1)] text-[hsl(var(--portal-warning))] border-[hsl(var(--portal-warning)/0.2)]",
   direct: "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-muted))] border-[hsl(var(--portal-border))]",
+  other: "bg-[hsl(var(--portal-bg-tertiary))] text-[hsl(var(--portal-text-muted))] border-[hsl(var(--portal-border))]",
 };
 
 const CHANNEL_LABELS: Record<ChannelType, string> = {
@@ -36,6 +37,7 @@ const CHANNEL_LABELS: Record<ChannelType, string> = {
   email: "Email",
   organic: "Organic",
   direct: "Direct",
+  other: "Other",
 };
 
 function ChannelBadge({ channel }: { channel: ChannelType }) {

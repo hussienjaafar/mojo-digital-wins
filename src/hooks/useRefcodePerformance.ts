@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 // Types
 // ============================================================================
 
-export type ChannelType = "meta" | "sms" | "email" | "organic" | "direct";
+export type ChannelType = "meta" | "sms" | "email" | "organic" | "direct" | "other";
 
 export interface RefcodePerformance {
   refcode: string;
@@ -89,7 +89,8 @@ const CHANNEL_LABELS: Record<ChannelType, string> = {
   sms: "SMS",
   email: "Email",
   organic: "Organic",
-  direct: "Direct/Other",
+  direct: "Direct",
+  other: "Other",
 };
 
 // ============================================================================
@@ -109,7 +110,7 @@ async function fetchRefcodePerformance(organizationId: string): Promise<RefcodeP
   // Get refcode performance data
   const { data: refcodeData, error: refcodeError } = await supabase
     .from("actblue_transactions")
-    .select("refcode, donor_email, amount, is_recurring")
+    .select("refcode, donor_email, amount, is_recurring, attributed_channel")
     .eq("organization_id", organizationId)
     .neq("transaction_type", "refund");
 
@@ -125,10 +126,12 @@ async function fetchRefcodePerformance(organizationId: string): Promise<RefcodeP
     donors: Set<string>;
     totalRevenue: number;
     recurringCount: number;
+    channel: ChannelType;
   }>();
 
   for (const t of transactions) {
     const refcode = t.refcode || "(no refcode)";
+    const channel = (t.attributed_channel as ChannelType) || inferChannel(t.refcode);
     
     if (!refcodeMap.has(refcode)) {
       refcodeMap.set(refcode, {
@@ -136,6 +139,7 @@ async function fetchRefcodePerformance(organizationId: string): Promise<RefcodeP
         donors: new Set(),
         totalRevenue: 0,
         recurringCount: 0,
+        channel,
       });
     }
     
@@ -150,7 +154,7 @@ async function fetchRefcodePerformance(organizationId: string): Promise<RefcodeP
   const refcodes: RefcodePerformance[] = Array.from(refcodeMap.entries())
     .map(([refcode, data]) => ({
       refcode,
-      channel: inferChannel(refcode === "(no refcode)" ? null : refcode),
+      channel: refcodeMap.get(refcode)!.channel,
       donationCount: data.donationCount,
       uniqueDonors: data.donors.size,
       totalRevenue: data.totalRevenue,
@@ -169,7 +173,7 @@ async function fetchRefcodePerformance(organizationId: string): Promise<RefcodeP
   }>();
 
   for (const t of transactions) {
-    const channel = inferChannel(t.refcode);
+    const channel = (t.attributed_channel as ChannelType) || inferChannel(t.refcode);
     
     if (!channelMap.has(channel)) {
       channelMap.set(channel, {
